@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addScannedItem, calculateCartSubtotal, canAccessView, formatMemberNumber, isStockAlert, formatMemberNumber, isStockAlert } from "./Home";
+import { addScannedItem, calculateCartSubtotal, canAccessView, formatMemberNumber, isStockAlert } from "./Home";
 
 describe("POS cart calculations", () => {
   it("calculates subtotal across quantities", () => {
@@ -32,14 +32,6 @@ describe("POS cart calculations", () => {
     expect(canAccessView("staff", "logs")).toBe(false);
     expect(canAccessView("admin", "settings")).toBe(true);
     expect(canAccessView("admin", "logs")).toBe(true);
-  });
-
-  it("formats member numbers and identifies stock alerts", () => {
-    expect(formatMemberNumber("running", 1325)).toBe("M-001325");
-    expect(formatMemberNumber("year", 1325)).toBe("69-01325");
-    expect(formatMemberNumber("manual", 1325)).toBe("กรอกเอง");
-    expect(isStockAlert(10)).toBe(true);
-    expect(isStockAlert(11)).toBe(false);
   });
 
   it("formats member numbers and identifies stock alerts", () => {
