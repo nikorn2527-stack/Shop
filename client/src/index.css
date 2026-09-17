@@ -234,3 +234,8 @@ body, button, input, select, textarea { font-family: var(--font-body); }
 @media (max-width: 900px) { .member-detail-stats { grid-template-columns: repeat(2, minmax(0,1fr)); } }
 @media (max-width: 820px) { .member-detail-head { align-items: flex-start; flex-direction: column; }.member-detail-actions { width: 100%; }.member-detail-actions button { flex: 1; justify-content: center; }.history-tabs { width: 100%; overflow-x: auto; }.history-tabs button { white-space: nowrap; } }
 @media (max-width: 560px) { .member-detail-stats { grid-template-columns: 1fr 1fr; gap: 8px; }.member-detail-stats > div { padding: 10px; }.member-detail-stats strong { font-size: 11px; }.history-row { align-items: flex-start; }.history-row > strong { margin-left: auto; }.receipt-actions button { flex: 1 1 46%; justify-content: center; } }
+
+/* Daily sales export actions */
+.report-export-actions { display: flex; gap: 6px; align-items: center; }
+.report-export-actions .compact { display: inline-flex; align-items: center; gap: 5px; }
+@media (max-width: 640px) { .report-export-actions { width: 100%; } .report-export-actions .compact { flex: 1; justify-content: center; } }
