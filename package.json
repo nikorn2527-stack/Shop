@@ -11,6 +11,9 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "test:sqlite": "vitest run server/sqliteStore.test.ts --pool=forks --maxWorkers=1 --minWorkers=1",
+    "backup:sqlite": "tsx scripts/sqlite-backup.ts backup",
+    "backup:sqlite:verify": "tsx scripts/sqlite-backup.ts verify",
+    "backup:sqlite:restore": "tsx scripts/sqlite-backup.ts restore",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
   },
   "dependencies": {
