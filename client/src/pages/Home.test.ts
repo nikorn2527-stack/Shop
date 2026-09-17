@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addScannedItem, calculateCartSubtotal } from "./Home";
+import { addScannedItem, calculateCartSubtotal, canAccessView } from "./Home";
 
 describe("POS cart calculations", () => {
   it("calculates subtotal across quantities", () => {
@@ -24,5 +24,13 @@ describe("POS cart calculations", () => {
 
     expect(addScannedItem(cart, product)).toHaveLength(2);
     expect(addScannedItem(cart, product)[0]).toEqual(cart[0]);
+  });
+
+  it("limits staff to operational views while admins can access audit settings", () => {
+    expect(canAccessView("staff", "pos")).toBe(true);
+    expect(canAccessView("staff", "settings")).toBe(false);
+    expect(canAccessView("staff", "logs")).toBe(false);
+    expect(canAccessView("admin", "settings")).toBe(true);
+    expect(canAccessView("admin", "logs")).toBe(true);
   });
 });
