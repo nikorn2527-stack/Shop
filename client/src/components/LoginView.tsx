@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { Crown, Eye, EyeOff, LogIn, ShieldCheck, UserRound } from "lucide-react";
+import { Crown, Eye, EyeOff, IdCard, LogIn, ShieldCheck, UserRound } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { getErrorMessage } from "@/pages/viewFormat";
 
@@ -110,6 +110,10 @@ export function LoginView({ onAuthed }: { onAuthed: () => void }) {
               </button>
             ))}
           </div>
+        </div>
+        <div className="login-scope-note" role="note">
+          <IdCard size={15} />
+          <span>ระบบนี้สำหรับ<b>เจ้าหน้าที่และผู้บริหารร้านค้า</b>เท่านั้น · สมาชิกสวัสดิการไม่มีการเข้าสู่ระบบ — ใช้สิทธิ์ที่เคาน์เตอร์ด้วยหมายเลขสมาชิก</span>
         </div>
         <p className="login-footer">v1.0.0 · ฝ่ายสวัสดิการ · Power by PNG TEAM</p>
       </div>
