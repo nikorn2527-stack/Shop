@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import {
-  Activity, ArrowDownToLine, ArrowUpFromLine, BarChart3, CalendarDays, ChevronDown, Crown, MoreHorizontal, PackageSearch, ReceiptText, ShieldCheck, ShoppingBag, SlidersHorizontal, WalletCards,
+  Activity, ArrowDownToLine, ArrowUpFromLine, BarChart3, CalendarDays, Crown, MoreHorizontal, PackageSearch, ReceiptText, ShieldCheck, ShoppingBag, SlidersHorizontal, WalletCards,
 } from "lucide-react";
 import type { Role, View } from "./pageData";
 import { money } from "./pageData";
@@ -102,7 +102,7 @@ export function Dashboard({ setView, setPosShortcut, role, userName }: { setView
   const loading = statsQuery.isLoading;
   return (
     <>
-      <SectionHeader eyebrow={`ภาพรวมการดำเนินงาน · ${role === "admin" ? "มุมมองผู้บริหาร" : "มุมมองเจ้าหน้าที่"}`} title={`${greetingWord}, ${firstName}`} description={`ยินดีต้อนรับ ${userName} เข้าสู่ระบบ · ดูภาพรวมร้านค้าสวัสดิการและรายการที่ควรติดตามวันนี้`} action={<><div className={`permission-chip ${role}`}><span>{role === "admin" ? <Crown size={14} /> : <ShieldCheck size={14} />}</span>{role === "admin" ? "สิทธิ์ผู้บริหาร · วิเคราะห์เต็มรูปแบบ" : "สิทธิ์เจ้าหน้าที่ · ปฏิบัติงานหน้าร้าน"}</div><button className="outline-button"><CalendarDays size={16} /> วันนี้ <ChevronDown size={15} /></button></>} />
+      <SectionHeader eyebrow={`ภาพรวมการดำเนินงาน · ${role === "admin" ? "มุมมองผู้บริหาร" : "มุมมองเจ้าหน้าที่"}`} title={`${greetingWord}, ${firstName}`} description={`ยินดีต้อนรับ ${userName} เข้าสู่ระบบ · ดูภาพรวมร้านค้าสวัสดิการและรายการที่ควรติดตามวันนี้`} action={<><div className={`permission-chip ${role}`}><span>{role === "admin" ? <Crown size={14} /> : <ShieldCheck size={14} />}</span>{role === "admin" ? "สิทธิ์ผู้บริหาร · วิเคราะห์เต็มรูปแบบ" : "สิทธิ์เจ้าหน้าที่ · ปฏิบัติงานหน้าร้าน"}</div><div className="permission-chip neutral" title="วันที่ปัจจุบัน"><span><CalendarDays size={14} /></span>วันนี้ · {formatThaiDate(new Date())}</div></>} />
       <div className="metric-grid">
         <div className="metric-card highlight"><div className="metric-top"><span>ยอดขายทั้งหมด · {range}</span><span className="metric-icon green"><ShoppingBag size={18} /></span></div><strong>{loading ? "…" : money(stats?.totalSales ?? 0)}</strong><div className="metric-foot"><span>{stats?.totalOrders ?? 0} บิล</span><span>สูงสุด {money(Math.max(...(stats?.revenueByDay ?? []).map((day) => day.total), 0))} ในหนึ่งวัน</span></div></div>
         <div className="metric-card"><div className="metric-top"><span>ออเดอร์ทั้งหมด</span><span className="metric-icon blue"><ReceiptText size={18} /></span></div><strong>{loading ? "…" : (stats?.totalOrders ?? 0).toLocaleString("th-TH")} <small>บิล</small></strong><div className="metric-foot"><span>เฉลี่ย {((stats?.totalOrders ?? 0) / rangeDays).toFixed(1)} บิล/วัน</span><span>ในช่วง{range}</span></div></div>
