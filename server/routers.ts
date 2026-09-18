@@ -11,6 +11,7 @@ import {
   createProduct,
   dailySalesRows,
   dashboardStats,
+  deleteMember,
   getMemberDetail,
   getSettings,
   listAuditLogs,
@@ -21,6 +22,8 @@ import {
   registerMember,
   setMemberStatus,
   setSettings,
+  stockCount,
+  updateMember,
   walletTx,
 } from "./sqliteStore";
 
@@ -70,6 +73,31 @@ const memberWalletInput = z.object({
   memberNumber: z.string().min(1),
   type: z.enum(["deposit", "withdrawal"]),
   amount: z.number(),
+  note: z.string().optional(),
+  actor: z.string().optional(),
+  actorRole: z.string().optional(),
+});
+
+const memberUpdateInput = z.object({
+  memberNumber: z.string().min(1),
+  firstName: z.string().optional(),
+  lastName: z.string().optional(),
+  idCard: z.string().nullish(),
+  phone: z.string().nullish(),
+  type: z.string().optional(),
+  actor: z.string().optional(),
+  actorRole: z.string().optional(),
+});
+
+const memberDeleteInput = z.object({
+  memberNumber: z.string().min(1),
+  actor: z.string().optional(),
+  actorRole: z.string().optional(),
+});
+
+const stockCountInput = z.object({
+  productId: z.number().int(),
+  countedQty: z.number(),
   note: z.string().optional(),
   actor: z.string().optional(),
   actorRole: z.string().optional(),
@@ -183,6 +211,9 @@ export const appRouter = router({
           ),
         ),
       ),
+    count: publicProcedure
+      .input(stockCountInput)
+      .mutation(({ input }) => withStoreErrors(() => stockCount(getWelfareDb(), input))),
   }),
 
   pos: router({
@@ -217,6 +248,19 @@ export const appRouter = router({
     wallet: publicProcedure
       .input(memberWalletInput)
       .mutation(({ input }) => withStoreErrors(() => walletTx(getWelfareDb(), input))),
+    update: publicProcedure
+      .input(memberUpdateInput)
+      .mutation(({ input }) => withStoreErrors(() => updateMember(getWelfareDb(), input))),
+    delete: publicProcedure
+      .input(memberDeleteInput)
+      .mutation(({ input }) =>
+        withStoreErrors(() => {
+          if ((input.actorRole ?? "").trim() !== "ผู้บริหาร") {
+            throw new TRPCError({ code: "FORBIDDEN", message: "การลบสมาชิกต้องใช้สิทธิ์ผู้บริหาร" });
+          }
+          return deleteMember(getWelfareDb(), input);
+        }),
+      ),
   }),
 
   dashboard: router({

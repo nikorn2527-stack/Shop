@@ -4,6 +4,7 @@ import {
   createSqliteStore,
   dailySalesRows,
   dashboardStats,
+  deleteMember,
   getMemberDetail,
   getMemberNumberMode,
   getSettings,
@@ -17,6 +18,8 @@ import {
   setMemberStatus,
   setMemberNumberMode,
   setSettings,
+  stockCount,
+  updateMember,
   walletTx,
 } from "./sqliteStore";
 import type { SqliteDb, SqliteProduct } from "./sqliteStore";
@@ -200,6 +203,65 @@ describe("stock receiving", () => {
   });
 });
 
+describe("stock counting", () => {
+  it("adjusts stock to the counted quantity and logs the difference", () => {
+    const database = freshDb();
+    const water = productBySku(database, "DRK-001");
+
+    const result = stockCount(database, {
+      productId: water.id,
+      countedQty: water.stock - 4,
+      note: "ตรวจนับประจำเดือน",
+      actor: "นายวรพจน์ ด.",
+      actorRole: "ผู้บริหาร",
+    });
+
+    expect(result.systemQty).toBe(water.stock);
+    expect(result.countedQty).toBe(water.stock - 4);
+    expect(result.diff).toBe(-4);
+    expect(result.product.stock).toBe(water.stock - 4);
+    expect(productBySku(database, "DRK-001").stock).toBe(water.stock - 4);
+    const latest = listAuditLogs(database, 1)[0];
+    expect(latest.action).toBe("นับสต็อก");
+    expect(latest.actor).toBe("นายวรพจน์ ด.");
+    expect(latest.detail).toContain(`ระบบ ${water.stock} → นับได้ ${water.stock - 4} ${water.unit} (-4)`);
+    expect(latest.detail).toContain("ตรวจนับประจำเดือน");
+    expect(latest.tone).toBe("red");
+  });
+
+  it("marks matching counts blue and surplus counts green", () => {
+    const database = freshDb();
+    const water = productBySku(database, "DRK-001");
+
+    const matching = stockCount(database, { productId: water.id, countedQty: water.stock });
+    expect(matching.diff).toBe(0);
+    expect(matching.product.stock).toBe(water.stock);
+    const matchingLog = listAuditLogs(database, 1)[0];
+    expect(matchingLog.detail).toContain(`ตรงตามระบบ ${water.stock} ${water.unit}`);
+    expect(matchingLog.tone).toBe("blue");
+
+    const surplus = stockCount(database, { productId: water.id, countedQty: water.stock + 5 });
+    expect(surplus.diff).toBe(5);
+    expect(productBySku(database, "DRK-001").stock).toBe(water.stock + 5);
+    const surplusLog = listAuditLogs(database, 1)[0];
+    expect(surplusLog.detail).toContain(`ระบบ ${water.stock} → นับได้ ${water.stock + 5} ${water.unit} (5)`);
+    expect(surplusLog.tone).toBe("green");
+  });
+
+  it("rejects negative or non-integer counts with a Thai error", () => {
+    const database = freshDb();
+    const water = productBySku(database, "DRK-001");
+    expect(() => stockCount(database, { productId: water.id, countedQty: -5 })).toThrowError(/จำนวนที่นับได้ต้องเป็น 0 ขึ้นไป/);
+    expect(() => stockCount(database, { productId: water.id, countedQty: 3.5 })).toThrowError(/จำนวนที่นับได้ต้องเป็น 0 ขึ้นไป/);
+    expect(productBySku(database, "DRK-001").stock).toBe(water.stock);
+  });
+
+  it("rejects unknown product ids with a Thai error", () => {
+    const database = freshDb();
+    expect(() => stockCount(database, { productId: 999, countedQty: 5 })).toThrowError(/ไม่พบสินค้ารหัส 999 ในระบบ/);
+  });
+});
+
 describe("member registration numbering", () => {
   it("auto-numbers sequentially in running mode (M-xxxxxx)", () => {
     const database = freshDb();
@@ -278,6 +340,129 @@ describe("wallet transactions", () => {
     expect(() => walletTx(database, { memberNumber: "M-000241", type: "deposit", amount: 0 })).toThrowError(/จำนวนเงินต้องมากกว่า 0/);
     expect(() => walletTx(database, { memberNumber: "M-000241", type: "withdrawal", amount: 9999 })).toThrowError(/ยอดเงินคงเหลือไม่พอ/);
     expect(() => walletTx(database, { memberNumber: "M-000092", type: "deposit", amount: 50 })).toThrowError(/สมาชิกถูกระงับ/);
+  });
+});
+
+describe("member editing", () => {
+  it("updates the provided fields, persists them and writes an audit log", () => {
+    const database = freshDb();
+
+    const updated = updateMember(database, {
+      memberNumber: "M-000218",
+      firstName: "อรทัยกมล",
+      idCard: "1-2345-67890-12-3",
+      phone: "081-234-5678",
+      type: "เจ้าหน้าที่",
+      actor: "นายวรพจน์ ด.",
+      actorRole: "ผู้บริหาร",
+    });
+
+    expect(updated.memberNumber).toBe("M-000218");
+    expect(updated.firstName).toBe("อรทัยกมล");
+    expect(updated.lastName).toBe("ส.");
+    expect(updated.idCard).toBe("1-2345-67890-12-3");
+    expect(updated.phone).toBe("081-234-5678");
+    expect(updated.type).toBe("เจ้าหน้าที่");
+    expect(updated.balance).toBe(1240);
+    expect(updated.status).toBe("active");
+
+    const persisted = getMemberDetail(database, "M-000218")?.member;
+    expect(persisted?.firstName).toBe("อรทัยกมล");
+    expect(persisted?.idCard).toBe("1-2345-67890-12-3");
+    expect(persisted?.phone).toBe("081-234-5678");
+    expect(persisted?.type).toBe("เจ้าหน้าที่");
+
+    const latest = listAuditLogs(database, 1)[0];
+    expect(latest.action).toBe("แก้ไขข้อมูลสมาชิก");
+    expect(latest.actor).toBe("นายวรพจน์ ด.");
+    expect(latest.actorRole).toBe("ผู้บริหาร");
+    expect(latest.detail).toContain("M-000218");
+    expect(latest.detail).toContain("อรทัยกมล ส.");
+    expect(latest.detail).toContain("แก้ไข: ชื่อ, เลขบัตรประชาชน, เบอร์โทร, ประเภท");
+    expect(latest.tone).toBe("blue");
+  });
+
+  it("keeps unspecified fields and clears idCard/phone when passed empty values", () => {
+    const database = freshDb();
+    updateMember(database, { memberNumber: "M-000218", phone: "089-111-2222", idCard: "1-1111-11111-11-1" });
+
+    const updated = updateMember(database, { memberNumber: "M-000218", phone: "", idCard: null });
+
+    expect(updated.firstName).toBe("อรทัย");
+    expect(updated.lastName).toBe("ส.");
+    expect(updated.type).toBe("สมาชิก");
+    expect(updated.balance).toBe(1240);
+    expect(updated.phone).toBeNull();
+    expect(updated.idCard).toBeNull();
+    const persisted = getMemberDetail(database, "M-000218")?.member;
+    expect(persisted?.phone).toBeNull();
+    expect(persisted?.idCard).toBeNull();
+    expect(listAuditLogs(database, 1)[0].detail).toContain("แก้ไข: เลขบัตรประชาชน, เบอร์โทร");
+  });
+
+  it("rejects an unknown member number with a Thai error", () => {
+    const database = freshDb();
+    expect(() => updateMember(database, { memberNumber: "M-999999", firstName: "ใหม่" })).toThrowError(/ไม่พบสมาชิก M-999999 ในระบบ/);
+  });
+
+  it("logs only fields whose values actually changed", () => {
+    const database = freshDb();
+    updateMember(database, { memberNumber: "M-000218", firstName: "อรทัย", lastName: "ส.", type: "สมาชิก", phone: "089-111-2222" });
+    expect(getMemberDetail(database, "M-000218")?.member?.phone).toBe("089-111-2222");
+
+    updateMember(database, { memberNumber: "M-000218", firstName: "อรทัย", lastName: "ส.", type: "สมาชิก", phone: "089-111-2222" });
+    expect(listAuditLogs(database, 1)[0].detail).toContain("ตรวจสอบข้อมูลแล้ว · ไม่มีการเปลี่ยนแปลง");
+
+    const changed = updateMember(database, { memberNumber: "M-000218", firstName: "อรทัย", lastName: "ส.", type: "สมาชิก", phone: "081-999-8888" });
+    expect(changed.phone).toBe("081-999-8888");
+    expect(listAuditLogs(database, 1)[0].detail).toContain("แก้ไข: เบอร์โทร");
+    expect(listAuditLogs(database, 1)[0].detail).not.toContain("ชื่อ");
+  });
+
+  it("rejects blank required fields with Thai errors and keeps the row intact", () => {
+    const database = freshDb();
+    expect(() => updateMember(database, { memberNumber: "M-000218", firstName: "   " })).toThrowError(/กรุณาระบุชื่อสมาชิก/);
+    expect(() => updateMember(database, { memberNumber: "M-000218", lastName: "" })).toThrowError(/กรุณาระบุนามสกุลสมาชิก/);
+    expect(() => updateMember(database, { memberNumber: "M-000218", type: " " })).toThrowError(/กรุณาระบุประเภทสมาชิก/);
+    const member = getMemberDetail(database, "M-000218")?.member;
+    expect(member?.firstName).toBe("อรทัย");
+    expect(member?.lastName).toBe("ส.");
+    expect(member?.type).toBe("สมาชิก");
+  });
+});
+
+describe("member deletion", () => {
+  it("deletes a fresh member with no balance and no history", () => {
+    const database = freshDb();
+    registerMember(database, { firstName: "ทดสอบลบ", lastName: "ระบบ" });
+
+    const result = deleteMember(database, { memberNumber: "M-000242", actor: "นายวรพจน์ ด.", actorRole: "ผู้บริหาร" });
+
+    expect(result).toEqual({ memberNumber: "M-000242", memberName: "ทดสอบลบ ระบบ" });
+    expect(getMemberDetail(database, "M-000242")).toBeUndefined();
+    expect(listMembers(database)).toHaveLength(5);
+    const latest = listAuditLogs(database, 1)[0];
+    expect(latest.action).toBe("ลบสมาชิก");
+    expect(latest.detail).toBe("M-000242 · ทดสอบลบ ระบบ");
+    expect(latest.tone).toBe("red");
+    expect(latest.actorRole).toBe("ผู้บริหาร");
+  });
+
+  it("refuses to delete a member who still holds a balance", () => {
+    const database = freshDb();
+    expect(() => deleteMember(database, { memberNumber: "M-000218", actorRole: "ผู้บริหาร" })).toThrowError(/ยอดเงินคงเหลือไม่เป็น 0 · ถอนเงิน ฿1,240.00 ออกก่อนลบสมาชิก/);
+    expect(getMemberDetail(database, "M-000218")).toBeDefined();
+    expect(listMembers(database)).toHaveLength(5);
+  });
+
+  it("refuses to delete a member with transaction history even at zero balance", () => {
+    const database = freshDb();
+    registerMember(database, { firstName: "ทดสอบ", lastName: "ประวัติ", initialDeposit: 100 });
+    walletTx(database, { memberNumber: "M-000242", type: "withdrawal", amount: 100 });
+    expect(getMemberDetail(database, "M-000242")?.member.balance).toBe(0);
+
+    expect(() => deleteMember(database, { memberNumber: "M-000242", actorRole: "ผู้บริหาร" })).toThrowError(/สมาชิกมีประวัติธุรกรรมในระบบ · ใช้การระงับการใช้งานแทนการลบ/);
+    expect(getMemberDetail(database, "M-000242")).toBeDefined();
   });
 });
 

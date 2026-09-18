@@ -497,6 +497,42 @@ export function listStockRows(db: SqliteDb): SqliteStockRow[] {
   });
 }
 
+export type StockCountInput = {
+  productId: number;
+  countedQty: number;
+  note?: string;
+  actor?: string;
+  actorRole?: string;
+};
+
+/** Reconciles the authoritative products.stock with a physical count. */
+export function stockCount(db: SqliteDb, input: StockCountInput) {
+  if (!Number.isInteger(input.countedQty) || input.countedQty < 0) throw new StoreError("จำนวนที่นับได้ต้องเป็น 0 ขึ้นไป");
+  const product = getProductById(db, input.productId);
+  if (!product || !product.active) throw new StoreError(`ไม่พบสินค้ารหัส ${input.productId} ในระบบ`);
+  const diff = input.countedQty - product.stock;
+  const note = input.note?.trim();
+  const detail =
+    (diff === 0
+      ? `${product.name} · ตรงตามระบบ ${input.countedQty} ${product.unit}`
+      : `${product.name} · ระบบ ${product.stock} → นับได้ ${input.countedQty} ${product.unit} (${diff})`) + (note ? ` · ${note}` : "");
+  const tone = diff < 0 ? "red" : diff > 0 ? "green" : "blue";
+  runInTransaction(db, () => {
+    db.prepare(`UPDATE products SET stock = ? WHERE id = ?`).run(input.countedQty, input.productId);
+    logAction(db, "นับสต็อก", input.actor?.trim() || "เจ้าหน้าที่ร้านค้า", detail, tone, input.actorRole ?? null, formatDateTime());
+  });
+  return {
+    productId: product.id,
+    sku: product.sku,
+    name: product.name,
+    unit: product.unit,
+    systemQty: product.stock,
+    countedQty: input.countedQty,
+    diff,
+    product: getProductById(db, input.productId)!,
+  };
+}
+
 // --- POS checkout -----------------------------------------------------------
 
 function yyMMdd(date: Date) {
@@ -619,6 +655,12 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
 }
 
 // --- members & wallet -------------------------------------------------------
+
+const MEMBER_SELECT = `SELECT id, member_number as memberNumber, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt FROM members WHERE member_number = ?`;
+
+function getMemberByNumber(db: SqliteDb, memberNumber: string): SqliteMember | undefined {
+  return db.prepare(MEMBER_SELECT).get(memberNumber) as SqliteMember | undefined;
+}
 
 export function listMembers(db: SqliteDb, search?: string, status?: "active" | "suspended"): SqliteMemberSummary[] {
   const conditions: string[] = [];
@@ -782,6 +824,90 @@ export function walletTx(db: SqliteDb, input: WalletTxInput) {
     balanceAfter,
     detail,
   };
+}
+
+export type UpdateMemberInput = {
+  memberNumber: string;
+  firstName?: string;
+  lastName?: string;
+  idCard?: string | null;
+  phone?: string | null;
+  type?: string;
+  actor?: string;
+  actorRole?: string;
+};
+
+/** Updates only the provided member profile fields. Undefined keeps the current value; empty idCard/phone clears them. */
+export function updateMember(db: SqliteDb, input: UpdateMemberInput): SqliteMember {
+  const member = getMemberByNumber(db, input.memberNumber?.trim() ?? "");
+  if (!member) throw new StoreError(`ไม่พบสมาชิก ${input.memberNumber} ในระบบ`);
+  if (typeof input.firstName === "string" && !input.firstName.trim()) throw new StoreError("กรุณาระบุชื่อสมาชิก");
+  if (typeof input.lastName === "string" && !input.lastName.trim()) throw new StoreError("กรุณาระบุนามสกุลสมาชิก");
+  if (typeof input.type === "string" && !input.type.trim()) throw new StoreError("กรุณาระบุประเภทสมาชิก");
+
+  const assignments: string[] = [];
+  const values: (string | null)[] = [];
+  const changedLabels: string[] = [];
+  const normalizeOptional = (value: string | null | undefined) => value?.trim() || null;
+  if (input.firstName != null && input.firstName.trim() !== member.firstName) {
+    assignments.push("first_name = ?");
+    values.push(input.firstName.trim());
+    changedLabels.push("ชื่อ");
+  }
+  if (input.lastName != null && input.lastName.trim() !== member.lastName) {
+    assignments.push("last_name = ?");
+    values.push(input.lastName.trim());
+    changedLabels.push("นามสกุล");
+  }
+  if (input.idCard !== undefined && normalizeOptional(input.idCard) !== member.idCard) {
+    assignments.push("id_card = ?");
+    values.push(normalizeOptional(input.idCard));
+    changedLabels.push("เลขบัตรประชาชน");
+  }
+  if (input.phone !== undefined && normalizeOptional(input.phone) !== member.phone) {
+    assignments.push("phone = ?");
+    values.push(normalizeOptional(input.phone));
+    changedLabels.push("เบอร์โทร");
+  }
+  if (input.type != null && input.type.trim() !== member.type) {
+    assignments.push("type = ?");
+    values.push(input.type.trim());
+    changedLabels.push("ประเภท");
+  }
+
+  const displayName = `${input.firstName?.trim() || member.firstName} ${input.lastName?.trim() || member.lastName}`.trim();
+  const changeSummary = changedLabels.length > 0 ? `แก้ไข: ${changedLabels.join(", ")}` : "ตรวจสอบข้อมูลแล้ว · ไม่มีการเปลี่ยนแปลง";
+  const detail = `${member.memberNumber} · ${displayName} · ${changeSummary}`;
+
+  runInTransaction(db, () => {
+    if (assignments.length > 0) {
+      db.prepare(`UPDATE members SET ${assignments.join(", ")} WHERE member_number = ?`).run(...values, member.memberNumber);
+    }
+    logAction(db, "แก้ไขข้อมูลสมาชิก", input.actor?.trim() || "เจ้าหน้าที่ร้านค้า", detail, "blue", input.actorRole ?? null, formatDateTime());
+  });
+  return getMemberByNumber(db, member.memberNumber)!;
+}
+
+export type DeleteMemberInput = {
+  memberNumber: string;
+  actor?: string;
+  actorRole?: string;
+};
+
+/** Hard-deletes a member. Blocked while a balance remains or any transaction history exists. */
+export function deleteMember(db: SqliteDb, input: DeleteMemberInput): { memberNumber: string; memberName: string } {
+  const member = getMemberByNumber(db, input.memberNumber?.trim() ?? "");
+  if (!member) throw new StoreError(`ไม่พบสมาชิก ${input.memberNumber} ในระบบ`);
+  if (member.balance > 0) throw new StoreError(`ยอดเงินคงเหลือไม่เป็น 0 · ถอนเงิน ${money(member.balance)} ออกก่อนลบสมาชิก`);
+  const history = db.prepare(`SELECT COUNT(*) AS count FROM member_transactions WHERE member_number = ?`).get(member.memberNumber) as { count: number };
+  if (history.count > 0) throw new StoreError("สมาชิกมีประวัติธุรกรรมในระบบ · ใช้การระงับการใช้งานแทนการลบ");
+
+  const displayName = `${member.firstName} ${member.lastName}`.trim();
+  runInTransaction(db, () => {
+    db.prepare(`DELETE FROM members WHERE member_number = ?`).run(member.memberNumber);
+    logAction(db, "ลบสมาชิก", input.actor?.trim() || "เจ้าหน้าที่ร้านค้า", `${member.memberNumber} · ${displayName}`, "red", input.actorRole ?? null, formatDateTime());
+  });
+  return { memberNumber: member.memberNumber, memberName: displayName };
 }
 
 // --- reports ----------------------------------------------------------------
