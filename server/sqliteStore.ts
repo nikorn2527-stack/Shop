@@ -123,7 +123,7 @@ export type SqliteAuditLog = {
 export type CheckoutReceipt = {
   orderNumber: string;
   createdAt: string;
-  items: { productId: number; name: string; unit: string; qty: number; price: number; amount: number }[];
+  items: { productId: number | null; name: string; unit: string; qty: number; price: number; amount: number }[];
   subtotal: number;
   discount: number;
   total: number;
@@ -785,7 +785,10 @@ function summarizeItems(items: { name: string; qty: number; unit: string }[]) {
   return items.length > 3 ? `${head} และอีก ${items.length - 3} รายการ` : head;
 }
 
-export type CheckoutItemInput = { productId: number; qty: number };
+/** A catalog line references a product; a "รายการพิเศษ" line is a priced ad-hoc item with no product/stock behind it. */
+export type CheckoutItemInput =
+  | { productId: number; qty: number }
+  | { name: string; price: number; qty: number; unit?: string };
 
 /**
  * Deducts sold qty from the product's lots FEFO-style (first-expiry-first-out:
@@ -825,11 +828,24 @@ export type CheckoutInput = {
 export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
   if (!input.items?.length) throw new StoreError("ยังไม่มีสินค้าในบิล");
   if (!PAYMENT_METHODS.includes(input.paymentMethod)) throw new StoreError("วิธีชำระเงินไม่ถูกต้อง");
+  // Catalog lines merge by productId; special ("รายการพิเศษ") lines merge by
+  // lowercased name+price+unit so adding the same special twice stacks its qty.
   const merged = new Map<number, number>();
+  const specials = new Map<string, { name: string; price: number; qty: number; unit: string }>();
   for (const item of input.items) {
-    if (!Number.isInteger(item.productId) || item.productId <= 0) throw new StoreError("รหัสสินค้าไม่ถูกต้อง");
     if (!Number.isInteger(item.qty) || item.qty <= 0) throw new StoreError("จำนวนต้องมากกว่า 0");
-    merged.set(item.productId, (merged.get(item.productId) ?? 0) + item.qty);
+    if ("productId" in item) {
+      if (!Number.isInteger(item.productId) || item.productId <= 0) throw new StoreError("รหัสสินค้าไม่ถูกต้อง");
+      merged.set(item.productId, (merged.get(item.productId) ?? 0) + item.qty);
+    } else {
+      const name = item.name.trim();
+      if (!name) throw new StoreError("กรุณาระบุชื่อรายการพิเศษ");
+      if (!(item.price > 0)) throw new StoreError("ราคารายการพิเศษต้องมากกว่า 0");
+      const unit = item.unit?.trim() || "รายการ";
+      const key = `${name.toLowerCase()}|${item.price}|${unit}`;
+      const existing = specials.get(key);
+      specials.set(key, { name, price: item.price, qty: (existing?.qty ?? 0) + item.qty, unit });
+    }
   }
   const isWallet = input.paymentMethod === WALLET_PAYMENT;
   if (isWallet && !input.memberNumber?.trim()) throw new StoreError("กรุณาเลือกสมาชิกก่อนชำระแบบหักบัญชีสมาชิก");
@@ -843,10 +859,13 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
     products.set(productId, product);
   }
 
-  const items = Array.from(merged.entries()).map(([productId, qty]) => {
-    const product = products.get(productId)!;
-    return { productId, name: product.name, unit: product.unit, qty, price: product.price, cost: product.cost, amount: round2(product.price * qty) };
-  });
+  const items: { productId: number | null; name: string; unit: string; qty: number; price: number; cost: number; amount: number }[] = [
+    ...Array.from(merged.entries()).map(([productId, qty]) => {
+      const product = products.get(productId)!;
+      return { productId, name: product.name, unit: product.unit, qty, price: product.price, cost: product.cost, amount: round2(product.price * qty) };
+    }),
+    ...Array.from(specials.values()).map((special) => ({ ...special, productId: null, cost: 0, amount: round2(special.price * special.qty) })),
+  ];
   const subtotal = round2(items.reduce((sum, item) => sum + item.amount, 0));
   const discount = round2(Math.max(0, input.discount ?? 0));
   if (discount > subtotal) throw new StoreError("ส่วนลดมากกว่ายอดรวมสินค้า");
@@ -882,6 +901,7 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
     const lotShortfalls: { name: string; unit: string; qty: number }[] = [];
     for (const item of items) {
       insertItem.run(saleId, item.productId, item.name, item.qty, item.price, item.cost, item.unit);
+      if (item.productId == null) continue; // รายการพิเศษ — no product/stock row behind it
       updateStock.run(item.qty, item.productId);
       const shortfall = deductLotsFifo(db, item.productId, item.qty);
       if (shortfall > 0) lotShortfalls.push({ name: item.name, unit: item.unit, qty: shortfall });

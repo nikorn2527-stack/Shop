@@ -1701,3 +1701,133 @@ body { max-width: 100vw; overflow-x: hidden; overflow-x: clip; min-height: 0; }
   .cart-foot { position: static !important; box-shadow: none; }
   .pos-terminal .shortcut-strip { position: static !important; }
 }
+
+/* ============================================================
+   ROUND 20 — POS scan-first terminal (user-mandated redesign)
+   โฟกัสใหม่: "การสแกนบาร์โค้ดและการดูรายการบิล" แทนการกดเลือกจากรูป
+   ① แถบเมนูด่วนแนวตั้งบางๆ (.pos-rail) ชิดขอบซ้ายสุด — แทน sidebar
+      บนจอ POS ขนาด ≥821px (แท็บเล็ต 561-820 ยังมี hamburger ตามเดิม)
+   ② พื้นที่บิลกลางจอ ~60-70% — ช่องสแกน (.scan-hero) โดดเด่นบนสุด
+      autofocus ตลอดเวลา / รายการบิลเลื่อนในกรอบ / ปุ่มชำระเงินล็อค
+      ล่างสุดของฝั่งบิล อ่านจบกดจ่ายที่เดียว
+   ③ แผงสินค้าไม่มีบาร์โค้ด (.quick-pick-panel) ย้ายไปขวา ~30-40%
+      เลื่อนอิสระภายในกรอบ (overflow-y: auto)
+   ④ หน้าต่างหลักยังล็อค height:100vh overflow:hidden เหมือนเดิม
+   ============================================================ */
+
+/* (1) Thin vertical quick-action rail — flush to the screen's left edge.
+       Brand mark on top, frequent actions in the middle, back-office at
+       the bottom; badge counts parked bills (พักบิล). */
+.pos-rail { width: 78px; flex: 0 0 78px; min-height: 0; display: flex; flex-direction: column; align-items: stretch; gap: 7px; padding: 14px 9px 10px; background: linear-gradient(180deg, #f6faf8, #eef5f1); border-right: 1px solid #dde8e3; overflow-y: auto; }
+.pos-rail .rail-brand { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 2px 0 6px; }
+.pos-rail .rail-brand .brand-mark { width: 40px; height: 40px; font-size: 19px; font-weight: 700; }
+.pos-rail .rail-caption { font-size: 8.5px; letter-spacing: 1.2px; color: #93a5a0; font-weight: 600; }
+.rail-btn { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 58px; padding: 8px 2px 7px; border-radius: 11px; border: 1px solid #e2ebe7; background: #fff; color: #5c716b; cursor: pointer; transition: .16s ease; }
+.rail-btn:hover { border-color: #a9d4ca; color: var(--teal); background: #f6fbf9; }
+.rail-btn.active { background: var(--teal); border-color: var(--teal); color: #fff; box-shadow: 0 6px 14px rgba(45, 138, 125, .28); }
+.rail-btn b { font-size: 9.5px; font-weight: 600; line-height: 1.15; }
+.rail-btn kbd { position: absolute; top: 5px; right: 5px; font-size: 7.5px; line-height: 1; padding: 2px 3px; background: #f1f6f3; color: #8fa39d; border: 1px solid #e0e9e5; border-radius: 4px; font-family: inherit; }
+.rail-btn.active kbd { background: #fff; color: var(--teal); border-color: rgba(255, 255, 255, .7); }
+.rail-badge { position: absolute; top: -5px; right: -4px; min-width: 18px; height: 18px; border-radius: 20px; background: #e19a3d; color: #fff; font-size: 9.5px; font-weight: 700; display: grid; place-items: center; padding: 0 4px; border: 2px solid #fff; }
+.rail-spacer { flex: 1 1 auto; }
+.rail-exit { border-color: #e7dfd4; background: #fdf9f2; color: #8a7550; }
+.rail-exit:hover { border-color: #d9c9a8; color: #6f5a35; background: #fbf5e8; }
+
+/* (2) The scan hero — the most prominent element on the screen. Teal-framed,
+       tall, glowing on focus; the scanner can be fired at any moment. */
+.pos-layout > .cart-panel { position: static; }
+.scan-hero { display: flex; align-items: center; gap: 10px; height: 54px; padding: 0 14px; background: #fff; border: 2px solid var(--teal); border-radius: 13px; box-shadow: 0 5px 18px rgba(45, 138, 125, .12); transition: box-shadow .16s ease, border-color .16s ease; }
+.scan-hero:focus-within { border-color: var(--teal-dark); box-shadow: 0 7px 22px rgba(45, 138, 125, .22); }
+.scan-hero .scan-hero-icon { color: var(--teal); flex-shrink: 0; }
+.scan-hero input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 14.5px; font-weight: 500; color: #33504a; font-family: inherit; }
+.scan-hero input::placeholder { color: #9fb5af; font-weight: 400; font-size: 13px; }
+.scan-clear { flex-shrink: 0; border: 0; background: #eef4f1; color: #71857f; width: 27px; height: 27px; border-radius: 8px; display: grid; place-items: center; }
+.scan-clear:hover { background: #e2ece7; color: #415650; }
+.scan-live { flex-shrink: 0; display: flex; align-items: center; gap: 6px; font-size: 10px; font-weight: 600; color: #3f8f7d; white-space: nowrap; }
+.scan-hero kbd { flex-shrink: 0; font-size: 9px; padding: 3px 6px; background: #f1f6f3; color: #7d918b; border: 1px solid #dfe9e4; border-radius: 5px; font-family: inherit; }
+.scan-hero-hint { display: flex; align-items: center; gap: 5px; color: #8d9d98; font-size: 9.5px; margin-top: 6px; padding: 0 3px; }
+
+/* (3) Held-bill chips (พักบิล) — parked bills queue right under the scan
+       hero: restore ↺ or discard ✕ without leaving the bill pane. */
+.held-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+.held-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px dashed #dcc99f; background: #fdf8ec; color: #8a6d2f; border-radius: 20px; padding: 4px 5px 4px 10px; font-size: 10px; }
+.held-chip b { color: #7a5f27; font-size: 10px; }
+.held-chip time { color: #a98f57; font-size: 9px; }
+.held-chip .chip-restore { border: 0; background: transparent; color: #8a6d2f; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 7px; }
+.held-chip .chip-restore:hover { background: #f3e7c9; color: #5f4a17; }
+.held-chip .chip-discard { border: 0; background: transparent; color: #b8a06e; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; }
+.held-chip .chip-discard:hover { background: #f3e5c8; color: #8c5f2b; }
+
+/* (4) Quick-pick panel (right) — "สินค้าไม่มีบาร์โค้ด": header + chip
+       categories + independently scrollable tile grid. */
+.quick-pick-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.quick-pick-head h2 { margin: 0; font-size: 14.5px; color: #2e4642; }
+.quick-pick-head p { margin: 3px 0 0; font-size: 9.5px; color: #99a6a2; }
+.quick-pick-count { flex-shrink: 0; font-size: 10px; font-weight: 600; color: #3f8f7d; background: #e9f5ef; border-radius: 20px; padding: 4px 10px; white-space: nowrap; }
+.quick-pick-panel .category-tabs { border-bottom: 0; margin-top: 12px; flex-wrap: wrap; gap: 6px; }
+.quick-pick-panel .category-tabs button { border: 1px solid #e3ebe8; border-radius: 20px; padding: 6px 12px; background: #fff; font-size: 10.5px; }
+.quick-pick-panel .category-tabs button.active { background: var(--teal); border-color: var(--teal); color: #fff; }
+.quick-pick-panel .category-tabs button.active::after { display: none; }
+
+/* (5) รายการพิเศษ — violet-tinted ad-hoc line form + row tag. */
+.special-form { border-color: #e9def8; background: #fbf9ff; }
+.special-form .special-icon { color: #896db6; background: #eee4fa; }
+.special-grid { display: grid; grid-template-columns: 1.3fr .8fr .9fr; gap: 7px; }
+.cart-item .special-tag { display: inline-block; font-style: normal; vertical-align: 1px; margin-right: 5px; font-size: 8px; font-weight: 700; letter-spacing: .3px; color: #896db6; background: #f0e9fa; border: 1px solid #e2d6f5; border-radius: 4px; padding: 1px 4px; }
+.shortcut-strip > button { position: relative; }
+.dock-badge { position: absolute; top: -5px; right: 6px; min-width: 16px; height: 16px; border-radius: 20px; background: #e19a3d; color: #fff; font-style: normal; font-size: 9px; font-weight: 700; display: grid; place-items: center; padding: 0 3px; border: 2px solid #fff; }
+
+/* (6) Terminal integration ≥561px — rail replaces the desktop sidebar, the
+       bottom strip retires (its actions live on the rail now), and the
+       bill pane's fixed chrome never shrinks. */
+@media (min-width: 561px) {
+  .pos-terminal .scan-hero, .pos-terminal .scan-hero-hint, .pos-terminal .held-chips { flex-shrink: 0; }
+  .pos-terminal .shortcut-strip { display: none; }
+}
+@media (min-width: 821px) {
+  .app-shell.pos-terminal .sidebar { display: none; }
+}
+
+/* (7) Swapped column geometry — bill (center-left, wide) | quick picks
+       (right, ~30-40%). Later rules supersede the Round-19 widths. */
+@media (min-width: 1121px) {
+  .pos-terminal .pos-layout { grid-template-columns: minmax(0, 1fr) minmax(360px, 30vw); }
+  .pos-terminal .product-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+}
+@media (min-width: 981px) and (max-width: 1120px) {
+  .pos-terminal .pos-layout { grid-template-columns: minmax(0, 1fr) 380px; }
+  .pos-terminal .product-grid { grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)); }
+}
+@media (min-width: 821px) and (max-width: 980px) {
+  .pos-terminal .pos-layout { grid-template-columns: minmax(0, 1fr) min(38vw, 340px); gap: 13px; }
+  .pos-terminal .product-grid { grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)); }
+}
+@media (min-width: 561px) and (max-width: 820px) {
+  .pos-terminal .pos-layout { grid-template-columns: minmax(0, 1fr) min(42vw, 320px); gap: 11px; }
+  .pos-terminal .product-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+}
+
+/* (8) Short screens — the scan hero compacts so the bill list keeps its rows. */
+@media (min-width: 561px) and (max-height: 880px) {
+  .pos-terminal .scan-hero { height: 46px; }
+  .pos-terminal .scan-hero-hint { display: none; }
+  .pos-terminal .cart-heading h2 { font-size: 13.5px; }
+}
+
+/* (9) Phones ≤560px — rail hidden (standard sidebar + hamburger remains),
+       the strip becomes the fixed 4-button dock, scan hero trims down. */
+@media (max-width: 560px) {
+  .pos-rail { display: none; }
+  .pos-terminal .shortcut-strip { grid-template-columns: repeat(4, 1fr); }
+  .pos-mobile-bar { bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
+  .scan-hero { height: 50px; border-radius: 12px; }
+  .scan-hero input { font-size: 13.5px; }
+  .scan-hero kbd, .scan-hero .scan-live { display: none; }
+  .scan-hero-hint { display: none; }
+  .quick-pick-head h2 { font-size: 13px; }
+}
+
+/* (10) Print — the rail is screen chrome; receipts print without it. */
+@media print {
+  .pos-rail { display: none; }
+}

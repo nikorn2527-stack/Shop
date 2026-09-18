@@ -4,7 +4,7 @@ import { BarChart3, LayoutDashboard, PackageSearch, ShoppingCart, UsersRound } f
 
 export type View = "dashboard" | "pos" | "stock" | "members" | "reports" | "settings" | "logs" | "users";
 export type Role = "staff" | "admin";
-export type CartItem = { id: number; name: string; price: number; qty: number; unit: string };
+export type CartItem = { id: number; name: string; price: number; qty: number; unit: string; special?: boolean };
 
 export type Product = {
   id: number;
@@ -69,3 +69,30 @@ export const navItems: { id: View; label: string; caption: string; icon: LucideI
 // (member.list / member.detail / logs.list / dashboard.stats).
 
 export const money = (value: number) => `฿${value.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`;
+
+// --- POS held bills (พักบิล) — device-local parking of the current bill ------
+export const HELD_BILLS_KEY = "png-held-bills-v1";
+export const HELD_BILLS_LIMIT = 6;
+
+export type HeldBill = {
+  id: number;
+  savedAt: number;
+  items: CartItem[];
+  discount: string;
+  memberNumber: string | null;
+};
+
+/** Reads parked bills from localStorage, dropping malformed/empty entries. */
+export function loadHeldBills(): HeldBill[] {
+  try {
+    const raw = localStorage.getItem(HELD_BILLS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as HeldBill[];
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((bill) => bill && Array.isArray(bill.items) && bill.items.length > 0)
+      .slice(0, HELD_BILLS_LIMIT);
+  } catch {
+    return [];
+  }
+}

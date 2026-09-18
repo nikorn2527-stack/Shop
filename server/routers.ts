@@ -159,9 +159,15 @@ const stockCountLotsInput = z.object({
   actorRole: z.string().optional(),
 });
 
+// A bill line is either a catalog product (barcode/quick-pick) or a "รายการพิเศษ"
+// (special/custom line: weighed goods, services, ad-hoc charges — no product row,
+// no stock movement). sale_items.product_id is nullable on purpose for these.
 const checkoutInput = z.object({
   items: z
-    .array(z.object({ productId: z.number().int(), qty: z.number().int() }))
+    .array(z.union([
+      z.object({ productId: z.number().int().positive(), qty: z.number().int().positive() }),
+      z.object({ name: z.string().min(1, "กรุณาระบุชื่อรายการพิเศษ"), price: z.number().positive("ราคาต้องมากกว่า 0"), qty: z.number().int().positive(), unit: z.string().optional() }),
+    ]))
     .min(1, "ยังไม่มีสินค้าในบิล"),
   paymentMethod: paymentMethodSchema,
   memberNumber: z.string().nullish(),
