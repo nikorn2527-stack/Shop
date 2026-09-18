@@ -1643,8 +1643,6 @@ body { max-width: 100vw; overflow-x: hidden; overflow-x: clip; min-height: 0; }
   .pos-terminal .admin-pos-note { display: none; }
   .pos-terminal .section-header p { display: none; }
   .pos-terminal .cart-heading p { margin: 2px 0 0; }
-  .pos-terminal .member-select { padding: 6px 0; }
-  .pos-terminal .member-avatar { width: 25px; height: 25px; }
   .pos-terminal .cart-status-line { min-height: 28px; padding: 4px 9px; }
   .pos-terminal .pay-button { height: 38px; }
   .pos-terminal .pay-split button { height: 36px; }
@@ -1779,9 +1777,10 @@ body { max-width: 100vw; overflow-x: hidden; overflow-x: clip; min-height: 0; }
 
 /* (6) Terminal integration ≥561px — rail replaces the desktop sidebar, the
        bottom strip retires (its actions live on the rail now), and the
-       bill pane's fixed chrome never shrinks. */
+       bill pane's fixed chrome never shrinks. (Round 21: the locked header
+       is now the single .pos-head row — scan hero + customer selector.) */
 @media (min-width: 561px) {
-  .pos-terminal .scan-hero, .pos-terminal .scan-hero-hint, .pos-terminal .held-chips { flex-shrink: 0; }
+  .pos-terminal .pos-head { flex-shrink: 0; }
   .pos-terminal .shortcut-strip { display: none; }
 }
 @media (min-width: 821px) {
@@ -1810,7 +1809,6 @@ body { max-width: 100vw; overflow-x: hidden; overflow-x: clip; min-height: 0; }
 /* (8) Short screens — the scan hero compacts so the bill list keeps its rows. */
 @media (min-width: 561px) and (max-height: 880px) {
   .pos-terminal .scan-hero { height: 46px; }
-  .pos-terminal .scan-hero-hint { display: none; }
   .pos-terminal .cart-heading h2 { font-size: 13.5px; }
 }
 
@@ -1823,11 +1821,90 @@ body { max-width: 100vw; overflow-x: hidden; overflow-x: clip; min-height: 0; }
   .scan-hero { height: 50px; border-radius: 12px; }
   .scan-hero input { font-size: 13.5px; }
   .scan-hero kbd, .scan-hero .scan-live { display: none; }
-  .scan-hero-hint { display: none; }
   .quick-pick-head h2 { font-size: 13px; }
 }
 
 /* (10) Print — the rail is screen chrome; receipts print without it. */
 @media print {
   .pos-rail { display: none; }
+}
+
+/* ============================================================
+   ROUND 21 — POS bill pane: 3-zone vertical lock + pick stepper
+   (user-mandated) โครงสร้างแนวตั้งของฝั่งบิล 3 ท่อน:
+   ① ท่อนบนล็อคตาย (.pos-head shrink-0) — ช่องสแกนบาร์โค้ด + ช่องเลือก
+      ลูกค้า (สมาชิก/บุคคลทั่วไป) อยู่บรรทัดเดียวกัน ซ้าย-ขวา
+      ประหยัดแนวตั้ง ลด margin/padding
+   ② ท่อนกลาง (.cart-mid flex-1 overflow-y-auto) — พื้นที่ยืดหยุ่นและ
+      เลื่อนได้เฉพาะส่วนนี้ท่อนเดียว: บิลที่พัก + แบนเนอร์ F2/F3/F4 +
+      กล่อง "รายการขาย · บิลปัจจุบัน" + รายการสินค้า + ฟอร์มต่างๆ
+      รายการยาวแค่ไหนก็ไม่ดันปุ่มด้านล่างตกจอ
+   ③ ท่อนล่างล็อคติดขอบล่าง (.cart-foot shrink-0 sticky bottom-0 พื้น
+      ขาว) — สรุปยอด 3 บรรทัด (ยอดรวม/ส่วนลด/ยอดที่ต้องชำระ) + ปุ่ม
+      ชำระเงินทั้งหมด มองเห็นชัดตลอดเวลา
+   ④ การ์ดสินค้าไม่มีบาร์โค้ดมีปุ่ม − จำนวน + (.pick-stepper) ในตัว —
+      แก้ไขเพิ่มลดจำนวนได้ทันทีบนการ์ด โดยไม่ต้องเลื่อนหาในบิล
+   ============================================================ */
+
+/* (1) locked header row — scan hero + customer selector share one line */
+.pos-head { flex: 0 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) clamp(235px, 26vw, 340px); gap: 9px; align-items: stretch; }
+.pos-head .member-select { min-height: 54px; padding: 0 12px; gap: 9px; border: 1px solid #dbe7e2; border-radius: 13px; background: #fff; box-shadow: 0 2px 8px rgba(30, 60, 50, .04); transition: border-color .16s ease; }
+.pos-head .member-select:hover { border-color: #a9d4ca; }
+.pos-head .member-select > div:nth-child(2) { min-width: 0; }
+.pos-head .member-select b, .pos-head .member-select small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pos-head .member-select .member-avatar { flex: 0 0 auto; }
+.pos-head .member-select .muted-icon { flex: 0 0 auto; }
+
+/* (2) middle zone — the single scrollable area (held bills / action
+       banners / bill heading / items / forms all live inside it) */
+.pos-terminal .cart-mid { padding: 2px 2px 4px; }
+.cart-mid > .held-chips { margin: 0 0 8px; }
+.cart-mid > .shortcut-banner { margin: 0 0 10px; }
+.cart-mid > :not(.cart-items) { flex: 0 0 auto; }
+
+/* (3) locked footer — solid white per spec, pinned to the bottom edge */
+.cart-foot { background: #fff; }
+
+/* (4) pick stepper on every no-barcode card — แก้ไขเพิ่ม/ลดได้ทันที */
+.quick-pick-panel .product-card { cursor: pointer; }
+.quick-pick-panel .product-art { height: 60px; font-size: 27px; }
+.quick-pick-panel .product-card-info { padding: 8px 10px 9px; }
+.pick-stepper { display: grid; grid-template-columns: 1fr 42px 1fr; gap: 5px; padding: 0 10px 10px; }
+.pick-stepper button { height: 30px; border: 1px solid #dfe9e4; background: #fff; border-radius: 8px; color: #55716a; display: grid; place-items: center; cursor: pointer; transition: .14s ease; }
+.pick-stepper button:hover:not(:disabled) { border-color: var(--teal); color: var(--teal); background: #f2faf7; }
+.pick-stepper button:active:not(:disabled) { transform: scale(.94); }
+.pick-stepper button:disabled { opacity: .35; cursor: not-allowed; }
+.pick-stepper .pick-qty { display: grid; place-items: center; border: 1px dashed #d9e5df; border-radius: 8px; background: #f8fbf9; color: #2f554d; font: 700 12.5px "IBM Plex Mono", monospace; }
+.pick-stepper .pick-qty.zero { color: #b3c0bb; }
+.product-card.in-bill { border-color: #7cc4b4; box-shadow: inset 0 0 0 1.5px #7cc4b4, 0 6px 14px rgba(57, 110, 97, .1); }
+.product-card.in-bill .product-card-info strong { color: var(--teal-dark); }
+.pick-qty-badge { position: absolute; top: 6px; left: 6px; min-width: 20px; height: 20px; border-radius: 20px; background: var(--teal); color: #fff; font-size: 10px; font-weight: 700; display: grid; place-items: center; padding: 0 5px; border: 2px solid #fff; font-variant-numeric: tabular-nums; }
+
+/* (5) height tiers — the member button tracks the scan hero height so the
+       header row stays one clean line on short laptop screens */
+@media (min-width: 561px) and (max-height: 1040px) {
+  .pos-head .member-select { min-height: 48px; }
+  .pos-head .member-select .member-avatar { width: 25px; height: 25px; }
+}
+@media (min-width: 561px) and (max-height: 880px) {
+  .pos-head .member-select { min-height: 46px; padding: 0 10px; }
+  .pos-head .member-select .member-avatar { width: 24px; height: 24px; }
+  .pos-head { gap: 7px; }
+}
+
+/* (6) phones — the two header fields stack full-width, steppers grow
+       fat touch targets */
+@media (max-width: 560px) {
+  .pos-head { grid-template-columns: 1fr; gap: 7px; }
+  .pos-head .member-select { min-height: 50px; border-radius: 12px; }
+  .pick-stepper button { height: 40px; }
+  .pick-stepper { grid-template-columns: 1fr 48px 1fr; }
+  .quick-pick-panel .product-art { height: 68px; }
+  .quick-pick-panel .product-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+}
+
+/* (7) print — steppers are screen chrome; receipts print clean */
+@media print {
+  .pick-stepper { display: none; }
+  .cart-foot { background: #fff !important; box-shadow: none !important; }
 }
