@@ -35,5 +35,8 @@ export function applyFontScale(id: FontScaleId) {
   } catch {
     // storage unavailable — keep the in-memory effect only
   }
+  // --fs-zoom mirrors the applied zoom so fixed-height layouts (POS terminal)
+  // can divide viewport units back to the real on-screen height.
+  document.documentElement.style.setProperty("--fs-zoom", String(scale.zoom));
   document.documentElement.style.zoom = String(scale.zoom);
 }
