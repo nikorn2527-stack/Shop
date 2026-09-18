@@ -704,3 +704,85 @@ nav button:active:not(:disabled),
 .lot-count-empty span { font-size: 10px; }
 @media (max-width: 560px) { .lot-count-row input { flex-basis: 72px; width: 72px; } .lot-count-diff { flex-basis: 44px; } }
 @media (prefers-reduced-motion: reduce) { .count-mode-toggle button, .lot-count-row { transition: none; } }
+
+/* ── Round 10 (Task 14-a): bell member low-balance alerts + receipt thermal print + detail polish ── */
+
+/* 1) Thermal-style receipt print — when a ReceiptModal is open (POS success or
+      Reports reprint), ONLY the receipt paper prints on a clean 8mm-margin page.
+      Guarded with :has() so a plain Ctrl+P without an open modal keeps the
+      default browser output instead of a blank sheet. */
+@media print {
+  @page { margin: 8mm; }
+  html, body { background: #fff !important; }
+  body:has(#receipt-paper) .sidebar,
+  body:has(#receipt-paper) .topbar,
+  body:has(#receipt-paper) .app-footer,
+  body:has(#receipt-paper) .page-content > *:not(.modal-backdrop) { display: none !important; }
+  body:has(#receipt-paper) .app-shell { display: block; min-height: 0; }
+  body:has(#receipt-paper) .main-shell { min-width: 0; }
+  body:has(#receipt-paper) .page-content { max-width: none; margin: 0; padding: 0; animation: none; }
+  body:has(#receipt-paper) .modal-backdrop { position: static; display: block; padding: 0; background: none; backdrop-filter: none; }
+  body:has(#receipt-paper) .receipt-modal { width: 72mm; max-height: none; overflow: visible; background: #fff; border: 0; border-radius: 0; box-shadow: none; padding: 0; animation: none; }
+  body:has(#receipt-paper) .receipt-success,
+  body:has(#receipt-paper) .receipt-actions { display: none !important; }
+  body:has(#receipt-paper) .receipt-paper { border: 0; box-shadow: none; padding: 0 1.5mm; background: #fff; font-family: "Sarabun", system-ui, sans-serif; }
+  body:has(#receipt-paper) .receipt-brand .brand-mark { display: none; } /* white-on-emerald mark would print blank */
+  body:has(#receipt-paper) .receipt-balance { background: none; }
+  body:has(#receipt-paper) .receipt-line b,
+  body:has(#receipt-paper) .receipt-total b,
+  body:has(#receipt-paper) .receipt-meta b,
+  body:has(#receipt-paper) .receipt-customer b,
+  body:has(#receipt-paper) .receipt-payment b,
+  body:has(#receipt-paper) .receipt-balance b { font-variant-numeric: tabular-nums; }
+  body:has(#receipt-paper) .receipt-thanks { border-top: 1px dashed #6d7f78; margin-top: 12px; padding-top: 10px; }
+}
+
+/* 2) Bell dropdown — member alert rows, keyboard focus, press feedback, cap hint. */
+.notif-row:focus-visible, .notif-footer:focus-visible { outline: 2px solid #57b39a; outline-offset: -2px; }
+.notif-row:active { background: #eaf4ef; }
+.notif-row.member-row small { font-variant-numeric: tabular-nums; }
+.notif-row .amount-low { color: #b8863d; font-weight: 700; font-variant-numeric: tabular-nums; }
+.notif-row .amount-negative { color: #c16b6e; font-weight: 700; font-variant-numeric: tabular-nums; }
+.notif-more { padding: 7px 14px 9px; border-top: 1px dashed #edf2ef; color: #a0aaa7; font-size: 10px; font-variant-numeric: tabular-nums; }
+/* Slightly taller scroll area now that a third section (members) can appear. */
+.notif-scroll { max-height: 340px; }
+.notif-scroll::-webkit-scrollbar { width: 8px; }
+.notif-scroll::-webkit-scrollbar-thumb { background: #d7e5e0; border-radius: 8px; }
+.notif-scroll::-webkit-scrollbar-thumb:hover { background: #c2d8d0; }
+
+/* 3) Settings — threshold number input (การแจ้งเตือน row) + toggle focus ring. */
+.toggle:focus-visible { outline: 2px solid #57b39a; outline-offset: 2px; }
+.toggle-row-controls { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
+.threshold-input { display: inline-flex; align-items: center; border: 1px solid #e2eae7; border-radius: 7px; background: #fcfefd; overflow: hidden; transition: border-color .15s ease, box-shadow .15s ease; }
+.threshold-input:focus-within { border-color: #9bcdbf; box-shadow: 0 0 0 3px #eaf6f2; }
+.threshold-input span { padding-left: 9px; color: #93a39e; font-size: 10px; font-weight: 600; }
+.threshold-input input { width: 78px; height: 30px; border: 0; outline: none; background: transparent; color: #5a716a; font-size: 11px; font-variant-numeric: tabular-nums; text-align: right; padding: 0 9px 0 4px; -moz-appearance: textfield; appearance: textfield; }
+.threshold-input input::-webkit-outer-spin-button,
+.threshold-input input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* 4) Receipt modal — dashed separator before the thank-you footer (screen; print adds its own). */
+.receipt-thanks { border-top: 1px dashed #d5e2dc; margin-top: 14px; padding-top: 12px; }
+
+/* 5) Phones — keep the bell reachable (unlike the logout icon it has no sidebar
+      twin; the sidebar badge covers stock only). The dropdown already caps to
+      the viewport, so the member rows stay readable at ~480px. */
+@media (max-width: 560px) {
+  .notif-wrap { display: inline-flex; }
+  .notif-wrap .top-icon { display: grid; }
+  .notif-dropdown { width: min(320px, calc(100vw - 24px)); }
+  .toggle-row { flex-wrap: wrap; }
+  .toggle-row-controls { flex-basis: 100%; justify-content: space-between; }
+}
+
+@media (prefers-reduced-motion: reduce) { .threshold-input { transition: none; } }
+
+/* --- Round 10 (main) — login lockout UI -------------------------------- */
+.notice-bar.warn { color: #8a6d2f; background: #fff8ec; border-color: #f3e4c6; }
+.notice-bar.warn svg { color: #c99a45; flex-shrink: 0; }
+tr.locked-row { background: #fffdf4; }
+tr.locked-row:hover { background: #fdf7e7; }
+tr.locked-row td b { color: #7c6229; }
+tr.locked-row .user-avatar { background: #f6ecd4; color: #a97f2e; }
+.lock-countdown { display: block; color: #b8863d; font-size: 9px; margin-top: 4px; font-family: "Sarabun", sans-serif; }
+.lock-countdown b { font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { tr.locked-row { transition: none; } }

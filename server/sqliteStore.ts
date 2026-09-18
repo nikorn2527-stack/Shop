@@ -286,6 +286,8 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
   ensureColumn(db, "member_transactions", "balance_after", "REAL");
   ensureColumn(db, "audit_logs", "actor_role", "TEXT");
   ensureColumn(db, "sale_items", "unit", "TEXT");
+  ensureColumn(db, "app_users", "failed_attempts", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "app_users", "locked_until", "TEXT");
   // Backfill units for sale_items rows written before the column existed (idempotent).
   db.prepare("UPDATE sale_items SET unit = (SELECT p.unit FROM products p WHERE p.id = sale_items.product_id) WHERE unit IS NULL").run();
   return db;
@@ -785,6 +787,32 @@ function summarizeItems(items: { name: string; qty: number; unit: string }[]) {
 
 export type CheckoutItemInput = { productId: number; qty: number };
 
+/**
+ * Deducts sold qty from the product's lots FEFO-style (first-expiry-first-out:
+ * earliest expiry first, undated lots last, then oldest received, then lot id).
+ * Best-effort by design: when the lots cannot cover the whole qty — drift
+ * between products.stock and the lot sums — they are zeroed instead and the
+ * shortfall is returned so checkout can flag it in the audit trail.
+ * products.stock stays the authoritative sellable figure at all times.
+ * Returns the unmet qty (0 when the lots covered the sale).
+ */
+function deductLotsFifo(db: SqliteDb, productId: number, qty: number): number {
+  const tracked = db.prepare(`SELECT COUNT(*) AS count FROM stock_lots WHERE product_id = ?`).get(productId) as { count: number };
+  if (tracked.count === 0) return 0; // product is not lot-tracked — nothing to deduct
+  const lots = db.prepare(
+    `SELECT id, qty FROM stock_lots WHERE product_id = ? AND qty > 0 ORDER BY (expiry_date IS NULL), expiry_date, received_at, id`,
+  ).all(productId) as unknown as { id: number; qty: number }[];
+  let remaining = qty;
+  const updateLot = db.prepare(`UPDATE stock_lots SET qty = qty - ? WHERE id = ?`);
+  for (const lot of lots) {
+    if (remaining <= 0) break;
+    const take = Math.min(lot.qty, remaining);
+    updateLot.run(take, lot.id);
+    remaining -= take;
+  }
+  return remaining;
+}
+
 export type CheckoutInput = {
   items: CheckoutItemInput[];
   paymentMethod: (typeof PAYMENT_METHODS)[number];
@@ -851,9 +879,12 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
     const saleId = Number(saleResult.lastInsertRowid);
     const insertItem = db.prepare(`INSERT INTO sale_items (sale_id, product_id, name, qty, price, cost, unit) VALUES (?, ?, ?, ?, ?, ?, ?)`);
     const updateStock = db.prepare(`UPDATE products SET stock = stock - ? WHERE id = ?`);
+    const lotShortfalls: { name: string; unit: string; qty: number }[] = [];
     for (const item of items) {
       insertItem.run(saleId, item.productId, item.name, item.qty, item.price, item.cost, item.unit);
       updateStock.run(item.qty, item.productId);
+      const shortfall = deductLotsFifo(db, item.productId, item.qty);
+      if (shortfall > 0) lotShortfalls.push({ name: item.name, unit: item.unit, qty: shortfall });
     }
 
     let balanceAfter: number | null = null;
@@ -870,7 +901,10 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
       );
     }
 
-    logAction(db, "ขายสินค้า", cashier, `บิล #${orderNumber} · ${money(total)}${member ? ` · หักบัญชี ${member.memberNumber}` : ""}`, "blue", input.actorRole ?? null, createdAt);
+    const lotNote = lotShortfalls.length
+      ? ` · ตัดยอด Lot ไม่ครบ: ${lotShortfalls.map((row) => `${row.name} ${row.qty} ${row.unit}`).join(", ")} (แนะนำนับสต็อกแยกล็อต)`
+      : "";
+    logAction(db, "ขายสินค้า", cashier, `บิล #${orderNumber} · ${money(total)}${member ? ` · หักบัญชี ${member.memberNumber}` : ""}${lotNote}`, "blue", input.actorRole ?? null, createdAt);
 
     return {
       orderNumber,
@@ -1313,6 +1347,8 @@ export type AppUser = {
   role: "staff" | "admin";
   active: number;
   createdAt: string;
+  failedAttempts: number;
+  lockedUntil: string | null;
 };
 
 const SCRYPT_SALT_BYTES = 16;
@@ -1348,7 +1384,70 @@ export function verifyPassword(plain: string, stored: string): boolean {
   }
 }
 
-const APP_USER_SELECT = `SELECT id, username, password_hash AS passwordHash, display_name AS displayName, role, active, created_at AS createdAt FROM app_users`;
+const APP_USER_SELECT = `SELECT id, username, password_hash AS passwordHash, display_name AS displayName, role, active, created_at AS createdAt, failed_attempts AS failedAttempts, locked_until AS lockedUntil FROM app_users`;
+
+// --- login rate limiting (failed-password lockout) ----------------------------
+
+/** Wrong passwords allowed before a temporary lock. */
+export const LOGIN_MAX_FAILURES = 5;
+/** Lock duration in minutes once the failure limit is reached. */
+export const LOGIN_LOCK_MINUTES = 15;
+
+function addMinutes(date: Date, minutes: number) {
+  const next = new Date(date);
+  next.setMinutes(next.getMinutes() + minutes);
+  return next;
+}
+
+/** Parses the store's "YYYY-MM-DD HH:MM:SS" strings as LOCAL time. */
+function parseStoreDateTime(text: string): Date {
+  const [datePart, timePart = "00:00:00"] = text.trim().split(" ");
+  const [year, month, day] = datePart.split("-").map(Number);
+  const [hours, minutes, seconds] = timePart.split(":").map(Number);
+  return new Date(year ?? 1970, (month ?? 1) - 1, day ?? 1, hours ?? 0, minutes ?? 0, seconds ?? 0);
+}
+
+/** Minutes (rounded up, at least 1) until the lock lifts; 0 once it has expired. */
+export function loginLockRemainingMinutes(lockedUntil: string): number {
+  const remaining = parseStoreDateTime(lockedUntil).getTime() - Date.now();
+  return remaining <= 0 ? 0 : Math.max(1, Math.ceil(remaining / 60000));
+}
+
+export type LoginFailureOutcome = {
+  attempts: number;
+  lockedUntil: string | null;
+  justLocked: boolean;
+};
+
+/**
+ * Records one wrong password for the (active) account. Unknown or suspended
+ * usernames never touch the counters. When a lock has already expired the
+ * window restarts at 1 instead of stacking onto the old count. Locking writes
+ * a red audit entry with the automatic-unlock time.
+ */
+export function registerLoginFailure(db: SqliteDb, username: string): LoginFailureOutcome {
+  const user = db.prepare(
+    `SELECT id, username, display_name AS displayName, failed_attempts AS failedAttempts, locked_until AS lockedUntil FROM app_users WHERE username = ? AND active = 1`,
+  ).get(username) as { id: number; username: string; displayName: string; failedAttempts: number; lockedUntil: string | null } | undefined;
+  if (!user) return { attempts: 0, lockedUntil: null, justLocked: false };
+  const stillLocked = user.lockedUntil !== null && loginLockRemainingMinutes(user.lockedUntil) > 0;
+  if (stillLocked) return { attempts: user.failedAttempts, lockedUntil: user.lockedUntil, justLocked: false };
+
+  const attempts = user.lockedUntil !== null ? 1 : user.failedAttempts + 1; // expired lock restarts the window
+  if (attempts >= LOGIN_MAX_FAILURES) {
+    const lockedUntil = formatDateTime(addMinutes(new Date(), LOGIN_LOCK_MINUTES));
+    db.prepare(`UPDATE app_users SET failed_attempts = ?, locked_until = ? WHERE id = ?`).run(attempts, lockedUntil, user.id);
+    logAction(db, "ระงับบัญชีชั่วคราว", user.displayName, `@${user.username} · กรอกรหัสผ่านผิด ${attempts} ครั้งติดต่อกัน · ปลดล็อกอัตโนมัติ ${lockedUntil} น.`, "red", null);
+    return { attempts, lockedUntil, justLocked: true };
+  }
+  db.prepare(`UPDATE app_users SET failed_attempts = ? WHERE id = ?`).run(attempts, user.id);
+  return { attempts, lockedUntil: null, justLocked: false };
+}
+
+/** Resets the failure window after a successful login. */
+export function clearLoginFailures(db: SqliteDb, userId: number): void {
+  db.prepare(`UPDATE app_users SET failed_attempts = 0, locked_until = NULL WHERE id = ?`).run(userId);
+}
 
 /** Finds an ACTIVE app user by exact username. */
 export function findAppUserByUsername(db: SqliteDb, username: string): AppUser | undefined {
@@ -1368,7 +1467,7 @@ export function createAppSession(db: SqliteDb, userId: number): { sessionId: str
 /** Resolves an active, unexpired session to its (active) app user. */
 export function authenticateAppSession(db: SqliteDb, sessionId: string): AppUser | undefined {
   return db.prepare(
-    `SELECT u.id, u.username, u.password_hash AS passwordHash, u.display_name AS displayName, u.role, u.active, u.created_at AS createdAt
+    `SELECT u.id, u.username, u.password_hash AS passwordHash, u.display_name AS displayName, u.role, u.active, u.created_at AS createdAt, u.failed_attempts AS failedAttempts, u.locked_until AS lockedUntil
      FROM app_sessions s JOIN app_users u ON u.id = s.user_id
      WHERE s.id = ? AND s.expires_at > ? AND u.active = 1`,
   ).get(sessionId, formatDateTime()) as AppUser | undefined;
@@ -1463,9 +1562,11 @@ export type AppUserSummary = {
   role: "staff" | "admin";
   active: number;
   createdAt: string;
+  failedAttempts: number;
+  lockedUntil: string | null;
 };
 
-const APP_USER_SUMMARY_SELECT = `SELECT id, username, display_name AS displayName, role, active, created_at AS createdAt FROM app_users`;
+const APP_USER_SUMMARY_SELECT = `SELECT id, username, display_name AS displayName, role, active, created_at AS createdAt, failed_attempts AS failedAttempts, locked_until AS lockedUntil FROM app_users`;
 
 function getAppUserSummaryById(db: SqliteDb, userId: number): AppUserSummary | undefined {
   return db.prepare(`${APP_USER_SUMMARY_SELECT} WHERE id = ?`).get(userId) as AppUserSummary | undefined;
@@ -1474,6 +1575,26 @@ function getAppUserSummaryById(db: SqliteDb, userId: number): AppUserSummary | u
 /** Lists every login account, oldest first. Never exposes password hashes. */
 export function listAppUsers(db: SqliteDb): AppUserSummary[] {
   return db.prepare(`${APP_USER_SUMMARY_SELECT} ORDER BY id`).all() as unknown as AppUserSummary[];
+}
+
+/**
+ * Clears a temporary login lock (wrong-password lockout) before its automatic
+ * expiry and audits the early unlock. Accounts that are not locked refuse with
+ * a Thai error so the UI can distinguish "nothing to do" from success.
+ */
+export function unlockAppUser(db: SqliteDb, userId: number, actor = "ผู้บริหาร", actorRole?: string | null): AppUserSummary {
+  const user = getAppUserSummaryById(db, userId);
+  if (!user) throw new StoreError(`ไม่พบผู้ใช้ระบบรหัส ${userId} ในระบบ`);
+  const locked = user.lockedUntil !== null && loginLockRemainingMinutes(user.lockedUntil) > 0;
+  if (!locked && user.failedAttempts === 0) {
+    throw new StoreError(`บัญชี @${user.username} ไม่ได้ถูกระงับชั่วคราว จึงไม่ต้องปลดล็อก`);
+  }
+  db.prepare(`UPDATE app_users SET failed_attempts = 0, locked_until = NULL WHERE id = ?`).run(userId);
+  const detail = locked
+    ? `@${user.username} · ปลดล็อกก่อนกำหนด (เดิมระงับถึง ${user.lockedUntil} น.)`
+    : `@${user.username} · ล้างยอดพยายามเข้าสู่ระบบ ${user.failedAttempts}/${LOGIN_MAX_FAILURES} ครั้ง`;
+  logAction(db, "ปลดล็อกบัญชีผู้ใช้", actor, detail, "green", actorRole ?? null);
+  return { ...user, failedAttempts: 0, lockedUntil: null };
 }
 
 const USERNAME_PATTERN = /^[a-zA-Z0-9_.]{3,30}$/;

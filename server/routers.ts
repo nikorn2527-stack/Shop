@@ -7,8 +7,10 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { getWelfareDb } from "./welfareStore";
 import {
+  LOGIN_MAX_FAILURES,
   StoreError,
   checkout,
+  clearLoginFailures,
   createAppSession,
   createAppUser,
   createProduct,
@@ -26,8 +28,10 @@ import {
   listProducts,
   listStockRows,
   logAction,
+  loginLockRemainingMinutes,
   memberSpendingStats,
   receiveStock,
+  registerLoginFailure,
   registerMember,
   revokeAppSession,
   revokeOtherAppSessions,
@@ -37,6 +41,7 @@ import {
   setSettings,
   stockCount,
   stockCountLots,
+  unlockAppUser,
   updateAppUser,
   updateMember,
   updateProduct,
@@ -281,11 +286,30 @@ export const appRouter = router({
       .mutation(({ ctx, input }) =>
         withStoreErrors(() => {
           const db = getWelfareDb();
-          const user = findAppUserByUsername(db, input.username.trim());
+          const username = input.username.trim();
+          const user = findAppUserByUsername(db, username);
+          // Temporary wrong-password lockout: even the CORRECT password is
+          // refused while the lock is live (admins can unlock early).
+          if (user?.lockedUntil && loginLockRemainingMinutes(user.lockedUntil) > 0) {
+            const minutes = loginLockRemainingMinutes(user.lockedUntil);
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: `บัญชีถูกระงับชั่วคราวเนื่องจากกรอกรหัสผ่านผิดหลายครั้ง · ลองอีกครั้งในอีก ${minutes} นาที หรือติดต่อผู้บริหารเพื่อปลดล็อก`,
+            });
+          }
           // Same message for unknown user and wrong password: no user enumeration.
           if (!user || !verifyPassword(input.password, user.passwordHash)) {
-            throw new TRPCError({ code: "UNAUTHORIZED", message: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง" });
+            const failure = registerLoginFailure(db, username);
+            throw new TRPCError({
+              code: "UNAUTHORIZED",
+              message: failure.justLocked
+                ? "รหัสผ่านไม่ถูกต้อง · บัญชีถูกระงับชั่วคราว 15 นาที"
+                : failure.attempts > 0
+                  ? `ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง · พยายามแล้ว ${failure.attempts}/${LOGIN_MAX_FAILURES} ครั้ง`
+                  : "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง",
+            });
           }
+          clearLoginFailures(db, user.id);
           const roleThai = user.role === "admin" ? "ผู้บริหาร" : "เจ้าหน้าที่";
           const session = createAppSession(db, user.id);
           ctx.res.cookie(COOKIE_NAME, session.sessionId, {
@@ -369,6 +393,19 @@ export const appRouter = router({
             actor,
             actorRole,
           });
+        });
+      }),
+    unlock: publicProcedure
+      .input(z.object({ userId: z.number().int().positive() }))
+      .mutation(({ ctx, input }) => {
+        const { actor, actorRole } = resolveActor(ctx, {});
+        return withStoreErrors(() => {
+          if (!isAdminCtx(ctx, {})) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "การจัดการผู้ใช้ระบบต้องใช้สิทธิ์ผู้บริหาร" });
+          }
+          // Unlocking your own account is allowed: a locked admin with a live
+          // session should be able to clear their own lock without waiting.
+          return unlockAppUser(getWelfareDb(), input.userId, actor, actorRole);
         });
       }),
   }),

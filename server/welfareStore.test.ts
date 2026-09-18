@@ -3,8 +3,10 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  LOGIN_MAX_FAILURES,
   authenticateAppSession,
   checkout,
+  clearLoginFailures,
   createAppSession,
   createAppUser,
   createSqliteStore,
@@ -23,9 +25,11 @@ import {
   listMembers,
   listProducts,
   listStockRows,
+  loginLockRemainingMinutes,
   memberSpendingStats,
   openWelfareStore,
   receiveStock,
+  registerLoginFailure,
   registerMember,
   revokeAppSession,
   revokeOtherAppSessions,
@@ -38,6 +42,7 @@ import {
   setSettings,
   stockCount,
   stockCountLots,
+  unlockAppUser,
   updateAppUser,
   updateMember,
   updateProduct,
@@ -200,6 +205,99 @@ describe("POS checkout", () => {
         memberNumber: "M-000092",
       }),
     ).toThrowError(/สมาชิกถูกระงับ/);
+  });
+});
+
+describe("FIFO lot deduction at checkout", () => {
+  function lotRows(database: SqliteDb, productId: number) {
+    return database.prepare(`SELECT id, lot, qty FROM stock_lots WHERE product_id = ? ORDER BY id`).all(productId) as { id: number; lot: string; qty: number }[];
+  }
+
+  it("deducts FEFO across lots (earliest expiry first) and keeps lots in sync with product stock", () => {
+    const database = freshDb();
+    const water = productBySku(database, "DRK-001");
+    // Seed lot CR-2608-01 expires 2027-08-18; add one lot expiring sooner and one later.
+    receiveStock(database, water.id, "FEFO-SOON", "2026-10-01", 6, 4, "นายวรพจน์ ด.");
+    receiveStock(database, water.id, "FEFO-LATE", "2027-12-01", 8, 4.2, "นายวรพจน์ ด.");
+
+    const receipt = checkout(database, {
+      items: [{ productId: water.id, qty: 9 }],
+      paymentMethod: "เงินสด",
+    });
+    expect(receipt.total).toBeGreaterThan(0);
+
+    const rows = lotRows(database, water.id);
+    const byLot = Object.fromEntries(rows.map((row) => [row.lot, row.qty]));
+    // FEFO-SOON is exhausted first, the remaining 3 come from the seed lot (next expiry).
+    expect(byLot["FEFO-SOON"]).toBe(0);
+    expect(byLot["CR-2608-01"]).toBe(124 - 3);
+    expect(byLot["FEFO-LATE"]).toBe(8);
+    const lotSum = rows.reduce((sum, row) => sum + row.qty, 0);
+    expect(productBySku(database, "DRK-001").stock).toBe(lotSum);
+    // No shortfall note when the lots covered the sale.
+    expect(listAuditLogs(database, 1)[0].detail).not.toContain("ตัดยอด Lot ไม่ครบ");
+  });
+
+  it("consumes undated lots only after every dated lot", () => {
+    const database = freshDb();
+    const ice = productBySku(database, "ICE-004"); // seed lot "รับรายวัน" is undated (35)
+    receiveStock(database, ice.id, "ICE-DATED", "2026-10-05", 5, 6, "นายวรพจน์ ด.");
+
+    checkout(database, { items: [{ productId: ice.id, qty: 7 }], paymentMethod: "เงินสด" });
+
+    const byLot = Object.fromEntries(lotRows(database, ice.id).map((row) => [row.lot, row.qty]));
+    expect(byLot["ICE-DATED"]).toBe(0);
+    expect(byLot["รับรายวัน"]).toBe(35 - 2);
+    expect(productBySku(database, "ICE-004").stock).toBe(35 + 5 - 7);
+  });
+
+  it("tolerates lot shortfall (drift), zeroes the lots and flags it in the audit log", () => {
+    const database = freshDb();
+    const water = productBySku(database, "DRK-001");
+    // Simulate drift: lots far below the authoritative product stock.
+    database.prepare(`UPDATE stock_lots SET qty = 0 WHERE product_id = ?`).run(water.id);
+    receiveStock(database, water.id, "SMALL-LOT", "2027-01-01", 2, 4, "นายวรพจน์ ด.");
+    const stockBefore = productBySku(database, "DRK-001").stock; // 124 + 2 = 126
+
+    const receipt = checkout(database, {
+      items: [{ productId: water.id, qty: 5 }],
+      paymentMethod: "เงินสด",
+    });
+
+    expect(receipt.total).toBe(35); // 5 × ฿7 — the sale is NOT blocked by the drift.
+    expect(lotRows(database, water.id).every((row) => row.qty === 0)).toBe(true);
+    expect(productBySku(database, "DRK-001").stock).toBe(stockBefore - 5);
+    const latest = listAuditLogs(database, 1)[0];
+    expect(latest.action).toBe("ขายสินค้า");
+    expect(latest.detail).toContain("ตัดยอด Lot ไม่ครบ");
+    expect(latest.detail).toContain(`น้ำดื่มคริสตัล 600 มล. 3 ขวด`);
+  });
+
+  it("sells lot-less products unchanged (no crash, no audit note)", () => {
+    const database = freshDb();
+    const coffee = productBySku(database, "DRK-002");
+    database.prepare(`DELETE FROM stock_lots WHERE product_id = ?`).run(coffee.id);
+
+    const receipt = checkout(database, {
+      items: [{ productId: coffee.id, qty: 3 }],
+      paymentMethod: "เงินสด",
+    });
+
+    expect(receipt.orderNumber).toMatch(/^RC-/);
+    expect(productBySku(database, "DRK-002").stock).toBe(coffee.stock - 3);
+    expect(listAuditLogs(database, 1)[0].detail).not.toContain("ตัดยอด Lot ไม่ครบ");
+  });
+
+  it("rolls back lot deductions together with the sale when stock is insufficient", () => {
+    const database = freshDb();
+    const water = productBySku(database, "DRK-001");
+    const lotsBefore = lotRows(database, water.id);
+
+    expect(() =>
+      checkout(database, { items: [{ productId: water.id, qty: 9999 }], paymentMethod: "เงินสด" }),
+    ).toThrowError(/สต็อกไม่พอ/);
+    expect(lotRows(database, water.id)).toEqual(lotsBefore);
+    expect(productBySku(database, "DRK-001").stock).toBe(water.stock);
   });
 });
 
@@ -940,6 +1038,115 @@ describe("authentication", () => {
   });
 });
 
+describe("login lockout", () => {
+  function lockRow(database: SqliteDb, username: string) {
+    return database.prepare(`SELECT failed_attempts AS failedAttempts, locked_until AS lockedUntil FROM app_users WHERE username = ?`).get(username) as { failedAttempts: number; lockedUntil: string | null };
+  }
+
+  it("locks the account after the failure limit and audits it in red", () => {
+    const database = freshDb();
+    for (let attempt = 1; attempt < LOGIN_MAX_FAILURES; attempt++) {
+      const outcome = registerLoginFailure(database, "kanyanat");
+      expect(outcome).toMatchObject({ attempts: attempt, lockedUntil: null, justLocked: false });
+    }
+
+    const locking = registerLoginFailure(database, "kanyanat");
+    expect(locking).toMatchObject({ attempts: LOGIN_MAX_FAILURES, justLocked: true });
+    expect(locking.lockedUntil).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+    expect(loginLockRemainingMinutes(locking.lockedUntil!)).toBeGreaterThan(0);
+    expect(loginLockRemainingMinutes(locking.lockedUntil!)).toBeLessThanOrEqual(15);
+
+    expect(lockRow(database, "kanyanat")).toEqual({ failedAttempts: LOGIN_MAX_FAILURES, lockedUntil: locking.lockedUntil });
+    const latest = listAuditLogs(database, 1)[0];
+    expect(latest.action).toBe("ระงับบัญชีชั่วคราว");
+    expect(latest.tone).toBe("red");
+    expect(latest.detail).toContain("@kanyanat");
+    expect(latest.detail).toContain(`กรอกรหัสผ่านผิด ${LOGIN_MAX_FAILURES} ครั้งติดต่อกัน`);
+    expect(latest.detail).toContain(`ปลดล็อกอัตโนมัติ ${locking.lockedUntil} น.`);
+  });
+
+  it("does not stack attempts or audits while a lock is already live", () => {
+    const database = freshDb();
+    for (let i = 0; i < LOGIN_MAX_FAILURES; i++) registerLoginFailure(database, "kanyanat");
+    const before = lockRow(database, "kanyanat");
+    const logsBefore = tableCount(database, "audit_logs");
+
+    const outcome = registerLoginFailure(database, "kanyanat");
+    expect(outcome).toMatchObject({ attempts: before.failedAttempts, lockedUntil: before.lockedUntil, justLocked: false });
+    expect(lockRow(database, "kanyanat")).toEqual(before);
+    expect(tableCount(database, "audit_logs")).toBe(logsBefore);
+  });
+
+  it("restarts the failure window at 1 once the lock has expired", () => {
+    const database = freshDb();
+    for (let i = 0; i < LOGIN_MAX_FAILURES; i++) registerLoginFailure(database, "kanyanat");
+    // Force-expire the lock, then fail once more: a fresh window starts at 1.
+    database.prepare(`UPDATE app_users SET locked_until = '2020-01-01 00:00:00' WHERE username = 'kanyanat'`).run();
+
+    const outcome = registerLoginFailure(database, "kanyanat");
+    expect(outcome).toMatchObject({ attempts: 1, lockedUntil: null, justLocked: false });
+    expect(lockRow(database, "kanyanat")).toEqual({ failedAttempts: 1, lockedUntil: "2020-01-01 00:00:00" });
+  });
+
+  it("resets the window after a successful login (clearLoginFailures)", () => {
+    const database = freshDb();
+    const user = findAppUserByUsername(database, "kanyanat")!;
+    for (let i = 0; i < 3; i++) registerLoginFailure(database, "kanyanat");
+    expect(lockRow(database, "kanyanat").failedAttempts).toBe(3);
+
+    // Simulate the success path the router runs: clear, then verify a further
+    // failure sequence needs the FULL limit again before locking.
+    clearLoginFailures(database, user.id);
+    expect(lockRow(database, "kanyanat")).toEqual({ failedAttempts: 0, lockedUntil: null });
+
+    for (let i = 0; i < LOGIN_MAX_FAILURES - 1; i++) registerLoginFailure(database, "kanyanat");
+    expect(lockRow(database, "kanyanat").lockedUntil).toBeNull();
+  });
+
+  it("ignores unknown usernames (no counters, no audit)", () => {
+    const database = freshDb();
+    const logsBefore = tableCount(database, "audit_logs");
+
+    expect(registerLoginFailure(database, "ghost.user")).toMatchObject({ attempts: 0, lockedUntil: null, justLocked: false });
+    expect(tableCount(database, "audit_logs")).toBe(logsBefore);
+    expect(loginLockRemainingMinutes("2020-01-01 00:00:00")).toBe(0);
+  });
+
+  it("unlocks early with a green audit and refuses when nothing is locked", () => {
+    const database = freshDb();
+    const user = findAppUserByUsername(database, "kanyanat")!;
+    for (let i = 0; i < LOGIN_MAX_FAILURES; i++) registerLoginFailure(database, "kanyanat");
+    const lockedAt = lockRow(database, "kanyanat").lockedUntil;
+
+    const unlocked = unlockAppUser(database, user.id, "นายวรพจน์ ด.", "ผู้บริหาร");
+    expect(unlocked).toMatchObject({ id: user.id, username: "kanyanat", failedAttempts: 0, lockedUntil: null });
+    expect(lockRow(database, "kanyanat")).toEqual({ failedAttempts: 0, lockedUntil: null });
+    const latest = listAuditLogs(database, 1)[0];
+    expect(latest).toMatchObject({ action: "ปลดล็อกบัญชีผู้ใช้", actor: "นายวรพจน์ ด.", actorRole: "ผู้บริหาร", tone: "green" });
+    expect(latest.detail).toContain(`@kanyanat`);
+    expect(latest.detail).toContain(`เดิมระงับถึง ${lockedAt} น.`);
+
+    // Login works again immediately after the unlock.
+    expect(verifyPassword("1234", findAppUserByUsername(database, "kanyanat")!.passwordHash)).toBe(true);
+    expect(findAppUserByUsername(database, "kanyanat")!.lockedUntil).toBeNull();
+
+    // Second unlock has nothing to do; unknown ids fail with a Thai error.
+    expect(() => unlockAppUser(database, user.id)).toThrowError(/ไม่ได้ถูกระงับชั่วคราว/);
+    expect(() => unlockAppUser(database, 999)).toThrowError(/ไม่พบผู้ใช้ระบบรหัส 999/);
+  });
+
+  it("clears only the failure counter (no lock yet) via unlock", () => {
+    const database = freshDb();
+    const user = findAppUserByUsername(database, "kanyanat")!;
+    for (let i = 0; i < 2; i++) registerLoginFailure(database, "kanyanat");
+
+    const cleared = unlockAppUser(database, user.id, "นายวรพจน์ ด.", "ผู้บริหาร");
+    expect(cleared).toMatchObject({ failedAttempts: 0, lockedUntil: null });
+    const latest = listAuditLogs(database, 1)[0];
+    expect(latest.detail).toContain("ล้างยอดพยายามเข้าสู่ระบบ 2/5 ครั้ง");
+  });
+});
+
 describe("user management", () => {
   it("lists every account ordered by id and never exposes password hashes", () => {
     const database = freshDb();
@@ -947,7 +1154,7 @@ describe("user management", () => {
     expect(users.map((user) => user.username)).toEqual(["kanyanat", "woraphot"]);
     expect(users.map((user) => user.id)).toEqual([...users.map((user) => user.id)].sort((a, b) => a - b));
     for (const user of users) {
-      expect(Object.keys(user).sort()).toEqual(["active", "createdAt", "displayName", "id", "role", "username"]);
+      expect(Object.keys(user).sort()).toEqual(["active", "createdAt", "displayName", "failedAttempts", "id", "lockedUntil", "role", "username"]);
     }
     expect(JSON.stringify(users)).not.toContain("scrypt");
   });
