@@ -386,3 +386,42 @@ kbd { border-bottom-width: 2px; background: #f8fbf9; color: #748983; }
   .filter-pills button, .table-more { animation: none !important; transition: none !important; }
 }
 
+
+/* ── Task 7-b: product management ── */
+
+/* Compact action buttons in the จัดการสินค้า table */
+.product-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.mini-button { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; font-size: 12px; border-radius: 8px; border: 1px solid #d7e5df; background: #fff; color: #5b7370; transition: border-color .15s ease, background .15s ease, color .15s ease, transform .15s ease; }
+.mini-button:hover { border-color: #a9d4ca; color: var(--teal); background: #f4faf8; transform: translateY(-1px); }
+.mini-button:active { transform: translateY(0); }
+.mini-button:disabled { opacity: .55; cursor: wait; transform: none; }
+.mini-button.danger { border-color: #eec7c1; color: #b56b64; background: #fffaf9; }
+.mini-button.danger:hover { border-color: #dfa59e; color: #a4524b; background: #fdf1ef; }
+.mini-button.success { border-color: #b7ddca; color: #3f8d79; background: #f2faf5; }
+.mini-button.success:hover { border-color: #8fcdb5; color: var(--teal); background: #eaf6f0; }
+.mini-button:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+/* Archived product rows — muted but readable; status pill keeps full opacity */
+.archived-row td:not(.status-cell) { opacity: .62; filter: saturate(.82); }
+.table-wrap tbody tr.archived-row:not(.table-state-row):hover { background: #f6f9f7; }
+
+/* Product two-line cell (emoji bubble + name/sku) */
+.product-cell { display: flex; align-items: center; gap: 8px; }
+.product-cell > div { min-width: 0; }
+.product-cell-icon { width: 28px; height: 28px; flex: 0 0 28px; display: grid; place-items: center; border-radius: 8px; background: #eaf4f0; font-size: 13px; line-height: 1; }
+
+/* Status pill inline in edit-modal heading text */
+.form-modal .modal-heading p .status-pill { margin-left: 8px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .mini-button { transition: none !important; }
+}
+
+/* ── Task 7-c: receipt history & reprint ── */
+
+/* Reprint-mode receipt header — soft purple accent instead of success green (same sizes) */
+.receipt-success.reprint > span { background: #8e78bb; }
+.receipt-success.reprint b { color: #6d5791; }
+
+/* Clickable bill rows in ประวัติบิล (warm hover tint already global from 4-c) */
+.table-wrap tbody tr.sales-history-row { cursor: pointer; }

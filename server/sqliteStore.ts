@@ -82,8 +82,9 @@ export type SqliteStockRow = {
   stock: number;
   reorderPoint: number;
   receivedAt: string | null;
-  status: "ปกติ" | "สต็อกต่ำ" | "ใกล้หมดอายุ";
-  tone: "green" | "red" | "amber";
+  active: number;
+  status: "ปกติ" | "สต็อกต่ำ" | "ใกล้หมดอายุ" | "ปิดการขาย";
+  tone: "green" | "red" | "amber" | "purple";
 };
 
 export type SqliteSale = {
@@ -130,6 +131,9 @@ export type CheckoutReceipt = {
   memberName: string | null;
   balanceAfter: number | null;
 };
+
+/** A past receipt rebuilt from the sales/sale_items tables (balanceAfter is not reconstructable → null). */
+export type SaleHistoryEntry = CheckoutReceipt & { cashier: string | null };
 
 export type DailySalesRow = {
   date: string;
@@ -265,6 +269,9 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
   ensureColumn(db, "members", "type", "TEXT NOT NULL DEFAULT 'สมาชิก'");
   ensureColumn(db, "member_transactions", "balance_after", "REAL");
   ensureColumn(db, "audit_logs", "actor_role", "TEXT");
+  ensureColumn(db, "sale_items", "unit", "TEXT");
+  // Backfill units for sale_items rows written before the column existed (idempotent).
+  db.prepare("UPDATE sale_items SET unit = (SELECT p.unit FROM products p WHERE p.id = sale_items.product_id) WHERE unit IS NULL").run();
   return db;
 }
 
@@ -385,7 +392,10 @@ export function listAuditLogs(db: SqliteDb, limit = 200): SqliteAuditLog[] {
 
 // --- products & stock -------------------------------------------------------
 
-export function listProducts(db: SqliteDb): SqliteProduct[] {
+export function listProducts(db: SqliteDb, includeInactive = false): SqliteProduct[] {
+  if (includeInactive) {
+    return db.prepare(`SELECT id, sku, barcode, name, category, emoji, color, unit, price, cost, stock, reorder_point AS reorderPoint, active, created_at AS createdAt FROM products ORDER BY active DESC, id`).all() as unknown as SqliteProduct[];
+  }
   return db.prepare(`SELECT id, sku, barcode, name, category, emoji, color, unit, price, cost, stock, reorder_point AS reorderPoint, active, created_at AS createdAt FROM products WHERE active = 1 ORDER BY id`).all() as unknown as SqliteProduct[];
 }
 
@@ -478,12 +488,15 @@ export function receiveStock(
 }
 
 export function listStockRows(db: SqliteDb): SqliteStockRow[] {
-  const rows = db.prepare(`SELECT l.id, p.id AS productId, p.sku, p.name, p.unit, l.lot, l.expiry_date AS expiry, l.qty, l.cost, p.price, p.stock, p.reorder_point AS reorderPoint, l.received_at AS receivedAt FROM stock_lots l JOIN products p ON p.id = l.product_id ORDER BY p.sku, l.id`).all() as unknown as (Omit<SqliteStockRow, "status" | "tone">)[];
+  const rows = db.prepare(`SELECT l.id, p.id AS productId, p.sku, p.name, p.unit, l.lot, l.expiry_date AS expiry, l.qty, l.cost, p.price, p.stock, p.reorder_point AS reorderPoint, l.received_at AS receivedAt, p.active AS active FROM stock_lots l JOIN products p ON p.id = l.product_id ORDER BY p.sku, l.id`).all() as unknown as (Omit<SqliteStockRow, "status" | "tone">)[];
   const today = startOfToday();
   return rows.map((row) => {
     let status: SqliteStockRow["status"] = "ปกติ";
     let tone: SqliteStockRow["tone"] = "green";
-    if (row.stock <= row.reorderPoint) {
+    if (!row.active) {
+      status = "ปิดการขาย";
+      tone = "purple";
+    } else if (row.stock <= row.reorderPoint) {
       status = "สต็อกต่ำ";
       tone = "red";
     } else if (row.expiry) {
@@ -531,6 +544,111 @@ export function stockCount(db: SqliteDb, input: StockCountInput) {
     diff,
     product: getProductById(db, input.productId)!,
   };
+}
+
+export type UpdateProductInput = {
+  productId: number;
+  name?: string;
+  unit?: string;
+  price?: number;
+  cost?: number;
+  reorderPoint?: number;
+  category?: string;
+  emoji?: string;
+  actor?: string;
+  actorRole?: string;
+};
+
+/** Updates only the provided product fields. Undefined keeps the current value; only fields whose value actually changed are written/logged. */
+export function updateProduct(db: SqliteDb, input: UpdateProductInput): SqliteProduct {
+  const product = getProductById(db, input.productId);
+  if (!product) throw new StoreError(`ไม่พบสินค้ารหัส ${input.productId} ในระบบ`);
+  if (input.name !== undefined && !input.name.trim()) throw new StoreError("กรุณาระบุชื่อสินค้า");
+  if (input.unit !== undefined && !input.unit.trim()) throw new StoreError("กรุณาระบุหน่วยสินค้า");
+  if (input.price !== undefined && !(input.price > 0)) throw new StoreError("ราคาขายต้องมากกว่า 0");
+  if (input.cost !== undefined && input.cost < 0) throw new StoreError("ต้นทุนต้องเป็น 0 ขึ้นไป");
+  if (input.reorderPoint !== undefined && (!Number.isInteger(input.reorderPoint) || input.reorderPoint < 0)) throw new StoreError("จุดสั่งซื้อต้องเป็นจำนวนเต็ม 0 ขึ้นไป");
+
+  const assignments: string[] = [];
+  const values: (string | number | null)[] = [];
+  const changedLabels: string[] = [];
+  const normalizeEmoji = (value: string | undefined) => value?.trim() || null;
+
+  if (input.name !== undefined && input.name.trim() !== product.name) {
+    assignments.push("name = ?");
+    values.push(input.name.trim());
+    changedLabels.push("ชื่อ");
+  }
+  if (input.unit !== undefined && input.unit.trim() !== product.unit) {
+    assignments.push("unit = ?");
+    values.push(input.unit.trim());
+    changedLabels.push("หน่วย");
+  }
+  if (input.price !== undefined && round2(input.price) !== product.price) {
+    assignments.push("price = ?");
+    values.push(round2(input.price));
+    changedLabels.push("ราคาขาย");
+  }
+  if (input.cost !== undefined && round2(input.cost) !== product.cost) {
+    assignments.push("cost = ?");
+    values.push(round2(input.cost));
+    changedLabels.push("ต้นทุน");
+  }
+  if (input.reorderPoint !== undefined && input.reorderPoint !== product.reorderPoint) {
+    assignments.push("reorder_point = ?");
+    values.push(input.reorderPoint);
+    changedLabels.push("จุดสั่งซื้อ");
+  }
+  if (input.category !== undefined && input.category.trim() !== product.category) {
+    assignments.push("category = ?");
+    values.push(input.category.trim());
+    changedLabels.push("หมวดหมู่");
+  }
+  if (input.emoji !== undefined && normalizeEmoji(input.emoji) !== product.emoji) {
+    assignments.push("emoji = ?");
+    values.push(normalizeEmoji(input.emoji));
+    changedLabels.push("สัญลักษณ์");
+  }
+
+  const displayName = input.name?.trim() || product.name;
+  const changeSummary = changedLabels.length > 0 ? `แก้ไข: ${changedLabels.join(", ")}` : "ตรวจสอบข้อมูลแล้ว · ไม่มีการเปลี่ยนแปลง";
+  const detail = `${product.sku} · ${displayName} · ${changeSummary}`;
+
+  runInTransaction(db, () => {
+    if (assignments.length > 0) {
+      db.prepare(`UPDATE products SET ${assignments.join(", ")} WHERE id = ?`).run(...values, input.productId);
+    }
+    logAction(db, "แก้ไขสินค้า", input.actor?.trim() || "เจ้าหน้าที่ร้านค้า", detail, "blue", input.actorRole ?? null, formatDateTime());
+  });
+  return getProductById(db, input.productId)!;
+}
+
+export type SetProductActiveInput = {
+  productId: number;
+  active: boolean;
+  actor?: string;
+  actorRole?: string;
+};
+
+/** Archives (active = 0) or restores (active = 1) a product. Archived products keep their stock, lots and history. */
+export function setProductActive(db: SqliteDb, input: SetProductActiveInput): SqliteProduct {
+  const product = getProductById(db, input.productId);
+  if (!product) throw new StoreError(`ไม่พบสินค้ารหัส ${input.productId} ในระบบ`);
+  const nextActive = input.active ? 1 : 0;
+  if (product.active === nextActive) return product;
+  runInTransaction(db, () => {
+    db.prepare(`UPDATE products SET active = ? WHERE id = ?`).run(nextActive, input.productId);
+    logAction(
+      db,
+      input.active ? "เปิดขายสินค้า" : "ปิดการขายสินค้า",
+      input.actor?.trim() || "เจ้าหน้าที่ร้านค้า",
+      `${product.sku} · ${product.name} · คงเหลือ ${product.stock} ${product.unit}`,
+      input.active ? "green" : "purple",
+      input.actorRole ?? null,
+      formatDateTime(),
+    );
+  });
+  return getProductById(db, input.productId)!;
 }
 
 // --- POS checkout -----------------------------------------------------------
@@ -616,10 +734,10 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
       createdAt,
     );
     const saleId = Number(saleResult.lastInsertRowid);
-    const insertItem = db.prepare(`INSERT INTO sale_items (sale_id, product_id, name, qty, price, cost) VALUES (?, ?, ?, ?, ?, ?)`);
+    const insertItem = db.prepare(`INSERT INTO sale_items (sale_id, product_id, name, qty, price, cost, unit) VALUES (?, ?, ?, ?, ?, ?, ?)`);
     const updateStock = db.prepare(`UPDATE products SET stock = stock - ? WHERE id = ?`);
     for (const item of items) {
-      insertItem.run(saleId, item.productId, item.name, item.qty, item.price, item.cost);
+      insertItem.run(saleId, item.productId, item.name, item.qty, item.price, item.cost, item.unit);
       updateStock.run(item.qty, item.productId);
     }
 
@@ -652,6 +770,63 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
       balanceAfter,
     };
   });
+}
+
+// --- sales history (receipt reprint) ---------------------------------------
+
+export type SalesListInput = {
+  search?: string;
+  limit?: number;
+};
+
+/** Lists past receipts, newest first. Search matches order number or member number (case-insensitive contains). */
+export function salesList(db: SqliteDb, input: SalesListInput = {}): SaleHistoryEntry[] {
+  const search = input.search?.trim();
+  const limit = Math.max(1, Math.min(500, Math.floor(input.limit ?? 50)));
+  const conditions: string[] = [];
+  const params: string[] = [];
+  if (search) {
+    conditions.push("(s.order_number LIKE ? OR s.member_number LIKE ?)");
+    params.push(`%${search}%`, `%${search}%`);
+  }
+  const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
+  const sales = db.prepare(`SELECT s.id, s.order_number AS orderNumber, s.payment_method AS paymentMethod, s.member_number AS memberNumber, s.subtotal, s.discount, s.total, s.cashier, s.created_at AS createdAt, m.first_name || ' ' || m.last_name AS memberName FROM sales s LEFT JOIN members m ON m.member_number = s.member_number${where} ORDER BY s.created_at DESC, s.id DESC LIMIT ?`).all(...params, limit) as unknown as {
+    id: number;
+    orderNumber: string;
+    paymentMethod: string;
+    memberNumber: string | null;
+    subtotal: number;
+    discount: number;
+    total: number;
+    cashier: string | null;
+    createdAt: string;
+    memberName: string | null;
+  }[];
+  if (sales.length === 0) return [];
+
+  const placeholders = sales.map(() => "?").join(", ");
+  const itemRows = db.prepare(`SELECT si.sale_id AS saleId, si.product_id AS productId, si.name, COALESCE(si.unit, p.unit, 'ชิ้น') AS unit, si.qty, si.price, ROUND(si.qty * si.price, 2) AS amount FROM sale_items si LEFT JOIN products p ON p.id = si.product_id WHERE si.sale_id IN (${placeholders})`).all(...sales.map((sale) => sale.id)) as unknown as { saleId: number; productId: number; name: string; unit: string; qty: number; price: number; amount: number }[];
+  const itemsBySale = new Map<number, SaleHistoryEntry["items"]>();
+  for (const row of itemRows) {
+    const bucket = itemsBySale.get(row.saleId) ?? [];
+    bucket.push({ productId: row.productId, name: row.name, unit: row.unit, qty: row.qty, price: row.price, amount: row.amount });
+    itemsBySale.set(row.saleId, bucket);
+  }
+
+  return sales.map((sale) => ({
+    orderNumber: sale.orderNumber,
+    createdAt: sale.createdAt,
+    items: itemsBySale.get(sale.id) ?? [],
+    subtotal: sale.subtotal,
+    discount: sale.discount,
+    total: sale.total,
+    paymentMethod: sale.paymentMethod,
+    memberNumber: sale.memberNumber,
+    memberName: sale.memberName?.trim() || null,
+    // Historical balance-after cannot be reconstructed from the sales table.
+    balanceAfter: null,
+    cashier: sale.cashier,
+  }));
 }
 
 // --- members & wallet -------------------------------------------------------
@@ -1094,7 +1269,7 @@ function seedHistoricalSales(db: SqliteDb) {
   const today = startOfToday();
   runInTransaction(db, () => {
     const insertSale = db.prepare(`INSERT INTO sales (order_number, payment_method, member_number, subtotal, discount, total, cashier, created_at) VALUES (?, ?, NULL, ?, ?, ?, ?, ?)`);
-    const insertItem = db.prepare(`INSERT INTO sale_items (sale_id, product_id, name, qty, price, cost) VALUES (?, ?, ?, ?, ?, ?)`);
+    const insertItem = db.prepare(`INSERT INTO sale_items (sale_id, product_id, name, qty, price, cost, unit) VALUES (?, ?, ?, ?, ?, ?, ?)`);
     for (let daysAgo = 30; daysAgo >= 1; daysAgo -= 1) {
       const date = addDays(today, -daysAgo);
       const orders = 90 + Math.floor(rand() * 40);
@@ -1118,7 +1293,7 @@ function seedHistoricalSales(db: SqliteDb) {
         const result = insertSale.run(orderNumber, paymentMethod, subtotal, discount, total, cashier, createdAt);
         const saleId = Number(result.lastInsertRowid);
         for (const { product, qty } of items) {
-          insertItem.run(saleId, product.id, product.name, qty, product.price, product.cost);
+          insertItem.run(saleId, product.id, product.name, qty, product.price, product.cost, product.unit);
         }
       }
     }

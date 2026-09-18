@@ -1,13 +1,12 @@
 import { useMemo, useState } from "react";
-import html2canvas from "html2canvas";
-import { jsPDF } from "jspdf";
 import { TRPCClientError } from "@trpc/client";
 import {
-  Activity, ArrowDownToLine, ArrowUpFromLine, BarChart3, Bell, Camera, Crown, Boxes, CalendarDays, Check, ChevronDown, CircleAlert, CircleHelp, ClipboardList, CreditCard, Download, FileBarChart, FileImage, LayoutDashboard, Menu, Minus, LockKeyhole, MoreHorizontal, PackagePlus, PackageSearch, Plus, Printer, QrCode, ReceiptText, RotateCcw, Search, ScanLine, Settings2, ShieldCheck, ShoppingBag, ShoppingCart, SlidersHorizontal, Trash2, Upload, UserCircle2, UsersRound, WalletCards, X,
+  Activity, ArrowDownToLine, ArrowUpFromLine, BarChart3, Bell, Camera, Crown, Boxes, CalendarDays, Check, ChevronDown, CircleAlert, CircleHelp, ClipboardList, CreditCard, FileBarChart, FileImage, LayoutDashboard, Menu, Minus, LockKeyhole, MoreHorizontal, PackagePlus, PackageSearch, Plus, QrCode, ReceiptText, RotateCcw, Search, ScanLine, Settings2, ShieldCheck, ShoppingBag, ShoppingCart, SlidersHorizontal, Trash2, Upload, UserCircle2, UsersRound, WalletCards, X,
 } from "lucide-react";
 import type { CartItem, MemberLite, Product, Role } from "./pageData";
 import { addScannedItem, calculateCartSubtotal, money } from "./pageData";
 import { ConfirmDialog, SectionHeader } from "./PagePrimitives";
+import { ReceiptModal } from "@/components/ReceiptModal";
 import { trpc } from "@/lib/trpc";
 
 /** Product row straight from trpc.product.list (backend SqliteProduct). */
@@ -38,13 +37,6 @@ function getErrorMessage(error: unknown) {
   return "เกิดข้อผิดพลาดในการเชื่อมต่อระบบ กรุณาลองอีกครั้ง";
 }
 
-/** "2026-09-18 14:42:33" → "18 ก.ย. 2569 · 14:42 น." */
-function formatReceiptDateTime(value: string) {
-  const date = new Date(value.includes("T") ? value : value.replace(" ", "T"));
-  if (Number.isNaN(date.getTime())) return value;
-  return `${date.toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" })} · ${date.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })} น.`;
-}
-
 export function Pos({ shortcut, setShortcut, role }: { shortcut: string; setShortcut: (value: string) => void; role: Role }) {
   const utils = trpc.useUtils();
   const productsQuery = trpc.product.list.useQuery(undefined);
@@ -67,7 +59,6 @@ export function Pos({ shortcut, setShortcut, role }: { shortcut: string; setShor
   const [walletNote, setWalletNote] = useState("");
   const [walletMemberNumber, setWalletMemberNumber] = useState("");
   const [cancelOpen, setCancelOpen] = useState(false);
-  const [receiptBusy, setReceiptBusy] = useState("");
   const products = useMemo<StoreProduct[]>(() => (productsQuery.data ?? []).map((product) => ({
     id: product.id,
     name: product.name,
@@ -199,26 +190,6 @@ export function Pos({ shortcut, setShortcut, role }: { shortcut: string; setShor
       utils.stock.rows.invalidate(),
     ]);
   };
-  const downloadReceipt = async (format: "pdf" | "image") => {
-    const element = document.getElementById("receipt-paper");
-    if (!element || !receipt) return;
-    setReceiptBusy(format);
-    try {
-      const canvas = await html2canvas(element, { scale: 2, backgroundColor: "#ffffff" });
-      const filename = `${receipt.orderNumber}.${format === "pdf" ? "pdf" : "png"}`;
-      if (format === "image") {
-        const link = document.createElement("a");
-        link.download = filename;
-        link.href = canvas.toDataURL("image/png");
-        link.click();
-      } else {
-        const pdf = new jsPDF({ orientation: "portrait", unit: "px", format: [canvas.width, canvas.height] });
-        pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, canvas.width, canvas.height);
-        pdf.save(filename);
-      }
-      setMessage(`ดาวน์โหลดใบเสร็จ ${format === "pdf" ? "PDF" : "รูปภาพ"} แล้ว`);
-    } finally { setReceiptBusy(""); }
-  };
   const payDisabled = cart.length === 0 || checkoutMutation.isPending;
   return <>
     <SectionHeader eyebrow="หน้าร้าน / จุดขายสินค้า" title="POS · ขายสินค้า" description="สแกนบาร์โค้ดหรือค้นหาสินค้า แล้วเลือกวิธีชำระเงินที่ต้องการ" action={<div className="pos-status"><span className="live-dot" /> จุดขายที่ 01 · เปิดให้บริการ</div>} />
@@ -228,5 +199,5 @@ export function Pos({ shortcut, setShortcut, role }: { shortcut: string; setShor
     </div>
     <div className="shortcut-strip"><div><span className="eyebrow">ทางลัด</span><b>รายการที่ไม่ใช่สินค้า</b><small>เติมเงิน ถอนเงิน หรือรายการที่ระบุยูนิตไม่ได้</small></div><button onClick={() => runShortcut("เติมเงิน")}><ArrowDownToLine size={17} /><span>เติมเงินสมาชิก</span><kbd>F2</kbd></button><button onClick={() => runShortcut("ถอนเงิน")}><ArrowUpFromLine size={17} /><span>ถอนเงินสมาชิก</span><kbd>F3</kbd></button><button onClick={() => runShortcut("สินค้าไม่ระบุตายตัว")}><SlidersHorizontal size={17} /><span>เพิ่มรายการพิเศษ</span><kbd>F4</kbd></button></div>
     {scanOpen && <div className="modal-backdrop" onClick={() => setScanOpen(false)}><div className="scanner-modal" onClick={(event) => event.stopPropagation()}><div className="modal-heading"><div><span className="eyebrow">SIMULATED SCANNER</span><h2>สแกนบาร์โค้ดสินค้า</h2><p>จำลองการเปิดกล้องเพื่ออ่านรหัสสินค้า</p></div><button className="icon-button" onClick={() => setScanOpen(false)}><X size={17} /></button></div><div className="scanner-viewport"><div className="scanner-corner tl" /><div className="scanner-corner tr" /><div className="scanner-corner bl" /><div className="scanner-corner br" /><div className="scanner-line" /><ScanLine size={46} /><span>เล็งบาร์โค้ดให้อยู่ในกรอบ</span></div><div className="scanner-input"><label>รหัสบาร์โค้ดตัวอย่าง</label><div className="search-field"><ScanLine size={16} /><input autoFocus value={barcode} onChange={(event) => setBarcode(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") simulateScan(); }} placeholder="เช่น 8850000000017 หรือ DRK-001" /><button onClick={() => simulateScan()}><Check size={16} /></button></div></div>{error && <div className="inline-message error"><CircleAlert size={15} /> {error}</div>}<div className="sample-codes"><span>ลองสแกน:</span>{sampleCodes.map((product) => <button key={product.barcode} onClick={() => { setBarcode(product.barcode!); simulateScan(product.barcode!); }}>{product.barcode} · {product.name.split(" ").slice(0, 2).join(" ")}</button>)}</div><div className="scanner-footer"><span><RotateCcw size={14} /> สแกนซ้ำเพื่อเพิ่มจำนวนสินค้า</span><button className="outline-button" onClick={() => setScanOpen(false)}>ยกเลิก</button></div></div></div>}
-    {receiptOpen && receipt && <div className="modal-backdrop" onClick={() => setReceiptOpen(false)}><div className="receipt-modal" onClick={(event) => event.stopPropagation()}><div className="receipt-success"><span><Check size={22} /></span><div><b>ชำระเงินสำเร็จ</b><small>ตรวจสอบรายละเอียดก่อนพิมพ์หรือเริ่มรายการใหม่</small></div><button className="icon-button" onClick={() => setReceiptOpen(false)}><X size={17} /></button></div><div className="receipt-paper" id="receipt-paper"><div className="receipt-brand"><div className="brand-mark small"><span>ส</span></div><div><b>ร้านค้าสวัสดิการ รพจ.</b><small>โรงพยาบาลผู้ป่วยจิตเวช</small></div></div><div className="receipt-divider" /><div className="receipt-meta"><span>ใบเสร็จเลขที่ <b>{receipt.orderNumber}</b></span><span>{formatReceiptDateTime(receipt.createdAt)}</span></div><div className="receipt-customer"><span>ผู้ซื้อ</span><b>{receipt.memberName ? `สมาชิก${receipt.memberName} · ${receipt.memberNumber}` : "บุคคลทั่วไป"}</b></div>{receipt.items.map((item) => <div className="receipt-line" key={`${item.productId}-${item.name}`}><span>{item.name}<small>{item.qty} {item.unit} × {money(item.price)}</small></span><b>{money(item.amount)}</b></div>)}<div className="receipt-line"><span>ยอดรวมสินค้า</span><b>{money(receipt.subtotal)}</b></div>{receipt.discount > 0 && <div className="receipt-line"><span>ส่วนลด</span><b>- {money(receipt.discount)}</b></div>}<div className="receipt-total"><span>ยอดชำระทั้งหมด</span><b>{money(receipt.total)}</b></div><div className="receipt-payment"><span>วิธีชำระเงิน</span><b>{receipt.paymentMethod}</b></div>{receipt.paymentMethod === "หักบัญชีสมาชิก" && receipt.balanceAfter !== null && <div className="receipt-balance"><span>ยอดคงเหลือหลังรายการ</span><b>{money(receipt.balanceAfter)}</b></div>}<div className="receipt-thanks">ขอบคุณที่ใช้บริการ<br /><small>ข้อมูลรายการถูกบันทึกในระบบ Log แล้ว</small></div></div><div className="receipt-actions"><button className="outline-button" disabled={Boolean(receiptBusy)} onClick={() => downloadReceipt("pdf")}><Download size={16} /> {receiptBusy === "pdf" ? "กำลังสร้าง PDF..." : "ดาวน์โหลด PDF"}</button><button className="outline-button" disabled={Boolean(receiptBusy)} onClick={() => downloadReceipt("image")}><FileImage size={16} /> {receiptBusy === "image" ? "กำลังสร้างรูป..." : "ดาวน์โหลดรูปภาพ"}</button><button className="outline-button" onClick={() => { setReceiptOpen(false); setMessage("ส่งใบเสร็จไปพิมพ์แล้ว"); }}><Printer size={16} /> พิมพ์ใบเสร็จ</button><button className="primary-button" onClick={startNewSale}><Plus size={16} /> เริ่มรายการขายใหม่</button></div></div></div>}<ConfirmDialog open={cancelOpen} title="ยืนยันการยกเลิกรายการขาย?" description="สินค้าที่อยู่ในบิลนี้จะถูกล้างออก และยังไม่บันทึกเป็นธุรกรรม" confirmLabel="ยืนยันยกเลิกบิล" onCancel={() => setCancelOpen(false)} onConfirm={() => { setCart([]); setCancelOpen(false); setMessage("ยกเลิกรายการขายแล้ว"); }} /></>;
+    {receiptOpen && receipt && <ReceiptModal receipt={receipt} onClose={() => setReceiptOpen(false)} onNewSale={startNewSale} onPrinted={() => setMessage("ส่งใบเสร็จไปพิมพ์แล้ว")} />}<ConfirmDialog open={cancelOpen} title="ยืนยันการยกเลิกรายการขาย?" description="สินค้าที่อยู่ในบิลนี้จะถูกล้างออก และยังไม่บันทึกเป็นธุรกรรม" confirmLabel="ยืนยันยกเลิกบิล" onCancel={() => setCancelOpen(false)} onConfirm={() => { setCart([]); setCancelOpen(false); setMessage("ยกเลิกรายการขายแล้ว"); }} /></>;
 }

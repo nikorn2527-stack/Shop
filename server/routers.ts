@@ -20,10 +20,13 @@ import {
   listStockRows,
   receiveStock,
   registerMember,
+  salesList,
   setMemberStatus,
+  setProductActive,
   setSettings,
   stockCount,
   updateMember,
+  updateProduct,
   walletTx,
 } from "./sqliteStore";
 
@@ -130,6 +133,38 @@ const productCreateInput = z.object({
   actorRole: z.string().optional(),
 });
 
+// Plain z.number() for price/cost/reorderPoint so the Thai StoreError validation surfaces instead of a zod message.
+const productUpdateInput = z.object({
+  productId: z.number().int(),
+  name: z.string().optional(),
+  unit: z.string().optional(),
+  price: z.number().optional(),
+  cost: z.number().optional(),
+  reorderPoint: z.number().optional(),
+  category: z.string().optional(),
+  emoji: z.string().optional(),
+  actor: z.string().optional(),
+  actorRole: z.string().optional(),
+});
+
+const productSetActiveInput = z.object({
+  productId: z.number().int(),
+  active: z.boolean(),
+  actor: z.string().optional(),
+  actorRole: z.string().optional(),
+});
+
+const productListInput = z
+  .object({ includeInactive: z.boolean().optional() })
+  .nullish();
+
+const salesListInput = z
+  .object({
+    search: z.string().optional(),
+    limit: z.number().int().min(1).max(500).optional(),
+  })
+  .nullish();
+
 const stockReceiveInput = z.object({
   productId: z.number().int(),
   lot: z.string().optional(),
@@ -184,11 +219,30 @@ export const appRouter = router({
 
   product: router({
     list: publicProcedure
-      .input(z.unknown().optional())
-      .query(() => withStoreErrors(() => listProducts(getWelfareDb()))),
+      .input(productListInput)
+      .query(({ input }) => withStoreErrors(() => listProducts(getWelfareDb(), input?.includeInactive ?? false))),
     create: publicProcedure
       .input(productCreateInput)
       .mutation(({ input }) => withStoreErrors(() => createProduct(getWelfareDb(), input))),
+    update: publicProcedure
+      .input(productUpdateInput)
+      .mutation(({ input }) => withStoreErrors(() => updateProduct(getWelfareDb(), input))),
+    setActive: publicProcedure
+      .input(productSetActiveInput)
+      .mutation(({ input }) =>
+        withStoreErrors(() => {
+          if ((input.actorRole ?? "").trim() !== "ผู้บริหาร") {
+            throw new TRPCError({ code: "FORBIDDEN", message: "การปิด/เปิดการขายสินค้าต้องใช้สิทธิ์ผู้บริหาร" });
+          }
+          return setProductActive(getWelfareDb(), input);
+        }),
+      ),
+  }),
+
+  sales: router({
+    list: publicProcedure
+      .input(salesListInput)
+      .query(({ input }) => withStoreErrors(() => salesList(getWelfareDb(), input ?? {}))),
   }),
 
   stock: router({

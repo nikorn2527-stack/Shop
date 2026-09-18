@@ -1,4 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import {
   checkout,
   createSqliteStore,
@@ -12,14 +15,18 @@ import {
   listMembers,
   listProducts,
   listStockRows,
+  openWelfareStore,
   receiveStock,
   registerMember,
+  salesList,
   seedWelfareStoreData,
   setMemberStatus,
   setMemberNumberMode,
+  setProductActive,
   setSettings,
   stockCount,
   updateMember,
+  updateProduct,
   walletTx,
 } from "./sqliteStore";
 import type { SqliteDb, SqliteProduct } from "./sqliteStore";
@@ -463,6 +470,252 @@ describe("member deletion", () => {
 
     expect(() => deleteMember(database, { memberNumber: "M-000242", actorRole: "ผู้บริหาร" })).toThrowError(/สมาชิกมีประวัติธุรกรรมในระบบ · ใช้การระงับการใช้งานแทนการลบ/);
     expect(getMemberDetail(database, "M-000242")).toBeDefined();
+  });
+});
+
+describe("product editing", () => {
+  it("updates only the changed fields, persists them and logs an audit entry", () => {
+    const database = freshDb();
+    const rice = productBySku(database, "FD-014");
+
+    const updated = updateProduct(database, {
+      productId: rice.id,
+      name: "ข้าวกล่องกะเพราไก่ (พิเศษ)",
+      unit: "กล่อง",
+      price: 48,
+      cost: 34,
+      reorderPoint: 12,
+      category: "อาหาร",
+      emoji: "🍱",
+      actor: "นายวรพจน์ ด.",
+      actorRole: "ผู้บริหาร",
+    });
+
+    expect(updated.name).toBe("ข้าวกล่องกะเพราไก่ (พิเศษ)");
+    expect(updated.price).toBe(48);
+    expect(updated.cost).toBe(34);
+    expect(updated.reorderPoint).toBe(12);
+    expect(updated.unit).toBe("กล่อง");
+    expect(updated.sku).toBe("FD-014");
+    expect(updated.stock).toBe(rice.stock);
+
+    const persisted = listProducts(database).find((item) => item.id === rice.id);
+    expect(persisted?.name).toBe("ข้าวกล่องกะเพราไก่ (พิเศษ)");
+    expect(persisted?.price).toBe(48);
+    expect(persisted?.cost).toBe(34);
+    expect(persisted?.reorderPoint).toBe(12);
+
+    const latest = listAuditLogs(database, 1)[0];
+    expect(latest.action).toBe("แก้ไขสินค้า");
+    expect(latest.actor).toBe("นายวรพจน์ ด.");
+    expect(latest.actorRole).toBe("ผู้บริหาร");
+    expect(latest.tone).toBe("blue");
+    expect(latest.detail).toBe("FD-014 · ข้าวกล่องกะเพราไก่ (พิเศษ) · แก้ไข: ชื่อ, ราคาขาย, ต้นทุน, จุดสั่งซื้อ");
+  });
+
+  it("logs ไม่มีการเปลี่ยนแปลง when every provided value matches the current one", () => {
+    const database = freshDb();
+    const rice = productBySku(database, "FD-014");
+
+    const updated = updateProduct(database, {
+      productId: rice.id,
+      name: rice.name,
+      unit: rice.unit,
+      price: rice.price,
+      cost: rice.cost,
+      reorderPoint: rice.reorderPoint,
+    });
+
+    expect(updated.name).toBe(rice.name);
+    expect(updated.price).toBe(rice.price);
+    const latest = listAuditLogs(database, 1)[0];
+    expect(latest.action).toBe("แก้ไขสินค้า");
+    expect(latest.detail).toBe(`${rice.sku} · ${rice.name} · ตรวจสอบข้อมูลแล้ว · ไม่มีการเปลี่ยนแปลง`);
+  });
+
+  it("rejects an unknown product id with a Thai error", () => {
+    const database = freshDb();
+    expect(() => updateProduct(database, { productId: 999, name: "ไม่มีจริง" })).toThrowError(/ไม่พบสินค้ารหัส 999 ในระบบ/);
+  });
+
+  it("rejects invalid values with Thai errors and keeps the row intact", () => {
+    const database = freshDb();
+    const rice = productBySku(database, "FD-014");
+    expect(() => updateProduct(database, { productId: rice.id, price: 0 })).toThrowError(/ราคาขายต้องมากกว่า 0/);
+    expect(() => updateProduct(database, { productId: rice.id, price: -5 })).toThrowError(/ราคาขายต้องมากกว่า 0/);
+    expect(() => updateProduct(database, { productId: rice.id, cost: -1 })).toThrowError(/ต้นทุนต้องเป็น 0 ขึ้นไป/);
+    expect(() => updateProduct(database, { productId: rice.id, reorderPoint: -1 })).toThrowError(/จุดสั่งซื้อต้องเป็นจำนวนเต็ม 0 ขึ้นไป/);
+    expect(() => updateProduct(database, { productId: rice.id, reorderPoint: 2.5 })).toThrowError(/จุดสั่งซื้อต้องเป็นจำนวนเต็ม 0 ขึ้นไป/);
+    expect(() => updateProduct(database, { productId: rice.id, name: "   " })).toThrowError(/กรุณาระบุชื่อสินค้า/);
+    expect(() => updateProduct(database, { productId: rice.id, unit: "" })).toThrowError(/กรุณาระบุหน่วยสินค้า/);
+    const persisted = listProducts(database).find((item) => item.id === rice.id);
+    expect(persisted?.name).toBe(rice.name);
+    expect(persisted?.price).toBe(rice.price);
+    expect(persisted?.cost).toBe(rice.cost);
+    expect(persisted?.reorderPoint).toBe(rice.reorderPoint);
+    expect(persisted?.unit).toBe(rice.unit);
+    // boundary values are valid
+    expect(updateProduct(database, { productId: rice.id, cost: 0 }).cost).toBe(0);
+    expect(updateProduct(database, { productId: rice.id, reorderPoint: 0 }).reorderPoint).toBe(0);
+  });
+});
+
+describe("product archive", () => {
+  it("archives a product, logs ปิดการขาย and hides it from the default list", () => {
+    const database = freshDb();
+    const masks = productBySku(database, "HYG-033");
+
+    const archived = setProductActive(database, { productId: masks.id, active: false, actor: "นายวรพจน์ ด.", actorRole: "ผู้บริหาร" });
+
+    expect(archived.active).toBe(0);
+    expect(archived.name).toBe(masks.name);
+    expect(archived.stock).toBe(masks.stock);
+    const latest = listAuditLogs(database, 1)[0];
+    expect(latest.action).toBe("ปิดการขายสินค้า");
+    expect(latest.tone).toBe("purple");
+    expect(latest.actor).toBe("นายวรพจน์ ด.");
+    expect(latest.actorRole).toBe("ผู้บริหาร");
+    expect(latest.detail).toBe(`HYG-033 · หน้ากากอนามัย 3 ชิ้น · คงเหลือ ${masks.stock} ${masks.unit}`);
+
+    expect(listProducts(database).some((item) => item.id === masks.id)).toBe(false);
+    const everything = listProducts(database, true);
+    expect(everything).toHaveLength(8);
+    expect(everything.findIndex((item) => item.id === masks.id)).toBe(7);
+    expect(everything.slice(0, 7).every((item) => item.active === 1)).toBe(true);
+
+    const maskLot = listStockRows(database).find((row) => row.productId === masks.id);
+    expect(maskLot?.status).toBe("ปิดการขาย");
+    expect(maskLot?.tone).toBe("purple");
+    const waterLot = listStockRows(database).find((row) => row.sku === "DRK-001");
+    expect(waterLot?.status).toBe("ปกติ");
+    expect(waterLot?.tone).toBe("green");
+  });
+
+  it("edits an archived product, restores it and logs เปิดขายสินค้า", () => {
+    const database = freshDb();
+    const masks = productBySku(database, "HYG-033");
+    setProductActive(database, { productId: masks.id, active: false });
+
+    const edited = updateProduct(database, { productId: masks.id, reorderPoint: 25 });
+    expect(edited.active).toBe(0);
+    expect(edited.reorderPoint).toBe(25);
+
+    const restored = setProductActive(database, { productId: masks.id, active: true, actor: "นายวรพจน์ ด.", actorRole: "ผู้บริหาร" });
+    expect(restored.active).toBe(1);
+    expect(restored.reorderPoint).toBe(25);
+    expect(listProducts(database).some((item) => item.id === masks.id)).toBe(true);
+    const latest = listAuditLogs(database, 1)[0];
+    expect(latest.action).toBe("เปิดขายสินค้า");
+    expect(latest.tone).toBe("green");
+    expect(latest.detail).toBe(`HYG-033 · หน้ากากอนามัย 3 ชิ้น · คงเหลือ ${masks.stock} ${masks.unit}`);
+    const maskLot = listStockRows(database).find((row) => row.productId === masks.id);
+    expect(maskLot?.status).not.toBe("ปิดการขาย");
+  });
+
+  it("returns the product without writing a log when the status already matches", () => {
+    const database = freshDb();
+    const water = productBySku(database, "DRK-001");
+    const logsBefore = tableCount(database, "audit_logs");
+    const noop = setProductActive(database, { productId: water.id, active: true, actor: "นายวรพจน์ ด.", actorRole: "ผู้บริหาร" });
+    expect(noop.active).toBe(1);
+    expect(tableCount(database, "audit_logs")).toBe(logsBefore);
+  });
+
+  it("rejects an unknown product id with a Thai error", () => {
+    const database = freshDb();
+    expect(() => setProductActive(database, { productId: 999, active: false })).toThrowError(/ไม่พบสินค้ารหัส 999 ในระบบ/);
+  });
+});
+
+describe("sales history", () => {
+  it("returns receipts newest first with items, units and member names", () => {
+    const database = freshDb();
+    const water = productBySku(database, "DRK-001");
+    const receipt = checkout(database, {
+      items: [{ productId: water.id, qty: 2 }],
+      paymentMethod: "หักบัญชีสมาชิก",
+      memberNumber: "M-000241",
+      cashier: "น.ส.กัญญาณัฐ พ.",
+    });
+
+    const entries = salesList(database, { limit: 10 });
+    expect(entries).toHaveLength(10);
+    expect(entries[0].orderNumber).toBe(receipt.orderNumber);
+    expect(entries[0].createdAt).toBe(receipt.createdAt);
+    expect(entries[0].paymentMethod).toBe("หักบัญชีสมาชิก");
+    expect(entries[0].memberNumber).toBe("M-000241");
+    expect(entries[0].memberName).toContain("สมชาย");
+    expect(entries[0].cashier).toBe("น.ส.กัญญาณัฐ พ.");
+    expect(entries[0].balanceAfter).toBeNull();
+    expect(entries[0].items).toEqual([{ productId: water.id, name: water.name, unit: "ขวด", qty: 2, price: water.price, amount: 14 }]);
+    for (let index = 1; index < entries.length; index += 1) {
+      expect(entries[index - 1].createdAt >= entries[index].createdAt).toBe(true);
+    }
+    expect(entries.every((entry) => entry.items.length > 0 && entry.items.every((item) => item.unit.length > 0))).toBe(true);
+    const cash = entries.find((entry) => entry.paymentMethod === "เงินสด");
+    expect(cash?.memberNumber).toBeNull();
+    expect(cash?.memberName).toBeNull();
+    expect(cash?.balanceAfter).toBeNull();
+  });
+
+  it("finds receipts by order number and member number (case-insensitive)", () => {
+    const database = freshDb();
+    const water = productBySku(database, "DRK-001");
+    const receipt = checkout(database, {
+      items: [{ productId: water.id, qty: 2 }],
+      paymentMethod: "หักบัญชีสมาชิก",
+      memberNumber: "M-000241",
+      cashier: "น.ส.กัญญาณัฐ พ.",
+    });
+
+    const exact = salesList(database, { search: receipt.orderNumber });
+    expect(exact).toHaveLength(1);
+    expect(exact[0].orderNumber).toBe(receipt.orderNumber);
+    expect(exact[0].memberName).toContain("สมชาย");
+
+    const lower = salesList(database, { search: receipt.orderNumber.toLowerCase() });
+    expect(lower).toHaveLength(1);
+    expect(lower[0].orderNumber).toBe(receipt.orderNumber);
+
+    const byMember = salesList(database, { search: "M-000241" });
+    expect(byMember).toHaveLength(1);
+    expect(byMember[0].orderNumber).toBe(receipt.orderNumber);
+
+    const byPrefix = salesList(database, { search: "RC-", limit: 500 });
+    expect(byPrefix.length).toBeGreaterThan(1);
+    expect(byPrefix.every((entry) => entry.orderNumber.startsWith("RC-"))).toBe(true);
+  });
+
+  it("respects the requested limit and defaults to 50", () => {
+    const database = freshDb();
+    expect(salesList(database, { limit: 3 })).toHaveLength(3);
+    const total = tableCount(database, "sales");
+    expect(salesList(database)).toHaveLength(Math.min(50, total));
+  });
+
+  it("backfills sale_items.unit when opening a pre-migration database file", () => {
+    const dir = mkdtempSync(join(tmpdir(), "welfare-backfill-"));
+    const filename = join(dir, "store.sqlite");
+    try {
+      const seeded = openWelfareStore(filename);
+      seeded.close();
+
+      // Simulate a database written before the unit column existed.
+      const stripped = createSqliteStore(filename);
+      stripped.prepare("UPDATE sale_items SET unit = NULL").run();
+      const remaining = (stripped.prepare("SELECT COUNT(*) AS count FROM sale_items WHERE unit IS NULL").get() as { count: number }).count;
+      expect(remaining).toBeGreaterThan(0);
+      stripped.close();
+
+      const migrated = openWelfareStore(filename);
+      const nullUnits = (migrated.prepare("SELECT COUNT(*) AS count FROM sale_items WHERE unit IS NULL").get() as { count: number }).count;
+      expect(nullUnits).toBe(0);
+      const sample = migrated.prepare("SELECT unit FROM sale_items LIMIT 1").get() as { unit: string };
+      expect(sample.unit.length).toBeGreaterThan(0);
+      migrated.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 
