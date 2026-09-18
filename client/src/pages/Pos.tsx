@@ -41,6 +41,10 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
   const utils = trpc.useUtils();
   const productsQuery = trpc.product.list.useQuery(undefined);
   const membersQuery = trpc.member.list.useQuery();
+  // Store settings drive POS behavior: autoPrintReceipt fires window.print()
+  // right after a successful checkout (passed to ReceiptModal), and
+  // showBalanceOnReceipt is read inside ReceiptModal for every slip.
+  const settingsQuery = trpc.settings.get.useQuery(undefined);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("ทั้งหมด");
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -88,6 +92,7 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
       setReceiptOpen(true);
       setError("");
       setMessage(`ชำระเงินสำเร็จด้วย${result.paymentMethod} · บิล ${result.orderNumber}`);
+      if (settingsQuery.data?.autoPrintReceipt) setMessage(`ชำระเงินสำเร็จด้วย${result.paymentMethod} · บิล ${result.orderNumber} · สั่งพิมพ์ใบเสร็จอัตโนมัติแล้ว`);
     },
     onError: (mutationError) => setError(getErrorMessage(mutationError)),
   });
@@ -199,5 +204,5 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
     </div>
     <div className="shortcut-strip"><div><span className="eyebrow">ทางลัด</span><b>รายการที่ไม่ใช่สินค้า</b><small>เติมเงิน ถอนเงิน หรือรายการที่ระบุยูนิตไม่ได้</small></div><button onClick={() => runShortcut("เติมเงิน")}><ArrowDownToLine size={17} /><span>เติมเงินสมาชิก</span><kbd>F2</kbd></button><button onClick={() => runShortcut("ถอนเงิน")}><ArrowUpFromLine size={17} /><span>ถอนเงินสมาชิก</span><kbd>F3</kbd></button><button onClick={() => runShortcut("สินค้าไม่ระบุตายตัว")}><SlidersHorizontal size={17} /><span>เพิ่มรายการพิเศษ</span><kbd>F4</kbd></button></div>
     {scanOpen && <div className="modal-backdrop" onClick={() => setScanOpen(false)}><div className="scanner-modal" onClick={(event) => event.stopPropagation()}><div className="modal-heading"><div><span className="eyebrow">SIMULATED SCANNER</span><h2>สแกนบาร์โค้ดสินค้า</h2><p>จำลองการเปิดกล้องเพื่ออ่านรหัสสินค้า</p></div><button className="icon-button" onClick={() => setScanOpen(false)}><X size={17} /></button></div><div className="scanner-viewport"><div className="scanner-corner tl" /><div className="scanner-corner tr" /><div className="scanner-corner bl" /><div className="scanner-corner br" /><div className="scanner-line" /><ScanLine size={46} /><span>เล็งบาร์โค้ดให้อยู่ในกรอบ</span></div><div className="scanner-input"><label>รหัสบาร์โค้ดตัวอย่าง</label><div className="search-field"><ScanLine size={16} /><input autoFocus value={barcode} onChange={(event) => setBarcode(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") simulateScan(); }} placeholder="เช่น 8850000000017 หรือ DRK-001" /><button onClick={() => simulateScan()}><Check size={16} /></button></div></div>{error && <div className="inline-message error"><CircleAlert size={15} /> {error}</div>}<div className="sample-codes"><span>ลองสแกน:</span>{sampleCodes.map((product) => <button key={product.barcode} onClick={() => { setBarcode(product.barcode!); simulateScan(product.barcode!); }}>{product.barcode} · {product.name.split(" ").slice(0, 2).join(" ")}</button>)}</div><div className="scanner-footer"><span><RotateCcw size={14} /> สแกนซ้ำเพื่อเพิ่มจำนวนสินค้า</span><button className="outline-button" onClick={() => setScanOpen(false)}>ยกเลิก</button></div></div></div>}
-    {receiptOpen && receipt && <ReceiptModal receipt={receipt} onClose={startNewSale} onNewSale={startNewSale} onPrinted={() => setMessage("ส่งใบเสร็จไปพิมพ์แล้ว")} />}<ConfirmDialog open={cancelOpen} title="ยืนยันการยกเลิกรายการขาย?" description="สินค้าที่อยู่ในบิลนี้จะถูกล้างออก และยังไม่บันทึกเป็นธุรกรรม" confirmLabel="ยืนยันยกเลิกบิล" onCancel={() => setCancelOpen(false)} onConfirm={() => { setCart([]); setCancelOpen(false); setMessage("ยกเลิกรายการขายแล้ว"); }} /></>;
+    {receiptOpen && receipt && <ReceiptModal receipt={receipt} onClose={startNewSale} onNewSale={startNewSale} onPrinted={() => setMessage("ส่งใบเสร็จไปพิมพ์แล้ว")} autoPrint={settingsQuery.data?.autoPrintReceipt === true} />}<ConfirmDialog open={cancelOpen} title="ยืนยันการยกเลิกรายการขาย?" description="สินค้าที่อยู่ในบิลนี้จะถูกล้างออก และยังไม่บันทึกเป็นธุรกรรม" confirmLabel="ยืนยันยกเลิกบิล" onCancel={() => setCancelOpen(false)} onConfirm={() => { setCart([]); setCancelOpen(false); setMessage("ยกเลิกรายการขายแล้ว"); }} /></>;
 }

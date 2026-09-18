@@ -4,6 +4,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
+import { applyFontScale, readFontScale } from "./fontScale";
+
+// Apply the saved display size before the first paint to avoid a flash
+// of the default scale on devices that chose a larger font.
+applyFontScale(readFontScale());
 import App from "./App";
 import { startLogin } from "./const";
 import "./index.css";

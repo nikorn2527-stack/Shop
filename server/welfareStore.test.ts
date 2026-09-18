@@ -829,7 +829,8 @@ describe("sales history", () => {
     expect(entries[0].memberNumber).toBe("M-000241");
     expect(entries[0].memberName).toContain("สมชาย");
     expect(entries[0].cashier).toBe("น.ส.กัญญาณัฐ พ.");
-    expect(entries[0].balanceAfter).toBeNull();
+    // Reconstructed from the wallet purchase transaction (seed 340 − 14).
+    expect(entries[0].balanceAfter).toBe(326);
     expect(entries[0].items).toEqual([{ productId: water.id, name: water.name, unit: "ขวด", qty: 2, price: water.price, amount: 14 }]);
     for (let index = 1; index < entries.length; index += 1) {
       expect(entries[index - 1].createdAt >= entries[index].createdAt).toBe(true);

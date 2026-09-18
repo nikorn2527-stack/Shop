@@ -962,6 +962,12 @@ export function salesList(db: SqliteDb, input: SalesListInput = {}): SaleHistory
     itemsBySale.set(row.saleId, bucket);
   }
 
+  // Wallet purchases wrote the post-sale balance into member_transactions
+  // (`บิล #<orderNumber> · …` + balance_after). Replaying that row lets
+  // reprinted member receipts show the same ยอดคงเหลือหลังรายการ line the
+  // original slip had — historical sales before this table stay null.
+  const balanceLookup = db.prepare(`SELECT balance_after AS balanceAfter FROM member_transactions WHERE member_number = ? AND detail LIKE ? ORDER BY id DESC LIMIT 1`);
+
   return sales.map((sale) => ({
     orderNumber: sale.orderNumber,
     createdAt: sale.createdAt,
@@ -972,8 +978,9 @@ export function salesList(db: SqliteDb, input: SalesListInput = {}): SaleHistory
     paymentMethod: sale.paymentMethod,
     memberNumber: sale.memberNumber,
     memberName: sale.memberName?.trim() || null,
-    // Historical balance-after cannot be reconstructed from the sales table.
-    balanceAfter: null,
+    balanceAfter: sale.memberNumber
+      ? ((balanceLookup.get(sale.memberNumber, `บิล #${sale.orderNumber} ·%`) as { balanceAfter: number | null } | undefined)?.balanceAfter ?? null)
+      : null,
     cashier: sale.cashier,
   }));
 }
