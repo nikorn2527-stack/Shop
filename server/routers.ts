@@ -19,6 +19,7 @@ import {
   findAppUserByUsername,
   getMemberDetail,
   getSettings,
+  listAppSessions,
   listAppUsers,
   listAuditLogs,
   listMembers,
@@ -28,6 +29,8 @@ import {
   memberSpendingStats,
   receiveStock,
   registerMember,
+  revokeAppSession,
+  revokeOtherAppSessions,
   salesList,
   setMemberStatus,
   setProductActive,
@@ -356,6 +359,51 @@ export const appRouter = router({
             actor,
             actorRole,
           });
+        });
+      }),
+  }),
+
+  session: router({
+    /** Lists active sessions; the caller's own session is flagged `current`. */
+    list: publicProcedure
+      .input(z.unknown().optional())
+      .query(({ ctx }) =>
+        withStoreErrors(() => {
+          if (!isAdminCtx(ctx, {})) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "การจัดการเซสชันต้องใช้สิทธิ์ผู้บริหาร" });
+          }
+          const currentSessionId = readAppSessionCookie(ctx.req);
+          return listAppSessions(getWelfareDb()).map((session) => ({ ...session, current: session.sessionId === currentSessionId }));
+        }),
+      ),
+    revoke: publicProcedure
+      .input(z.object({ sessionId: z.string().min(1) }))
+      .mutation(({ ctx, input }) => {
+        const { actor, actorRole } = resolveActor(ctx, {});
+        return withStoreErrors(() => {
+          if (!isAdminCtx(ctx, {})) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "การจัดการเซสชันต้องใช้สิทธิ์ผู้บริหาร" });
+          }
+          // Revoking the session making this very request is what logout is for.
+          if (input.sessionId === readAppSessionCookie(ctx.req)) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "ไม่สามารถยกเลิกเซสชันที่กำลังใช้งานอยู่ · ใช้ปุ่มออกจากระบบ" });
+          }
+          return revokeAppSession(getWelfareDb(), input.sessionId, actor, actorRole);
+        });
+      }),
+    revokeOthers: publicProcedure
+      .input(z.unknown().optional())
+      .mutation(({ ctx }) => {
+        const { actor, actorRole } = resolveActor(ctx, {});
+        return withStoreErrors(() => {
+          if (!isAdminCtx(ctx, {})) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "การจัดการเซสชันต้องใช้สิทธิ์ผู้บริหาร" });
+          }
+          const currentSessionId = readAppSessionCookie(ctx.req);
+          if (!currentSessionId) {
+            throw new TRPCError({ code: "UNAUTHORIZED", message: "ไม่พบเซสชันที่ใช้งานอยู่" });
+          }
+          return { revoked: revokeOtherAppSessions(getWelfareDb(), currentSessionId, actor, actorRole) };
         });
       }),
   }),

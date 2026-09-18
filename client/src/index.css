@@ -649,3 +649,33 @@ nav button:active:not(:disabled),
 @media (prefers-reduced-motion: reduce) {
   .notif-dropdown { animation: none !important; }
 }
+
+/* ── Round 8: active sessions panel (Users view) + toolbar inline icons ── */
+.session-panel { margin-top: 17px; }
+.table-toolbar h2 .toolbar-icon { display: inline-block; vertical-align: -3px; margin-right: 6px; color: var(--teal); }
+.session-list { display: flex; flex-direction: column; gap: 9px; margin-top: 14px; }
+.session-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid #e7eeeb; border-radius: 11px; background: #fdfefe; transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease; }
+.session-row:hover { border-color: #d3e4de; box-shadow: 0 4px 14px rgba(30, 82, 70, .07); transform: translateY(-1px); }
+.session-row.current { border-color: #bfe3d6; background: #f4fbf8; box-shadow: inset 3px 0 0 #57b39a; }
+.session-row.current:hover { border-color: #a9d9c8; }
+.session-avatar { width: 34px; height: 34px; flex: 0 0 34px; display: grid; place-items: center; border-radius: 50%; font-size: 12px; font-weight: 600; }
+.session-avatar.admin { background: #fff3e0; color: #b8863d; }
+.session-avatar.staff { background: #e7f3f0; color: #4b8d82; }
+.session-main { flex: 1; min-width: 0; }
+.session-main b { display: block; color: #4c645e; font-size: 12px; }
+.session-main small { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 3px; color: #a0aaa7; font-size: 10px; }
+.session-main .user-role-badge { padding: 2px 7px; font-size: 8px; }
+.session-current-tag { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; padding: 1px 7px; border-radius: 20px; font-size: 8px; font-weight: 500; color: #3e8d7d; background: #e2f4ec; vertical-align: 1px; }
+.session-current-tag i { width: 5px; height: 5px; border-radius: 50%; background: #46a387; animation: sessionPulse 2s ease-out infinite; }
+.session-suspended-tag { padding: 1px 6px; border-radius: 20px; font-size: 8px; color: #c16b6e; background: #fff0f0; }
+.session-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; text-align: right; }
+.session-meta small { color: #97a3a0; font-size: 9px; font-variant-numeric: tabular-nums; }
+.session-meta small b { color: #7d8d88; font-weight: 600; }
+.session-id { font-family: "IBM Plex Mono", monospace; font-size: 8px; color: #b3bcbc; background: #f4f7f5; padding: 1px 6px; border-radius: 5px; letter-spacing: .3px; }
+.session-current-badge { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 20px; background: #e2f4ec; color: #3e8d7d; font-size: 9px; font-weight: 600; white-space: nowrap; }
+.session-skeleton { border-color: transparent; background: transparent; box-shadow: none !important; transform: none !important; }
+.session-skeleton .skeleton-cell-w { width: 130px; }
+.session-skeleton .skeleton-cell-n { width: 170px; height: 11px; }
+@keyframes sessionPulse { 0% { box-shadow: 0 0 0 0 rgba(70, 163, 135, .45); } 70% { box-shadow: 0 0 0 6px rgba(70, 163, 135, 0); } 100% { box-shadow: 0 0 0 0 rgba(70, 163, 135, 0); } }
+@media (max-width: 720px) { .session-row { flex-wrap: wrap; } .session-meta { flex-basis: 100%; flex-direction: row; justify-content: space-between; align-items: center; } .session-row > .mini-button, .session-row > .session-current-badge { margin-left: auto; } }
+@media (prefers-reduced-motion: reduce) { .session-current-tag i { animation: none !important; } .session-row { transition: none; transform: none; } .session-row:hover { transform: none; } }

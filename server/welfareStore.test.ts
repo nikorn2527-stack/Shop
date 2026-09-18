@@ -17,6 +17,7 @@ import {
   getMemberNumberMode,
   getSettings,
   hashPassword,
+  listAppSessions,
   listAppUsers,
   listAuditLogs,
   listMembers,
@@ -26,6 +27,8 @@ import {
   openWelfareStore,
   receiveStock,
   registerMember,
+  revokeAppSession,
+  revokeOtherAppSessions,
   salesList,
   seedSqliteDemoData,
   seedWelfareStoreData,
@@ -1054,5 +1057,76 @@ describe("member spending stats", () => {
   it("rejects unknown members with the same Thai error as member detail", () => {
     const database = freshDb();
     expect(() => memberSpendingStats(database, "M-999999")).toThrowError(/ไม่พบสมาชิก M-999999 ในระบบ/);
+  });
+});
+
+describe("active session administration", () => {
+  it("lists unexpired sessions newest-first with user info and purges expired rows", () => {
+    const database = freshDb();
+    const staff = findAppUserByUsername(database, "kanyanat")!;
+    const admin = findAppUserByUsername(database, "woraphot")!;
+
+    const older = createAppSession(database, staff.id);
+    const newer = createAppSession(database, admin.id);
+    database.prepare(`UPDATE app_sessions SET created_at = '2026-09-17 08:00:00' WHERE id = ?`).run(older.sessionId);
+
+    let rows = listAppSessions(database);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ sessionId: newer.sessionId, username: "woraphot", displayName: "วรพจน์ ด.", role: "admin" });
+    expect(rows[1]).toMatchObject({ sessionId: older.sessionId, username: "kanyanat" });
+
+    // Expired sessions vanish from the listing (housekeeping purge).
+    database.prepare(`UPDATE app_sessions SET expires_at = '2020-01-01 00:00:00' WHERE id = ?`).run(older.sessionId);
+    rows = listAppSessions(database);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].sessionId).toBe(newer.sessionId);
+  });
+
+  it("revokes one session, audits it with the login timestamp and rejects unknown ids", () => {
+    const database = freshDb();
+    const staff = findAppUserByUsername(database, "kanyanat")!;
+    const session = createAppSession(database, staff.id);
+    database.prepare(`UPDATE app_sessions SET created_at = '2026-09-18 09:12:00' WHERE id = ?`).run(session.sessionId);
+
+    const revoked = revokeAppSession(database, session.sessionId, "วรพจน์ ด.", "ผู้บริหาร");
+    expect(revoked).toMatchObject({ username: "kanyanat", displayName: "กัญญาณัฐ พ." });
+    expect(tableCount(database, "app_sessions")).toBe(0);
+    expect(authenticateAppSession(database, session.sessionId)).toBeUndefined();
+
+    const latest = listAuditLogs(database, 1)[0];
+    expect(latest).toMatchObject({ action: "ยกเลิกเซสชัน", actor: "วรพจน์ ด.", actorRole: "ผู้บริหาร", tone: "amber" });
+    expect(latest.detail).toBe("@kanyanat · เข้าสู่ระบบ 2026-09-18 09:12:00");
+
+    // Revoking an already-revoked (unknown) session is a Thai StoreError.
+    expect(() => revokeAppSession(database, session.sessionId, "วรพจน์ ด.", "ผู้บริหาร")).toThrowError(/ไม่พบเซสชันนี้ในระบบ/);
+  });
+
+  it("revokes every other session but keeps the caller's own, with one sweep audit entry", () => {
+    const database = freshDb();
+    const staff = findAppUserByUsername(database, "kanyanat")!;
+    const admin = findAppUserByUsername(database, "woraphot")!;
+
+    const mine = createAppSession(database, admin.id);
+    const staffOne = createAppSession(database, staff.id);
+    const staffTwo = createAppSession(database, staff.id);
+    const adminOld = createAppSession(database, admin.id);
+    expect(tableCount(database, "app_sessions")).toBe(4);
+
+    const revoked = revokeOtherAppSessions(database, mine.sessionId, "วรพจน์ ด.", "ผู้บริหาร");
+    expect(revoked).toBe(3);
+    expect(tableCount(database, "app_sessions")).toBe(1);
+    expect(authenticateAppSession(database, mine.sessionId)).toMatchObject({ username: "woraphot" });
+    expect(authenticateAppSession(database, staffOne.sessionId)).toBeUndefined();
+    expect(authenticateAppSession(database, staffTwo.sessionId)).toBeUndefined();
+    expect(authenticateAppSession(database, adminOld.sessionId)).toBeUndefined();
+
+    const latest = listAuditLogs(database, 1)[0];
+    expect(latest).toMatchObject({ action: "ยกเลิกเซสชันอื่นทั้งหมด", actor: "วรพจน์ ด.", tone: "amber" });
+    expect(latest.detail).toContain("3 เซสชัน");
+
+    // A second sweep with nothing left is a quiet no-op (no extra audit row).
+    const before = listAuditLogs(database, 5).length;
+    expect(revokeOtherAppSessions(database, mine.sessionId, "วรพจน์ ด.", "ผู้บริหาร")).toBe(0);
+    expect(listAuditLogs(database, 5).length).toBe(before);
   });
 });

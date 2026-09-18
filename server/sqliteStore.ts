@@ -1281,6 +1281,80 @@ export function deleteAppSession(db: SqliteDb, sessionId: string): void {
   db.prepare(`DELETE FROM app_sessions WHERE id = ?`).run(sessionId);
 }
 
+// --- active session administration (admin only) ------------------------------
+
+/** Active session without internal ids — safe to return to clients. */
+export type AppSessionSummary = {
+  sessionId: string;
+  username: string;
+  displayName: string;
+  role: "staff" | "admin";
+  active: number;
+  createdAt: string;
+  expiresAt: string;
+};
+
+/** Purges expired session rows (housekeeping shared by list/revoke helpers). */
+function purgeExpiredAppSessions(db: SqliteDb): void {
+  db.prepare(`DELETE FROM app_sessions WHERE expires_at < ?`).run(formatDateTime());
+}
+
+/**
+ * Lists every unexpired session with its owning user, newest login first.
+ * Suspended users keep their sessions listed (revoking them is the point).
+ */
+export function listAppSessions(db: SqliteDb): AppSessionSummary[] {
+  purgeExpiredAppSessions(db);
+  return db.prepare(
+    `SELECT s.id AS sessionId, u.username, u.display_name AS displayName, u.role, u.active, s.created_at AS createdAt, s.expires_at AS expiresAt
+     FROM app_sessions s JOIN app_users u ON u.id = s.user_id
+     WHERE s.expires_at > ?
+     ORDER BY s.created_at DESC, s.id DESC`,
+  ).all(formatDateTime()) as unknown as AppSessionSummary[];
+}
+
+/** Finds one unexpired session (with user info) by id. */
+function findAppSessionById(db: SqliteDb, sessionId: string): AppSessionSummary | undefined {
+  return db.prepare(
+    `SELECT s.id AS sessionId, u.username, u.display_name AS displayName, u.role, u.active, s.created_at AS createdAt, s.expires_at AS expiresAt
+     FROM app_sessions s JOIN app_users u ON u.id = s.user_id
+     WHERE s.id = ? AND s.expires_at > ?`,
+  ).get(sessionId, formatDateTime()) as AppSessionSummary | undefined;
+}
+
+/** Session revoke audit detail, e.g. "@kanyanat · เข้าสู่ระบบ 18 ก.ย. 09:12". */
+function sessionAuditDetail(session: AppSessionSummary): string {
+  return `@${session.username} · เข้าสู่ระบบ ${session.createdAt}`;
+}
+
+/**
+ * Revokes one active session by id and audits it. Unknown/expired ids are a
+ * StoreError so the UI can distinguish "already gone" from success.
+ */
+export function revokeAppSession(db: SqliteDb, sessionId: string, actor?: string, actorRole?: string | null): AppSessionSummary {
+  const session = findAppSessionById(db, sessionId);
+  if (!session) {
+    throw new StoreError("ไม่พบเซสชันนี้ในระบบ อาจหมดอายุหรือถูกยกเลิกไปแล้ว");
+  }
+  db.prepare(`DELETE FROM app_sessions WHERE id = ?`).run(sessionId);
+  logAction(db, "ยกเลิกเซสชัน", actor ?? "ผู้ใช้ระบบ", sessionAuditDetail(session), "amber", actorRole ?? null);
+  return session;
+}
+
+/**
+ * Revokes every active session EXCEPT the kept one (the caller's own) and
+ * audits the sweep as a single entry. Returns the number revoked.
+ */
+export function revokeOtherAppSessions(db: SqliteDb, keepSessionId: string, actor?: string, actorRole?: string | null): number {
+  purgeExpiredAppSessions(db);
+  const doomed = listAppSessions(db).filter((session) => session.sessionId !== keepSessionId);
+  if (doomed.length === 0) return 0;
+  const deleteAll = db.prepare(`DELETE FROM app_sessions WHERE id = ?`);
+  for (const session of doomed) deleteAll.run(session.sessionId);
+  logAction(db, "ยกเลิกเซสชันอื่นทั้งหมด", actor ?? "ผู้ใช้ระบบ", `${doomed.length} เซสชัน · เหลือเฉพาะเซสชันที่ใช้อยู่`, "amber", actorRole ?? null);
+  return doomed.length;
+}
+
 // --- app user administration (admin only) ------------------------------------
 
 /** AppUser without the password hash — safe to return to clients. */

@@ -28,7 +28,7 @@ const emptyEditForm = { name: "", unit: "ชิ้น", price: "", cost: "", reo
 const stockStatusFilters = ["ทั้งหมด", "ปกติ", "สต็อกต่ำ", "ใกล้หมดอายุ", "ปิดการขาย"] as const;
 type StockStatusFilter = (typeof stockStatusFilters)[number];
 
-export function Stock({ role }: { role: Role }) {
+export function Stock({ role, userName }: { role: Role; userName: string }) {
   const utils = trpc.useUtils();
   const stockQuery = trpc.stock.rows.useQuery(undefined);
   const productsQuery = trpc.product.list.useQuery(undefined);
@@ -52,7 +52,7 @@ export function Stock({ role }: { role: Role }) {
   const products = productsQuery.data ?? [];
   const stockRows = stockQuery.data ?? [];
   const allProducts = allProductsQuery.data ?? [];
-  const actor = role === "admin" ? "วรพจน์ ด." : "กัญญาณัฐ พ.";
+  const actor = userName || "ผู้ใช้ระบบ";
   const actorRole = role === "admin" ? "ผู้บริหาร" : "เจ้าหน้าที่";
   const inventoryValue = products.reduce((sum, product) => sum + product.stock * product.cost, 0);
   const lowStockCount = stockRows.filter((row) => row.status === "สต็อกต่ำ").length;

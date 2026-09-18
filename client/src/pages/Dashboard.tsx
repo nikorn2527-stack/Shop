@@ -26,7 +26,7 @@ function buildDepositsByDay(logs: { action: string; detail: string; createdAt: s
   return map;
 }
 
-export function Dashboard({ setView, setPosShortcut, role }: { setView: (view: View) => void; setPosShortcut: (shortcut: string) => void; role: Role }) {
+export function Dashboard({ setView, setPosShortcut, role, userName }: { setView: (view: View) => void; setPosShortcut: (shortcut: string) => void; role: Role; userName: string }) {
   const [range, setRange] = useState("30 วัน");
   const [selectedBar, setSelectedBar] = useState(5);
   const [bestMode, setBestMode] = useState("จำนวนขาย");
@@ -37,6 +37,9 @@ export function Dashboard({ setView, setPosShortcut, role }: { setView: (view: V
   const productsQuery = trpc.product.list.useQuery(undefined);
   const stats = statsQuery.data;
 
+  const firstName = (userName || "ผู้ใช้ระบบ").trim().split(/\s+/)[0];
+  const clockHour = new Date().getHours();
+  const greetingWord = clockHour < 12 ? "สวัสดีตอนเช้า" : clockHour < 17 ? "สวัสดีตอนบ่าย" : "สวัสดีตอนเย็น";
   const emojiByName = useMemo(() => {
     const map = new Map<string, string>();
     for (const product of productsQuery.data ?? []) map.set(product.name, product.emoji ?? "🛍️");
@@ -99,7 +102,7 @@ export function Dashboard({ setView, setPosShortcut, role }: { setView: (view: V
   const loading = statsQuery.isLoading;
   return (
     <>
-      <SectionHeader eyebrow={`ภาพรวมการดำเนินงาน · ${role === "admin" ? "มุมมองผู้บริหาร" : "มุมมองเจ้าหน้าที่"}`} title="สวัสดีค่ะ, กัญญาณัฐ" description="ดูภาพรวมร้านค้าสวัสดิการและรายการที่ควรติดตามวันนี้" action={<><div className={`permission-chip ${role}`}><span>{role === "admin" ? <Crown size={14} /> : <ShieldCheck size={14} />}</span>{role === "admin" ? "สิทธิ์ผู้บริหาร · วิเคราะห์เต็มรูปแบบ" : "สิทธิ์เจ้าหน้าที่ · ปฏิบัติงานหน้าร้าน"}</div><button className="outline-button"><CalendarDays size={16} /> วันนี้ <ChevronDown size={15} /></button></>} />
+      <SectionHeader eyebrow={`ภาพรวมการดำเนินงาน · ${role === "admin" ? "มุมมองผู้บริหาร" : "มุมมองเจ้าหน้าที่"}`} title={`${greetingWord}, ${firstName}`} description={`ยินดีต้อนรับ ${userName} เข้าสู่ระบบ · ดูภาพรวมร้านค้าสวัสดิการและรายการที่ควรติดตามวันนี้`} action={<><div className={`permission-chip ${role}`}><span>{role === "admin" ? <Crown size={14} /> : <ShieldCheck size={14} />}</span>{role === "admin" ? "สิทธิ์ผู้บริหาร · วิเคราะห์เต็มรูปแบบ" : "สิทธิ์เจ้าหน้าที่ · ปฏิบัติงานหน้าร้าน"}</div><button className="outline-button"><CalendarDays size={16} /> วันนี้ <ChevronDown size={15} /></button></>} />
       <div className="metric-grid">
         <div className="metric-card highlight"><div className="metric-top"><span>ยอดขายทั้งหมด · {range}</span><span className="metric-icon green"><ShoppingBag size={18} /></span></div><strong>{loading ? "…" : money(stats?.totalSales ?? 0)}</strong><div className="metric-foot"><span>{stats?.totalOrders ?? 0} บิล</span><span>สูงสุด {money(Math.max(...(stats?.revenueByDay ?? []).map((day) => day.total), 0))} ในหนึ่งวัน</span></div></div>
         <div className="metric-card"><div className="metric-top"><span>ออเดอร์ทั้งหมด</span><span className="metric-icon blue"><ReceiptText size={18} /></span></div><strong>{loading ? "…" : (stats?.totalOrders ?? 0).toLocaleString("th-TH")} <small>บิล</small></strong><div className="metric-foot"><span>เฉลี่ย {((stats?.totalOrders ?? 0) / rangeDays).toFixed(1)} บิล/วัน</span><span>ในช่วง{range}</span></div></div>

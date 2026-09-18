@@ -37,7 +37,7 @@ function getErrorMessage(error: unknown) {
   return "เกิดข้อผิดพลาดในการเชื่อมต่อระบบ กรุณาลองอีกครั้ง";
 }
 
-export function Pos({ shortcut, setShortcut, role }: { shortcut: string; setShortcut: (value: string) => void; role: Role }) {
+export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: string; setShortcut: (value: string) => void; role: Role; userName: string }) {
   const utils = trpc.useUtils();
   const productsQuery = trpc.product.list.useQuery(undefined);
   const membersQuery = trpc.member.list.useQuery();
@@ -80,7 +80,7 @@ export function Pos({ shortcut, setShortcut, role }: { shortcut: string; setShor
   const subtotal = calculateCartSubtotal(cart);
   const discountValue = Math.max(0, Number(discount) || 0);
   const payable = Math.max(0, subtotal - discountValue);
-  const cashier = role === "admin" ? "วรพจน์ ด." : "กัญญาณัฐ พ.";
+  const cashier = userName || "ผู้ใช้ระบบ";
   const actorRole = role === "admin" ? "ผู้บริหาร" : "เจ้าหน้าที่";
   const checkoutMutation = trpc.pos.checkout.useMutation({
     onSuccess: (result) => {
