@@ -932,7 +932,7 @@ describe("reports", () => {
     expect(expirySkus).toEqual(expect.arrayContaining(["FD-014", "FD-015", "DRK-003"]));
     expect(stats.memberWalletTotal).toBe(4620);
     expect(stats.memberCount).toEqual({ total: 5, active: 4, suspended: 1 });
-    expect(stats.recentActivities.length).toBeLessThanOrEqual(5);
+    expect(stats.recentActivities.length).toBeLessThanOrEqual(12);
   });
 });
 

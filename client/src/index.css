@@ -2216,3 +2216,231 @@ nav button.active small { color: #4c7a58; }
   .card-scroll { overflow: visible !important; }
   .theme-swatches, .logo-uploader, .brand-live-preview { display: none; }
 }
+
+/* ============================================================
+   ROUND 26 — footer บาง 1 บรรทัด + หน้าภาพรวมแบบ tab workspace
+   (user-mandated) ① ออกจากระบบอยู่ท้าย footer แต่ footer ต้อง
+   เป็นแถบบาง 1-2 บรรทัดต่อท้ายตารางเท่านั้น — ห้ามกินพื้นที่
+   ส่วนแสดงข้อมูล ② หน้าเดียว ≠ ย่อทุกอย่างจนตารางเห็นแค่ 1-2
+   แถว: ภาพรวม redesign เป็นแถบ KPI คงที่ + tab workspace ที่
+   แต่ละมุมมองได้พื้นที่เต็มจอ (ยอดขาย / ขายดี 10 อันดับ /
+   ต้องติดตาม / กิจกรรม) — รายการเห็น ~10 แถวขึ้นไปจริง
+   ============================================================ */
+
+/* (1) footer บาง — แถบสถานะ 1 บรรทัด ต่อท้ายเนื้อหา */
+.app-footer {
+  max-width: none;
+  margin: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 5px 34px;
+  min-height: 0;
+  font-size: 10px;
+  color: #a0a498;
+  background: #fbfaf6;
+  border-top: 1px solid #edf0ea;
+}
+.app-footer .footer-brand { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #8b9083; font-weight: 600; }
+.app-footer .footer-brand small { color: #aab0a2; font-weight: 400; }
+.app-footer .footer-help { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; color: #aab0a2; }
+.footer-logout { padding: 3px 11px; font-size: 10px; gap: 4px; }
+@media (max-width: 980px) { .app-footer .footer-help { display: none; } }
+@media (max-width: 820px) {
+  .app-footer { flex-direction: row; flex-wrap: wrap; row-gap: 2px; padding: 4px 16px; }
+}
+
+/* (2) dash-workbench — แถบ tab + เนื้อหาเต็มความสูงที่เหลือ
+       (metrics คงที่ด้านบน ไม่ถูกบีบ) */
+.dash-workbench { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+.dash-tabbar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid #e7eeeb;
+  border-bottom: 0;
+  border-radius: 14px 14px 0 0;
+}
+.dash-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #7f8579;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 13px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: .16s ease;
+  white-space: nowrap;
+}
+.dash-tab svg { opacity: .8; }
+.dash-tab:hover { color: var(--teal-dark); background: var(--teal-mist); }
+.dash-tab.active { color: var(--teal-dark); background: var(--teal-mist); border-color: #cfe8dd; box-shadow: inset 2.5px 0 0 var(--teal); }
+.tab-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 17px;
+  height: 17px;
+  border-radius: 20px;
+  font-size: 9px;
+  font-weight: 700;
+  font-style: normal;
+  padding: 0 5px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.tab-badge.red { background: #f9e5e3; color: #b05557; }
+.tab-badge.amber { background: #f7ecd9; color: #96682b; }
+.dash-tabbar-spacer { flex: 1 1 auto; }
+.dash-quick { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.dash-quick-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #dbe7e2;
+  background: #fff;
+  color: #53605a;
+  border-radius: 999px;
+  padding: 6px 13px;
+  font-family: inherit;
+  font-size: 11px;
+  cursor: pointer;
+  transition: .16s ease;
+  white-space: nowrap;
+}
+.dash-quick-pill b { font-weight: 600; }
+.dash-quick-pill:hover { border-color: var(--teal); color: var(--teal-dark); background: #f4fbf7; box-shadow: 0 3px 10px var(--teal-glow); }
+.dash-quick-pill:active { transform: scale(.96); }
+
+/* (3) tab body — กรอบใบงานเดียว สูงเต็มที่เหลือ; แต่ละ tab ใส่
+       panel เดียว (หรือกริด 2 คอลัมน์) แล้วเลื่อนข้อมูลข้างใน */
+.dash-tab-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid #e7eeeb;
+  border-radius: 0 0 14px 14px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.dash-tab-body > .panel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; border: 0; border-radius: 0; box-shadow: none; }
+.dash-tab-body .panel-heading, .dash-tab-body .alert-heading, .dash-tab-body .chart-interactive-meta, .dash-tab-body .chart-summary, .dash-tab-body .ranking-insight, .dash-tab-body .alert-footer-action { flex: 0 0 auto; }
+
+/* tab ยอดขาย — กราฟยืดเต็มความสูงที่เหลือ */
+.dash-tab-body .chart-wrap { flex: 1 1 auto; height: auto; min-height: 200px; }
+
+/* tab ขายดี — ตารางอันดับเลื่อนภายใน แถวไม่โดนบีบ */
+.dash-tab-body .product-ranking-chart { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
+
+/* tab ต้องติดตาม — 2 คอลัมน์เต็มส่วน คั่นด้วยเส้นประ */
+.dash-tab-body .inventory-alert-grid { flex: 1 1 auto; min-height: 0; margin: 0; gap: 0; }
+.dash-tab-body .inventory-alert-grid .alert-panel { display: flex; flex-direction: column; min-height: 0; }
+.dash-tab-body .inventory-alert-grid .alert-panel + .alert-panel { border-left: 1px dashed #e7eeeb; border-radius: 0; }
+.dash-tab-body .alert-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
+
+/* tab กิจกรรม — timeline เลื่อนภายใน (CSS แถว timeline ใช้ชุด Logs จาก ROUND 25) */
+.dash-activity-scroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 13px 16px 6px; }
+
+/* (4) one-screen lock เสริมจาก ROUND 24 — workbench คือลูกของ
+       page-content ที่กินพื้นที่ที่เหลือทั้งหมด (metrics และ header
+       คง shrink-0 ตามเดิม) */
+@media (min-width: 561px) {
+  .app-shell:not(.pos-terminal) .page-content > .dash-workbench { flex: 1 1 0; min-height: 0; }
+}
+
+/* (4b) จอเตี้ย (สูง ≤880px) — บีบ header + KPI ให้กราฟ/ตารางได้พื้นที่
+       เพิ่ม ~50px โดยข้อมูลตัวเลขยังอ่านชัด */
+@media (min-width: 561px) and (max-height: 880px) {
+  .section-header { margin-bottom: 12px; gap: 10px; }
+  .section-header h1 { font-size: 20px; }
+  .section-header p { margin: 3px 0 0; font-size: 11px; }
+  .metric-grid { margin-bottom: 12px; gap: 10px; }
+  .metric-card { min-height: 92px; padding: 11px 14px 9px; }
+  .metric-card strong { font-size: 20px; margin-top: 6px; }
+  .metric-card .metric-foot { font-size: 10px; }
+  .dash-tabbar { padding: 6px 8px; }
+  .dash-tab { padding: 6px 11px; }
+}
+
+/* (5) โทรศัพท์ ≤560px — แท็บกดง่ายขึ้น flow ตามธรรมชาติ (ไม่ล็อคจอ);
+       561-820px แผงต้องติดตามสแต็กแนวตั้ง → ย้ายเส้นคั่นไปคั่นบน-ล่าง */
+@media (max-width: 820px) {
+  .dash-tab-body .inventory-alert-grid .alert-panel + .alert-panel { border-left: 0; border-top: 1px dashed #e7eeeb; }
+}
+@media (max-width: 560px) {
+  .dash-tab { padding: 9px 13px; }
+  .dash-tabbar { gap: 4px; }
+  .dash-quick { width: 100%; }
+  .dash-quick-pill { flex: 1; justify-content: center; }
+}
+
+/* (6) print — คลายเฟรม แสดงทุก tab เป็นบล็อกต่อเนื่อง */
+@media print {
+  .app-footer { display: none; }
+  .dash-workbench, .dash-tab-body { display: block; overflow: visible; }
+  .dash-tab-body > .panel { display: block; overflow: visible; }
+  .dash-tabbar, .dash-quick { display: none; }
+  .dash-tab-body .product-ranking-chart, .dash-tab-body .alert-list, .dash-activity-scroll { overflow: visible; }
+}
+
+/* ============================================================
+   ROUND 26b — เลือกรูปแบบตามธรรมชาติของข้อมูล (user-mandated)
+   ไม่ใช่ทุกหน้าจะเป็นการ์ด: ธุรกรรมที่ไล่ตามเวลา (ประวัติบิล /
+   ระบบ Log / ฟีดกิจกรรมในภาพรวม) กลับมาเป็นแถวตารางเพื่อกวาดตา
+   หาข้อมูลเร็ว ส่วนเอนทิตีที่กดเข้าดูรายละเอียด (สมาชิก / สต็อก /
+   ผู้ใช้) คงเป็นการ์ดตามเดิม
+   ============================================================ */
+
+/* ตารางประวัติบิล — แถวกดเปิดใบเสร็จได้ทั้งแถว */
+.bill-history-table { min-width: 780px; }
+.bill-history-table th { white-space: nowrap; }
+.bill-history-table th.num, .bill-history-table td.num { text-align: right; }
+tr.clickable { cursor: pointer; }
+tr.clickable:hover td { background: #f4faf7; }
+.bill-history-table .bill-number { font-family: "IBM Plex Mono", monospace; font-size: 11px; font-weight: 700; color: #33422f; letter-spacing: -.2px; }
+.bill-items-cell { color: #727764; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 300px; display: block; }
+.bill-total-cell { font-family: "IBM Plex Mono", monospace; font-size: 12.5px; color: #33513f; white-space: nowrap; }
+.row-open { display: inline-flex; align-items: center; gap: 4px; border: 0; background: transparent; color: var(--teal); font-size: 10px; font-family: inherit; cursor: pointer; white-space: nowrap; padding: 3px 7px; border-radius: 7px; transition: .14s ease; }
+.row-open:hover { color: var(--teal-dark); background: var(--teal-mist); }
+.cell-mono { font-family: "IBM Plex Mono", monospace; color: #a1a497; white-space: nowrap; }
+
+/* ตาราง Log — จุดสีระดับ + เวลา mono + รายละเอียดยาวตัดด้วย ellipsis */
+.log-table { min-width: 680px; }
+.log-table th { white-space: nowrap; }
+.log-table .log-tone-cell { width: 20px; }
+.log-dot-mini { width: 8px; height: 8px; border-radius: 50%; display: inline-block; box-shadow: 0 0 0 2.5px #fff, 0 0 0 3.5px #d9e4df; }
+.log-dot-mini.tone-green { background: #4b987b; }
+.log-dot-mini.tone-amber { background: #c98a32; }
+.log-dot-mini.tone-red { background: #c26162; }
+.log-dot-mini.tone-blue { background: #5d91b5; }
+.log-dot-mini.tone-purple { background: #8267b5; }
+.log-detail-text { display: block; color: #727764; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 520px; }
+
+/* ฟีดกิจกรรมในแท็บภาพรวม — แถวกระชับ ไม่ล็อคความกว้างขั้นต่ำ */
+.log-table.compact { min-width: 0; }
+.log-table.compact td { padding: 7px 10px; }
+.log-table.compact .log-detail-text { max-width: 360px; }
+
+/* จอแคบ — รายละเอียดตัดสั้นลง ไม่ดันตารางเตะข้าง */
+@media (max-width: 900px) {
+  .log-detail-text { max-width: 260px; }
+  .bill-items-cell { max-width: 170px; }
+}
+
+/* พิมพ์ — ซ่อนปุ่มเปิดใบเสร็จในตาราง */
+@media print {
+  .row-open { display: none; }
+  tr.clickable { cursor: default; }
+}
