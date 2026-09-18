@@ -1,9 +1,19 @@
+import { mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
+import { dirname, resolve } from "node:path";
 
 const require = createRequire(import.meta.url);
 const { DatabaseSync } = require("node:sqlite") as typeof import("node:sqlite");
 
 export type SqliteDb = InstanceType<typeof DatabaseSync>;
+
+/** Business-rule error carrying a Thai, user-facing message. tRPC maps it to BAD_REQUEST. */
+export class StoreError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "StoreError";
+  }
+}
 
 export type SqliteMember = {
   id: number;
@@ -11,6 +21,8 @@ export type SqliteMember = {
   firstName: string;
   lastName: string;
   idCard: string | null;
+  phone: string | null;
+  type: string;
   balance: number;
   status: "active" | "suspended";
   createdAt: string;
@@ -23,7 +35,139 @@ export type SqliteTransaction = {
   detail: string;
   amount: number;
   paymentMethod: string | null;
+  balanceAfter: number | null;
   createdAt: string;
+};
+
+export type SqliteMemberSummary = {
+  id: number;
+  memberNumber: string;
+  firstName: string;
+  lastName: string;
+  type: string;
+  balance: number;
+  status: "active" | "suspended";
+  createdAt: string;
+  lastTransactionAt: string | null;
+};
+
+export type SqliteProduct = {
+  id: number;
+  sku: string;
+  barcode: string | null;
+  name: string;
+  category: string;
+  emoji: string | null;
+  color: string | null;
+  unit: string;
+  price: number;
+  cost: number;
+  stock: number;
+  reorderPoint: number;
+  active: number;
+  createdAt: string;
+};
+
+export type SqliteStockRow = {
+  id: number;
+  productId: number;
+  sku: string;
+  name: string;
+  unit: string;
+  lot: string;
+  expiry: string | null;
+  qty: number;
+  cost: number;
+  price: number;
+  stock: number;
+  reorderPoint: number;
+  receivedAt: string | null;
+  status: "ปกติ" | "สต็อกต่ำ" | "ใกล้หมดอายุ";
+  tone: "green" | "red" | "amber";
+};
+
+export type SqliteSale = {
+  id: number;
+  orderNumber: string;
+  paymentMethod: string;
+  memberNumber: string | null;
+  subtotal: number;
+  discount: number;
+  total: number;
+  cashier: string | null;
+  createdAt: string;
+};
+
+export type SqliteSaleItem = {
+  id: number;
+  saleId: number;
+  productId: number | null;
+  name: string;
+  qty: number;
+  price: number;
+  cost: number;
+};
+
+export type SqliteAuditLog = {
+  id: number;
+  action: string;
+  actor: string;
+  actorRole: string | null;
+  detail: string;
+  tone: string;
+  createdAt: string;
+};
+
+export type CheckoutReceipt = {
+  orderNumber: string;
+  createdAt: string;
+  items: { productId: number; name: string; unit: string; qty: number; price: number; amount: number }[];
+  subtotal: number;
+  discount: number;
+  total: number;
+  paymentMethod: string;
+  memberNumber: string | null;
+  memberName: string | null;
+  balanceAfter: number | null;
+};
+
+export type DailySalesRow = {
+  date: string;
+  orders: number;
+  items: number;
+  revenue: number;
+  cogs: number;
+  profit: number;
+};
+
+export type DashboardStats = {
+  rangeDays: number;
+  totalSales: number;
+  totalOrders: number;
+  itemsSold: number;
+  bestSellerCount: number;
+  avgDailySales: number;
+  revenueByDay: { date: string; total: number }[];
+  bestSellers: { name: string; qty: number; revenue: number }[];
+  lowStock: { id: number; sku: string; name: string; unit: string; stock: number; reorderPoint: number }[];
+  expirySoon: { id: number; productId: number; sku: string; name: string; unit: string; lot: string; expiry: string; qty: number }[];
+  recentActivities: SqliteAuditLog[];
+  memberWalletTotal: number;
+  memberCount: { total: number; active: number; suspended: number };
+};
+
+export type StoreSettings = {
+  memberNumberMode: "running" | "year" | "manual";
+  storeName: string;
+  storeCode: string;
+  storeAddress: string;
+  autoPrintReceipt: boolean;
+  showBalanceOnReceipt: boolean;
+  lowBalanceAlert: boolean;
+  lowBalanceThreshold: number;
+  lowStockAlert: boolean;
+  expiryAlert: boolean;
+  expiryAlertDays: number;
 };
 
 /**
@@ -41,6 +185,8 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
       first_name TEXT NOT NULL,
       last_name TEXT NOT NULL,
       id_card TEXT,
+      phone TEXT,
+      type TEXT NOT NULL DEFAULT 'สมาชิก',
       balance REAL NOT NULL DEFAULT 0,
       status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended')),
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -52,6 +198,7 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
       detail TEXT NOT NULL,
       amount REAL NOT NULL,
       payment_method TEXT,
+      balance_after REAL,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (member_number) REFERENCES members(member_number)
     );
@@ -59,8 +206,74 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
       key TEXT PRIMARY KEY,
       value TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS products (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sku TEXT NOT NULL UNIQUE,
+      barcode TEXT,
+      name TEXT NOT NULL,
+      category TEXT NOT NULL DEFAULT 'ของใช้',
+      emoji TEXT,
+      color TEXT,
+      unit TEXT NOT NULL DEFAULT 'ชิ้น',
+      price REAL NOT NULL,
+      cost REAL NOT NULL DEFAULT 0,
+      stock INTEGER NOT NULL DEFAULT 0,
+      reorder_point INTEGER NOT NULL DEFAULT 10,
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS stock_lots (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_id INTEGER NOT NULL REFERENCES products(id),
+      lot TEXT NOT NULL,
+      expiry_date TEXT,
+      qty INTEGER NOT NULL,
+      cost REAL NOT NULL DEFAULT 0,
+      received_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS sales (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      order_number TEXT NOT NULL UNIQUE,
+      payment_method TEXT NOT NULL,
+      member_number TEXT REFERENCES members(member_number),
+      subtotal REAL NOT NULL,
+      discount REAL NOT NULL DEFAULT 0,
+      total REAL NOT NULL,
+      cashier TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS sale_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sale_id INTEGER NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
+      product_id INTEGER,
+      name TEXT NOT NULL,
+      qty INTEGER NOT NULL,
+      price REAL NOT NULL,
+      cost REAL NOT NULL DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      action TEXT NOT NULL,
+      actor TEXT NOT NULL,
+      actor_role TEXT,
+      detail TEXT,
+      tone TEXT NOT NULL DEFAULT 'blue',
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
   `);
+  ensureColumn(db, "members", "phone", "TEXT");
+  ensureColumn(db, "members", "type", "TEXT NOT NULL DEFAULT 'สมาชิก'");
+  ensureColumn(db, "member_transactions", "balance_after", "REAL");
+  ensureColumn(db, "audit_logs", "actor_role", "TEXT");
   return db;
+}
+
+/** Migration-safe column add for databases created before a column existed. */
+function ensureColumn(db: SqliteDb, table: string, column: string, definition: string) {
+  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as unknown as { name: string }[];
+  if (!columns.some((entry) => entry.name === column)) {
+    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  }
 }
 
 export function seedSqliteDemoData(db: SqliteDb) {
@@ -74,10 +287,10 @@ export function seedSqliteDemoData(db: SqliteDb) {
   insertTransaction.run("M-000092", "withdrawal", "ถอนเพื่อถอนฟัน · แนบหลักฐานแล้ว", -200, "cash", "2026-09-16 09:12:00");
 }
 
-export function getMemberDetail(db: SqliteDb, memberNumber: string) {
-  const member = db.prepare(`SELECT id, member_number as memberNumber, first_name as firstName, last_name as lastName, id_card as idCard, balance, status, created_at as createdAt FROM members WHERE member_number = ?`).get(memberNumber) as SqliteMember | undefined;
+export function getMemberDetail(db: SqliteDb, memberNumber: string, transactionLimit = 50) {
+  const member = db.prepare(`SELECT id, member_number as memberNumber, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt FROM members WHERE member_number = ?`).get(memberNumber) as SqliteMember | undefined;
   if (!member) return undefined;
-  const transactions = db.prepare(`SELECT id, member_number as memberNumber, type, detail, amount, payment_method as paymentMethod, created_at as createdAt FROM member_transactions WHERE member_number = ? ORDER BY created_at DESC, id DESC`).all(memberNumber) as unknown as SqliteTransaction[];
+  const transactions = db.prepare(`SELECT id, member_number as memberNumber, type, detail, amount, payment_method as paymentMethod, balance_after as balanceAfter, created_at as createdAt FROM member_transactions WHERE member_number = ? ORDER BY created_at DESC, id DESC LIMIT ?`).all(memberNumber, transactionLimit) as unknown as SqliteTransaction[];
   return { member, transactions };
 }
 
@@ -93,4 +306,748 @@ export function getMemberNumberMode(db: SqliteDb) {
 export function suspendMember(db: SqliteDb, memberNumber: string) {
   const result = db.prepare(`UPDATE members SET status = 'suspended' WHERE member_number = ?`).run(memberNumber);
   return result.changes > 0;
+}
+
+// ---------------------------------------------------------------------------
+// Welfare store domain: products, stock, POS checkout, members, wallet,
+// reports, settings and audit logs. All user-facing errors are Thai.
+// ---------------------------------------------------------------------------
+
+const PAYMENT_METHODS = ["เงินสด", "QR / สแกน", "หักบัญชีสมาชิก"] as const;
+const WALLET_PAYMENT = "หักบัญชีสมาชิก";
+
+const pad2 = (value: number) => String(value).padStart(2, "0");
+
+function round2(value: number) {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function formatDateTime(date = new Date()) {
+  return `${formatDate(date)} ${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
+}
+
+function formatDate(date = new Date()) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date);
+  next.setDate(next.getDate() + days);
+  return next;
+}
+
+function startOfToday() {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today;
+}
+
+/** ฿-formatted money for log details, e.g. "฿1,240.00" */
+export function money(value: number) {
+  return `฿${value.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function runInTransaction<T>(db: SqliteDb, fn: () => T): T {
+  db.exec("BEGIN");
+  try {
+    const result = fn();
+    db.exec("COMMIT");
+    return result;
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+function countRows(db: SqliteDb, table: string) {
+  const row = db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number };
+  return row.count;
+}
+
+/** Audit trail entry. Called from every mutation. */
+export function logAction(
+  db: SqliteDb,
+  action: string,
+  actor: string,
+  detail: string,
+  tone = "blue",
+  actorRole: string | null = null,
+  createdAt: string = formatDateTime(),
+): SqliteAuditLog {
+  const result = db.prepare(`INSERT INTO audit_logs (action, actor, actor_role, detail, tone, created_at) VALUES (?, ?, ?, ?, ?, ?)`).run(action, actor, actorRole, detail, tone, createdAt);
+  return { id: Number(result.lastInsertRowid), action, actor, actorRole, detail, tone, createdAt };
+}
+
+export function listAuditLogs(db: SqliteDb, limit = 200): SqliteAuditLog[] {
+  const capped = Math.max(1, Math.min(1000, Math.floor(limit)));
+  return db.prepare(`SELECT id, action, actor, actor_role AS actorRole, detail, tone, created_at AS createdAt FROM audit_logs ORDER BY created_at DESC, id DESC LIMIT ?`).all(capped) as unknown as SqliteAuditLog[];
+}
+
+// --- products & stock -------------------------------------------------------
+
+export function listProducts(db: SqliteDb): SqliteProduct[] {
+  return db.prepare(`SELECT id, sku, barcode, name, category, emoji, color, unit, price, cost, stock, reorder_point AS reorderPoint, active, created_at AS createdAt FROM products WHERE active = 1 ORDER BY id`).all() as unknown as SqliteProduct[];
+}
+
+function getProductById(db: SqliteDb, productId: number): SqliteProduct | undefined {
+  return db.prepare(`SELECT id, sku, barcode, name, category, emoji, color, unit, price, cost, stock, reorder_point AS reorderPoint, active, created_at AS createdAt FROM products WHERE id = ?`).get(productId) as SqliteProduct | undefined;
+}
+
+export type CreateProductInput = {
+  name: string;
+  sku?: string;
+  barcode?: string;
+  unit?: string;
+  price: number;
+  cost?: number;
+  stock?: number;
+  reorderPoint?: number;
+  category?: string;
+  emoji?: string;
+  color?: string;
+  actor?: string;
+  actorRole?: string;
+};
+
+const CATEGORY_SKU_PREFIXES: Record<string, string> = {
+  "เครื่องดื่ม": "DRK",
+  "อาหาร": "FD",
+  "ของใช้": "HYG",
+};
+
+function generateSku(db: SqliteDb, category: string) {
+  const prefix = CATEGORY_SKU_PREFIXES[category] ?? "GEN";
+  const rows = db.prepare(`SELECT sku FROM products WHERE sku LIKE ?`).all(`${prefix}-%`) as unknown as { sku: string }[];
+  const used = new Set(rows.map((row) => row.sku));
+  let sequence = rows.length + 1;
+  while (used.has(`${prefix}-${String(sequence).padStart(3, "0")}`)) sequence += 1;
+  return `${prefix}-${String(sequence).padStart(3, "0")}`;
+}
+
+export function createProduct(db: SqliteDb, input: CreateProductInput): SqliteProduct {
+  const name = input.name?.trim();
+  if (!name) throw new StoreError("กรุณาระบุชื่อสินค้า");
+  if (!(input.price > 0)) throw new StoreError("ราคาขายต้องมากกว่า 0");
+  if (input.stock !== undefined && (!Number.isInteger(input.stock) || input.stock < 0)) throw new StoreError("จำนวนสต็อกเริ่มต้นไม่ถูกต้อง");
+  const sku = input.sku?.trim() || generateSku(db, input.category ?? "ของใช้");
+  if (db.prepare(`SELECT id FROM products WHERE sku = ?`).get(sku)) {
+    throw new StoreError(`รหัสสินค้า ${sku} ถูกใช้แล้ว กรุณาระบุรหัสอื่น`);
+  }
+  const result = db.prepare(`INSERT INTO products (sku, barcode, name, category, emoji, color, unit, price, cost, stock, reorder_point, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`).run(
+    sku,
+    input.barcode?.trim() || null,
+    name,
+    input.category?.trim() || "ของใช้",
+    input.emoji ?? null,
+    input.color ?? null,
+    input.unit?.trim() || "ชิ้น",
+    round2(input.price),
+    round2(input.cost ?? 0),
+    input.stock ?? 0,
+    input.reorderPoint ?? 10,
+  );
+  logAction(db, "เพิ่มสินค้า", input.actor?.trim() || "ระบบ", `${name} (${sku})`, "green", input.actorRole ?? null);
+  return getProductById(db, Number(result.lastInsertRowid))!;
+}
+
+export function receiveStock(
+  db: SqliteDb,
+  productId: number,
+  lot: string,
+  expiryDate: string | null,
+  qty: number,
+  cost?: number,
+  actor?: string,
+  actorRole?: string,
+) {
+  if (!Number.isInteger(qty) || qty <= 0) throw new StoreError("จำนวนต้องมากกว่า 0");
+  const product = getProductById(db, productId);
+  if (!product || !product.active) throw new StoreError(`ไม่พบสินค้ารหัส ${productId} ในระบบ`);
+  const effectiveCost = cost === undefined ? product.cost : round2(cost);
+  const lotLabel = lot?.trim() || `LOT-${formatDate()}`;
+  const createdAt = formatDateTime();
+  return runInTransaction(db, () => {
+    const result = db.prepare(`INSERT INTO stock_lots (product_id, lot, expiry_date, qty, cost, received_at) VALUES (?, ?, ?, ?, ?, ?)`).run(productId, lotLabel, expiryDate || null, qty, effectiveCost, createdAt);
+    db.prepare(`UPDATE products SET stock = stock + ?, cost = ? WHERE id = ?`).run(qty, effectiveCost, productId);
+    logAction(db, "รับเข้าสินค้า", actor?.trim() || "ระบบ", `${product.name} · Lot ${lotLabel} · +${qty} ${product.unit}`, "green", actorRole ?? null, createdAt);
+    return {
+      lot: { id: Number(result.lastInsertRowid), productId, lot: lotLabel, expiry: expiryDate || null, qty, cost: effectiveCost, receivedAt: createdAt },
+      product: getProductById(db, productId)!,
+    };
+  });
+}
+
+export function listStockRows(db: SqliteDb): SqliteStockRow[] {
+  const rows = db.prepare(`SELECT l.id, p.id AS productId, p.sku, p.name, p.unit, l.lot, l.expiry_date AS expiry, l.qty, l.cost, p.price, p.stock, p.reorder_point AS reorderPoint, l.received_at AS receivedAt FROM stock_lots l JOIN products p ON p.id = l.product_id ORDER BY p.sku, l.id`).all() as unknown as (Omit<SqliteStockRow, "status" | "tone">)[];
+  const today = startOfToday();
+  return rows.map((row) => {
+    let status: SqliteStockRow["status"] = "ปกติ";
+    let tone: SqliteStockRow["tone"] = "green";
+    if (row.stock <= row.reorderPoint) {
+      status = "สต็อกต่ำ";
+      tone = "red";
+    } else if (row.expiry) {
+      const daysLeft = Math.floor((Date.parse(`${row.expiry}T00:00:00`) - today.getTime()) / 86400000);
+      if (daysLeft <= 30) {
+        status = "ใกล้หมดอายุ";
+        tone = "amber";
+      }
+    }
+    return { ...row, status, tone };
+  });
+}
+
+// --- POS checkout -----------------------------------------------------------
+
+function yyMMdd(date: Date) {
+  return `${String(date.getFullYear()).slice(-2)}${pad2(date.getMonth() + 1)}${pad2(date.getDate())}`;
+}
+
+function nextOrderNumber(db: SqliteDb, date = new Date()) {
+  const prefix = `RC-${yyMMdd(date)}-`;
+  const row = db.prepare(`SELECT MAX(CAST(SUBSTR(order_number, 11) AS INTEGER)) AS maxSeq FROM sales WHERE order_number LIKE ?`).get(`${prefix}%`) as { maxSeq: number | null };
+  return `${prefix}${String((row?.maxSeq ?? 0) + 1).padStart(3, "0")}`;
+}
+
+function summarizeItems(items: { name: string; qty: number; unit: string }[]) {
+  const head = items.slice(0, 3).map((item) => `${item.name} ${item.qty} ${item.unit}`).join(", ");
+  return items.length > 3 ? `${head} และอีก ${items.length - 3} รายการ` : head;
+}
+
+export type CheckoutItemInput = { productId: number; qty: number };
+
+export type CheckoutInput = {
+  items: CheckoutItemInput[];
+  paymentMethod: (typeof PAYMENT_METHODS)[number];
+  memberNumber?: string | null;
+  discount?: number;
+  cashier?: string;
+  actorRole?: string;
+};
+
+export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
+  if (!input.items?.length) throw new StoreError("ยังไม่มีสินค้าในบิล");
+  if (!PAYMENT_METHODS.includes(input.paymentMethod)) throw new StoreError("วิธีชำระเงินไม่ถูกต้อง");
+  const merged = new Map<number, number>();
+  for (const item of input.items) {
+    if (!Number.isInteger(item.productId) || item.productId <= 0) throw new StoreError("รหัสสินค้าไม่ถูกต้อง");
+    if (!Number.isInteger(item.qty) || item.qty <= 0) throw new StoreError("จำนวนต้องมากกว่า 0");
+    merged.set(item.productId, (merged.get(item.productId) ?? 0) + item.qty);
+  }
+  const isWallet = input.paymentMethod === WALLET_PAYMENT;
+  if (isWallet && !input.memberNumber?.trim()) throw new StoreError("กรุณาเลือกสมาชิกก่อนชำระแบบหักบัญชีสมาชิก");
+
+  const products = new Map<number, SqliteProduct>();
+  for (const entry of Array.from(merged.entries())) {
+    const [productId, qty] = entry;
+    const product = getProductById(db, productId);
+    if (!product || !product.active) throw new StoreError(`ไม่พบสินค้ารหัส ${productId} ในระบบ`);
+    if (product.stock < qty) throw new StoreError(`สต็อกไม่พอ · ${product.name} เหลือ ${product.stock} ${product.unit}`);
+    products.set(productId, product);
+  }
+
+  const items = Array.from(merged.entries()).map(([productId, qty]) => {
+    const product = products.get(productId)!;
+    return { productId, name: product.name, unit: product.unit, qty, price: product.price, cost: product.cost, amount: round2(product.price * qty) };
+  });
+  const subtotal = round2(items.reduce((sum, item) => sum + item.amount, 0));
+  const discount = round2(Math.max(0, input.discount ?? 0));
+  if (discount > subtotal) throw new StoreError("ส่วนลดมากกว่ายอดรวมสินค้า");
+  const total = round2(subtotal - discount);
+
+  let member: SqliteMember | undefined;
+  if (isWallet) {
+    member = db.prepare(`SELECT id, member_number as memberNumber, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt FROM members WHERE member_number = ?`).get(input.memberNumber!.trim()) as SqliteMember | undefined;
+    if (!member) throw new StoreError(`ไม่พบสมาชิก ${input.memberNumber} ในระบบ`);
+    if (member.status !== "active") throw new StoreError(`สมาชิกถูกระงับการใช้งาน · ${member.memberNumber}`);
+    if (member.balance < total) throw new StoreError(`ยอดเงินคงเหลือไม่พอ · ยอดชำระ ${money(total)} คงเหลือ ${money(member.balance)}`);
+  }
+
+  const now = new Date();
+  const createdAt = formatDateTime(now);
+  const orderNumber = nextOrderNumber(db, now);
+  const cashier = input.cashier?.trim() || "เจ้าหน้าที่ร้านค้า";
+
+  return runInTransaction(db, () => {
+    const saleResult = db.prepare(`INSERT INTO sales (order_number, payment_method, member_number, subtotal, discount, total, cashier, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      orderNumber,
+      input.paymentMethod,
+      member?.memberNumber ?? (input.memberNumber?.trim() || null),
+      subtotal,
+      discount,
+      total,
+      cashier,
+      createdAt,
+    );
+    const saleId = Number(saleResult.lastInsertRowid);
+    const insertItem = db.prepare(`INSERT INTO sale_items (sale_id, product_id, name, qty, price, cost) VALUES (?, ?, ?, ?, ?, ?)`);
+    const updateStock = db.prepare(`UPDATE products SET stock = stock - ? WHERE id = ?`);
+    for (const item of items) {
+      insertItem.run(saleId, item.productId, item.name, item.qty, item.price, item.cost);
+      updateStock.run(item.qty, item.productId);
+    }
+
+    let balanceAfter: number | null = null;
+    if (isWallet && member) {
+      balanceAfter = round2(member.balance - total);
+      db.prepare(`UPDATE members SET balance = ? WHERE member_number = ?`).run(balanceAfter, member.memberNumber);
+      db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, created_at) VALUES (?, 'purchase', ?, ?, ?, ?, ?)`).run(
+        member.memberNumber,
+        `บิล #${orderNumber} · ${summarizeItems(items)}`,
+        -total,
+        input.paymentMethod,
+        balanceAfter,
+        createdAt,
+      );
+    }
+
+    logAction(db, "ขายสินค้า", cashier, `บิล #${orderNumber} · ${money(total)}${member ? ` · หักบัญชี ${member.memberNumber}` : ""}`, "blue", input.actorRole ?? null, createdAt);
+
+    return {
+      orderNumber,
+      createdAt,
+      items: items.map(({ productId, name, unit, qty, price, amount }) => ({ productId, name, unit, qty, price, amount })),
+      subtotal,
+      discount,
+      total,
+      paymentMethod: input.paymentMethod,
+      memberNumber: member?.memberNumber ?? null,
+      memberName: member ? `${member.firstName} ${member.lastName}`.trim() : null,
+      balanceAfter,
+    };
+  });
+}
+
+// --- members & wallet -------------------------------------------------------
+
+export function listMembers(db: SqliteDb, search?: string, status?: "active" | "suspended"): SqliteMemberSummary[] {
+  const conditions: string[] = [];
+  const params: string[] = [];
+  if (search?.trim()) {
+    conditions.push(`(first_name || ' ' || last_name || ' ' || member_number) LIKE ?`);
+    params.push(`%${search.trim()}%`);
+  }
+  if (status) {
+    conditions.push("status = ?");
+    params.push(status);
+  }
+  const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
+  return db.prepare(`SELECT m.id, m.member_number AS memberNumber, m.first_name AS firstName, m.last_name AS lastName, m.type, m.balance, m.status, m.created_at AS createdAt, (SELECT MAX(t.created_at) FROM member_transactions t WHERE t.member_number = m.member_number) AS lastTransactionAt FROM members m${where} ORDER BY m.member_number`).all(...params) as unknown as SqliteMemberSummary[];
+}
+
+function nextMemberSequence(db: SqliteDb, prefix: string) {
+  const rows = db.prepare(`SELECT member_number AS memberNumber FROM members WHERE member_number LIKE ?`).all(`${prefix}%`) as unknown as { memberNumber: string }[];
+  let max = 0;
+  for (const row of rows) {
+    const suffix = row.memberNumber.slice(prefix.length);
+    if (/^\d+$/.test(suffix)) max = Math.max(max, Number(suffix));
+  }
+  return max + 1;
+}
+
+function generateMemberNumber(db: SqliteDb, mode: "running" | "year" | "manual", provided?: string) {
+  if (mode === "manual") {
+    const manual = provided?.trim();
+    if (!manual) throw new StoreError("โหมดกำหนดหมายเลขเอง: กรุณาระบุหมายเลขสมาชิก");
+    return manual;
+  }
+  if (mode === "year") {
+    const buddhistYear = String(new Date().getFullYear() + 543).slice(-2);
+    const prefix = `${buddhistYear}-`;
+    return `${prefix}${String(nextMemberSequence(db, prefix)).padStart(5, "0")}`;
+  }
+  return `M-${String(nextMemberSequence(db, "M-")).padStart(6, "0")}`;
+}
+
+export type RegisterMemberInput = {
+  firstName: string;
+  lastName: string;
+  citizenId?: string;
+  phone?: string;
+  type?: string;
+  initialDeposit?: number;
+  memberNumber?: string;
+  actor?: string;
+  actorRole?: string;
+};
+
+export function registerMember(db: SqliteDb, input: RegisterMemberInput) {
+  const firstName = input.firstName?.trim();
+  const lastName = input.lastName?.trim();
+  if (!firstName || !lastName) throw new StoreError("กรุณาระบุชื่อและนามสกุลสมาชิก");
+  if (input.initialDeposit !== undefined && !(input.initialDeposit > 0)) throw new StoreError("จำนวนเงินต้องมากกว่า 0");
+  const memberNumber = generateMemberNumber(db, getMemberNumberMode(db), input.memberNumber);
+  if (db.prepare(`SELECT id FROM members WHERE member_number = ?`).get(memberNumber)) {
+    throw new StoreError(`หมายเลขสมาชิก ${memberNumber} ถูกใช้แล้ว`);
+  }
+  const initialDeposit = input.initialDeposit ? round2(input.initialDeposit) : 0;
+  const createdAt = formatDateTime();
+  runInTransaction(db, () => {
+    db.prepare(`INSERT INTO members (member_number, first_name, last_name, id_card, phone, type, balance, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?)`).run(
+      memberNumber,
+      firstName,
+      lastName,
+      input.citizenId?.trim() || null,
+      input.phone?.trim() || null,
+      input.type?.trim() || "สมาชิก",
+      initialDeposit,
+      createdAt,
+    );
+    if (initialDeposit > 0) {
+      db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, created_at) VALUES (?, 'deposit', ?, ?, 'เงินสด', ?, ?)`).run(
+        memberNumber,
+        "เงินเริ่มต้นตอนลงทะเบียน · เงินสด",
+        initialDeposit,
+        initialDeposit,
+        createdAt,
+      );
+    }
+    logAction(db, "ลงทะเบียนสมาชิก", input.actor?.trim() || "ระบบ", `${memberNumber} · ${firstName} ${lastName}${initialDeposit > 0 ? ` · เงินเริ่มต้น ${money(initialDeposit)}` : ""}`, "green", input.actorRole ?? null, createdAt);
+  });
+  return getMemberDetail(db, memberNumber)!;
+}
+
+export function setMemberStatus(db: SqliteDb, memberNumber: string, suspended: boolean, actor?: string, actorRole?: string) {
+  const member = db.prepare(`SELECT member_number AS memberNumber, first_name AS firstName, last_name AS lastName, status FROM members WHERE member_number = ?`).get(memberNumber) as { memberNumber: string; firstName: string; lastName: string; status: "active" | "suspended" } | undefined;
+  if (!member) throw new StoreError(`ไม่พบสมาชิก ${memberNumber} ในระบบ`);
+  const nextStatus = suspended ? "suspended" : "active";
+  if (member.status !== nextStatus) {
+    const createdAt = formatDateTime();
+    runInTransaction(db, () => {
+      db.prepare(`UPDATE members SET status = ? WHERE member_number = ?`).run(nextStatus, memberNumber);
+      logAction(
+        db,
+        suspended ? "ระงับสมาชิก" : "เปิดใช้งานสมาชิก",
+        actor?.trim() || "ระบบ",
+        `${memberNumber} · ${member.firstName} ${member.lastName}`,
+        suspended ? "red" : "green",
+        actorRole ?? null,
+        createdAt,
+      );
+    });
+  }
+  return getMemberDetail(db, memberNumber);
+}
+
+export type WalletTxInput = {
+  memberNumber: string;
+  type: "deposit" | "withdrawal";
+  amount: number;
+  note?: string;
+  actor?: string;
+  actorRole?: string;
+};
+
+export function walletTx(db: SqliteDb, input: WalletTxInput) {
+  if (!(input.amount > 0)) throw new StoreError("จำนวนเงินต้องมากกว่า 0");
+  const amount = round2(input.amount);
+  const member = db.prepare(`SELECT id, member_number as memberNumber, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt FROM members WHERE member_number = ?`).get(input.memberNumber?.trim()) as SqliteMember | undefined;
+  if (!member) throw new StoreError(`ไม่พบสมาชิก ${input.memberNumber} ในระบบ`);
+  if (member.status !== "active") throw new StoreError(`สมาชิกถูกระงับการใช้งาน · ${member.memberNumber}`);
+  if (input.type === "withdrawal" && member.balance < amount) {
+    throw new StoreError(`ยอดเงินคงเหลือไม่พอ · ถอน ${money(amount)} คงเหลือ ${money(member.balance)}`);
+  }
+  const signedAmount = input.type === "deposit" ? amount : -amount;
+  const balanceAfter = round2(member.balance + signedAmount);
+  const note = input.note?.trim();
+  const detail = note || (input.type === "deposit" ? "เติมเงินเข้าบัญชีสมาชิก · เงินสด" : "ถอนเงินจากบัญชีสมาชิก · เงินสด");
+  const actor = input.actor?.trim() || "เจ้าหน้าที่ร้านค้า";
+  const createdAt = formatDateTime();
+  runInTransaction(db, () => {
+    db.prepare(`UPDATE members SET balance = ? WHERE member_number = ?`).run(balanceAfter, member.memberNumber);
+    db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, created_at) VALUES (?, ?, ?, ?, 'เงินสด', ?, ?)`).run(
+      member.memberNumber,
+      input.type,
+      detail,
+      signedAmount,
+      balanceAfter,
+      createdAt,
+    );
+    logAction(
+      db,
+      input.type === "deposit" ? "เติมเงินสมาชิก" : "ถอนเงินสมาชิก",
+      actor,
+      `${member.memberNumber} · ${money(amount)} · ${note || "เงินสด"}`,
+      input.type === "deposit" ? "green" : "purple",
+      input.actorRole ?? null,
+      createdAt,
+    );
+  });
+  return {
+    memberNumber: member.memberNumber,
+    memberName: `${member.firstName} ${member.lastName}`.trim(),
+    type: input.type,
+    amount,
+    balanceBefore: member.balance,
+    balanceAfter,
+    detail,
+  };
+}
+
+// --- reports ----------------------------------------------------------------
+
+export function dailySalesRows(db: SqliteDb, days = 30): DailySalesRow[] {
+  const range = Math.max(1, Math.min(365, Math.floor(days)));
+  const today = startOfToday();
+  const since = `${formatDate(addDays(today, -(range - 1)))} 00:00:00`;
+  const salesByDay = new Map<string, { orders: number; revenue: number }>();
+  for (const row of db.prepare(`SELECT substr(created_at, 1, 10) AS date, COUNT(*) AS orders, ROUND(SUM(total), 2) AS revenue FROM sales WHERE created_at >= ? GROUP BY date`).all(since) as unknown as { date: string; orders: number; revenue: number }[]) {
+    salesByDay.set(row.date, { orders: row.orders, revenue: round2(row.revenue) });
+  }
+  const itemsByDay = new Map<string, { items: number; cogs: number }>();
+  for (const row of db.prepare(`SELECT substr(s.created_at, 1, 10) AS date, COALESCE(SUM(si.qty), 0) AS items, ROUND(COALESCE(SUM(si.qty * si.cost), 0), 2) AS cogs FROM sales s JOIN sale_items si ON si.sale_id = s.id WHERE s.created_at >= ? GROUP BY date`).all(since) as unknown as { date: string; items: number; cogs: number }[]) {
+    itemsByDay.set(row.date, { items: row.items, cogs: round2(row.cogs) });
+  }
+  const rows: DailySalesRow[] = [];
+  for (let offset = range - 1; offset >= 0; offset -= 1) {
+    const date = formatDate(addDays(today, -offset));
+    const sales = salesByDay.get(date);
+    const items = itemsByDay.get(date);
+    const revenue = sales?.revenue ?? 0;
+    const cogs = items?.cogs ?? 0;
+    rows.push({ date, orders: sales?.orders ?? 0, items: items?.items ?? 0, revenue, cogs, profit: round2(revenue - cogs) });
+  }
+  return rows;
+}
+
+export function dashboardStats(db: SqliteDb, rangeDays = 30): DashboardStats {
+  const range = Math.max(1, Math.min(365, Math.floor(rangeDays)));
+  const today = startOfToday();
+  const since = `${formatDate(addDays(today, -(range - 1)))} 00:00:00`;
+  const totals = db.prepare(`SELECT COUNT(*) AS orders, ROUND(COALESCE(SUM(total), 0), 2) AS revenue FROM sales WHERE created_at >= ?`).get(since) as { orders: number; revenue: number };
+  const itemsRow = db.prepare(`SELECT COALESCE(SUM(si.qty), 0) AS items FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE s.created_at >= ?`).get(since) as { items: number };
+  const revenueByDayRows = db.prepare(`SELECT substr(created_at, 1, 10) AS date, ROUND(SUM(total), 2) AS total FROM sales WHERE created_at >= ? GROUP BY date`).all(since) as unknown as { date: string; total: number }[];
+  const byDay = new Map(revenueByDayRows.map((row) => [row.date, round2(row.total)]));
+  const revenueByDay: { date: string; total: number }[] = [];
+  for (let offset = range - 1; offset >= 0; offset -= 1) {
+    const date = formatDate(addDays(today, -offset));
+    revenueByDay.push({ date, total: byDay.get(date) ?? 0 });
+  }
+  const bestSellers = db.prepare(`SELECT si.name, SUM(si.qty) AS qty, ROUND(SUM(si.qty * si.price), 2) AS revenue FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE s.created_at >= ? GROUP BY si.name ORDER BY qty DESC, revenue DESC LIMIT 5`).all(since) as unknown as { name: string; qty: number; revenue: number }[];
+  const lowStock = db.prepare(`SELECT id, sku, name, unit, stock, reorder_point AS reorderPoint FROM products WHERE active = 1 AND stock <= reorder_point ORDER BY stock ASC`).all() as unknown as DashboardStats["lowStock"];
+  const expirySoon = db.prepare(`SELECT l.id, l.product_id AS productId, p.sku, p.name, p.unit, l.lot, l.expiry_date AS expiry, l.qty FROM stock_lots l JOIN products p ON p.id = l.product_id WHERE l.expiry_date IS NOT NULL AND l.expiry_date >= ? AND l.expiry_date <= ? ORDER BY l.expiry_date`).all(formatDate(today), formatDate(addDays(today, 30))) as unknown as DashboardStats["expirySoon"];
+  const recentActivities = db.prepare(`SELECT id, action, actor, actor_role AS actorRole, detail, tone, created_at AS createdAt FROM audit_logs ORDER BY created_at DESC, id DESC LIMIT 5`).all() as unknown as SqliteAuditLog[];
+  const memberWalletRow = db.prepare(`SELECT ROUND(COALESCE(SUM(balance), 0), 2) AS total FROM members`).get() as { total: number };
+  const memberCountRow = db.prepare(`SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END), 0) AS active, COALESCE(SUM(CASE WHEN status = 'suspended' THEN 1 ELSE 0 END), 0) AS suspended FROM members`).get() as { total: number; active: number; suspended: number };
+  return {
+    rangeDays: range,
+    totalSales: round2(totals.revenue),
+    totalOrders: totals.orders,
+    itemsSold: itemsRow.items,
+    bestSellerCount: bestSellers[0]?.qty ?? 0,
+    avgDailySales: round2(totals.revenue / range),
+    revenueByDay,
+    bestSellers,
+    lowStock,
+    expirySoon,
+    recentActivities,
+    memberWalletTotal: round2(memberWalletRow.total),
+    memberCount: memberCountRow,
+  };
+}
+
+// --- settings ---------------------------------------------------------------
+
+export const DEFAULT_STORE_SETTINGS: StoreSettings = {
+  memberNumberMode: "running",
+  storeName: "ร้านค้าสวัสดิการโรงพยาบาลผู้ป่วยจิตเวช",
+  storeCode: "WEL-PSY-001",
+  storeAddress: "โรงพยาบาลผู้ป่วยจิตเวช · ฝ่ายสวัสดิการ",
+  autoPrintReceipt: true,
+  showBalanceOnReceipt: true,
+  lowBalanceAlert: true,
+  lowBalanceThreshold: 100,
+  lowStockAlert: true,
+  expiryAlert: true,
+  expiryAlertDays: 30,
+};
+
+const SETTINGS_KEY = "app_settings";
+
+export function getSettings(db: SqliteDb): StoreSettings {
+  const row = db.prepare(`SELECT value FROM store_settings WHERE key = ?`).get(SETTINGS_KEY) as { value: string } | undefined;
+  const stored = row ? (JSON.parse(row.value) as Partial<StoreSettings>) : {};
+  return { ...DEFAULT_STORE_SETTINGS, ...stored, memberNumberMode: getMemberNumberMode(db) };
+}
+
+export function setSettings(db: SqliteDb, patch: Partial<StoreSettings>, actor = "ผู้บริหาร", actorRole?: string | null): StoreSettings {
+  if (patch.memberNumberMode !== undefined) {
+    setMemberNumberMode(db, patch.memberNumberMode);
+  }
+  const { memberNumberMode: _mode, ...rest } = patch;
+  if (Object.keys(rest).length > 0) {
+    const next = { ...getSettings(db), ...rest };
+    db.prepare(`INSERT INTO store_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(SETTINGS_KEY, JSON.stringify(next));
+  }
+  const changedKeys = Object.entries(patch)
+    .map(([key, value]) => `${key}: ${typeof value === "boolean" ? (value ? "เปิด" : "ปิด") : String(value)}`)
+    .join(" · ");
+  logAction(db, "บันทึกการตั้งค่า", actor, changedKeys || "ไม่มีการเปลี่ยนแปลง", "amber", actorRole ?? null);
+  return getSettings(db);
+}
+
+// --- seeding ----------------------------------------------------------------
+
+const SEED_PRODUCTS: { sku: string; barcode: string; name: string; category: string; emoji: string; color: string; unit: string; price: number; cost: number; stock: number; reorderPoint: number }[] = [
+  { sku: "DRK-001", barcode: "8850000000017", name: "น้ำดื่มคริสตัล 600 มล.", category: "เครื่องดื่ม", emoji: "💧", color: "blue", unit: "ขวด", price: 7, cost: 4.2, stock: 124, reorderPoint: 60 },
+  { sku: "DRK-002", barcode: "8850000000024", name: "กาแฟกระป๋อง เบอร์ดี้", category: "เครื่องดื่ม", emoji: "☕", color: "amber", unit: "กระป๋อง", price: 18, cost: 13.5, stock: 42, reorderPoint: 48 },
+  { sku: "FD-014", barcode: "8850000000031", name: "ข้าวกล่องกะเพราไก่", category: "อาหาร", emoji: "🍱", color: "orange", unit: "กล่อง", price: 45, cost: 32, stock: 18, reorderPoint: 10 },
+  { sku: "DRK-003", barcode: "8850000000048", name: "นมยูเอชที รสจืด", category: "เครื่องดื่ม", emoji: "🥛", color: "sky", unit: "กล่อง", price: 13, cost: 9.5, stock: 65, reorderPoint: 24 },
+  { sku: "FD-015", barcode: "8850000000055", name: "ขนมปังแซนด์วิช", category: "อาหาร", emoji: "🥪", color: "rose", unit: "ชิ้น", price: 25, cost: 18, stock: 9, reorderPoint: 12 },
+  { sku: "HYG-032", barcode: "8850000000062", name: "สบู่เหลวล้างมือ", category: "ของใช้", emoji: "🧴", color: "mint", unit: "ขวด", price: 32, cost: 24, stock: 28, reorderPoint: 10 },
+  { sku: "HYG-033", barcode: "8850000000079", name: "หน้ากากอนามัย 3 ชิ้น", category: "ของใช้", emoji: "😷", color: "violet", unit: "แพ็ก", price: 20, cost: 14, stock: 86, reorderPoint: 20 },
+  { sku: "ICE-004", barcode: "8850000000086", name: "น้ำแข็งถุงเล็ก", category: "ของใช้", emoji: "🧊", color: "cyan", unit: "ถุง", price: 10, cost: 6, stock: 35, reorderPoint: 40 },
+];
+
+const SEED_STOCK_LOTS: { sku: string; lot: string; expiry: string | null; qty: number; cost: number; receivedAt: string }[] = [
+  { sku: "DRK-001", lot: "CR-2608-01", expiry: "2027-08-18", qty: 124, cost: 4.2, receivedAt: "2026-08-20 09:12:00" },
+  { sku: "DRK-002", lot: "CF-2607-02", expiry: "2027-03-10", qty: 42, cost: 13.5, receivedAt: "2026-08-15 10:40:00" },
+  { sku: "FD-014", lot: "ครัวกลาง-17", expiry: "2026-09-18", qty: 18, cost: 32, receivedAt: "2026-09-17 07:20:00" },
+  { sku: "DRK-003", lot: "ML-2608-08", expiry: "2026-09-30", qty: 65, cost: 9.5, receivedAt: "2026-08-22 08:55:00" },
+  { sku: "FD-015", lot: "BR-260917-A", expiry: "2026-09-20", qty: 9, cost: 18, receivedAt: "2026-09-17 06:45:00" },
+  { sku: "HYG-032", lot: "HM-2606-03", expiry: "2028-06-04", qty: 28, cost: 24, receivedAt: "2026-06-28 13:10:00" },
+  { sku: "HYG-033", lot: "MSK-2606-01", expiry: "2029-06-30", qty: 86, cost: 14, receivedAt: "2026-06-28 13:25:00" },
+  { sku: "ICE-004", lot: "รับรายวัน", expiry: null, qty: 35, cost: 6, receivedAt: "2026-09-17 05:30:00" },
+];
+
+const SEED_MEMBERS: { memberNumber: string; firstName: string; lastName: string; type: string; balance: number; status: "active" | "suspended" }[] = [
+  { memberNumber: "M-000218", firstName: "อรทัย", lastName: "ส.", type: "สมาชิก", balance: 1240, status: "active" },
+  { memberNumber: "M-000184", firstName: "ธนกร", lastName: "พ.", type: "เจ้าหน้าที่", balance: 860, status: "active" },
+  { memberNumber: "M-000092", firstName: "พิมพ์ชนก", lastName: "ร.", type: "สมาชิก", balance: 0, status: "suspended" },
+  { memberNumber: "M-000241", firstName: "สมชาย", lastName: "ว.", type: "สมาชิก", balance: 340, status: "active" },
+  { memberNumber: "M-000119", firstName: "จุฑามาศ", lastName: "ก.", type: "เจ้าหน้าที่", balance: 2180, status: "active" },
+];
+
+const SEED_MEMBER_TRANSACTIONS: { memberNumber: string; type: "purchase" | "deposit" | "withdrawal"; detail: string; amount: number; paymentMethod: string | null; balanceAfter: number; createdAt: string }[] = [
+  { memberNumber: "M-000218", type: "purchase", detail: "บิล #INV-260917-038 · น้ำดื่ม 2 ขวด, ข้าวกล่อง 1 กล่อง", amount: -59, paymentMethod: "member_balance", balanceAfter: 1240, createdAt: "2026-09-17 14:38:00" },
+  { memberNumber: "M-000218", type: "deposit", detail: "เงินสด · ผู้ฝาก: น.ส.กัญญาณัฐ พ.", amount: 500, paymentMethod: "cash", balanceAfter: 1299, createdAt: "2026-09-17 14:32:00" },
+  { memberNumber: "M-000218", type: "withdrawal", detail: "ถอนเพื่อถอนฟัน · เงินสด", amount: -200, paymentMethod: "cash", balanceAfter: 799, createdAt: "2026-09-12 10:16:00" },
+  { memberNumber: "M-000218", type: "purchase", detail: "บิล #INV-260901-006 · สินค้า 4 รายการ", amount: -132, paymentMethod: "member_balance", balanceAfter: 999, createdAt: "2026-09-01 09:05:00" },
+  { memberNumber: "M-000092", type: "withdrawal", detail: "ถอนเพื่อถอนฟัน · แนบหลักฐานแล้ว", amount: -200, paymentMethod: "cash", balanceAfter: 0, createdAt: "2026-09-16 09:12:00" },
+  { memberNumber: "M-000092", type: "purchase", detail: "บิล #INV-260912-091 · สินค้า 2 รายการ", amount: -80, paymentMethod: "member_balance", balanceAfter: 200, createdAt: "2026-09-12 11:40:00" },
+];
+
+const SEED_AUDIT_LOGS: { action: string; actor: string; actorRole: string; detail: string; tone: string; createdAt: string }[] = [
+  { action: "ขายสินค้า", actor: "น.ส.กัญญาณัฐ พ.", actorRole: "เจ้าหน้าที่", detail: "บิล #INV-260917-038 · ฿186.00", tone: "blue", createdAt: "2026-09-17 14:38:00" },
+  { action: "เติมเงินสมาชิก", actor: "น.ส.กัญญาณัฐ พ.", actorRole: "เจ้าหน้าที่", detail: "M-000218 · ฿500.00 · เงินสด", tone: "green", createdAt: "2026-09-17 14:32:00" },
+  { action: "แก้ไขสต็อก", actor: "นายวรพจน์ ด.", actorRole: "ผู้บริหาร", detail: "น้ำดื่มคริสตัล · +24 ขวด", tone: "amber", createdAt: "2026-09-17 13:51:00" },
+  { action: "ถอนเงินสมาชิก", actor: "น.ส.กัญญาณัฐ พ.", actorRole: "เจ้าหน้าที่", detail: "M-000092 · ฿200.00 · ถอนเพื่อถอนฟัน", tone: "purple", createdAt: "2026-09-17 12:06:00" },
+];
+
+/** Deterministic pseudo-random generator so seeded history is reproducible. */
+function createRng(seed: number) {
+  let state = seed >>> 0;
+  return () => {
+    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+    return state / 0x100000000;
+  };
+}
+
+function seedHistoricalSales(db: SqliteDb) {
+  const products = listProducts(db);
+  const bySku = new Map(products.map((product) => [product.sku, product]));
+  const weights: { sku: string; weight: number }[] = [
+    { sku: "DRK-001", weight: 30 },
+    { sku: "DRK-002", weight: 12 },
+    { sku: "FD-014", weight: 8 },
+    { sku: "DRK-003", weight: 12 },
+    { sku: "FD-015", weight: 8 },
+    { sku: "HYG-032", weight: 6 },
+    { sku: "HYG-033", weight: 12 },
+    { sku: "ICE-004", weight: 12 },
+  ];
+  const rand = createRng(20260918);
+  const pickProduct = () => {
+    let roll = rand() * 100;
+    for (const entry of weights) {
+      roll -= entry.weight;
+      if (roll < 0) return bySku.get(entry.sku)!;
+    }
+    return bySku.get("DRK-001")!;
+  };
+  const today = startOfToday();
+  runInTransaction(db, () => {
+    const insertSale = db.prepare(`INSERT INTO sales (order_number, payment_method, member_number, subtotal, discount, total, cashier, created_at) VALUES (?, ?, NULL, ?, ?, ?, ?, ?)`);
+    const insertItem = db.prepare(`INSERT INTO sale_items (sale_id, product_id, name, qty, price, cost) VALUES (?, ?, ?, ?, ?, ?)`);
+    for (let daysAgo = 30; daysAgo >= 1; daysAgo -= 1) {
+      const date = addDays(today, -daysAgo);
+      const orders = 90 + Math.floor(rand() * 40);
+      for (let sequence = 1; sequence <= orders; sequence += 1) {
+        const itemCount = 2 + Math.floor(rand() * 4);
+        const chosen = new Map<number, { product: SqliteProduct; qty: number }>();
+        for (let index = 0; index < itemCount; index += 1) {
+          const product = pickProduct();
+          const qty = 1 + Math.floor(rand() * 3);
+          const existing = chosen.get(product.id);
+          chosen.set(product.id, { product, qty: (existing?.qty ?? 0) + qty });
+        }
+        const items = Array.from(chosen.values());
+        const subtotal = round2(items.reduce((sum, { product, qty }) => sum + product.price * qty, 0));
+        const discount = rand() < 0.1 ? round2(5 + Math.floor(rand() * 11)) : 0;
+        const total = round2(subtotal - discount);
+        const paymentMethod = rand() < 0.6 ? "เงินสด" : "QR / สแกน";
+        const createdAt = `${formatDate(date)} ${pad2(8 + Math.floor(rand() * 10))}:${pad2(Math.floor(rand() * 60))}:${pad2(Math.floor(rand() * 60))}`;
+        const orderNumber = `RC-${yyMMdd(date)}-${String(sequence).padStart(3, "0")}`;
+        const cashier = rand() < 0.75 ? "น.ส.กัญญาณัฐ พ." : "นายวรพจน์ ด.";
+        const result = insertSale.run(orderNumber, paymentMethod, subtotal, discount, total, cashier, createdAt);
+        const saleId = Number(result.lastInsertRowid);
+        for (const { product, qty } of items) {
+          insertItem.run(saleId, product.id, product.name, qty, product.price, product.cost);
+        }
+      }
+    }
+  });
+}
+
+/**
+ * Idempotent seeding of the welfare store demo dataset, mirroring the client
+ * mock data in client/src/pages/pageData.ts plus a plausible 30-day sales
+ * history. Each table only seeds when it is still empty.
+ */
+export function seedWelfareStoreData(db: SqliteDb) {
+  const insertMember = db.prepare(`INSERT OR IGNORE INTO members (member_number, first_name, last_name, id_card, balance, status, type) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+  for (const member of SEED_MEMBERS) {
+    insertMember.run(member.memberNumber, member.firstName, member.lastName, null, member.balance, member.status, member.type);
+  }
+  if (countRows(db, "member_transactions") === 0) {
+    const insertTransaction = db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+    for (const transaction of SEED_MEMBER_TRANSACTIONS) {
+      insertTransaction.run(transaction.memberNumber, transaction.type, transaction.detail, transaction.amount, transaction.paymentMethod, transaction.balanceAfter, transaction.createdAt);
+    }
+  }
+  if (countRows(db, "products") === 0) {
+    const insertProduct = db.prepare(`INSERT INTO products (sku, barcode, name, category, emoji, color, unit, price, cost, stock, reorder_point, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`);
+    for (const product of SEED_PRODUCTS) {
+      insertProduct.run(product.sku, product.barcode, product.name, product.category, product.emoji, product.color, product.unit, product.price, product.cost, product.stock, product.reorderPoint);
+    }
+  }
+  if (countRows(db, "stock_lots") === 0) {
+    const insertLot = db.prepare(`INSERT INTO stock_lots (product_id, lot, expiry_date, qty, cost, received_at) VALUES (?, ?, ?, ?, ?, ?)`);
+    for (const lot of SEED_STOCK_LOTS) {
+      const product = db.prepare(`SELECT id FROM products WHERE sku = ?`).get(lot.sku) as { id: number } | undefined;
+      if (product) insertLot.run(product.id, lot.lot, lot.expiry, lot.qty, lot.cost, lot.receivedAt);
+    }
+  }
+  if (countRows(db, "sales") === 0) {
+    seedHistoricalSales(db);
+  }
+  if (countRows(db, "audit_logs") === 0) {
+    const insertLog = db.prepare(`INSERT INTO audit_logs (action, actor, actor_role, detail, tone, created_at) VALUES (?, ?, ?, ?, ?, ?)`);
+    for (const log of SEED_AUDIT_LOGS) {
+      insertLog.run(log.action, log.actor, log.actorRole, log.detail, log.tone, log.createdAt);
+    }
+  }
+}
+
+/**
+ * Opens (and creates if needed) the welfare store database, runs migrations
+ * and seeds demo data. Uses SQLITE_DB_PATH when no filename is provided.
+ */
+export function openWelfareStore(filename = process.env.SQLITE_DB_PATH ?? "data/welfare-store.sqlite"): SqliteDb {
+  if (filename !== ":memory:") {
+    mkdirSync(dirname(resolve(filename)), { recursive: true });
+  }
+  const db = createSqliteStore(filename);
+  seedWelfareStoreData(db);
+  return db;
 }

@@ -102,6 +102,7 @@ tmp/
 temp/
 
 # Database
+data/
 *.db
 *.sqlite
 *.sqlite3
