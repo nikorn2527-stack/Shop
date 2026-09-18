@@ -1,8 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Sarabun:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 
 :root {
-  font-family: "Noto Sans Thai", system-ui, sans-serif;
+  font-family: "Sarabun", system-ui, sans-serif;
   color: #203033;
   background: #f4f7f5;
   font-synthesis: none;
@@ -212,7 +212,7 @@ kbd { font-family: "IBM Plex Mono", monospace; font-size: 9px; color: #a7b1b0; b
 @media (max-width: 560px) { .chart-controls button { padding: 4px 5px; }.chart-interactive-meta { gap: 7px; }.scanner-modal { padding: 15px; }.scanner-viewport { height: 160px; }.product-grid { grid-template-columns: repeat(2, 1fr); }.role-switcher { width: 100%; }.role-switcher button { flex: 1; justify-content: center; } }
 
 /* Requirement update: readable Thai typography, inventory alerts, member management and receipt preview */
-:root { --font-body: "Noto Sans Thai", system-ui, sans-serif; }
+:root { --font-body: "Sarabun", system-ui, sans-serif; }
 body, button, input, select, textarea { font-family: var(--font-body); }
 .inventory-alert-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 16px 0; }
 .alert-panel { padding: 17px 19px 12px; }
@@ -239,3 +239,39 @@ body, button, input, select, textarea { font-family: var(--font-body); }
 .report-export-actions { display: flex; gap: 6px; align-items: center; }
 .report-export-actions .compact { display: inline-flex; align-items: center; gap: 5px; }
 @media (max-width: 640px) { .report-export-actions { width: 100%; } .report-export-actions .compact { flex: 1; justify-content: center; } }
+
+/* --- real-data POS/Stock additions (OLD-2-b) -------------------------------- */
+.member-select-wrap { position: relative; }
+.member-dropdown { position: absolute; left: 0; right: 0; top: calc(100% + 4px); background: #fff; border: 1px solid #e1ebe7; border-radius: 9px; box-shadow: 0 14px 34px rgba(24, 61, 53, .16); z-index: 40; max-height: 224px; overflow-y: auto; padding: 4px; }
+.member-option { display: flex; align-items: center; gap: 7px; width: 100%; border: 0; background: transparent; border-radius: 7px; padding: 8px 9px; text-align: left; cursor: pointer; }
+.member-option:hover:not(:disabled) { background: #f2faf7; }
+.member-option div { flex: 1; min-width: 0; }
+.member-option b { display: block; color: #57706a; font-size: 10px; }
+.member-option small { display: block; color: #8ba39b; font-size: 9px; margin-top: 2px; }
+.member-option:disabled, .member-option.disabled { opacity: .55; cursor: not-allowed; }
+.option-check { color: var(--teal); flex: 0 0 auto; }
+.suspended-tag { flex: 0 0 auto; color: #c16b6e; background: #fff0f0; border-radius: 20px; padding: 3px 7px; font-size: 8px; white-space: nowrap; }
+.wallet-form { border: 1px solid #e4eee9; background: #f7fbf9; border-radius: 8px; padding: 10px; margin-top: 11px; }
+.wallet-heading { display: flex; align-items: center; gap: 8px; }
+.wallet-heading span { width: 27px; height: 27px; display: grid; place-items: center; color: #3e9380; background: #e2f4ed; border-radius: 7px; }
+.wallet-heading b, .wallet-heading small { display: block; }
+.wallet-heading b { color: #4c6c63; font-size: 10px; }
+.wallet-heading small { color: #93a8a0; font-size: 9px; margin-top: 2px; }
+.wallet-form label { display: block; color: #71847e; font-size: 10px; margin-top: 9px; }
+.wallet-form input, .wallet-form select { width: 100%; height: 33px; margin-top: 5px; border: 1px solid #e1eae7; border-radius: 7px; padding: 0 9px; outline: none; background: #fff; color: #536d64; font-size: 11px; }
+.wallet-form input:focus, .wallet-form select:focus { border-color: #8fc5b4; box-shadow: 0 0 0 3px #eaf6f2; }
+.wallet-form .primary-button { width: 100%; margin-top: 12px; }
+.discount-edit input { width: 52px; height: 21px; border: 1px solid #d9e7e1; border-radius: 5px; padding: 0 5px; outline: none; background: #fff; color: #5b706b; font: 10px "IBM Plex Mono", monospace; text-align: right; }
+.discount-edit input:focus { border-color: #8fc5b4; box-shadow: 0 0 0 3px #eaf6f2; }
+.inline-message.error, .notice-bar.error { color: #b05457; background: #fdf3f3; border-color: #f3dcdc; }
+.inline-message.error { color: #ad5053; }
+.inline-message.error button, .notice-bar.error button { color: #bd7a7c; }
+.pos-loading { grid-column: 1 / -1; min-height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #b4bfbc; gap: 6px; border: 1px dashed #e3ede8; border-radius: 10px; margin-top: 15px; }
+.pos-loading b { color: #70827e; font-size: 11px; }
+.pos-loading span { font-size: 10px; }
+.table-loading { min-height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #b4bfbc; gap: 6px; padding: 20px 0; }
+.table-loading b { color: #70827e; font-size: 11px; }
+.table-loading span { font-size: 10px; }
+.pay-button:disabled, .pay-split button:disabled { opacity: .55; cursor: not-allowed; filter: saturate(.6); }
+.pay-button:disabled:hover, .pay-split button:disabled:hover { background: var(--teal); }
+.pay-split button:disabled:hover { background: #fff; }
