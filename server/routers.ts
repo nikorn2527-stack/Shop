@@ -10,6 +10,7 @@ import {
   StoreError,
   checkout,
   createAppSession,
+  createAppUser,
   createProduct,
   dailySalesRows,
   dashboardStats,
@@ -18,11 +19,13 @@ import {
   findAppUserByUsername,
   getMemberDetail,
   getSettings,
+  listAppUsers,
   listAuditLogs,
   listMembers,
   listProducts,
   listStockRows,
   logAction,
+  memberSpendingStats,
   receiveStock,
   registerMember,
   salesList,
@@ -30,6 +33,7 @@ import {
   setProductActive,
   setSettings,
   stockCount,
+  updateAppUser,
   updateMember,
   updateProduct,
   verifyPassword,
@@ -239,6 +243,21 @@ const authLoginInput = z.object({
   password: z.string().min(1, "กรุณากรอกรหัสผ่าน"),
 });
 
+const userCreateInput = z.object({
+  username: z.string().min(1, "กรุณาระบุชื่อผู้ใช้"),
+  password: z.string().min(1, "กรุณากรอกรหัสผ่าน"),
+  displayName: z.string().min(1, "กรุณาระบุชื่อ-นามสกุล"),
+  role: z.enum(["staff", "admin"]),
+});
+
+const userUpdateInput = z.object({
+  userId: z.number().int().positive(),
+  displayName: z.string().optional(),
+  role: z.enum(["staff", "admin"]).optional(),
+  active: z.boolean().optional(),
+  password: z.string().optional(),
+});
+
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
@@ -289,6 +308,56 @@ export const appRouter = router({
         success: true,
       } as const;
     }),
+  }),
+
+  user: router({
+    list: publicProcedure
+      .input(z.unknown().optional())
+      .query(({ ctx }) =>
+        withStoreErrors(() => {
+          if (!isAdminCtx(ctx, {})) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "การจัดการผู้ใช้ระบบต้องใช้สิทธิ์ผู้บริหาร" });
+          }
+          return listAppUsers(getWelfareDb());
+        }),
+      ),
+    create: publicProcedure
+      .input(userCreateInput)
+      .mutation(({ ctx, input }) => {
+        // The zod schema has no actor/actorRole fields, so the session is the
+        // only source of identity — the admin gate requires an admin session.
+        const { actor, actorRole } = resolveActor(ctx, {});
+        return withStoreErrors(() => {
+          if (!isAdminCtx(ctx, {})) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "การจัดการผู้ใช้ระบบต้องใช้สิทธิ์ผู้บริหาร" });
+          }
+          return createAppUser(getWelfareDb(), { ...input, actor, actorRole });
+        });
+      }),
+    update: publicProcedure
+      .input(userUpdateInput)
+      .mutation(({ ctx, input }) => {
+        const { actor, actorRole } = resolveActor(ctx, {});
+        return withStoreErrors(() => {
+          if (!isAdminCtx(ctx, {})) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "การจัดการผู้ใช้ระบบต้องใช้สิทธิ์ผู้บริหาร" });
+          }
+          // Self-protection: role changes and suspension target other accounts.
+          if (ctx.user && ctx.user.id === input.userId && (input.role !== undefined || input.active === false)) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "ไม่สามารถเปลี่ยนสิทธิ์หรือระงับบัญชีของตัวเองได้" });
+          }
+          // Pass only the defined fields so the changed-fields diff in the store works.
+          return updateAppUser(getWelfareDb(), {
+            userId: input.userId,
+            displayName: input.displayName,
+            role: input.role,
+            active: input.active,
+            password: input.password,
+            actor,
+            actorRole,
+          });
+        });
+      }),
   }),
 
   product: router({
@@ -379,6 +448,9 @@ export const appRouter = router({
           return detail;
         }),
       ),
+    stats: publicProcedure
+      .input(memberDetailInput)
+      .query(({ input }) => withStoreErrors(() => memberSpendingStats(getWelfareDb(), input.memberNumber))),
     register: publicProcedure
       .input(memberRegisterInput)
       .mutation(({ ctx, input }) => {

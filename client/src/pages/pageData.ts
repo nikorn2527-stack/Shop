@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { BarChart3, LayoutDashboard, PackageSearch, ShoppingCart, UsersRound } from "lucide-react";
 
-export type View = "dashboard" | "pos" | "stock" | "members" | "reports" | "settings" | "logs";
+export type View = "dashboard" | "pos" | "stock" | "members" | "reports" | "settings" | "logs" | "users";
 export type Role = "staff" | "admin";
 export type CartItem = { id: number; name: string; price: number; qty: number; unit: string };
 
@@ -41,7 +41,7 @@ export function addScannedItem(items: CartItem[], product: Product) {
 }
 
 export function canAccessView(role: Role, view: View) {
-  return role === "admin" || !["settings", "logs"].includes(view);
+  return role === "admin" || !["settings", "logs", "users"].includes(view);
 }
 
 export function isStockAlert(stock: number, reorderLevel = 10) {

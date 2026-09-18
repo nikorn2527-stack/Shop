@@ -5,24 +5,28 @@ import {
   BarChart3,
   Package,
   PackageSearch,
+  ReceiptText,
   Search,
   Settings2,
   ShoppingCart,
+  UserCog,
   UserPlus,
   UsersRound,
 } from "lucide-react";
 
 import type { Role, View } from "@/pages/pageData";
 import { canAccessView, money, navItems } from "@/pages/pageData";
+import { formatLastActivity } from "@/pages/viewFormat";
 import { trpc } from "@/lib/trpc";
 
 /**
- * Global ⌘K command palette. Searches quick actions, menus, members and
- * products (case-insensitive includes). Keyboard driven: ↑/↓ move the
- * highlight (wrap-around), Enter selects, Escape closes.
+ * Global ⌘K command palette. Searches quick actions, menus, members,
+ * products and sale bills (bills are matched server-side on order/member
+ * number via sales.list). Keyboard driven: ↑/↓ move the highlight
+ * (wrap-around), Enter selects, Escape closes.
  */
 
-type CommandSection = "การดำเนินการด่วน" | "เมนู" | "สมาชิก" | "สินค้า";
+type CommandSection = "การดำเนินการด่วน" | "เมนู" | "สมาชิก" | "สินค้า" | "บิลขาย";
 
 type CommandItem = {
   key: string;
@@ -33,14 +37,15 @@ type CommandItem = {
   select: () => void;
 };
 
-const SECTION_ORDER: CommandSection[] = ["การดำเนินการด่วน", "เมนู", "สมาชิก", "สินค้า"];
+const SECTION_ORDER: CommandSection[] = ["การดำเนินการด่วน", "เมนู", "สมาชิก", "สินค้า", "บิลขาย"];
 
-export function GlobalSearch({ role, open, onClose, onNavigate, onOpenMember }: {
+export function GlobalSearch({ role, open, onClose, onNavigate, onOpenMember, onOpenBill }: {
   role: Role;
   open: boolean;
   onClose: () => void;
   onNavigate: (view: View) => void;
   onOpenMember: (memberNumber: string) => void;
+  onOpenBill: (orderNumber: string) => void;
 }) {
   const [query, setQuery] = useState("");
   const [highlighted, setHighlighted] = useState(0);
@@ -50,7 +55,10 @@ export function GlobalSearch({ role, open, onClose, onNavigate, onOpenMember }: 
   const membersQuery = trpc.member.list.useQuery(undefined, { enabled: open });
   const trimmed = query.trim();
   const needle = trimmed.toLowerCase();
-  const loading = trimmed !== "" && (productsQuery.isFetching || membersQuery.isFetching);
+  // Bills are searched server-side (order number OR member number) once the
+  // query is long enough to be meaningful.
+  const billsQuery = trpc.sales.list.useQuery({ search: trimmed, limit: 6 }, { enabled: open && trimmed.length >= 2, placeholderData: (previous) => previous });
+  const loading = trimmed !== "" && (productsQuery.isFetching || membersQuery.isFetching || billsQuery.isFetching);
 
   useEffect(() => {
     if (open) {
@@ -76,6 +84,7 @@ export function GlobalSearch({ role, open, onClose, onNavigate, onOpenMember }: 
   const menuEntries = useMemo(() => {
     const extra: { id: View; label: string; caption: string; icon: LucideIcon }[] = [
       { id: "settings", label: "ตั้งค่า", caption: "ระบบและใบเสร็จ", icon: Settings2 },
+      { id: "users", label: "ผู้ใช้ระบบ", caption: "จัดการสิทธิ์และบัญชี", icon: UserCog },
       { id: "logs", label: "ระบบ Log", caption: "ประวัติการใช้งาน", icon: Activity },
     ];
     const all = [...navItems, ...(role === "admin" ? extra : [])];
@@ -107,13 +116,18 @@ export function GlobalSearch({ role, open, onClose, onNavigate, onOpenMember }: 
         if (!haystack.includes(needle)) continue;
         list.push({ key: `product-${product.id}`, section: "สินค้า", icon: Package, label: product.name, sub: `${product.sku} · คงเหลือ ${product.stock} ${product.unit} · ${money(product.price)}`, select: () => onNavigate("pos") });
       }
+      if (trimmed.length >= 2) {
+        for (const bill of billsQuery.data ?? []) {
+          list.push({ key: `bill-${bill.orderNumber}`, section: "บิลขาย", icon: ReceiptText, label: bill.orderNumber, sub: `${money(bill.total)} · ${bill.memberName ?? "บุคคลทั่วไป"} · ${formatLastActivity(bill.createdAt)}`, select: () => onOpenBill(bill.orderNumber) });
+        }
+      }
     }
 
     // Cap the data-driven sections at 6 rows each (quick actions + menus stay complete).
     const capped: CommandItem[] = [];
     const counts = new Map<CommandSection, number>();
     for (const item of list) {
-      if (item.section === "สมาชิก" || item.section === "สินค้า") {
+      if (item.section === "สมาชิก" || item.section === "สินค้า" || item.section === "บิลขาย") {
         const used = counts.get(item.section) ?? 0;
         if (used >= 6) continue;
         counts.set(item.section, used + 1);
@@ -121,7 +135,7 @@ export function GlobalSearch({ role, open, onClose, onNavigate, onOpenMember }: 
       capped.push(item);
     }
     return capped;
-  }, [open, needle, quickActions, menuEntries, membersQuery.data, productsQuery.data, onNavigate, onOpenMember]);
+  }, [open, needle, trimmed, quickActions, menuEntries, membersQuery.data, productsQuery.data, billsQuery.data, onNavigate, onOpenMember, onOpenBill]);
 
   useEffect(() => {
     setHighlighted((current) => (items.length === 0 ? 0 : Math.min(current, items.length - 1)));
@@ -153,13 +167,13 @@ export function GlobalSearch({ role, open, onClose, onNavigate, onOpenMember }: 
   let flatIndex = -1;
 
   return <div className="command-palette-backdrop" onClick={onClose}><div className="command-palette" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="ค้นหาทั่วไป">
-    <div className="command-input-row"><Search size={17} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={onKeyDown} placeholder="ค้นหาเมนู สมาชิก หรือสินค้า…" aria-label="ค้นหาเมนู สมาชิก หรือสินค้า" /></div>
+    <div className="command-input-row"><Search size={17} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={onKeyDown} placeholder="ค้นหาเมนู สมาชิก สินค้า หรือเลขที่บิล…" aria-label="ค้นหาเมนู สมาชิก สินค้า หรือเลขที่บิล" /></div>
     <div className="command-results" ref={resultsRef}>
       {loading && <div className="command-loading-row">กำลังโหลดข้อมูล…</div>}
       {sections.length === 0 && !loading && <div className="command-empty">ไม่พบผลลัพธ์สำหรับ “{trimmed}”</div>}
       {sections.map(({ section, entries }) => <div className="command-section" key={section}>
         <div className="command-section-label">{section}</div>
-        {entries.map((item) => { flatIndex += 1; const index = flatIndex; const Icon = item.icon; return <button type="button" className={`command-item ${index === highlighted ? "highlighted" : ""}`} key={item.key} onMouseEnter={() => setHighlighted(index)} onClick={() => selectItem(item)}><span className="command-item-icon"><Icon size={16} /></span><span className="command-item-main"><b>{item.label}</b><small className="command-item-sub">{item.sub}</small></span></button>; })}
+        {entries.map((item) => { flatIndex += 1; const index = flatIndex; const Icon = item.icon; return <button type="button" className={`command-item ${index === highlighted ? "highlighted" : ""}`} key={item.key} data-section={item.section} onMouseEnter={() => setHighlighted(index)} onClick={() => selectItem(item)}><span className="command-item-icon"><Icon size={16} /></span><span className="command-item-main"><b>{item.label}</b><small className="command-item-sub">{item.sub}</small></span></button>; })}
       </div>)}
     </div>
     <div className="command-footer"><span><kbd>↑</kbd><kbd>↓</kbd> เลื่อนดู</span><span><kbd>↵</kbd> เลือก</span><span><kbd>esc</kbd> ปิด</span></div>

@@ -1281,6 +1281,184 @@ export function deleteAppSession(db: SqliteDb, sessionId: string): void {
   db.prepare(`DELETE FROM app_sessions WHERE id = ?`).run(sessionId);
 }
 
+// --- app user administration (admin only) ------------------------------------
+
+/** AppUser without the password hash — safe to return to clients. */
+export type AppUserSummary = {
+  id: number;
+  username: string;
+  displayName: string;
+  role: "staff" | "admin";
+  active: number;
+  createdAt: string;
+};
+
+const APP_USER_SUMMARY_SELECT = `SELECT id, username, display_name AS displayName, role, active, created_at AS createdAt FROM app_users`;
+
+function getAppUserSummaryById(db: SqliteDb, userId: number): AppUserSummary | undefined {
+  return db.prepare(`${APP_USER_SUMMARY_SELECT} WHERE id = ?`).get(userId) as AppUserSummary | undefined;
+}
+
+/** Lists every login account, oldest first. Never exposes password hashes. */
+export function listAppUsers(db: SqliteDb): AppUserSummary[] {
+  return db.prepare(`${APP_USER_SUMMARY_SELECT} ORDER BY id`).all() as unknown as AppUserSummary[];
+}
+
+const USERNAME_PATTERN = /^[a-zA-Z0-9_.]{3,30}$/;
+
+export type CreateAppUserInput = {
+  username: string;
+  password: string;
+  displayName: string;
+  role: "staff" | "admin";
+  actor?: string;
+  actorRole?: string | null;
+};
+
+/** Creates a login account with a scrypt-hashed password and audits it. */
+export function createAppUser(db: SqliteDb, input: CreateAppUserInput): AppUserSummary {
+  const username = input.username?.trim() ?? "";
+  if (!USERNAME_PATTERN.test(username)) {
+    throw new StoreError("ชื่อผู้ใช้ต้องเป็นตัวอักษรอังกฤษ ตัวเลข จุด หรือขีดล่าง ความยาว 3-30 ตัวอักษร");
+  }
+  if (db.prepare(`SELECT id FROM app_users WHERE LOWER(username) = LOWER(?)`).get(username)) {
+    throw new StoreError("มีชื่อผู้ใช้นี้ในระบบแล้ว");
+  }
+  if (typeof input.password !== "string" || input.password.length < 4) {
+    throw new StoreError("รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร");
+  }
+  const displayName = input.displayName?.trim() ?? "";
+  if (!displayName) throw new StoreError("กรุณาระบุชื่อ-นามสกุลผู้ใช้");
+  const createdAt = formatDateTime();
+  const result = db.prepare(`INSERT INTO app_users (username, password_hash, display_name, role, active, created_at) VALUES (?, ?, ?, ?, 1, ?)`).run(
+    username,
+    hashPassword(input.password),
+    displayName,
+    input.role,
+    createdAt,
+  );
+  const roleThai = input.role === "admin" ? "ผู้บริหาร" : "เจ้าหน้าที่";
+  logAction(db, "เพิ่มผู้ใช้ระบบ", input.actor?.trim() || "ผู้บริหาร", `${username} · ${displayName} · สิทธิ์ ${roleThai}`, "green", input.actorRole ?? null, createdAt);
+  return getAppUserSummaryById(db, Number(result.lastInsertRowid))!;
+}
+
+export type UpdateAppUserInput = {
+  userId: number;
+  displayName?: string;
+  role?: "staff" | "admin";
+  active?: boolean;
+  password?: string;
+  actor?: string;
+  actorRole?: string | null;
+};
+
+/** Updates only the provided account fields. Undefined keeps the current value; empty password strings are ignored. */
+export function updateAppUser(db: SqliteDb, input: UpdateAppUserInput): AppUserSummary {
+  const user = db.prepare(`${APP_USER_SELECT} WHERE id = ?`).get(input.userId) as AppUser | undefined;
+  if (!user) throw new StoreError("ไม่พบผู้ใช้ระบบรายนี้");
+  if (input.displayName !== undefined && !input.displayName.trim()) {
+    throw new StoreError("กรุณาระบุชื่อ-นามสกุลผู้ใช้");
+  }
+  const newPassword = typeof input.password === "string" && input.password !== "" ? input.password : undefined;
+  if (newPassword !== undefined && newPassword.length < 4) {
+    throw new StoreError("รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร");
+  }
+
+  const nextDisplayName = input.displayName !== undefined && input.displayName.trim() !== user.displayName ? input.displayName.trim() : undefined;
+  const nextRole = input.role !== undefined && input.role !== user.role ? input.role : undefined;
+  const nextActive = input.active !== undefined && (input.active ? 1 : 0) !== user.active ? (input.active ? 1 : 0) : undefined;
+
+  // Last-admin guard: the final active admin cannot be demoted or deactivated.
+  if (user.role === "admin" && user.active === 1 && (nextRole !== undefined || nextActive === 0)) {
+    const others = db.prepare(`SELECT COUNT(*) AS count FROM app_users WHERE role = 'admin' AND active = 1 AND id != ?`).get(input.userId) as { count: number };
+    if (others.count === 0) {
+      throw new StoreError("ต้องมีผู้ดูแลระบบ (ผู้บริหาร) ที่ใช้งานได้อย่างน้อย 1 รายเสมอ");
+    }
+  }
+
+  const assignments: string[] = [];
+  const values: (string | number)[] = [];
+  const changedLabels: string[] = [];
+  if (nextDisplayName !== undefined) {
+    assignments.push("display_name = ?");
+    values.push(nextDisplayName);
+    changedLabels.push("ชื่อ-นามสกุล");
+  }
+  if (nextRole !== undefined) {
+    assignments.push("role = ?");
+    values.push(nextRole);
+    changedLabels.push("สิทธิ์การใช้งาน");
+  }
+  if (nextActive !== undefined) {
+    assignments.push("active = ?");
+    values.push(nextActive);
+    changedLabels.push("สถานะ");
+  }
+
+  // Nothing actually changed → return the current state without an audit entry.
+  if (assignments.length === 0 && newPassword === undefined) {
+    return getAppUserSummaryById(db, input.userId)!;
+  }
+
+  const actor = input.actor?.trim() || "ผู้บริหาร";
+  const createdAt = formatDateTime();
+  runInTransaction(db, () => {
+    if (assignments.length > 0) {
+      db.prepare(`UPDATE app_users SET ${assignments.join(", ")} WHERE id = ?`).run(...values, input.userId);
+      logAction(
+        db,
+        "แก้ไขผู้ใช้ระบบ",
+        actor,
+        `${user.username} · ${nextDisplayName ?? user.displayName} · แก้ไข: ${changedLabels.join(", ")}`,
+        nextRole !== undefined || nextActive !== undefined ? "amber" : "blue",
+        input.actorRole ?? null,
+        createdAt,
+      );
+    }
+    if (newPassword !== undefined) {
+      db.prepare(`UPDATE app_users SET password_hash = ? WHERE id = ?`).run(hashPassword(newPassword), input.userId);
+      // The plaintext password must never appear anywhere in the audit trail.
+      logAction(db, "ตั้งรหัสผ่านใหม่", actor, `${user.username} · ตั้งรหัสผ่านใหม่`, "amber", input.actorRole ?? null, createdAt);
+    }
+  });
+  return getAppUserSummaryById(db, input.userId)!;
+}
+
+// --- member spending stats ----------------------------------------------------
+
+export type MemberSpendingStats = {
+  totalSpent: number;
+  billCount: number;
+  lastPurchaseAt: string | null;
+  topProducts: { name: string; qty: number; total: number }[];
+};
+
+/** Lifetime purchase summary for one member, computed from the sales tables (paid totals after discount). */
+export function memberSpendingStats(db: SqliteDb, memberNumber: string): MemberSpendingStats {
+  const number = memberNumber?.trim() ?? "";
+  const member = db.prepare(`SELECT member_number FROM members WHERE member_number = ?`).get(number);
+  if (!member) throw new StoreError(`ไม่พบสมาชิก ${memberNumber} ในระบบ`);
+  const totals = db.prepare(
+    `SELECT ROUND(COALESCE(SUM(total), 0), 2) AS totalSpent, COUNT(*) AS billCount, MAX(created_at) AS lastPurchaseAt FROM sales WHERE member_number = ?`,
+  ).get(number) as { totalSpent: number; billCount: number; lastPurchaseAt: string | null };
+  const topProducts = db.prepare(
+    `SELECT COALESCE(si.name, p.name) AS name, SUM(si.qty) AS qty, ROUND(SUM(si.qty * si.price), 2) AS total
+     FROM sales s
+     JOIN sale_items si ON si.sale_id = s.id
+     LEFT JOIN products p ON p.id = si.product_id
+     WHERE s.member_number = ?
+     GROUP BY si.name
+     ORDER BY qty DESC, total DESC
+     LIMIT 3`,
+  ).all(number) as unknown as MemberSpendingStats["topProducts"];
+  return {
+    totalSpent: round2(totals.totalSpent ?? 0),
+    billCount: totals.billCount ?? 0,
+    lastPurchaseAt: totals.lastPurchaseAt ?? null,
+    topProducts,
+  };
+}
+
 // --- seeding ----------------------------------------------------------------
 
 const SEED_PRODUCTS: { sku: string; barcode: string; name: string; category: string; emoji: string; color: string; unit: string; price: number; cost: number; stock: number; reorderPoint: number }[] = [

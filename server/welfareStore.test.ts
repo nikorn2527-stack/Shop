@@ -6,6 +6,7 @@ import {
   authenticateAppSession,
   checkout,
   createAppSession,
+  createAppUser,
   createSqliteStore,
   dailySalesRows,
   dashboardStats,
@@ -16,10 +17,12 @@ import {
   getMemberNumberMode,
   getSettings,
   hashPassword,
+  listAppUsers,
   listAuditLogs,
   listMembers,
   listProducts,
   listStockRows,
+  memberSpendingStats,
   openWelfareStore,
   receiveStock,
   registerMember,
@@ -31,6 +34,7 @@ import {
   setProductActive,
   setSettings,
   stockCount,
+  updateAppUser,
   updateMember,
   updateProduct,
   verifyPassword,
@@ -859,5 +863,196 @@ describe("authentication", () => {
     createAppSession(database, user.id);
     expect(tableCount(database, "app_sessions")).toBe(1);
     expect(authenticateAppSession(database, "expired-session")).toBeUndefined();
+  });
+});
+
+describe("user management", () => {
+  it("lists every account ordered by id and never exposes password hashes", () => {
+    const database = freshDb();
+    const users = listAppUsers(database);
+    expect(users.map((user) => user.username)).toEqual(["kanyanat", "woraphot"]);
+    expect(users.map((user) => user.id)).toEqual([...users.map((user) => user.id)].sort((a, b) => a - b));
+    for (const user of users) {
+      expect(Object.keys(user).sort()).toEqual(["active", "createdAt", "displayName", "id", "role", "username"]);
+    }
+    expect(JSON.stringify(users)).not.toContain("scrypt");
+  });
+
+  it("creates a user with a scrypt hash, active flag and an audit log", () => {
+    const database = freshDb();
+    const created = createAppUser(database, {
+      username: "somchai.j",
+      password: "secret9",
+      displayName: " สมชาย ใจดี ",
+      role: "staff",
+      actor: "นายวรพจน์ ด.",
+      actorRole: "ผู้บริหาร",
+    });
+
+    expect(created).toMatchObject({ id: expect.any(Number), username: "somchai.j", displayName: "สมชาย ใจดี", role: "staff", active: 1 });
+    expect(created.createdAt).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+
+    const row = database.prepare(`SELECT password_hash AS passwordHash FROM app_users WHERE id = ?`).get(created.id) as { passwordHash: string };
+    expect(row.passwordHash.startsWith("scrypt$")).toBe(true);
+    expect(verifyPassword("secret9", row.passwordHash)).toBe(true);
+    expect(verifyPassword("wrongpass", row.passwordHash)).toBe(false);
+
+    const latest = listAuditLogs(database, 1)[0];
+    expect(latest.action).toBe("เพิ่มผู้ใช้ระบบ");
+    expect(latest.actor).toBe("นายวรพจน์ ด.");
+    expect(latest.actorRole).toBe("ผู้บริหาร");
+    expect(latest.detail).toBe("somchai.j · สมชาย ใจดี · สิทธิ์ เจ้าหน้าที่");
+    expect(latest.tone).toBe("green");
+    expect(listAppUsers(database)).toHaveLength(3);
+  });
+
+  it("rejects duplicate usernames, including different casing", () => {
+    const database = freshDb();
+    const attempt = (username: string) => createAppUser(database, { username, password: "1234", displayName: "ทดสอบ ระบบ", role: "staff" });
+    expect(() => attempt("kanyanat")).toThrowError(/มีชื่อผู้ใช้นี้ในระบบแล้ว/);
+    expect(() => attempt("Kanyanat")).toThrowError(/มีชื่อผู้ใช้นี้ในระบบแล้ว/);
+    expect(() => attempt("WORAPHOT")).toThrowError(/มีชื่อผู้ใช้นี้ในระบบแล้ว/);
+    expect(tableCount(database, "app_users")).toBe(2);
+  });
+
+  it("validates username format, password length and display name with Thai errors", () => {
+    const database = freshDb();
+    const base = { password: "1234", displayName: "ทดสอบ ระบบ", role: "staff" as const };
+    expect(() => createAppUser(database, { ...base, username: "สมชาย" })).toThrowError(/ชื่อผู้ใช้ต้องเป็นตัวอักษรอังกฤษ ตัวเลข จุด หรือขีดล่าง ความยาว 3-30 ตัวอักษร/);
+    expect(() => createAppUser(database, { ...base, username: "ab" })).toThrowError(/ชื่อผู้ใช้ต้องเป็นตัวอักษรอังกฤษ/);
+    expect(() => createAppUser(database, { ...base, username: "a".repeat(31) })).toThrowError(/ชื่อผู้ใช้ต้องเป็นตัวอักษรอังกฤษ/);
+    expect(() => createAppUser(database, { username: "new.user", password: "123", displayName: "ทดสอบ ระบบ", role: "staff" })).toThrowError(/รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร/);
+    expect(() => createAppUser(database, { username: "new.user", password: "1234", displayName: "   ", role: "staff" })).toThrowError(/กรุณาระบุชื่อ-นามสกุลผู้ใช้/);
+    expect(tableCount(database, "app_users")).toBe(2);
+  });
+
+  it("updates only changed fields and logs exactly what changed", () => {
+    const database = freshDb();
+    const kanyanat = findAppUserByUsername(database, "kanyanat")!;
+    expect(() => updateAppUser(database, { userId: 999 })).toThrowError(/ไม่พบผู้ใช้ระบบรายนี้/);
+
+    const updated = updateAppUser(database, {
+      userId: kanyanat.id,
+      displayName: "กัญญาณัฐ พรหมมา",
+      role: "admin",
+      actor: "นายวรพจน์ ด.",
+      actorRole: "ผู้บริหาร",
+    });
+
+    expect(updated).toMatchObject({ id: kanyanat.id, username: "kanyanat", displayName: "กัญญาณัฐ พรหมมา", role: "admin", active: 1 });
+    const latest = listAuditLogs(database, 1)[0];
+    expect(latest.action).toBe("แก้ไขผู้ใช้ระบบ");
+    expect(latest.actor).toBe("นายวรพจน์ ด.");
+    expect(latest.detail).toBe("kanyanat · กัญญาณัฐ พรหมมา · แก้ไข: ชื่อ-นามสกุล, สิทธิ์การใช้งาน");
+    expect(latest.tone).toBe("amber");
+
+    // No-op update: nothing changes and no audit row is written.
+    const logsBefore = tableCount(database, "audit_logs");
+    const noop = updateAppUser(database, { userId: kanyanat.id, displayName: "กัญญาณัฐ พรหมมา", role: "admin", active: true });
+    expect(noop).toMatchObject({ displayName: "กัญญาณัฐ พรหมมา", role: "admin", active: 1 });
+    expect(tableCount(database, "audit_logs")).toBe(logsBefore);
+  });
+
+  it("keeps at least one active admin (last-admin guard)", () => {
+    const database = freshDb();
+    const woraphot = findAppUserByUsername(database, "woraphot")!;
+
+    expect(() => updateAppUser(database, { userId: woraphot.id, role: "staff" })).toThrowError(/ต้องมีผู้ดูแลระบบ/);
+    expect(() => updateAppUser(database, { userId: woraphot.id, active: false })).toThrowError(/ต้องมีผู้ดูแลระบบ/);
+    expect(findAppUserByUsername(database, "woraphot")!.role).toBe("admin");
+    expect(tableCount(database, "app_users")).toBe(2);
+
+    // A second active admin frees the first one to be demoted.
+    const second = createAppUser(database, { username: "admin.two", password: "1234", displayName: "ผู้บริหาร สอง", role: "admin" });
+    const demoted = updateAppUser(database, { userId: woraphot.id, role: "staff" });
+    expect(demoted.role).toBe("staff");
+
+    // ...and the second admin is now the last one standing.
+    expect(() => updateAppUser(database, { userId: second.id, active: false })).toThrowError(/ต้องมีผู้ดูแลระบบ/);
+    expect(() => updateAppUser(database, { userId: second.id, role: "staff" })).toThrowError(/ต้องมีผู้ดูแลระบบ/);
+  });
+
+  it("resets passwords with a separate audit entry that never contains the value", () => {
+    const database = freshDb();
+    const kanyanat = findAppUserByUsername(database, "kanyanat")!;
+    const readHash = () => (database.prepare(`SELECT password_hash AS passwordHash FROM app_users WHERE id = ?`).get(kanyanat.id) as { passwordHash: string }).passwordHash;
+
+    const updated = updateAppUser(database, { userId: kanyanat.id, password: "newpass" });
+    expect(updated.username).toBe("kanyanat");
+    expect(verifyPassword("newpass", readHash())).toBe(true);
+    expect(verifyPassword("1234", readHash())).toBe(false);
+
+    const latest = listAuditLogs(database, 1)[0];
+    expect(latest.action).toBe("ตั้งรหัสผ่านใหม่");
+    expect(latest.detail).toBe("kanyanat · ตั้งรหัสผ่านใหม่");
+    expect(latest.detail).not.toContain("newpass");
+    // Only the password changed → no "แก้ไขผู้ใช้ระบบ" entry was written.
+    expect(listAuditLogs(database, 200).some((entry) => entry.action === "แก้ไขผู้ใช้ระบบ")).toBe(false);
+
+    // Empty password strings are treated as "no change".
+    const logsBefore = tableCount(database, "audit_logs");
+    updateAppUser(database, { userId: kanyanat.id, password: "" });
+    expect(verifyPassword("newpass", readHash())).toBe(true);
+    expect(tableCount(database, "audit_logs")).toBe(logsBefore);
+
+    // Short passwords are rejected.
+    expect(() => updateAppUser(database, { userId: kanyanat.id, password: "abc" })).toThrowError(/รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร/);
+  });
+});
+
+describe("member spending stats", () => {
+  it("sums spending, bills and top products from checkout history (discount included)", () => {
+    const database = freshDb();
+    const detail = registerMember(database, { firstName: "สถิติ", lastName: "ทดสอบ", initialDeposit: 200 });
+    const memberNumber = detail.member.memberNumber;
+    const water = productBySku(database, "DRK-001");
+    const rice = productBySku(database, "FD-014");
+
+    const first = checkout(database, {
+      items: [
+        { productId: water.id, qty: 2 },
+        { productId: rice.id, qty: 1 },
+      ],
+      paymentMethod: "หักบัญชีสมาชิก",
+      memberNumber,
+      discount: 0,
+      cashier: "น.ส.กัญญาณัฐ พ.",
+    });
+    expect(first.total).toBe(59);
+
+    // A second bill with a discount: paid total 7 - 2 = 5, still attached to the member.
+    const second = checkout(database, {
+      items: [{ productId: water.id, qty: 1 }],
+      paymentMethod: "เงินสด",
+      memberNumber,
+      discount: 2,
+      cashier: "น.ส.กัญญาณัฐ พ.",
+    });
+    expect(second.total).toBe(5);
+
+    const stats = memberSpendingStats(database, memberNumber);
+    expect(stats.totalSpent).toBe(64);
+    expect(stats.billCount).toBe(2);
+    expect(stats.lastPurchaseAt).toBe(second.createdAt);
+    expect(stats.topProducts).toEqual([
+      { name: "น้ำดื่มคริสตัล 600 มล.", qty: 3, total: 21 },
+      { name: "ข้าวกล่องกะเพราไก่", qty: 1, total: 45 },
+    ]);
+  });
+
+  it("returns zeroed stats for a member without purchases", () => {
+    const database = freshDb();
+    const detail = registerMember(database, { firstName: "ไม่ซื้อ", lastName: "อะไร" });
+    expect(memberSpendingStats(database, detail.member.memberNumber)).toEqual({
+      totalSpent: 0,
+      billCount: 0,
+      lastPurchaseAt: null,
+      topProducts: [],
+    });
+  });
+
+  it("rejects unknown members with the same Thai error as member detail", () => {
+    const database = freshDb();
+    expect(() => memberSpendingStats(database, "M-999999")).toThrowError(/ไม่พบสมาชิก M-999999 ในระบบ/);
   });
 });
