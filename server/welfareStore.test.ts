@@ -37,6 +37,7 @@ import {
   setProductActive,
   setSettings,
   stockCount,
+  stockCountLots,
   updateAppUser,
   updateMember,
   updateProduct,
@@ -280,6 +281,76 @@ describe("stock counting", () => {
   it("rejects unknown product ids with a Thai error", () => {
     const database = freshDb();
     expect(() => stockCount(database, { productId: 999, countedQty: 5 })).toThrowError(/ไม่พบสินค้ารหัส 999 ในระบบ/);
+  });
+
+  it("counts every lot, recomputes product stock as the lot sum and audits the breakdown", () => {
+    const database = freshDb();
+    const water = productBySku(database, "DRK-001");
+    receiveStock(database, water.id, "CR-260918-01", "2027-09-01", 10, 4.5, "นายวรพจน์ ด.");
+    const lots = database.prepare(`SELECT id, lot, qty FROM stock_lots WHERE product_id = ? ORDER BY id`).all(water.id) as { id: number; lot: string; qty: number }[];
+    expect(lots).toHaveLength(2);
+    const lotSum = lots.reduce((sum, lot) => sum + lot.qty, 0);
+    expect(productBySku(database, "DRK-001").stock).toBe(lotSum);
+
+    const result = stockCountLots(database, {
+      counts: [
+        { lotId: lots[0]!.id, countedQty: lots[0]!.qty - 6 },
+        { lotId: lots[1]!.id, countedQty: lots[1]!.qty + 1 },
+      ],
+      note: "ตรวจนับก่อนปิดร้าน",
+      actor: "นายวรพจน์ ด.",
+      actorRole: "ผู้บริหาร",
+    });
+
+    expect(result.lots).toHaveLength(2);
+    expect(result.lots[0]).toMatchObject({ lotId: lots[0]!.id, systemQty: lots[0]!.qty, countedQty: lots[0]!.qty - 6, diff: -6 });
+    expect(result.lots[1]).toMatchObject({ systemQty: lots[1]!.qty, countedQty: lots[1]!.qty + 1, diff: 1 });
+    const newSum = (lots[0]!.qty - 6) + (lots[1]!.qty + 1);
+    expect(result.countedQty).toBe(newSum);
+    expect(result.diff).toBe(newSum - lotSum);
+    expect(productBySku(database, "DRK-001").stock).toBe(newSum);
+    const storedLots = database.prepare(`SELECT qty FROM stock_lots WHERE product_id = ? ORDER BY id`).all(water.id) as { qty: number }[];
+    expect(storedLots.map((row) => row.qty)).toEqual([lots[0]!.qty - 6, lots[1]!.qty + 1]);
+
+    const latest = listAuditLogs(database, 1)[0];
+    expect(latest).toMatchObject({ action: "นับสต็อก (แยกล็อต)", actor: "นายวรพจน์ ด.", actorRole: "ผู้บริหาร", tone: "red" });
+    expect(latest.detail).toContain(`รวม ${lotSum} → ${newSum}`);
+    expect(latest.detail).toContain(`${lots[0]!.lot}: ${lots[0]!.qty} → ${lots[0]!.qty - 6} (-6)`);
+    expect(latest.detail).toContain("ตรวจนับก่อนปิดร้าน");
+  });
+
+  it("keeps untouched lots and only sums what exists when counting a subset", () => {
+    const database = freshDb();
+    const water = productBySku(database, "DRK-001");
+    receiveStock(database, water.id, "CR-260918-02", "2027-09-01", 8, 4.5, "นายวรพจน์ ด.");
+    const lots = database.prepare(`SELECT id, qty FROM stock_lots WHERE product_id = ? ORDER BY id`).all(water.id) as { id: number; qty: number }[];
+    const lotSum = lots.reduce((sum, lot) => sum + lot.qty, 0);
+
+    const result = stockCountLots(database, { counts: [{ lotId: lots[1]!.id, countedQty: 3 }] });
+
+    expect(result.countedQty).toBe(lots[0]!.qty + 3);
+    expect(productBySku(database, "DRK-001").stock).toBe(lots[0]!.qty + 3);
+    const untouched = database.prepare(`SELECT qty FROM stock_lots WHERE id = ?`).get(lots[0]!.id) as { qty: number };
+    expect(untouched.qty).toBe(lots[0]!.qty);
+    expect(lotSum).toBeGreaterThan(0);
+  });
+
+  it("rejects empty lists, duplicates, unknown lots, mixed products and bad quantities with Thai errors", () => {
+    const database = freshDb();
+    const water = productBySku(database, "DRK-001");
+    const coffee = productBySku(database, "DRK-002");
+    const waterLot = database.prepare(`SELECT id FROM stock_lots WHERE product_id = ? ORDER BY id LIMIT 1`).get(water.id) as { id: number };
+    const coffeeLot = database.prepare(`SELECT id FROM stock_lots WHERE product_id = ? ORDER BY id LIMIT 1`).get(coffee.id) as { id: number };
+
+    expect(() => stockCountLots(database, { counts: [] })).toThrowError(/อย่างน้อย 1 Lot/);
+    expect(() => stockCountLots(database, { counts: [{ lotId: waterLot.id, countedQty: -1 }] })).toThrowError(/จำนวนที่นับได้ต้องเป็น 0 ขึ้นไป/);
+    expect(() => stockCountLots(database, { counts: [{ lotId: waterLot.id, countedQty: 1 }, { lotId: waterLot.id, countedQty: 2 }] })).toThrowError(/พบ Lot ซ้ำในรายการนับ/);
+    expect(() => stockCountLots(database, { counts: [{ lotId: 99999, countedQty: 1 }] })).toThrowError(/ไม่พบ Lot รหัส 99999 ในระบบ/);
+    expect(() => stockCountLots(database, { counts: [{ lotId: waterLot.id, countedQty: 1 }, { lotId: coffeeLot.id, countedQty: 1 }] })).toThrowError(/ครั้งละ 1 สินค้า/);
+
+    // Nothing above mutated any stock.
+    expect(productBySku(database, "DRK-001").stock).toBe(water.stock);
+    expect(productBySku(database, "DRK-002").stock).toBe(coffee.stock);
   });
 });
 

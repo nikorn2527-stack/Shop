@@ -36,6 +36,7 @@ import {
   setProductActive,
   setSettings,
   stockCount,
+  stockCountLots,
   updateAppUser,
   updateMember,
   updateProduct,
@@ -139,6 +140,15 @@ const memberDeleteInput = z.object({
 const stockCountInput = z.object({
   productId: z.number().int(),
   countedQty: z.number(),
+  note: z.string().optional(),
+  actor: z.string().optional(),
+  actorRole: z.string().optional(),
+});
+
+const stockCountLotsInput = z.object({
+  counts: z
+    .array(z.object({ lotId: z.number().int(), countedQty: z.number().int().min(0) }))
+    .min(1, "กรุณาระบุจำนวนที่นับได้อย่างน้อย 1 Lot"),
   note: z.string().optional(),
   actor: z.string().optional(),
   actorRole: z.string().optional(),
@@ -469,6 +479,12 @@ export const appRouter = router({
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input);
         return withStoreErrors(() => stockCount(getWelfareDb(), { ...input, actor, actorRole }));
+      }),
+    countLots: publicProcedure
+      .input(stockCountLotsInput)
+      .mutation(({ ctx, input }) => {
+        const { actor, actorRole } = resolveActor(ctx, input);
+        return withStoreErrors(() => stockCountLots(getWelfareDb(), { ...input, actor, actorRole }));
       }),
   }),
 

@@ -679,3 +679,28 @@ nav button:active:not(:disabled),
 @keyframes sessionPulse { 0% { box-shadow: 0 0 0 0 rgba(70, 163, 135, .45); } 70% { box-shadow: 0 0 0 6px rgba(70, 163, 135, 0); } 100% { box-shadow: 0 0 0 0 rgba(70, 163, 135, 0); } }
 @media (max-width: 720px) { .session-row { flex-wrap: wrap; } .session-meta { flex-basis: 100%; flex-direction: row; justify-content: space-between; align-items: center; } .session-row > .mini-button, .session-row > .session-current-badge { margin-left: auto; } }
 @media (prefers-reduced-motion: reduce) { .session-current-tag i { animation: none !important; } .session-row { transition: none; transform: none; } .session-row:hover { transform: none; } }
+
+/* ── Round 9: lot-level stock count — mode toggle + lot rows ── */
+.count-mode-toggle { display: flex; gap: 6px; padding: 4px; margin-top: 13px; background: #f0f4f2; border-radius: 9px; }
+.count-mode-toggle button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 10px; border: 0; border-radius: 7px; background: transparent; color: #83918d; font-size: 11px; font-weight: 500; transition: background .15s ease, color .15s ease, box-shadow .15s ease; }
+.count-mode-toggle button:hover { color: var(--teal); }
+.count-mode-toggle button.active { background: #fff; color: var(--teal); box-shadow: 0 1px 4px rgba(30, 82, 70, .12); font-weight: 600; }
+.lot-count-list { display: flex; flex-direction: column; gap: 7px; margin-top: 13px; max-height: 264px; overflow-y: auto; padding-right: 4px; }
+.lot-count-row { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border: 1px solid #e7eeeb; border-radius: 9px; background: #fdfefe; transition: border-color .15s ease; }
+.lot-count-row:focus-within { border-color: #9bcdbf; box-shadow: 0 0 0 3px #eaf6f2; }
+.lot-count-label { flex: 1; min-width: 0; }
+.lot-count-label b { display: block; color: #4c645e; font-size: 11px; font-family: "IBM Plex Mono", monospace; letter-spacing: .2px; }
+.lot-count-label small { display: block; margin-top: 2px; color: #a0aaa7; font-size: 9px; font-variant-numeric: tabular-nums; }
+.lot-count-row input { width: 86px; height: 32px; flex: 0 0 86px; border: 1px solid #e2eae7; border-radius: 7px; padding: 0 9px; outline: none; color: #5a716a; font-size: 12px; font-variant-numeric: tabular-nums; background: #fcfefd; text-align: right; }
+.lot-count-row input:focus { border-color: #9bcdbf; box-shadow: 0 0 0 3px #eaf6f2; }
+.lot-count-diff { flex: 0 0 58px; text-align: right; color: #98a5a2; font-size: 10px; font-variant-numeric: tabular-nums; }
+.lot-count-diff.negative { color: #c16b6e; }
+.lot-count-diff.positive { color: #4b9881; }
+.lot-count-total { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 4px; padding: 10px 12px; border-radius: 9px; background: #f4fbf8; border: 1px dashed #bfe3d6; }
+.lot-count-total span { color: #7d8d88; font-size: 10px; font-variant-numeric: tabular-nums; }
+.lot-count-total b { color: #3e7d74; font-size: 11px; font-variant-numeric: tabular-nums; }
+.lot-count-empty { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 22px 14px; margin-top: 13px; border: 1px dashed #e0e8e4; border-radius: 9px; color: #98a5a1; }
+.lot-count-empty b { font-size: 12px; color: #7d8d88; }
+.lot-count-empty span { font-size: 10px; }
+@media (max-width: 560px) { .lot-count-row input { flex-basis: 72px; width: 72px; } .lot-count-diff { flex-basis: 44px; } }
+@media (prefers-reduced-motion: reduce) { .count-mode-toggle button, .lot-count-row { transition: none; } }

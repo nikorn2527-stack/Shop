@@ -563,6 +563,104 @@ export function stockCount(db: SqliteDb, input: StockCountInput) {
   };
 }
 
+export type LotCountEntry = { lotId: number; countedQty: number };
+
+export type StockCountLotsInput = {
+  counts: LotCountEntry[];
+  note?: string;
+  actor?: string;
+  actorRole?: string;
+};
+
+export type StockCountLotResult = {
+  lotId: number;
+  lot: string;
+  expiry: string | null;
+  systemQty: number;
+  countedQty: number;
+  diff: number;
+};
+
+export type StockCountLotsResult = {
+  productId: number;
+  sku: string;
+  name: string;
+  unit: string;
+  systemQty: number;
+  countedQty: number;
+  diff: number;
+  lots: StockCountLotResult[];
+};
+
+/**
+ * Reconciles physical counts PER LOT: each listed lot's qty is set to its
+ * counted value, then the product's sellable stock is recomputed as the SUM
+ * of all its lots (lots not listed keep their current qty). One audit entry
+ * per product records every lot old→new plus the product total.
+ */
+export function stockCountLots(db: SqliteDb, input: StockCountLotsInput): StockCountLotsResult {
+  if (!Array.isArray(input.counts) || input.counts.length === 0) {
+    throw new StoreError("กรุณาระบุจำนวนที่นับได้อย่างน้อย 1 Lot");
+  }
+  const seen = new Set<number>();
+  for (const entry of input.counts) {
+    if (!Number.isInteger(entry.lotId)) throw new StoreError("รหัส Lot ไม่ถูกต้อง");
+    if (!Number.isInteger(entry.countedQty) || entry.countedQty < 0) {
+      throw new StoreError("จำนวนที่นับได้ต้องเป็น 0 ขึ้นไป");
+    }
+    if (seen.has(entry.lotId)) throw new StoreError("พบ Lot ซ้ำในรายการนับ กรุณาตรวจสอบอีกครั้ง");
+    seen.add(entry.lotId);
+  }
+
+  const lotSelect = `SELECT l.id, l.lot, l.expiry_date AS expiry, l.qty, p.id AS productId, p.sku, p.name, p.unit, p.stock, p.active FROM stock_lots l JOIN products p ON p.id = l.product_id`;
+  const lots = input.counts.map((entry) => {
+    const lot = db.prepare(`${lotSelect} WHERE l.id = ?`).get(entry.lotId) as
+      | { id: number; lot: string; expiry: string | null; qty: number; productId: number; sku: string; name: string; unit: string; stock: number; active: number }
+      | undefined;
+    if (!lot) throw new StoreError(`ไม่พบ Lot รหัส ${entry.lotId} ในระบบ`);
+    return { lot, countedQty: entry.countedQty };
+  });
+
+  // A single count session covers exactly one product (the UI enforces it;
+  // the server double-checks so mixed submissions can never corrupt stock).
+  const productIds = new Set(lots.map((item) => item.lot.productId));
+  if (productIds.size !== 1) {
+    throw new StoreError("การนับแยกตาม Lot ทำได้ครั้งละ 1 สินค้า");
+  }
+  const head = lots[0]!.lot;
+  if (!head.active) throw new StoreError(`ไม่พบสินค้ารหัส ${head.productId} ในระบบ`);
+
+  const note = input.note?.trim();
+  return runInTransaction(db, () => {
+    const results: StockCountLotResult[] = [];
+    for (const { lot, countedQty } of lots) {
+      db.prepare(`UPDATE stock_lots SET qty = ? WHERE id = ?`).run(countedQty, lot.id);
+      results.push({ lotId: lot.id, lot: lot.lot, expiry: lot.expiry, systemQty: lot.qty, countedQty, diff: countedQty - lot.qty });
+    }
+    // Recompute sellable stock from every lot of this product.
+    const { total } = db.prepare(`SELECT COALESCE(SUM(qty), 0) AS total FROM stock_lots WHERE product_id = ?`).get(head.productId) as { total: number };
+    db.prepare(`UPDATE products SET stock = ? WHERE id = ?`).run(total, head.productId);
+
+    const lotBreakdown = results
+      .map((result) => `${result.lot}: ${result.systemQty} → ${result.countedQty}${result.diff !== 0 ? ` (${result.diff > 0 ? "+" : ""}${result.diff})` : ""}`)
+      .join(" · ");
+    const detail = `${head.name} · รวม ${head.stock} → ${total} ${head.unit} (${total - head.stock}) · ${lotBreakdown}` + (note ? ` · ${note}` : "");
+    const tone = total < head.stock ? "red" : total > head.stock ? "green" : "blue";
+    logAction(db, "นับสต็อก (แยกล็อต)", input.actor?.trim() || "เจ้าหน้าที่ร้านค้า", detail, tone, input.actorRole ?? null, formatDateTime());
+
+    return {
+      productId: head.productId,
+      sku: head.sku,
+      name: head.name,
+      unit: head.unit,
+      systemQty: head.stock,
+      countedQty: total,
+      diff: total - head.stock,
+      lots: results,
+    };
+  });
+}
+
 export type UpdateProductInput = {
   productId: number;
   name?: string;
