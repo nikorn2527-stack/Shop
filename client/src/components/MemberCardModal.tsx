@@ -58,7 +58,7 @@ export function MemberCardModal({ member, onClose }: { member: MemberCardData; o
     <div className="member-card-stage">
       <div className="member-card" id="member-card">
         <div className="member-card-top">
-          <div className="member-card-brand"><span>ส</span><div><b>ร้านค้าสวัสดิการ รพจ.</b><small>โรงพยาบาลผู้ป่วยจิตเวช</small></div></div>
+          <div className="member-card-brand"><span>ส</span><div><b>ร้านค้าสวัสดิการ</b><small>Welfare Store</small></div></div>
           <span className="member-card-type">{member.type}</span>
         </div>
         <div className="member-card-body">

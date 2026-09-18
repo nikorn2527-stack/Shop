@@ -1979,3 +1979,57 @@ nav button.active small { color: #4c7a58; }
 /* ROUND 23b — chart bars to true WSR emerald + amber pair */
 .bar.teal { background: linear-gradient(#2fbe8a, #007a55); }
 .bar.lilac { background: linear-gradient(#ecc98e, #d8a75c); }
+
+/* ============================================================
+   ROUND 24 — user mandates
+   ① EVERY view fits ONE screen (≥561px): the page itself never
+      scrolls; only data frames (tables / lists / settings
+      column / dashboard panels) scroll inside their own box
+   ② POS เติม/ถอน/รายการพิเศษ now MODALS (.wallet-modal)
+   ③ footer logout button (moved out of the sidebar menu)
+   ============================================================ */
+
+/* ③ logout lives at the very end of the app footer */
+.footer-logout { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); background: var(--surface); color: #6d6157; border-radius: 999px; padding: 4px 12px; font-size: 9px; font-family: inherit; cursor: pointer; transition: .16s ease; }
+.footer-logout:hover { color: var(--red); border-color: #e0b1ad; background: #fff6f4; }
+.footer-logout:disabled { opacity: .55; cursor: default; }
+.app-footer { align-items: center; }
+
+/* ② wallet / special transaction modal */
+.wallet-modal { width: min(540px, calc(100vw - 32px)); }
+.wallet-modal-body { max-height: min(58vh, 540px); overflow-y: auto; display: flex; flex-direction: column; gap: 11px; }
+.wallet-modal .wallet-form, .wallet-modal .special-form { margin-top: 0; }
+.wallet-modal .primary-button { width: 100%; }
+.wallet-modal-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; border-top: 1px solid var(--line); margin-top: 13px; padding-top: 12px; }
+.wallet-modal-foot small { color: var(--muted); font-size: 9px; }
+
+/* ① one-screen lock for every non-POS view (tablets up) */
+@media (min-width: 561px) {
+  .app-shell:not(.pos-terminal) .page-content { display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+  .app-shell:not(.pos-terminal) .page-content > * { flex-shrink: 0; }
+  /* main data panels absorb the remaining height and scroll inside */
+  .app-shell:not(.pos-terminal) .page-content > section.panel { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+  .app-shell:not(.pos-terminal) .page-content > section.panel > .table-wrap { flex: 1 1 auto; min-height: 0; overflow: auto; }
+  /* dashboard: metrics + both grid rows share the screen; each panel scrolls */
+  .app-shell:not(.pos-terminal) .page-content > .dashboard-grid { flex: 1 1 0; min-height: 0; grid-auto-rows: minmax(0, 1fr); }
+  .app-shell:not(.pos-terminal) .page-content > .dashboard-grid > .panel { min-height: 0; overflow-y: auto; }
+  /* bills history deserves the bigger share on the reports page */
+  .app-shell:not(.pos-terminal) .page-content > .dashboard-grid.report-lower { flex: 1 1 0; }
+  .app-shell:not(.pos-terminal) .page-content > section.table-panel.member-history-panel { flex: 1.25 1 0; }
+  /* settings: the content column scrolls inside its frame */
+  .app-shell:not(.pos-terminal) .settings-layout { flex: 1 1 0; min-height: 0; align-items: stretch; }
+  .app-shell:not(.pos-terminal) .settings-content { overflow-y: auto; min-height: 0; padding-right: 6px; }
+  .app-shell:not(.pos-terminal) .settings-save-bar { position: sticky; bottom: 0; z-index: 2; margin-top: auto; }
+  /* legacy scroll containers keep behaving inside their panels */
+  .table-panel > .table-wrap { flex: 1 1 auto; min-height: 0; overflow: auto; }
+}
+
+/* print guard: never let the one-screen lock clip printed paper */
+@media print {
+  .app-shell:not(.pos-terminal) .page-content { display: block; overflow: visible; }
+  .app-shell:not(.pos-terminal) .page-content > * { flex-shrink: initial; }
+  .app-shell:not(.pos-terminal) .page-content > section.panel { flex: initial; min-height: initial; overflow: visible; }
+  .app-shell:not(.pos-terminal) .page-content > .dashboard-grid { flex: initial; min-height: initial; }
+  .app-shell:not(.pos-terminal) .page-content > .dashboard-grid > .panel { overflow: visible; }
+  .app-shell:not(.pos-terminal) .settings-layout, .app-shell:not(.pos-terminal) .settings-content { overflow: visible; }
+}

@@ -119,7 +119,7 @@ export function StatementModal({ member, transactions, onClose }: { member: Stat
     <div className="statement-stage">
       <div className="statement-paper" id="member-statement">
         <div className="statement-head">
-          <div className="statement-brand"><span className="statement-brand-mark">ส</span><div><b>ร้านค้าสวัสดิการ โรงพยาบาลผู้ป่วยจิตเวช</b><small>Hospital Welfare Store · ฝ่ายสวัสดิการ</small></div></div>
+          <div className="statement-brand"><span className="statement-brand-mark">ส</span><div><b>ร้านค้าสวัสดิการ</b><small>Welfare Store · ระบบร้านค้า</small></div></div>
           <div className="statement-title">
             <b>รายงานยอดเงินคงเหลือและประวัติการทำรายการ</b>
             <small>ออกเมื่อ {formatFullThaiDate(generatedAt.toISOString())} · Statement {member.memberNumber}</small>
@@ -164,7 +164,7 @@ export function StatementModal({ member, transactions, onClose }: { member: Stat
           <div><span>ลงชื่อสมาชิก</span><i /></div>
           <div><span>วันที่</span><i /></div>
         </div>
-        <div className="statement-foot">เอกสารนี้ออกโดยระบบร้านค้าสวัสดิการ โรงพยาบาลผู้ป่วยจิตเวช · Power by PNG TEAM</div>
+        <div className="statement-foot">เอกสารนี้ออกโดยระบบร้านค้าสวัสดิการ</div>
       </div>
     </div>
     <div className="statement-actions modal-actions">

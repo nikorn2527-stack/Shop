@@ -56,7 +56,7 @@ export function LoginView({ onAuthed }: { onAuthed: () => void }) {
       <div className="login-card">
         <div className="login-brand">
           <div className="brand-mark"><span>ส</span></div>
-          <b>ร้านค้าสวัสดิการ โรงพยาบาลผู้ป่วยจิตเวช</b>
+          <b>ร้านค้าสวัสดิการ</b>
           <small>Hospital Welfare Store · ระบบหน้าร้านและบัญชีสมาชิก</small>
         </div>
         <form className="login-form" ref={formRef} onSubmit={submit}>
@@ -115,7 +115,7 @@ export function LoginView({ onAuthed }: { onAuthed: () => void }) {
           <IdCard size={15} />
           <span>ระบบนี้สำหรับ<b>เจ้าหน้าที่และผู้บริหารร้านค้า</b>เท่านั้น · สมาชิกสวัสดิการไม่มีการเข้าสู่ระบบ — ใช้สิทธิ์ที่เคาน์เตอร์ด้วยหมายเลขสมาชิก</span>
         </div>
-        <p className="login-footer">v1.0.0 · ฝ่ายสวัสดิการ · Power by PNG TEAM</p>
+        <p className="login-footer">v1.0.0 · ระบบร้านค้าสวัสดิการ</p>
       </div>
     </div>
   );
