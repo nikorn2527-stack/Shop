@@ -166,6 +166,12 @@ export type StoreSettings = {
   storeName: string;
   storeCode: string;
   storeAddress: string;
+  /** Round 25 — ปรับแต่งแอป: ชื่อที่แสดงบน sidebar/login/title */
+  appName: string;
+  /** data-URL รูปโลโก้ (สูงสุด ~512KB) — ว่าง = ใช้อักษรย่อ */
+  appLogo: string;
+  /** สีธีมหลัก: preset id เช่น "emerald" หรือ hex "#007a55" */
+  appTheme: string;
   autoPrintReceipt: boolean;
   showBalanceOnReceipt: boolean;
   lowBalanceAlert: boolean;
@@ -1327,9 +1333,12 @@ export function dashboardStats(db: SqliteDb, rangeDays = 30): DashboardStats {
 
 export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   memberNumberMode: "running",
-  storeName: "ร้านค้าสวัสดิการโรงพยาบาลผู้ป่วยจิตเวช",
-  storeCode: "WEL-PSY-001",
-  storeAddress: "โรงพยาบาลผู้ป่วยจิตเวช · ฝ่ายสวัสดิการ",
+  storeName: "ร้านค้าสวัสดิการ",
+  storeCode: "WEL-001",
+  storeAddress: "ร้านค้าสวัสดิการ",
+  appName: "ร้านค้าสวัสดิการ",
+  appLogo: "",
+  appTheme: "emerald",
   autoPrintReceipt: true,
   showBalanceOnReceipt: true,
   lowBalanceAlert: true,

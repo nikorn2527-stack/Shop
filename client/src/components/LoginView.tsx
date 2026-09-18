@@ -3,6 +3,7 @@ import type { FormEvent } from "react";
 import { Crown, Eye, EyeOff, IdCard, LogIn, ShieldCheck, UserRound } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { getErrorMessage } from "@/pages/viewFormat";
+import { brandInitial, type BrandSettings } from "@/theme";
 
 /** Demo accounts behind the quick-fill chips (fill only — the user presses เข้าสู่ระบบ). */
 const DEMO_ACCOUNTS = [
@@ -15,7 +16,9 @@ const DEMO_ACCOUNTS = [
  * session. Real form submit (Enter works); errors surface the Thai TRPC
  * message (e.g. "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง") in the red bar.
  */
-export function LoginView({ onAuthed }: { onAuthed: () => void }) {
+export function LoginView({ brand, onAuthed }: { brand?: BrandSettings | null | undefined; onAuthed: () => void }) {
+  const appName = (brand?.appName ?? "").trim() || "ร้านค้าสวัสดิการ";
+  const appLogo = brand?.appLogo ?? "";
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -55,9 +58,9 @@ export function LoginView({ onAuthed }: { onAuthed: () => void }) {
       <i className="login-blob amber" aria-hidden="true" />
       <div className="login-card">
         <div className="login-brand">
-          <div className="brand-mark"><span>ส</span></div>
-          <b>ร้านค้าสวัสดิการ</b>
-          <small>Hospital Welfare Store · ระบบหน้าร้านและบัญชีสมาชิก</small>
+          {appLogo ? <img className="brand-logo login-logo" src={appLogo} alt={appName} /> : <div className="brand-mark"><span>{brandInitial(appName)}</span></div>}
+          <b>{appName}</b>
+          <small>ระบบหน้าร้านและบัญชีสมาชิก</small>
         </div>
         <form className="login-form" ref={formRef} onSubmit={submit}>
           <label>

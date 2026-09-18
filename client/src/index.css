@@ -15,6 +15,10 @@
   --teal: #007a55;
   --teal-dark: #006b47;
   --teal-soft: #e0f4d6;
+  --teal-mist: #eaf5f1;
+  --rail-a: #0c4b34;
+  --rail-b: #07392a;
+  --teal-glow: rgba(35, 124, 97, .2);
   --purple: #8267b5;
   --amber: #c98a32;
   --red: #c26162;
@@ -28,7 +32,7 @@ button:active { transform: scale(.985); }
 .app-shell { min-height: 100vh; display: flex; }
 .sidebar { width: 266px; flex: 0 0 266px; min-height: 100vh; background: #fbfdfc; border-right: 1px solid var(--line); padding: 25px 16px 17px; display: flex; flex-direction: column; }
 .brand { display: flex; align-items: center; gap: 11px; padding: 0 10px 25px; }
-.brand-mark { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 12px; background: var(--teal); color: #fff; box-shadow: 0 5px 12px rgba(35, 124, 97, .2); }
+.brand-mark { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 12px; background: var(--teal); color: #fff; box-shadow: 0 5px 12px var(--teal-glow); }
 .brand-mark span { font-weight: 700; font-size: 20px; }
 .brand b { display: block; font-size: 16px; line-height: 1.1; letter-spacing: -.2px; }
 .brand small { display: block; color: #9da093; font-size: 10px; letter-spacing: .2px; margin-top: 4px; }
@@ -41,7 +45,7 @@ button:active { transform: scale(.985); }
 nav { display: flex; flex-direction: column; gap: 3px; }
 nav button { border: 0; background: transparent; color: #747868; text-align: left; border-radius: 11px; padding: 10px 10px; display: flex; align-items: center; gap: 11px; transition: all .18s ease; }
 nav button:hover { background: #f1f6f4; color: var(--teal); }
-nav button.active { color: var(--teal); background: #eaf5f1; box-shadow: inset 3px 0 0 var(--teal); }
+nav button.active { color: var(--teal); background: var(--teal-mist); box-shadow: inset 3px 0 0 var(--teal); }
 nav button > span { flex: 1; min-width: 0; }
 nav button b { display: block; font-size: 13px; font-weight: 600; }
 nav button small { display: block; font-size: 10px; color: #a1a497; margin-top: 1px; }
@@ -440,7 +444,7 @@ kbd { border-bottom-width: 2px; background: #f8fbf9; color: #848974; }
 
 /* Brand header — larger brand-mark (52px emerald tile) */
 .login-brand { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; margin-bottom: 24px; }
-.login-brand .brand-mark { width: 52px; height: 52px; border-radius: 16px; box-shadow: 0 8px 18px rgba(35, 124, 97, .24); }
+.login-brand .brand-mark { width: 52px; height: 52px; border-radius: 16px; box-shadow: 0 8px 18px var(--teal-glow); }
 .login-brand .brand-mark span { font-size: 24px; }
 .login-brand b { font-size: 16px; color: #274138; line-height: 1.35; letter-spacing: -.2px; }
 .login-brand small { color: #9da093; font-size: 10.5px; letter-spacing: .3px; margin-top: 2px; }
@@ -1951,7 +1955,7 @@ nav button.active small { color: #4c7a58; }
 .filter-pills button { border-radius: 999px; }
 
 /* Deep emerald POS rail — echoes the online-shop header strip */
-.pos-rail { background: linear-gradient(180deg, #0c4b34, #07392a); border-right: 1px solid #062e21; }
+.pos-rail { background: linear-gradient(180deg, var(--rail-a), var(--rail-b)); border-right: 1px solid var(--rail-b); }
 .pos-rail .rail-brand small, .pos-rail .rail-caption { color: rgba(255, 255, 255, .55); }
 .rail-btn { background: rgba(255, 255, 255, .07); border-color: rgba(255, 255, 255, .14); color: #e9f2ea; }
 .rail-btn b { color: #f2f7ee; }
@@ -2032,4 +2036,183 @@ nav button.active small { color: #4c7a58; }
   .app-shell:not(.pos-terminal) .page-content > .dashboard-grid { flex: initial; min-height: initial; }
   .app-shell:not(.pos-terminal) .page-content > .dashboard-grid > .panel { overflow: visible; }
   .app-shell:not(.pos-terminal) .settings-layout, .app-shell:not(.pos-terminal) .settings-content { overflow: visible; }
+}
+
+/* ============================================================
+   ROUND 25 — การ์ดแทนตาราง (Members/Bills/Stock/Users) + Logs timeline
+   + ปรับแต่งแบรนด์ (ชื่อ/โลโก้/สีธีม) ตามที่ผู้ใช้ขอ
+   ============================================================ */
+
+/* --- โลโก้แบรนด์ (ใช้แทนอักษรย่อเมื่อผู้บริหารอัปโหลด) --- */
+.brand-logo { width: 38px; height: 38px; border-radius: 12px; object-fit: contain; background: #fff; border: 1px solid var(--line); flex: 0 0 auto; }
+.brand-logo.login-logo { width: 52px; height: 52px; border-radius: 16px; box-shadow: 0 8px 18px var(--teal-glow); }
+.brand-logo.receipt-logo { width: 27px; height: 27px; border-radius: 8px; }
+.rail-brand .brand-logo { width: 40px; height: 40px; border-radius: 12px; border-color: rgba(255, 255, 255, .22); background: rgba(255, 255, 255, .1); }
+
+/* --- ตั้งค่า → แบรนด์และธีม --- */
+.logo-uploader { display: flex; align-items: flex-start; gap: 13px; margin-top: 6px; padding: 13px; border: 1px dashed #cfdcd6; border-radius: 11px; background: #fbfdfc; }
+.logo-preview { width: 64px; height: 64px; border-radius: 12px; object-fit: contain; background: #fff; border: 1px solid var(--line); flex: 0 0 auto; }
+.logo-empty { width: 64px; height: 64px; border-radius: 12px; display: grid; place-items: center; background: var(--teal-mist); color: var(--teal); flex: 0 0 auto; }
+.logo-actions { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px; }
+.logo-actions > small { color: var(--muted); font-size: 9.5px; line-height: 1.5; }
+.logo-button-row { display: flex; flex-wrap: wrap; gap: 7px; }
+.brand-live-preview { margin-top: 14px; padding: 15px; border: 1px solid var(--line); border-radius: 12px; background: #fbfdfc; }
+.brand-live-preview .eyebrow { display: block; font-size: 9px; letter-spacing: 1.2px; color: #9aa398; text-transform: uppercase; margin-bottom: 9px; }
+.brand-preview-card { display: flex; align-items: center; gap: 11px; }
+.brand-preview-card img { width: 38px; height: 38px; border-radius: 12px; object-fit: contain; background: #fff; border: 1px solid var(--line); }
+.brand-preview-card b { display: block; font-size: 16px; line-height: 1.15; letter-spacing: -.2px; color: #2c3530; }
+.brand-preview-card small { display: block; color: #9da093; font-size: 10px; letter-spacing: .2px; margin-top: 3px; }
+.theme-swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 9px; padding-top: 15px; }
+.theme-swatch { border: 1.5px solid var(--line); background: #fff; border-radius: 11px; padding: 11px 12px; display: flex; align-items: center; gap: 10px; text-align: left; transition: all .16s ease; }
+.theme-swatch:hover { border-color: var(--teal); transform: translateY(-1px); }
+.theme-swatch.active { border-color: var(--teal); background: var(--teal-mist); box-shadow: inset 0 0 0 1px var(--teal); }
+.theme-swatch .swatch-dot { width: 26px; height: 26px; border-radius: 50%; flex: 0 0 auto; box-shadow: inset 0 0 0 2px rgba(255, 255, 255, .65), 0 2px 6px rgba(64, 51, 24, .18); }
+.theme-swatch b { display: block; font-size: 11px; color: #57615a; }
+.theme-swatch small { display: block; font-family: "IBM Plex Mono", monospace; font-size: 8.5px; color: #a9ac9f; margin-top: 2px; }
+.theme-custom-row { display: flex; align-items: center; gap: 10px; padding: 14px 2px 0; color: #7f8373; font-size: 11px; flex-wrap: wrap; }
+.theme-custom-row input[type="color"] { width: 42px; height: 30px; border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 2px; cursor: pointer; }
+.theme-custom-row code { font-family: "IBM Plex Mono", monospace; font-size: 10.5px; color: var(--teal); background: var(--teal-mist); padding: 3px 7px; border-radius: 6px; }
+.theme-custom-row > small:last-child { color: #a9ac9f; font-size: 9px; }
+
+/* --- โครงการ์ดกลาง (แทนตาราง) --- */
+.card-scroll { overflow-x: hidden; }
+.entity-grid { display: grid; gap: 12px; }
+.entity-card { border: 1px solid #e7eeeb; background: #fff; border-radius: 13px; padding: 13px 14px; text-align: left; display: flex; flex-direction: column; gap: 10px; box-shadow: var(--shadow); transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease; cursor: pointer; font: inherit; color: inherit; min-width: 0; }
+.entity-card:hover { transform: translateY(-2px); border-color: var(--teal); box-shadow: 0 10px 22px var(--teal-glow); }
+.entity-card:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.entity-state { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 34px 18px; color: #9aa093; }
+.entity-state b { color: #6d7a72; font-size: 12px; }
+.entity-state span { font-size: 10px; }
+.entity-state.error b { color: #b05557; }
+.skeleton-card { pointer-events: none; opacity: .8; }
+.skeleton-stack { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
+
+/* --- การ์ดสมาชิก --- */
+.member-card-grid { grid-template-columns: repeat(auto-fill, minmax(238px, 1fr)); }
+.member-card .member-card-head { display: flex; align-items: center; gap: 9px; }
+.member-card-avatar { width: 37px; height: 37px; border-radius: 50%; display: grid; place-items: center; background: var(--teal-soft); color: var(--teal-dark); font-weight: 700; font-size: 14px; flex: 0 0 auto; }
+.member-card-id { flex: 1; min-width: 0; }
+.member-card-id b { display: block; font-size: 12.5px; color: #3d4a43; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.member-card-id small { display: block; font-family: "IBM Plex Mono", monospace; font-size: 9px; color: #a1a497; margin-top: 2px; }
+.member-card-body { display: grid; grid-template-columns: 1.1fr 1fr; gap: 8px; padding-top: 9px; border-top: 1px dashed #edf0ec; }
+.member-card-balance small, .member-card-activity small { display: block; color: #a2a598; font-size: 9px; }
+.member-card-balance strong { display: block; font-size: 15px; color: #33513f; margin-top: 3px; font-family: "IBM Plex Mono", monospace; }
+.member-card-balance strong.negative { color: #c26162; }
+.member-card-activity span { display: block; font-size: 10px; color: #7c8375; margin-top: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.member-card-foot { display: flex; align-items: center; justify-content: space-between; color: var(--teal); font-size: 9.5px; gap: 6px; }
+.member-card-foot span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.member-card.suspended { background: #fdfbfa; }
+.member-card.suspended .member-card-avatar { background: #f3e3e0; color: #a06455; }
+
+/* --- การ์ดบิล (รายงาน) --- */
+.bill-card-grid { grid-template-columns: repeat(auto-fill, minmax(252px, 1fr)); }
+.bill-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.bill-card-head .bill-number { font-family: "IBM Plex Mono", monospace; font-size: 11px; color: #33422f; font-weight: 700; letter-spacing: -.2px; }
+.bill-card-body { display: flex; flex-direction: column; gap: 5px; padding-top: 9px; border-top: 1px dashed #edf0ec; }
+.bill-card-buyer b { font-size: 11.5px; color: #4a5850; }
+.bill-card-buyer small { display: block; font-family: "IBM Plex Mono", monospace; font-size: 8.5px; color: #a1a497; margin-top: 2px; }
+.bill-card-items span { font-size: 10px; color: #7c8375; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.bill-card-time { color: #a9ac9f; font-size: 9px; }
+.bill-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.bill-card-foot strong { font-family: "IBM Plex Mono", monospace; font-size: 14.5px; color: #33513f; }
+.bill-card-open { display: inline-flex; align-items: center; gap: 4px; color: var(--teal); font-size: 9.5px; }
+
+/* --- การ์ดสต็อก --- */
+.stock-card-grid { grid-template-columns: repeat(auto-fill, minmax(258px, 1fr)); }
+.stock-card-head { display: flex; align-items: center; gap: 9px; }
+.stock-card-art { width: 37px; height: 37px; border-radius: 11px; display: grid; place-items: center; background: var(--teal-mist); color: var(--teal-dark); font-weight: 700; font-size: 15px; flex: 0 0 auto; }
+.stock-card-id { flex: 1; min-width: 0; }
+.stock-card-id b { display: block; font-size: 12.5px; color: #3d4a43; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stock-card-id small { display: block; font-family: "IBM Plex Mono", monospace; font-size: 8.5px; color: #a1a497; margin-top: 2px; }
+.stock-card-body { display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
+.stock-card-qty small { display: block; color: #a2a598; font-size: 9px; }
+.stock-card-qty strong { display: block; font-size: 17px; color: #33513f; margin-top: 2px; font-family: "IBM Plex Mono", monospace; }
+.stock-card-qty strong em { font-style: normal; font-size: 9.5px; color: #9aa093; }
+.stock-card-qty strong.low { color: #c26162; }
+.stock-card-meta { display: grid; grid-template-columns: auto auto; gap: 4px 12px; justify-items: start; }
+.stock-card-meta small { display: block; color: #a9ac9f; font-size: 8.5px; }
+.stock-card-meta span { display: block; font-size: 9.5px; color: #6d7a72; margin-top: 1px; }
+.stock-card-foot { display: flex; align-items: center; justify-content: space-between; color: var(--teal); font-size: 9.5px; padding-top: 8px; border-top: 1px dashed #edf0ec; gap: 6px; }
+.stock-card-foot span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stock-card.status-red { box-shadow: inset 3px 0 0 #c26162, var(--shadow); }
+.stock-card.status-amber { box-shadow: inset 3px 0 0 #c98a32, var(--shadow); }
+.stock-card.status-purple { box-shadow: inset 3px 0 0 #8267b5, var(--shadow); }
+.stock-card.status-red .stock-card-art { background: #f6e7e5; color: #a5645a; }
+.stock-card.status-amber .stock-card-art { background: #f7ecd9; color: #96682b; }
+.stock-card.status-purple .stock-card-art { background: #eee8f8; color: #6e5a9c; }
+
+/* --- modal รายละเอียดสินค้า (กดจากการ์ดสต็อก) --- */
+.stock-detail-modal { width: min(560px, calc(100vw - 32px)); }
+.stock-detail-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.stock-detail-grid > div { border: 1px solid #edf0ec; border-radius: 10px; padding: 9px 11px; background: #fbfdfc; min-width: 0; }
+.stock-detail-grid small { display: block; color: #a2a598; font-size: 8.5px; }
+.stock-detail-grid strong { display: block; font-size: 12px; color: #43524a; margin-top: 3px; font-family: "IBM Plex Mono", monospace; }
+.stock-detail-grid strong em { font-style: normal; font-size: 9px; color: #9aa093; }
+.stock-detail-lots { margin-top: 13px; }
+.stock-detail-lots-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.stock-detail-lots-head h3 { margin: 0; font-size: 12px; color: #43524a; }
+.stock-detail-lots-head small { color: #a9ac9f; font-size: 9px; }
+.stock-lot-list { display: flex; flex-direction: column; gap: 7px; max-height: 218px; overflow-y: auto; padding-right: 2px; }
+.stock-lot-row { display: flex; align-items: center; gap: 10px; border: 1px solid #edf0ec; border-radius: 10px; padding: 9px 11px; background: #fff; }
+.stock-lot-row.expiring { border-color: #ecd9b5; background: #fffaf0; }
+.stock-lot-main { flex: 1; min-width: 0; }
+.stock-lot-main b { display: block; font-size: 10.5px; color: #4a5850; font-family: "IBM Plex Mono", monospace; }
+.stock-lot-main small { display: block; color: #a9ac9f; font-size: 8.5px; margin-top: 2px; }
+.stock-lot-expiry small, .stock-lot-qty small { display: block; color: #a2a598; font-size: 8.5px; }
+.stock-lot-expiry span, .stock-lot-qty span { display: block; font-size: 10px; color: #6d7a72; margin-top: 2px; }
+.stock-lot-qty span b { font-family: "IBM Plex Mono", monospace; font-size: 11px; color: #33513f; }
+.stock-lots-empty { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 22px; color: #9aa093; }
+.stock-lots-empty b { font-size: 11px; color: #6d7a72; }
+.stock-lots-empty span { font-size: 9.5px; }
+.stock-detail-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 14px; padding-top: 13px; border-top: 1px solid #edf0ec; }
+
+/* --- Logs: timeline กิจกรรม --- */
+.log-timeline { display: flex; flex-direction: column; position: relative; }
+.log-timeline-item { display: flex; gap: 13px; padding: 10px 4px 14px 2px; position: relative; }
+.log-timeline-item::before { content: ""; position: absolute; left: 8.5px; top: 26px; bottom: -4px; width: 1.5px; background: #e7eeeb; }
+.log-timeline-item:last-child::before { display: none; }
+.log-dot { width: 19px; height: 19px; border-radius: 50%; flex: 0 0 auto; margin-top: 2px; border: 3.5px solid #fff; box-shadow: 0 0 0 1.5px #d9e4df, 0 2px 5px rgba(64, 51, 24, .12); background: #8fb8a5; }
+.log-timeline-item.tone-green .log-dot { background: #4b987b; }
+.log-timeline-item.tone-amber .log-dot { background: #c98a32; }
+.log-timeline-item.tone-red .log-dot { background: #c26162; }
+.log-timeline-item.tone-blue .log-dot { background: #5d91b5; }
+.log-timeline-item.tone-purple .log-dot { background: #8267b5; }
+.log-content { flex: 1; min-width: 0; border: 1px solid #e7eeeb; background: #fff; border-radius: 11px; padding: 9px 12px; box-shadow: var(--shadow); }
+.log-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.log-head b { font-size: 11.5px; color: #43524a; }
+.log-time { font-family: "IBM Plex Mono", monospace; font-size: 8.5px; color: #a9ac9f; white-space: nowrap; }
+.log-detail { display: flex; align-items: center; gap: 7px; margin-top: 4px; flex-wrap: wrap; }
+.log-actor { font-size: 10px; color: var(--teal); font-weight: 600; }
+.log-role { font-size: 8.5px; color: #a1a497; background: #f2f5f1; border-radius: 20px; padding: 2px 8px; }
+.log-note { margin: 5px 0 0; font-size: 10px; color: #7c8375; line-height: 1.55; word-break: break-word; }
+
+/* --- การ์ดผู้ใช้ระบบ --- */
+.user-card-grid { grid-template-columns: repeat(auto-fill, minmax(252px, 1fr)); }
+.user-card-head { display: flex; align-items: center; gap: 9px; }
+.user-card-id { flex: 1; min-width: 0; }
+.user-card-id b { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: #3d4a43; }
+.user-card-id small { display: block; font-family: "IBM Plex Mono", monospace; font-size: 9px; color: #a1a497; margin-top: 2px; }
+.user-card-status { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-wrap: wrap; padding-top: 8px; border-top: 1px dashed #edf0ec; }
+.user-card-status .lock-countdown { color: #b05557; font-size: 8.5px; }
+.user-card-created { color: #a9ac9f; font-size: 8.5px; }
+.user-card-actions { display: flex; flex-wrap: wrap; gap: 5px; }
+.user-card.archived { background: #fdfbfa; }
+.user-card.locked { box-shadow: inset 3px 0 0 #c26162, var(--shadow); }
+
+/* --- responsive การ์ด --- */
+@media (max-width: 900px) {
+  .stock-detail-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 560px) {
+  .member-card-grid, .bill-card-grid, .stock-card-grid, .user-card-grid { grid-template-columns: 1fr; }
+  .stock-card-meta { grid-template-columns: auto auto auto; }
+  .stock-detail-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* --- พิมพ์: ซ่อนองค์ประกอบปุ่มการ์ด --- */
+@media print {
+  .entity-card { box-shadow: none; border-color: #ddd; transform: none; }
+  .member-card-foot, .bill-card-open, .stock-card-foot { display: none; }
+  .card-scroll { overflow: visible !important; }
+  .theme-swatches, .logo-uploader, .brand-live-preview { display: none; }
 }
