@@ -66,16 +66,26 @@ async function authenticateLocalSession(req: CreateExpressContextOptions["req"])
   }
 }
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export async function createContext(
   opts: CreateExpressContextOptions
 ): Promise<TrpcContext> {
   let user: User | null = null;
 
-  try {
-    user = await sdk.authenticateRequest(opts.req);
-  } catch (error) {
-    // Authentication is optional for public procedures.
-    user = null;
+  // Local session ids are UUIDs; OAuth session cookies are JWS compact
+  // strings. Skip the OAuth attempt for local sessions so the SDK does not
+  // log a JWSInvalid warning on every request from a signed-in local user.
+  const cookieValue = readAppSessionCookie(opts.req);
+  const isLocalSessionCookie = Boolean(cookieValue && UUID_PATTERN.test(cookieValue));
+
+  if (!isLocalSessionCookie) {
+    try {
+      user = await sdk.authenticateRequest(opts.req);
+    } catch (error) {
+      // Authentication is optional for public procedures.
+      user = null;
+    }
   }
 
   // Sandbox / local fallback: resolve the welfare store's own session cookie
