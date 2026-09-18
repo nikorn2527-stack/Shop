@@ -275,3 +275,5 @@ body, button, input, select, textarea { font-family: var(--font-body); }
 .pay-button:disabled, .pay-split button:disabled { opacity: .55; cursor: not-allowed; filter: saturate(.6); }
 .pay-button:disabled:hover, .pay-split button:disabled:hover { background: var(--teal); }
 .pay-split button:disabled:hover { background: #fff; }
+
+.activity-dot.red { background: #c97f7c; }

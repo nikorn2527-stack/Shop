@@ -64,36 +64,8 @@ export const navItems: { id: View; label: string; caption: string; icon: LucideI
 
 // NOTE (OLD-2-b): mock exports `products` + `stockRows` were DELETED — Pos.tsx and
 // Stock.tsx now load real data via trpc.product.list / trpc.stock.rows.
-
-// TEMP: removed in OLD-2-c — still used by Home.tsx (Members view) + Dashboard.tsx
-export const memberRows = [
-  { id: "M-000218", name: "นางสาวอรทัย ส.", type: "สมาชิก", balance: "฿1,240.00", last: "วันนี้ 14:24", status: "ใช้งาน", tone: "green" },
-  { id: "M-000184", name: "นายธนกร พ.", type: "เจ้าหน้าที่", balance: "฿860.00", last: "วันนี้ 12:08", status: "ใช้งาน", tone: "green" },
-  { id: "M-000092", name: "นางสาวพิมพ์ชนก ร.", type: "สมาชิก", balance: "฿0.00", last: "16 ก.ย. 09:12", status: "ระงับ", tone: "red" },
-  { id: "M-000241", name: "นายสมชาย ว.", type: "สมาชิก", balance: "฿340.00", last: "15 ก.ย. 15:46", status: "ใช้งาน", tone: "green" },
-  { id: "M-000119", name: "นางสาวจุฑามาศ ก.", type: "เจ้าหน้าที่", balance: "฿2,180.00", last: "14 ก.ย. 10:21", status: "ใช้งาน", tone: "green" },
-];
-
-// TEMP: removed in OLD-2-c — still used by Home.tsx Members detail view
-export const memberTransactions: Record<string, { id: string; date: string; type: "ซื้อสินค้า" | "เติมเงิน" | "ถอนเงิน"; detail: string; amount: string; tone: string }[]> = {
-  "M-000218": [
-    { id: "TX-038", date: "17 ก.ย. 2569 · 14:38", type: "ซื้อสินค้า", detail: "บิล #INV-260917-038 · น้ำดื่ม 2 ขวด, ข้าวกล่อง 1 กล่อง", amount: "- ฿59.00", tone: "blue" },
-    { id: "TX-029", date: "17 ก.ย. 2569 · 14:32", type: "เติมเงิน", detail: "เงินสด · ผู้ฝาก: น.ส.กัญญาณัฐ พ.", amount: "+ ฿500.00", tone: "green" },
-    { id: "TX-014", date: "12 ก.ย. 2569 · 10:16", type: "ถอนเงิน", detail: "ถอนเพื่อถอนฟัน · เงินสด", amount: "- ฿200.00", tone: "purple" },
-    { id: "TX-006", date: "01 ก.ย. 2569 · 09:05", type: "ซื้อสินค้า", detail: "บิล #INV-260901-006 · สินค้า 4 รายการ", amount: "- ฿132.00", tone: "blue" },
-  ],
-  "M-000092": [
-    { id: "TX-112", date: "16 ก.ย. 2569 · 09:12", type: "ถอนเงิน", detail: "ถอนเพื่อถอนฟัน · แนบหลักฐานแล้ว", amount: "- ฿200.00", tone: "purple" },
-    { id: "TX-091", date: "12 ก.ย. 2569 · 11:40", type: "ซื้อสินค้า", detail: "บิล #INV-260912-091 · สินค้า 2 รายการ", amount: "- ฿80.00", tone: "blue" },
-  ],
-};
-
-// TEMP: removed in OLD-2-c — still used by Home.tsx Logs view + Dashboard.tsx
-export const logs = [
-  { time: "17 ก.ย. 2569 14:38", actor: "น.ส.กัญญาณัฐ พ.", role: "เจ้าหน้าที่", action: "ขายสินค้า", detail: "บิล #INV-260917-038 · ฿186.00", tone: "blue" },
-  { time: "17 ก.ย. 2569 14:32", actor: "น.ส.กัญญาณัฐ พ.", role: "เจ้าหน้าที่", action: "เติมเงินสมาชิก", detail: "M-000218 · ฿500.00 · เงินสด", tone: "green" },
-  { time: "17 ก.ย. 2569 13:51", actor: "นายวรพจน์ ด.", role: "ผู้บริหาร", action: "แก้ไขสต็อก", detail: "น้ำดื่มคริสตัล · +24 ขวด", tone: "amber" },
-  { time: "17 ก.ย. 2569 12:06", actor: "น.ส.กัญญาณัฐ พ.", role: "เจ้าหน้าที่", action: "ถอนเงินสมาชิก", detail: "M-000092 · ฿200.00 · ถอนเพื่อถอนฟัน", tone: "purple" },
-];
+// NOTE (OLD-2-c): mock exports `memberRows` + `memberTransactions` + `logs` were
+// DELETED — Home.tsx / Dashboard.tsx views load real data via tRPC procedures
+// (member.list / member.detail / logs.list / dashboard.stats).
 
 export const money = (value: number) => `฿${value.toLocaleString("th-TH", { minimumFractionDigits: 2 })}`;
