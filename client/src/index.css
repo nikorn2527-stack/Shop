@@ -1215,3 +1215,106 @@ td small { font-size: 10px; }
 
 /* Browser printing / thermal output never contains list-expansion controls. */
 @media print { .table-show-more { display: none; } }
+
+/* ============================================================
+   ROUND 16 — Member statement (รายงานยอดเงินคงเหลือสมาชิก)
+   A4 printable/downloadable document from member detail.
+   ============================================================ */
+
+/* (1) Modal shell — wider than form modals because the paper is A4-ish */
+.statement-modal { width: min(760px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); overflow-y: auto; background: #fff; border: 1px solid #e4edea; border-radius: 14px; box-shadow: 0 22px 55px rgba(35, 62, 54, .22); padding: 20px; }
+.statement-stage { background: repeating-linear-gradient(-45deg, #f2f6f4 0 14px, #eef3f1 14px 28px); border: 1px solid #dfe9e5; border-radius: 11px; padding: 16px; display: grid; place-items: start center; margin-top: 6px; }
+.statement-actions { align-items: center; }
+.statement-hint { display: inline-flex; align-items: center; gap: 5px; margin-right: auto; color: #8fa19a; font-size: 10px; }
+
+/* (2) The paper — A4 proportions on screen (210:297), real A4 in print */
+.statement-paper { width: 100%; max-width: 660px; background: #fff; border: 1px solid #d3e0da; box-shadow: 0 12px 30px rgba(40, 70, 60, .14); padding: 26px 28px 22px; color: #33473f; font-size: 11px; }
+
+.statement-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding-bottom: 12px; border-bottom: 2px solid #2d8a7d; }
+.statement-brand { display: flex; gap: 9px; align-items: center; }
+.statement-brand-mark { width: 34px; height: 34px; border-radius: 9px; background: linear-gradient(140deg, #2d8a7d, #55a893); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 16px; }
+.statement-brand b { display: block; font-size: 13px; color: #27413a; }
+.statement-brand small { display: block; color: #8aa19a; font-size: 9px; margin-top: 1px; }
+.statement-title { text-align: right; }
+.statement-title b { display: block; font-size: 14px; color: #27413a; letter-spacing: -.2px; }
+.statement-title small { display: block; color: #8aa19a; font-size: 9px; margin-top: 3px; }
+
+.statement-member { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 14px; padding: 13px 0 11px; border-bottom: 1px solid #e7efeb; }
+.statement-member > div > small { display: block; color: #93a5a0; font-size: 9px; }
+.statement-member > div > b { display: block; color: #33503f; font-size: 11.5px; margin-top: 2px; font-weight: 600; }
+.statement-member .st-ok { color: #3d8f79; }
+.statement-member .st-suspended { color: #c26568; }
+
+.statement-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0; }
+.statement-summary > div { border: 1px solid #e3ece8; border-radius: 9px; padding: 9px 11px; background: #f8fbf9; }
+.statement-summary small { display: block; color: #8fa19a; font-size: 9px; line-height: 1.35; }
+.statement-summary b { display: block; font-size: 14px; margin-top: 4px; letter-spacing: -.3px; }
+.statement-summary .st-balance { color: #2d8a7d; }
+.statement-summary .st-in { color: #3d8f79; }
+.statement-summary .st-out { color: #a06bc9; }
+.statement-summary .st-buy { color: #b8863d; }
+
+.statement-table { width: 100%; border-collapse: collapse; font-size: 10px; }
+.statement-table th { text-align: left; color: #f2f7f5; background: #2d8a7d; font-weight: 600; font-size: 9.5px; padding: 7px 9px; }
+.statement-table th:first-child { border-radius: 6px 0 0 0; }
+.statement-table th:last-child { border-radius: 0 6px 0 0; }
+.statement-table td { padding: 6.5px 9px; border-bottom: 1px solid #edf3f0; color: #52675f; vertical-align: top; }
+.statement-table tr:nth-child(even) td { background: #f9fcfa; }
+.statement-table .st-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.statement-table .st-strong { color: #2d5a4e; font-weight: 600; }
+.statement-table .st-time { white-space: nowrap; color: #7c8f89; font-family: "IBM Plex Mono", monospace; font-size: 9px; }
+.statement-table .st-detail { color: #6d8079; }
+.statement-table .st-in { color: #3d8f79; font-weight: 600; }
+.statement-table .st-out { color: #c26568; font-weight: 600; }
+.statement-table .st-type { display: inline-block; padding: 2px 7px; border-radius: 12px; font-size: 9px; white-space: nowrap; }
+.statement-table .st-type.green { color: #3d8f79; background: #e9f6f0; }
+.statement-table .st-type.blue { color: #5d91b5; background: #edf6fb; }
+.statement-table .st-type.purple { color: #8870af; background: #f3edfb; }
+.statement-table .st-empty { text-align: center; color: #93a5a0; padding: 22px 0; }
+
+.statement-note { margin-top: 9px; color: #7f948d; font-size: 9.5px; }
+
+.statement-sign { display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px; margin-top: 26px; }
+.statement-sign > div { text-align: center; }
+.statement-sign span { display: block; color: #6d8079; font-size: 10px; margin-bottom: 34px; }
+.statement-sign i { display: block; border-top: 1px dotted #9db4aa; }
+
+.statement-foot { margin-top: 16px; padding-top: 9px; border-top: 1px solid #e7efeb; color: #9db0a9; font-size: 8.5px; text-align: center; }
+
+/* (3) Phones — the paper stays readable, member grid stacks */
+@media (max-width: 560px) {
+  .statement-modal { padding: 14px; }
+  .statement-stage { padding: 10px; }
+  .statement-paper { padding: 16px 14px 14px; }
+  .statement-member { grid-template-columns: 1fr 1fr; }
+  .statement-summary { grid-template-columns: 1fr 1fr; }
+  .statement-head { flex-direction: column; }
+  .statement-title { text-align: left; }
+  .statement-hint { display: none; }
+}
+
+/* (4) Print — isolate the statement onto a clean A4 page
+      (same guard pattern as receipt + wallet card) */
+@media print {
+  body:has(#member-statement) .sidebar,
+  body:has(#member-statement) .topbar,
+  body:has(#member-statement) .app-footer,
+  body:has(#member-statement) .page-content > *:not(.modal-backdrop) { display: none !important; }
+  body:has(#member-statement) .app-shell { display: block; min-height: 0; }
+  body:has(#member-statement) .main-shell { min-width: 0; }
+  body:has(#member-statement) .page-content { max-width: none; margin: 0; padding: 0; animation: none; }
+  body:has(#member-statement) .modal-backdrop { position: static; display: block; padding: 0; background: none; backdrop-filter: none; animation: none; }
+  body:has(#member-statement) { min-height: 0 !important; height: auto !important; }
+  body:has(#member-statement) .statement-modal { width: auto; max-height: none; overflow: visible; border: 0; border-radius: 0; box-shadow: none; padding: 0; background: #fff; }
+  body:has(#member-statement) .modal-heading,
+  body:has(#member-statement) .statement-actions { display: none !important; }
+  body:has(#member-statement) .statement-stage { background: none; border: 0; padding: 0; border-radius: 0; }
+  body:has(#member-statement) .statement-paper { width: 100%; max-width: none; border: 0; box-shadow: none; padding: 6mm 4mm; font-size: 10.5px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body:has(#member-statement) .statement-member { grid-template-columns: repeat(3, 1fr); }
+  body:has(#member-statement) .statement-summary { grid-template-columns: repeat(4, 1fr); }
+}
+
+/* (5) Round 16 detail polish — on-screen reading affordances */
+.statement-table tbody tr:hover td { background: #f2f8f5; }
+.statement-paper { user-select: text; }
+.statement-actions .outline-button:disabled { opacity: .6; }
