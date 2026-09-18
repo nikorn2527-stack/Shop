@@ -425,3 +425,79 @@ kbd { border-bottom-width: 2px; background: #f8fbf9; color: #748983; }
 
 /* Clickable bill rows in ประวัติบิล (warm hover tint already global from 4-c) */
 .table-wrap tbody tr.sales-history-row { cursor: pointer; }
+
+/* ── Task 10-b: authentication ── */
+
+/* Full-screen login — warm canvas + two soft blurred glows (first impression) */
+.login-screen { min-height: 100dvh; display: grid; place-items: center; position: relative; overflow: hidden; background: var(--canvas); padding: 24px 16px; }
+.login-blob { position: absolute; width: 380px; height: 380px; border-radius: 50%; filter: blur(90px); opacity: .5; pointer-events: none; }
+.login-blob.teal { background: #9ed8cb; top: -120px; left: -110px; }
+.login-blob.amber { background: #ecc9a0; bottom: -130px; right: -120px; }
+
+/* Card — layered shadow + gentle entrance */
+.login-card { width: min(420px, calc(100vw - 32px)); background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 36px 32px; box-shadow: 0 24px 60px rgba(24, 61, 53, .14), 0 4px 14px rgba(24, 61, 53, .06); position: relative; z-index: 1; animation: login-card-in 380ms cubic-bezier(.16, 1, .3, 1); }
+@keyframes login-card-in { from { opacity: 0; transform: translateY(14px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
+/* Brand header — larger brand-mark (52px emerald tile) */
+.login-brand { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; margin-bottom: 24px; }
+.login-brand .brand-mark { width: 52px; height: 52px; border-radius: 16px; box-shadow: 0 8px 18px rgba(35, 124, 118, .24); }
+.login-brand .brand-mark span { font-size: 24px; }
+.login-brand b { font-size: 16px; color: #27413d; line-height: 1.35; letter-spacing: -.2px; }
+.login-brand small { color: #93a09e; font-size: 10.5px; letter-spacing: .3px; margin-top: 2px; }
+
+/* Login form — larger type than the in-app forms (13px labels / 15px inputs) */
+.login-form { display: flex; flex-direction: column; gap: 13px; }
+.login-form label { display: block; font-size: 13px; font-weight: 600; color: #3d5651; }
+.login-form input { display: block; width: 100%; margin-top: 6px; padding: 12px 14px; border: 1px solid #dce6e2; border-radius: 10px; font-size: 15px; color: #2c4640; background: #fcfefd; outline: none; transition: border-color .15s ease, box-shadow .15s ease; }
+.login-form input::placeholder { color: #a9b5b1; font-weight: 400; }
+.login-form input:focus { border-color: #8fc5b4; box-shadow: 0 0 0 3px #eaf6f2; }
+
+/* Password field with show/hide toggle inside the input */
+.login-password { position: relative; display: block; }
+.login-password input { padding-right: 40px; }
+.login-password button { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); width: 26px; height: 26px; display: grid; place-items: center; border: 0; border-radius: 6px; background: transparent; color: #a3afac; }
+.login-password button:hover { color: var(--teal); background: #eff7f3; }
+
+/* Error bar — same red family as .notice-bar.error */
+.login-error { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid #f3dcdc; background: #fdf3f3; color: #b05457; border-radius: 10px; font-size: 13px; animation: login-error-in .22s ease-out; }
+@keyframes login-error-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Submit — full-width, taller than the in-app primary buttons */
+.login-form .primary-button { width: 100%; height: 46px; margin-top: 4px; border-radius: 10px; font-size: 14px; font-weight: 600; }
+.login-form .primary-button:disabled { opacity: .6; cursor: not-allowed; box-shadow: none; }
+
+/* Demo accounts — dashed divider + quick-fill chips (fill only, no submit) */
+.login-demo { margin-top: 22px; padding-top: 18px; border-top: 1px dashed #dde7e3; }
+.login-demo > span { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .8px; color: #9aa7a3; margin-bottom: 10px; }
+.login-demo-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.login-demo-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 1px solid #dce7e2; border-radius: 999px; background: #f7fbf9; color: #5b7370; font-size: 12.5px; transition: border-color .16s ease, background .16s ease, color .16s ease, transform .16s ease, box-shadow .16s ease; }
+.login-demo-btn:hover { transform: translateY(-1px); border-color: #8fc5b4; color: var(--teal); background: #f2faf6; box-shadow: 0 3px 8px rgba(35, 124, 118, .08); }
+.login-demo-btn.admin { border-color: #e4d9f5; background: #faf6fe; color: #72589f; }
+.login-demo-btn.admin:hover { border-color: #b9a3e3; color: #5f4790; background: #f6effd; box-shadow: 0 3px 8px rgba(130, 103, 181, .1); }
+.login-demo-btn:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
+.login-footer { margin: 20px 0 0; text-align: center; font-size: 11px; color: #a2aeab; }
+
+/* Session-check splash (auth.me in flight) */
+.auth-splash { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: var(--canvas); }
+.auth-splash .brand-mark { width: 56px; height: 56px; border-radius: 17px; animation: auth-pulse 1.6s ease-in-out infinite; }
+.auth-splash .brand-mark span { font-size: 26px; }
+.auth-splash p { margin: 0; font-size: 14px; color: var(--muted); }
+@keyframes auth-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+
+/* Sidebar logout row (above the version line) + topbar logout icon state */
+.sidebar-logout { width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 10px 12px; border: none; border-radius: 10px; background: transparent; color: #8d9d98; font-size: 13.5px; margin-top: 8px; cursor: pointer; transition: color .15s ease, background .15s ease; }
+.sidebar-logout:hover { color: #b56b64; background: #fdf1ef; }
+.sidebar-logout:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+.sidebar-logout:disabled, .top-icon:disabled { opacity: .55; cursor: wait; }
+
+/* Reduced motion — kill every animation added in this block */
+@media (prefers-reduced-motion: reduce) {
+  .login-card, .login-error, .login-demo-btn, .sidebar-logout, .auth-splash .brand-mark, .login-form input, .login-password button { animation: none !important; transition: none !important; }
+}
+
+/* Responsive — slimmer card on small phones */
+@media (max-width: 480px) {
+  .login-card { padding: 28px 22px; border-radius: 16px; }
+  .login-screen { padding: 16px 12px; }
+}

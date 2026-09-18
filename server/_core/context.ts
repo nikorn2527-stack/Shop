@@ -1,5 +1,8 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
+import { COOKIE_NAME } from "@shared/const";
 import type { User } from "../../drizzle/schema";
+import { authenticateAppSession } from "../sqliteStore";
+import { getWelfareDb } from "../welfareStore";
 import { sdk } from "./sdk";
 
 export type TrpcContext = {
@@ -7,6 +10,61 @@ export type TrpcContext = {
   res: CreateExpressContextOptions["res"];
   user: User | null;
 };
+
+/** Extracts the app session id cookie without a cookie-parser dependency. */
+export function readAppSessionCookie(req: CreateExpressContextOptions["req"]): string | undefined {
+  const header = req.headers.cookie;
+  if (typeof header !== "string" || !header) return undefined;
+  for (const part of header.split(";")) {
+    const separator = part.indexOf("=");
+    const name = separator === -1 ? part.trim() : part.slice(0, separator).trim();
+    if (name !== COOKIE_NAME) continue;
+    const value = separator === -1 ? "" : part.slice(separator + 1).trim();
+    return value || undefined;
+  }
+  return undefined;
+}
+
+/** Maps a local app user row onto the drizzle User shape used by ctx.user. */
+function toDrizzleUser(user: {
+  id: number;
+  username: string;
+  displayName: string;
+  role: "staff" | "admin";
+  createdAt: string;
+}): User {
+  // created_at is stored as "YYYY-MM-DD HH:mm:ss"; Date parses it as local time
+  // when the space is swapped for the ISO "T" separator.
+  const createdAt = new Date(user.createdAt.replace(" ", "T"));
+  return {
+    id: user.id,
+    openId: user.username,
+    name: user.displayName,
+    email: null,
+    loginMethod: "local",
+    role: user.role === "admin" ? "admin" : "user",
+    createdAt,
+    updatedAt: createdAt,
+    lastSignedIn: createdAt,
+  };
+}
+
+/**
+ * Local session fallback: resolves the app_session_id cookie against the
+ * welfare SQLite store. Never throws — auth failures just mean anonymous.
+ */
+async function authenticateLocalSession(req: CreateExpressContextOptions["req"]): Promise<User | null> {
+  try {
+    const sessionId = readAppSessionCookie(req);
+    if (!sessionId) return null;
+    const appUser = authenticateAppSession(getWelfareDb(), sessionId);
+    if (!appUser) return null;
+    return toDrizzleUser(appUser);
+  } catch (error) {
+    console.warn("[Auth] Local session lookup failed:", String(error));
+    return null;
+  }
+}
 
 export async function createContext(
   opts: CreateExpressContextOptions
@@ -18,6 +76,12 @@ export async function createContext(
   } catch (error) {
     // Authentication is optional for public procedures.
     user = null;
+  }
+
+  // Sandbox / local fallback: resolve the welfare store's own session cookie
+  // when the OAuth session did not produce a user.
+  if (!user) {
+    user = await authenticateLocalSession(opts.req);
   }
 
   return {

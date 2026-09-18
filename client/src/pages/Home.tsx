@@ -11,10 +11,10 @@ import {
   ChevronDown,
   CircleHelp,
   CreditCard,
-  Crown,
   Download,
   FileBarChart,
   LockKeyhole,
+  LogOut,
   Menu,
   MoreHorizontal,
   Plus,
@@ -32,10 +32,12 @@ import {
 
 import type { MemberLite, Role, View } from "./pageData";
 import type { SaleHistoryEntry } from "../../../server/sqliteStore";
+import type { User } from "../../../drizzle/schema";
 import { canAccessView, formatMemberNumber, money, navItems } from "./pageData";
 import { ConfirmDialog, SectionHeader, StatusPill } from "./PagePrimitives";
 import { Dashboard } from "./Dashboard";
 import { GlobalSearch } from "@/components/GlobalSearch";
+import { LoginView } from "@/components/LoginView";
 import { ReceiptModal } from "@/components/ReceiptModal";
 import { Pos } from "./Pos";
 import { Stock } from "./Stock";
@@ -371,17 +373,13 @@ function Logs() {
   return <><SectionHeader eyebrow="ตรวจสอบย้อนหลังและความโปร่งใส" title="ระบบ Log" description="บันทึกทุกกิจกรรมสำคัญของผู้ใช้งานและธุรกรรมในระบบ" action={<button className="outline-button" onClick={downloadLogsCsv}><Download size={16} /> ส่งออก Log</button>} /><div className="log-summary"><div><Activity size={18} /><span>รายการวันนี้<strong>{todayCount}</strong></span></div><div><ShieldCheck size={18} /><span>ผู้ใช้งานในระบบ<strong>{actorCount}</strong></span></div><div><ReceiptText size={18} /><span>ธุรกรรมที่บันทึก<strong>100%</strong></span></div></div><section className="panel table-panel"><div className="table-toolbar"><div><h2>กิจกรรมทั้งหมด</h2><p>ข้อมูลสำหรับตรวจสอบย้อนหลังของเจ้าหน้าที่และผู้บริหาร</p></div><div className="toolbar-actions"><div className="search-field"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ค้นหากิจกรรม หรือผู้ใช้งาน" /></div><button className="outline-button"><CalendarDays size={16} /> ช่วงเวลา</button></div></div><div className="table-wrap"><table><thead><tr><th>วันและเวลา</th><th>ผู้ทำรายการ</th><th>กิจกรรม</th><th>รายละเอียด</th><th>ระดับสิทธิ์</th><th /></tr></thead><tbody>{logsQuery.isLoading ? <tr className="table-state-row"><td colSpan={6}><div className="table-loading"><Activity size={22} /><b>กำลังโหลดรายการ Log จากระบบ</b><span>ดึงข้อมูล 200 รายการล่าสุด</span></div></td></tr> : logsQuery.isError ? <tr className="table-state-row"><td colSpan={6}><div className="table-loading"><ShieldCheck size={22} /><b>โหลดรายการ Log ไม่สำเร็จ</b><span>{getErrorMessage(logsQuery.error)}</span></div></td></tr> : filtered.length === 0 ? <tr className="table-state-row"><td colSpan={6}><div className="table-loading"><Activity size={22} /><b>ไม่พบกิจกรรมตามเงื่อนไข</b><span>ลองเปลี่ยนคำค้นหา</span></div></td></tr> : filtered.map((log) => <tr key={log.id}><td>{formatLogDateTime(log.createdAt)}</td><td><b>{log.actor}</b></td><td><StatusPill tone={log.tone}>{log.action}</StatusPill></td><td>{log.detail}</td><td>{log.actorRole ?? "—"}</td><td><button className="table-more"><MoreHorizontal size={18} /></button></td></tr>)}</tbody></table></div>{notice && <div className="notice-bar"><Check size={16} /> {notice}<button onClick={() => setNotice("")}><X size={14} /></button></div>}</section></>;
 }
 
-function RoleSwitcher({ role, onChange }: { role: Role; onChange: (role: Role) => void }) {
-  return <div className="role-switcher" aria-label="สลับสิทธิ์การใช้งาน"><span className="role-switch-label"><ShieldCheck size={13} /> สิทธิ์</span><button className={role === "staff" ? "active" : ""} onClick={() => onChange("staff")}>เจ้าหน้าที่</button><button className={role === "admin" ? "active admin" : ""} onClick={() => onChange("admin")}><Crown size={12} /> ผู้บริหาร</button></div>;
-}
-
-export default function Home() {
+function AppShell({ user, onLogout }: { user: User; onLogout: () => void }) {
   const [activeView, setActiveView] = useState<View>("dashboard");
   const [mobileNav, setMobileNav] = useState(false);
   const [posShortcut, setPosShortcut] = useState("");
-  const [role, setRole] = useState<Role>("staff");
   const [searchOpen, setSearchOpen] = useState(false);
   const [pendingMemberNumber, setPendingMemberNumber] = useState<string | null>(null);
+  const logoutMutation = trpc.auth.logout.useMutation({ onSuccess: () => onLogout() });
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
@@ -392,9 +390,25 @@ export default function Home() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
+  // Role/profile now come from the login session (auth.me) — no client switcher.
+  const role: Role = user.role === "admin" ? "admin" : "staff";
+  const profileName = user.name ?? "ผู้ใช้ระบบ";
+  const profileAvatar = profileName.slice(0, 1);
   const safeView = canAccessView(role, activeView) ? activeView : "dashboard";
   const pageTitle = navItems.find((item) => item.id === safeView)?.label ?? (safeView === "settings" ? "ตั้งค่า" : safeView === "logs" ? "ระบบ Log" : "ภาพรวม");
-  const profileName = role === "admin" ? "วรพจน์ ด." : "กัญญาณัฐ พ.";
-  const switchRole = (nextRole: Role) => { setRole(nextRole); if (nextRole === "staff" && (activeView === "settings" || activeView === "logs")) setActiveView("dashboard"); };
-  return <div className="app-shell"><aside className={`sidebar ${mobileNav ? "open" : ""}`}><div className="brand"><div className="brand-mark"><span>ส</span></div><div><b>สวัสดิการ รพจ.</b><small>Hospital Welfare Store</small></div><button className="mobile-close" onClick={() => setMobileNav(false)}><X size={19} /></button></div><div className="role-card"><div className={`role-avatar ${role}`}>{role === "admin" ? "ว" : "ก"}</div><div><b>{profileName}</b><span>{role === "admin" ? "ผู้บริหารระบบ" : "เจ้าหน้าที่ร้านค้า"}</span></div><ChevronDown size={15} className="muted-icon" /></div><RoleSwitcher role={role} onChange={switchRole} /><nav>{navItems.map(({ id, label, caption, icon: Icon }) => <button className={safeView === id ? "active" : ""} key={id} onClick={() => { setActiveView(id); setMobileNav(false); }}><Icon size={19} /><span><b>{label}</b><small>{caption}</small></span>{id === "stock" && <i className="nav-badge">9</i>}</button>)}</nav><div className="nav-separator" /><nav className="secondary-nav">{role === "admin" ? <><button className={safeView === "settings" ? "active" : ""} onClick={() => { setActiveView("settings"); setMobileNav(false); }}><Settings2 size={19} /><span><b>ตั้งค่า</b><small>ระบบและใบเสร็จ</small></span></button><button className={safeView === "logs" ? "active" : ""} onClick={() => { setActiveView("logs"); setMobileNav(false); }}><Activity size={19} /><span><b>ระบบ Log</b><small>ประวัติการใช้งาน</small></span></button></> : <div className="locked-nav"><LockKeyhole size={15} /><span>เมนูผู้บริหารถูกซ่อน</span></div>}</nav><div className="sidebar-footer"><div className="secure-badge"><ShieldCheck size={17} /><span><b>ระบบปลอดภัย</b><small>ข้อมูลถูกเข้ารหัสและสำรอง</small></span></div><div className="sidebar-version">v1.0.0 · ฝ่ายสวัสดิการ</div></div></aside><main className="main-shell"><header className="topbar"><button className="mobile-menu" onClick={() => setMobileNav(true)}><Menu size={21} /></button><div className="breadcrumb"><span>ร้านค้าสวัสดิการ</span><b>/</b><strong>{pageTitle}</strong></div><div className="topbar-actions"><div className="global-search" role="button" tabIndex={0} aria-label="เปิดค้นหาเมนู สมาชิก หรือสินค้า" onClick={() => setSearchOpen(true)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSearchOpen(true); } }}><Search size={17} /><span>ค้นหาเมนูหรือรายการ...</span><kbd>⌘ K</kbd></div><RoleSwitcher role={role} onChange={switchRole} /><button className="top-icon"><Bell size={18} /><i /></button><div className="profile-pill"><span className={`profile-avatar ${role}`}>{role === "admin" ? "ว" : "ก"}</span><div><b>{profileName}</b><small>{role === "admin" ? "ผู้บริหาร" : "เจ้าหน้าที่"}</small></div><ChevronDown size={15} className="muted-icon" /></div></div></header><div className="page-content">{safeView === "dashboard" && <Dashboard setView={setActiveView} setPosShortcut={setPosShortcut} role={role} />}{safeView === "pos" && <Pos shortcut={posShortcut} setShortcut={setPosShortcut} role={role} />}{safeView === "stock" && <Stock role={role} />}{safeView === "members" && <Members role={role} focusMemberNumber={pendingMemberNumber} onFocusMemberConsumed={() => setPendingMemberNumber(null)} />}{safeView === "reports" && <Reports />}{safeView === "settings" && role === "admin" && <Settings />}{safeView === "logs" && role === "admin" && <Logs />}</div><footer className="app-footer"><span>ร้านค้าสวัสดิการโรงพยาบาลผู้ป่วยจิตเวช</span><span>ศูนย์ช่วยเหลือ <CircleHelp size={14} /> · 02-XXX-XXXX</span><span className="powered-by">Power by PNG TEAM</span></footer><GlobalSearch role={role} open={searchOpen} onClose={() => setSearchOpen(false)} onNavigate={(view) => { setActiveView(view); setSearchOpen(false); setMobileNav(false); }} onOpenMember={(memberNumber) => { setSearchOpen(false); setPendingMemberNumber(memberNumber); setActiveView("members"); }} /></main></div>;
+  const logout = () => { if (!logoutMutation.isPending) logoutMutation.mutate(); };
+  return <div className="app-shell"><aside className={`sidebar ${mobileNav ? "open" : ""}`}><div className="brand"><div className="brand-mark"><span>ส</span></div><div><b>สวัสดิการ รพจ.</b><small>Hospital Welfare Store</small></div><button className="mobile-close" onClick={() => setMobileNav(false)}><X size={19} /></button></div><div className="role-card"><div className={`role-avatar ${role}`}>{profileAvatar}</div><div><b>{profileName}</b><span>{role === "admin" ? "ผู้บริหารระบบ" : "เจ้าหน้าที่ร้านค้า"}</span></div><ChevronDown size={15} className="muted-icon" /></div><nav>{navItems.map(({ id, label, caption, icon: Icon }) => <button className={safeView === id ? "active" : ""} key={id} onClick={() => { setActiveView(id); setMobileNav(false); }}><Icon size={19} /><span><b>{label}</b><small>{caption}</small></span>{id === "stock" && <i className="nav-badge">9</i>}</button>)}</nav><div className="nav-separator" /><nav className="secondary-nav">{role === "admin" ? <><button className={safeView === "settings" ? "active" : ""} onClick={() => { setActiveView("settings"); setMobileNav(false); }}><Settings2 size={19} /><span><b>ตั้งค่า</b><small>ระบบและใบเสร็จ</small></span></button><button className={safeView === "logs" ? "active" : ""} onClick={() => { setActiveView("logs"); setMobileNav(false); }}><Activity size={19} /><span><b>ระบบ Log</b><small>ประวัติการใช้งาน</small></span></button></> : <div className="locked-nav"><LockKeyhole size={15} /><span>เมนูผู้บริหารถูกซ่อน</span></div>}</nav><div className="sidebar-footer"><div className="secure-badge"><ShieldCheck size={17} /><span><b>ระบบปลอดภัย</b><small>ข้อมูลถูกเข้ารหัสและสำรอง</small></span></div><button type="button" className="sidebar-logout" onClick={logout} disabled={logoutMutation.isPending}><LogOut size={15} /> ออกจากระบบ</button><div className="sidebar-version">v1.0.0 · ฝ่ายสวัสดิการ</div></div></aside><main className="main-shell"><header className="topbar"><button className="mobile-menu" onClick={() => setMobileNav(true)}><Menu size={21} /></button><div className="breadcrumb"><span>ร้านค้าสวัสดิการ</span><b>/</b><strong>{pageTitle}</strong></div><div className="topbar-actions"><div className="global-search" role="button" tabIndex={0} aria-label="เปิดค้นหาเมนู สมาชิก หรือสินค้า" onClick={() => setSearchOpen(true)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSearchOpen(true); } }}><Search size={17} /><span>ค้นหาเมนูหรือรายการ...</span><kbd>⌘ K</kbd></div><button type="button" className="top-icon" title="ออกจากระบบ" aria-label="ออกจากระบบ" onClick={logout} disabled={logoutMutation.isPending}><LogOut size={18} /></button><button className="top-icon"><Bell size={18} /><i /></button><div className="profile-pill"><span className={`profile-avatar ${role}`}>{profileAvatar}</span><div><b>{profileName}</b><small>{role === "admin" ? "ผู้บริหาร" : "เจ้าหน้าที่"}</small></div><ChevronDown size={15} className="muted-icon" /></div></div></header><div className="page-content">{safeView === "dashboard" && <Dashboard setView={setActiveView} setPosShortcut={setPosShortcut} role={role} />}{safeView === "pos" && <Pos shortcut={posShortcut} setShortcut={setPosShortcut} role={role} />}{safeView === "stock" && <Stock role={role} />}{safeView === "members" && <Members role={role} focusMemberNumber={pendingMemberNumber} onFocusMemberConsumed={() => setPendingMemberNumber(null)} />}{safeView === "reports" && <Reports />}{safeView === "settings" && role === "admin" && <Settings />}{safeView === "logs" && role === "admin" && <Logs />}</div><footer className="app-footer"><span>ร้านค้าสวัสดิการโรงพยาบาลผู้ป่วยจิตเวช</span><span>ศูนย์ช่วยเหลือ <CircleHelp size={14} /> · 02-XXX-XXXX</span><span className="powered-by">Power by PNG TEAM</span></footer><GlobalSearch role={role} open={searchOpen} onClose={() => setSearchOpen(false)} onNavigate={(view) => { setActiveView(view); setSearchOpen(false); setMobileNav(false); }} onOpenMember={(memberNumber) => { setSearchOpen(false); setPendingMemberNumber(memberNumber); setActiveView("members"); }} /></main></div>;
+}
+
+/** Auth gate: session check (auth.me) → splash → login view → app shell. */
+export default function Home() {
+  const authQuery = trpc.auth.me.useQuery();
+  if (authQuery.isLoading) {
+    return <div className="auth-splash"><div className="brand-mark"><span>ส</span></div><p>กำลังตรวจสอบสิทธิ์การใช้งาน…</p></div>;
+  }
+  const user = authQuery.data;
+  if (!user) {
+    return <LoginView onAuthed={() => void authQuery.refetch()} />;
+  }
+  return <AppShell user={user} onLogout={() => void authQuery.refetch()} />;
 }

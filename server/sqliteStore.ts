@@ -1,3 +1,4 @@
+import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
@@ -264,6 +265,21 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
       tone TEXT NOT NULL DEFAULT 'blue',
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE TABLE IF NOT EXISTS app_users (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      username TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      display_name TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'staff',
+      active INTEGER NOT NULL DEFAULT 1,
+      created_at TEXT NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS app_sessions (
+      id TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+      expires_at TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
   `);
   ensureColumn(db, "members", "phone", "TEXT");
   ensureColumn(db, "members", "type", "TEXT NOT NULL DEFAULT 'สมาชิก'");
@@ -284,6 +300,7 @@ function ensureColumn(db: SqliteDb, table: string, column: string, definition: s
 }
 
 export function seedSqliteDemoData(db: SqliteDb) {
+  seedAppUsers(db);
   const insertMember = db.prepare(`INSERT OR IGNORE INTO members (member_number, first_name, last_name, id_card, balance, status) VALUES (?, ?, ?, ?, ?, ?)`);
   insertMember.run("M-000218", "อรทัย", "ส.", null, 1240, "active");
   insertMember.run("M-000092", "พิมพ์ชนก", "ร.", null, 0, "suspended");
@@ -1187,6 +1204,83 @@ export function setSettings(db: SqliteDb, patch: Partial<StoreSettings>, actor =
   return getSettings(db);
 }
 
+// --- app users & local sessions ---------------------------------------------
+
+/** Login account for the welfare store app itself (local session auth). */
+export type AppUser = {
+  id: number;
+  username: string;
+  passwordHash: string;
+  displayName: string;
+  role: "staff" | "admin";
+  active: number;
+  createdAt: string;
+};
+
+const SCRYPT_SALT_BYTES = 16;
+const SCRYPT_KEY_BYTES = 64;
+/** Session lifetime for local logins. */
+export const APP_SESSION_TTL_DAYS = 7;
+
+/** scrypt password hash, format: `scrypt$<saltHex>$<keyHex>`. */
+export function hashPassword(plain: string): string {
+  const salt = randomBytes(SCRYPT_SALT_BYTES);
+  const key = scryptSync(plain, salt, SCRYPT_KEY_BYTES);
+  return `scrypt$${salt.toString("hex")}$${key.toString("hex")}`;
+}
+
+/** Constant-time verification. Malformed stored hashes simply fail. */
+export function verifyPassword(plain: string, stored: string): boolean {
+  const parts = stored.split("$");
+  if (parts.length !== 3 || parts[0] !== "scrypt") return false;
+  let salt: Buffer;
+  let expected: Buffer;
+  try {
+    salt = Buffer.from(parts[1], "hex");
+    expected = Buffer.from(parts[2], "hex");
+  } catch {
+    return false;
+  }
+  if (salt.length === 0 || expected.length === 0) return false;
+  try {
+    const actual = scryptSync(plain, salt, expected.length);
+    return timingSafeEqual(actual, expected);
+  } catch {
+    return false;
+  }
+}
+
+const APP_USER_SELECT = `SELECT id, username, password_hash AS passwordHash, display_name AS displayName, role, active, created_at AS createdAt FROM app_users`;
+
+/** Finds an ACTIVE app user by exact username. */
+export function findAppUserByUsername(db: SqliteDb, username: string): AppUser | undefined {
+  return db.prepare(`${APP_USER_SELECT} WHERE username = ? AND active = 1`).get(username) as AppUser | undefined;
+}
+
+/** Creates a new session row (uuid) expiring in 7 days; lazily purges expired sessions. */
+export function createAppSession(db: SqliteDb, userId: number): { sessionId: string; expiresAt: string } {
+  const now = new Date();
+  const sessionId = randomUUID();
+  const expiresAt = formatDateTime(addDays(now, APP_SESSION_TTL_DAYS));
+  db.prepare(`DELETE FROM app_sessions WHERE expires_at < ?`).run(formatDateTime(now));
+  db.prepare(`INSERT INTO app_sessions (id, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)`).run(sessionId, userId, expiresAt, formatDateTime(now));
+  return { sessionId, expiresAt };
+}
+
+/** Resolves an active, unexpired session to its (active) app user. */
+export function authenticateAppSession(db: SqliteDb, sessionId: string): AppUser | undefined {
+  return db.prepare(
+    `SELECT u.id, u.username, u.password_hash AS passwordHash, u.display_name AS displayName, u.role, u.active, u.created_at AS createdAt
+     FROM app_sessions s JOIN app_users u ON u.id = s.user_id
+     WHERE s.id = ? AND s.expires_at > ? AND u.active = 1`,
+  ).get(sessionId, formatDateTime()) as AppUser | undefined;
+}
+
+/** Deletes a session row (logout). Unknown ids are a no-op. */
+export function deleteAppSession(db: SqliteDb, sessionId: string): void {
+  db.prepare(`DELETE FROM app_sessions WHERE id = ?`).run(sessionId);
+}
+
 // --- seeding ----------------------------------------------------------------
 
 const SEED_PRODUCTS: { sku: string; barcode: string; name: string; category: string; emoji: string; color: string; unit: string; price: number; cost: number; stock: number; reorderPoint: number }[] = [
@@ -1234,6 +1328,22 @@ const SEED_AUDIT_LOGS: { action: string; actor: string; actorRole: string; detai
   { action: "แก้ไขสต็อก", actor: "นายวรพจน์ ด.", actorRole: "ผู้บริหาร", detail: "น้ำดื่มคริสตัล · +24 ขวด", tone: "amber", createdAt: "2026-09-17 13:51:00" },
   { action: "ถอนเงินสมาชิก", actor: "น.ส.กัญญาณัฐ พ.", actorRole: "เจ้าหน้าที่", detail: "M-000092 · ฿200.00 · ถอนเพื่อถอนฟัน", tone: "purple", createdAt: "2026-09-17 12:06:00" },
 ];
+
+const SEED_APP_USERS: { username: string; password: string; displayName: string; role: "staff" | "admin" }[] = [
+  { username: "kanyanat", password: "1234", displayName: "กัญญาณัฐ พ.", role: "staff" },
+  { username: "woraphot", password: "1234", displayName: "วรพจน์ ด.", role: "admin" },
+];
+
+/** Idempotent demo login accounts — inserts only usernames that are still missing. */
+export function seedAppUsers(db: SqliteDb) {
+  const lookup = db.prepare(`SELECT id FROM app_users WHERE username = ?`);
+  const insert = db.prepare(`INSERT INTO app_users (username, password_hash, display_name, role, active, created_at) VALUES (?, ?, ?, ?, 1, ?)`);
+  for (const user of SEED_APP_USERS) {
+    if (!lookup.get(user.username)) {
+      insert.run(user.username, hashPassword(user.password), user.displayName, user.role, formatDateTime());
+    }
+  }
+}
 
 /** Deterministic pseudo-random generator so seeded history is reproducible. */
 function createRng(seed: number) {
@@ -1306,6 +1416,7 @@ function seedHistoricalSales(db: SqliteDb) {
  * history. Each table only seeds when it is still empty.
  */
 export function seedWelfareStoreData(db: SqliteDb) {
+  seedAppUsers(db);
   const insertMember = db.prepare(`INSERT OR IGNORE INTO members (member_number, first_name, last_name, id_card, balance, status, type) VALUES (?, ?, ?, ?, ?, ?, ?)`);
   for (const member of SEED_MEMBERS) {
     insertMember.run(member.memberNumber, member.firstName, member.lastName, null, member.balance, member.status, member.type);

@@ -2,22 +2,27 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
+import { readAppSessionCookie, type TrpcContext } from "./_core/context";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { getWelfareDb } from "./welfareStore";
 import {
   StoreError,
   checkout,
+  createAppSession,
   createProduct,
   dailySalesRows,
   dashboardStats,
+  deleteAppSession,
   deleteMember,
+  findAppUserByUsername,
   getMemberDetail,
   getSettings,
   listAuditLogs,
   listMembers,
   listProducts,
   listStockRows,
+  logAction,
   receiveStock,
   registerMember,
   salesList,
@@ -27,6 +32,7 @@ import {
   stockCount,
   updateMember,
   updateProduct,
+  verifyPassword,
   walletTx,
 } from "./sqliteStore";
 
@@ -40,6 +46,31 @@ function withStoreErrors<T>(fn: () => T): T {
     }
     throw error;
   }
+}
+
+/** Same-origin cookie policy: secure only when the request is actually https. */
+function isSecureRequest(req: TrpcContext["req"]) {
+  if (req.protocol === "https") return true;
+  const forwardedProto = req.headers["x-forwarded-proto"];
+  if (!forwardedProto) return false;
+  const protoList = Array.isArray(forwardedProto) ? forwardedProto : String(forwardedProto).split(",");
+  return protoList.some((proto) => proto.trim().toLowerCase() === "https");
+}
+
+/** Session-priority actor: a signed-in user overrides client-sent actor/role. */
+function resolveActor(ctx: TrpcContext, input: { actor?: string; actorRole?: string }) {
+  if (ctx.user) {
+    return {
+      actor: ctx.user.name ?? "ผู้ใช้ระบบ",
+      actorRole: ctx.user.role === "admin" ? "ผู้บริหาร" : "เจ้าหน้าที่",
+    };
+  }
+  return { actor: input.actor, actorRole: input.actorRole };
+}
+
+/** Admin gate: session role wins; only anonymous requests fall back to input. */
+function isAdminCtx(ctx: TrpcContext, input: { actorRole?: string }) {
+  return ctx.user ? ctx.user.role === "admin" : (input.actorRole ?? "").trim() === "ผู้บริหาร";
 }
 
 const paymentMethodSchema = z.enum(["เงินสด", "QR / สแกน", "หักบัญชีสมาชิก"]);
@@ -203,12 +234,55 @@ const settingsPatchInput = z
   })
   .nullish();
 
+const authLoginInput = z.object({
+  username: z.string().min(1, "กรุณาระบุชื่อผู้ใช้"),
+  password: z.string().min(1, "กรุณากรอกรหัสผ่าน"),
+});
+
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
+    login: publicProcedure
+      .input(authLoginInput)
+      .mutation(({ ctx, input }) =>
+        withStoreErrors(() => {
+          const db = getWelfareDb();
+          const user = findAppUserByUsername(db, input.username.trim());
+          // Same message for unknown user and wrong password: no user enumeration.
+          if (!user || !verifyPassword(input.password, user.passwordHash)) {
+            throw new TRPCError({ code: "UNAUTHORIZED", message: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง" });
+          }
+          const roleThai = user.role === "admin" ? "ผู้บริหาร" : "เจ้าหน้าที่";
+          const session = createAppSession(db, user.id);
+          ctx.res.cookie(COOKIE_NAME, session.sessionId, {
+            httpOnly: true,
+            path: "/",
+            sameSite: "lax",
+            secure: isSecureRequest(ctx.req),
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+          });
+          logAction(db, "เข้าสู่ระบบ", user.displayName, `${user.username} · สิทธิ์ ${roleThai}`, "blue", roleThai);
+          return { id: user.id, username: user.username, displayName: user.displayName, role: user.role };
+        }),
+      ),
     logout: publicProcedure.mutation(({ ctx }) => {
+      // Delete the local session row (and audit) before clearing the cookie.
+      try {
+        const sessionId = readAppSessionCookie(ctx.req);
+        if (sessionId) {
+          const db = getWelfareDb();
+          deleteAppSession(db, sessionId);
+          if (ctx.user) {
+            const roleThai = ctx.user.role === "admin" ? "ผู้บริหาร" : "เจ้าหน้าที่";
+            logAction(db, "ออกจากระบบ", ctx.user.name ?? "ผู้ใช้ระบบ", `${ctx.user.openId} · สิทธิ์ ${roleThai}`, "green", roleThai);
+          }
+        }
+      } catch (error) {
+        // Logout must always succeed for the cookie clear below.
+        console.warn("[Auth] Session delete on logout failed:", String(error));
+      }
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return {
@@ -223,20 +297,27 @@ export const appRouter = router({
       .query(({ input }) => withStoreErrors(() => listProducts(getWelfareDb(), input?.includeInactive ?? false))),
     create: publicProcedure
       .input(productCreateInput)
-      .mutation(({ input }) => withStoreErrors(() => createProduct(getWelfareDb(), input))),
+      .mutation(({ ctx, input }) => {
+        const { actor, actorRole } = resolveActor(ctx, input);
+        return withStoreErrors(() => createProduct(getWelfareDb(), { ...input, actor, actorRole }));
+      }),
     update: publicProcedure
       .input(productUpdateInput)
-      .mutation(({ input }) => withStoreErrors(() => updateProduct(getWelfareDb(), input))),
+      .mutation(({ ctx, input }) => {
+        const { actor, actorRole } = resolveActor(ctx, input);
+        return withStoreErrors(() => updateProduct(getWelfareDb(), { ...input, actor, actorRole }));
+      }),
     setActive: publicProcedure
       .input(productSetActiveInput)
-      .mutation(({ input }) =>
-        withStoreErrors(() => {
-          if ((input.actorRole ?? "").trim() !== "ผู้บริหาร") {
+      .mutation(({ ctx, input }) => {
+        const { actor, actorRole } = resolveActor(ctx, input);
+        return withStoreErrors(() => {
+          if (!isAdminCtx(ctx, input)) {
             throw new TRPCError({ code: "FORBIDDEN", message: "การปิด/เปิดการขายสินค้าต้องใช้สิทธิ์ผู้บริหาร" });
           }
-          return setProductActive(getWelfareDb(), input);
-        }),
-      ),
+          return setProductActive(getWelfareDb(), { ...input, actor, actorRole });
+        });
+      }),
   }),
 
   sales: router({
@@ -251,8 +332,9 @@ export const appRouter = router({
       .query(() => withStoreErrors(() => listStockRows(getWelfareDb()))),
     receive: publicProcedure
       .input(stockReceiveInput)
-      .mutation(({ input }) =>
-        withStoreErrors(() =>
+      .mutation(({ ctx, input }) => {
+        const { actor, actorRole } = resolveActor(ctx, input);
+        return withStoreErrors(() =>
           receiveStock(
             getWelfareDb(),
             input.productId,
@@ -260,20 +342,26 @@ export const appRouter = router({
             input.expiryDate ?? null,
             input.qty,
             input.cost,
-            input.actor,
-            input.actorRole,
+            actor,
+            actorRole,
           ),
-        ),
-      ),
+        );
+      }),
     count: publicProcedure
       .input(stockCountInput)
-      .mutation(({ input }) => withStoreErrors(() => stockCount(getWelfareDb(), input))),
+      .mutation(({ ctx, input }) => {
+        const { actor, actorRole } = resolveActor(ctx, input);
+        return withStoreErrors(() => stockCount(getWelfareDb(), { ...input, actor, actorRole }));
+      }),
   }),
 
   pos: router({
     checkout: publicProcedure
       .input(checkoutInput)
-      .mutation(({ input }) => withStoreErrors(() => checkout(getWelfareDb(), input))),
+      .mutation(({ ctx, input }) => {
+        const { actor, actorRole } = resolveActor(ctx, input);
+        return withStoreErrors(() => checkout(getWelfareDb(), { ...input, cashier: input.cashier ?? actor, actorRole }));
+      }),
   }),
 
   member: router({
@@ -293,28 +381,39 @@ export const appRouter = router({
       ),
     register: publicProcedure
       .input(memberRegisterInput)
-      .mutation(({ input }) => withStoreErrors(() => registerMember(getWelfareDb(), input))),
+      .mutation(({ ctx, input }) => {
+        const { actor, actorRole } = resolveActor(ctx, input);
+        return withStoreErrors(() => registerMember(getWelfareDb(), { ...input, actor, actorRole }));
+      }),
     setStatus: publicProcedure
       .input(memberSetStatusInput)
-      .mutation(({ input }) =>
-        withStoreErrors(() => setMemberStatus(getWelfareDb(), input.memberNumber, input.suspended, input.actor, input.actorRole)),
-      ),
+      .mutation(({ ctx, input }) => {
+        const { actor, actorRole } = resolveActor(ctx, input);
+        return withStoreErrors(() => setMemberStatus(getWelfareDb(), input.memberNumber, input.suspended, actor, actorRole));
+      }),
     wallet: publicProcedure
       .input(memberWalletInput)
-      .mutation(({ input }) => withStoreErrors(() => walletTx(getWelfareDb(), input))),
+      .mutation(({ ctx, input }) => {
+        const { actor, actorRole } = resolveActor(ctx, input);
+        return withStoreErrors(() => walletTx(getWelfareDb(), { ...input, actor, actorRole }));
+      }),
     update: publicProcedure
       .input(memberUpdateInput)
-      .mutation(({ input }) => withStoreErrors(() => updateMember(getWelfareDb(), input))),
+      .mutation(({ ctx, input }) => {
+        const { actor, actorRole } = resolveActor(ctx, input);
+        return withStoreErrors(() => updateMember(getWelfareDb(), { ...input, actor, actorRole }));
+      }),
     delete: publicProcedure
       .input(memberDeleteInput)
-      .mutation(({ input }) =>
-        withStoreErrors(() => {
-          if ((input.actorRole ?? "").trim() !== "ผู้บริหาร") {
+      .mutation(({ ctx, input }) => {
+        const { actor, actorRole } = resolveActor(ctx, input);
+        return withStoreErrors(() => {
+          if (!isAdminCtx(ctx, input)) {
             throw new TRPCError({ code: "FORBIDDEN", message: "การลบสมาชิกต้องใช้สิทธิ์ผู้บริหาร" });
           }
-          return deleteMember(getWelfareDb(), input);
-        }),
-      ),
+          return deleteMember(getWelfareDb(), { ...input, actor, actorRole });
+        });
+      }),
   }),
 
   dashboard: router({
@@ -335,9 +434,15 @@ export const appRouter = router({
       .query(() => withStoreErrors(() => getSettings(getWelfareDb()))),
     set: publicProcedure
       .input(settingsPatchInput)
-      .mutation(({ input }) =>
-        withStoreErrors(() => setSettings(getWelfareDb(), input ?? {})),
-      ),
+      .mutation(({ ctx, input }) => {
+        const { actor, actorRole } = resolveActor(ctx, {});
+        return withStoreErrors(() => {
+          if (!isAdminCtx(ctx, {})) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "การตั้งค่าระบบต้องใช้สิทธิ์ผู้บริหาร" });
+          }
+          return setSettings(getWelfareDb(), input ?? {}, actor ?? "ผู้บริหาร", actorRole);
+        });
+      }),
   }),
 
   logs: router({

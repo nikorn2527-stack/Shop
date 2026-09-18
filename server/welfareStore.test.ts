@@ -3,14 +3,19 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
+  authenticateAppSession,
   checkout,
+  createAppSession,
   createSqliteStore,
   dailySalesRows,
   dashboardStats,
+  deleteAppSession,
   deleteMember,
+  findAppUserByUsername,
   getMemberDetail,
   getMemberNumberMode,
   getSettings,
+  hashPassword,
   listAuditLogs,
   listMembers,
   listProducts,
@@ -19,6 +24,7 @@ import {
   receiveStock,
   registerMember,
   salesList,
+  seedSqliteDemoData,
   seedWelfareStoreData,
   setMemberStatus,
   setMemberNumberMode,
@@ -27,6 +33,7 @@ import {
   stockCount,
   updateMember,
   updateProduct,
+  verifyPassword,
   walletTx,
 } from "./sqliteStore";
 import type { SqliteDb, SqliteProduct } from "./sqliteStore";
@@ -768,5 +775,89 @@ describe("settings", () => {
     expect(getMemberNumberMode(database)).toBe("year");
     expect(getSettings(database).storeName).toBe("ร้านค้าทดสอบ");
     expect(listAuditLogs(database, 1)[0].action).toBe("บันทึกการตั้งค่า");
+  });
+});
+
+describe("authentication", () => {
+  it("hashes and verifies passwords (round-trip, wrong password, malformed hash)", () => {
+    const stored = hashPassword("1234");
+    expect(stored).toMatch(/^scrypt\$[0-9a-f]{32}\$[0-9a-f]{128}$/);
+    expect(stored).not.toContain("1234");
+    expect(verifyPassword("1234", stored)).toBe(true);
+    expect(verifyPassword("1234", hashPassword("1234"))).toBe(true);
+    expect(verifyPassword("wrong", stored)).toBe(false);
+    expect(verifyPassword("", stored)).toBe(false);
+    expect(verifyPassword("1234", "not-a-hash")).toBe(false);
+    expect(verifyPassword("1234", "scrypt")).toBe(false);
+    expect(verifyPassword("1234", "scrypt$zz$zz")).toBe(false);
+    expect(verifyPassword("1234", "scrypt$$")).toBe(false);
+  });
+
+  it("seeds both demo login users idempotently via seedSqliteDemoData", () => {
+    db = createSqliteStore();
+    seedSqliteDemoData(db);
+
+    const staff = findAppUserByUsername(db, "kanyanat");
+    expect(staff).toMatchObject({ username: "kanyanat", displayName: "กัญญาณัฐ พ.", role: "staff", active: 1 });
+    expect(verifyPassword("1234", staff!.passwordHash)).toBe(true);
+
+    const admin = findAppUserByUsername(db, "woraphot");
+    expect(admin).toMatchObject({ username: "woraphot", displayName: "วรพจน์ ด.", role: "admin", active: 1 });
+    expect(verifyPassword("1234", admin!.passwordHash)).toBe(true);
+
+    expect(tableCount(db, "app_users")).toBe(2);
+    seedSqliteDemoData(db);
+    expect(tableCount(db, "app_users")).toBe(2);
+  });
+
+  it("round-trips a session and rejects unknown session ids", () => {
+    const database = freshDb();
+    const user = findAppUserByUsername(database, "kanyanat")!;
+
+    const session = createAppSession(database, user.id);
+    expect(session.sessionId).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/);
+    expect(session.expiresAt).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
+
+    const resolved = authenticateAppSession(database, session.sessionId);
+    expect(resolved).toMatchObject({ id: user.id, username: "kanyanat", displayName: "กัญญาณัฐ พ.", role: "staff" });
+
+    expect(authenticateAppSession(database, "00000000-0000-0000-0000-000000000000")).toBeUndefined();
+  });
+
+  it("rejects expired sessions", () => {
+    const database = freshDb();
+    const user = findAppUserByUsername(database, "kanyanat")!;
+    const session = createAppSession(database, user.id);
+
+    database.prepare(`UPDATE app_sessions SET expires_at = '2020-01-01 00:00:00' WHERE id = ?`).run(session.sessionId);
+    expect(authenticateAppSession(database, session.sessionId)).toBeUndefined();
+  });
+
+  it("ignores inactive users", () => {
+    const database = freshDb();
+    const user = findAppUserByUsername(database, "woraphot")!;
+    const session = createAppSession(database, user.id);
+    expect(authenticateAppSession(database, session.sessionId)).toBeDefined();
+
+    database.prepare(`UPDATE app_users SET active = 0 WHERE id = ?`).run(user.id);
+    expect(findAppUserByUsername(database, "woraphot")).toBeUndefined();
+    expect(authenticateAppSession(database, session.sessionId)).toBeUndefined();
+  });
+
+  it("deletes sessions (logout) and purges expired rows when creating new ones", () => {
+    const database = freshDb();
+    const user = findAppUserByUsername(database, "kanyanat")!;
+    const session = createAppSession(database, user.id);
+    expect(tableCount(database, "app_sessions")).toBe(1);
+
+    deleteAppSession(database, session.sessionId);
+    expect(tableCount(database, "app_sessions")).toBe(0);
+    expect(authenticateAppSession(database, session.sessionId)).toBeUndefined();
+
+    // Seed an expired row, then verify createAppSession lazily purges it.
+    database.prepare(`INSERT INTO app_sessions (id, user_id, expires_at, created_at) VALUES ('expired-session', ?, '2020-01-01 00:00:00', '2020-01-01 00:00:00')`).run(user.id);
+    createAppSession(database, user.id);
+    expect(tableCount(database, "app_sessions")).toBe(1);
+    expect(authenticateAppSession(database, "expired-session")).toBeUndefined();
   });
 });
