@@ -2622,9 +2622,11 @@ th { font-weight: 600; }
 @media (max-width: 1100px) {
   .settings-content { grid-template-columns: 1fr; }
 }
-/* เดสก์ท็อปล็อคจอ — ยกเลิก scroll ภายในของ settings (เนื้อหา 2 คอลัมน์พอดีจอ) */
+/* เดสก์ท็อปล็อคจอ — ROUND 33: แท็บใบเสร็จ (การ์ดเครื่องพิมพ์) สูงกว่าจอได้
+   เปลี่ยนจาก hidden เป็น auto — พอดีจอ = ไม่มีแถบเลื่อนเหมือนเดิม
+   ล้นจอ = เลื่อนดูส่วนท้ายได้ ไม่ถูกตัดหาย (เครื่องพิมพ์หลุดเฟรมช่วงท้าย) */
 @media (min-width: 1101px) and (min-height: 700px) {
-  .app-shell:not(.pos-terminal) .settings-content { overflow-y: hidden; }
+  .app-shell:not(.pos-terminal) .settings-content { overflow-y: auto; }
 }
 
 /* พิมพ์ — ตารางแถวเปิดเต็ม */
@@ -3237,3 +3239,18 @@ th { font-weight: 600; }
 
 /* ── 32-16: โมดัลลงทะเบียนสมาชิกที่ POS ── */
 .pos-register-modal .form-grid { max-width: none; }
+
+/* ═══ ROUND 33 — การ์ดเครื่องพิมพ์หน้าร้านไม่หลุดเฟรมช่วงท้าย ═══ */
+/* แท็บใบเสร็จและการขาย: การ์ดเครื่องพิมพ์กางเต็มความกว้างแถวของตัวเอง (ใต้การ์ด
+   ข้อมูลร้าน + การ์ดใบเสร็จ) แล้วขั้นตอน 1-2-3 เรียงแนวนอนบนจอกว้าง — สูงจาก
+   ~558px เหลือประมาณ 320px รวมแท็บทั้งหมดพอดีจอเดียวไม่ต้องเลื่อน */
+.printer-card { grid-column: 1 / -1; }
+@media (min-width: 1280px) {
+  .printer-flow-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+}
+.printer-step { height: 100%; }
+/* จอแคบกว่านั้น (1101–1279px) การ์ดก็ยังกางเต็มแถว แต่ขั้นตอนเรียงลง (เนื้อความยาว)
+   ส่วนสูงเกินจอเลื่อนดูได้จากกฎ auto ด้านบน */
+/* ตัดเหลื่อม 3px ให้แท็บใบเสร็จพอดีจอเป๊ะ (ไม่เกิดแถบเลื่อนบางๆ) */
+.printer-card .printer-tips { margin-top: 8px; }
+.printer-card .printer-test-row { margin-top: 8px; padding: 9px 13px; }
