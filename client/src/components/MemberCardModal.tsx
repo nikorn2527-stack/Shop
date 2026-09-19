@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import html2canvas from "html2canvas";
 import QRCode from "qrcode";
-import { Barcode, CreditCard, Download, Printer, QrCode as QrIcon, X } from "lucide-react";
+import { Barcode, CreditCard, Download, Printer, QrCode as QrIcon, ScanLine, ShieldAlert, UserCheck, X } from "lucide-react";
 import { money } from "../pages/pageData";
 import { code128DataUrl } from "../barcode";
 import { MemberAvatar } from "./MemberAvatar";
@@ -14,9 +14,12 @@ export type MemberCardData = {
   type: string;
   balance: number;
   status: "active" | "suspended";
-  createdAt: string;
+  /** ในโหมดยืนยัน (สแกนบัตรที่ POS) อาจมีแค่ข้อมูลจาก member.list ที่ไม่มีวันสมัคร */
+  createdAt?: string | null;
   photoUrl?: string | null;
   gender?: string | null;
+  /** ROUND 34 — วงเงินซื้อต่อวัน (ชำระหักบัญชี) แสดงเฉพาะโหมดยืนยัน */
+  creditLimit?: number | null;
 };
 
 /** "2026-09-18 14:42:33" → "18 ก.ย. 2569" */
@@ -33,12 +36,34 @@ function formatCardDate(value: string) {
  * member photo (gender-based placeholder when no photo exists).
  * The cashier scans either code, the POS shows the member profile to confirm
  * before any deduction — the card and the flow now protect each other.
+ *
+ * Round 37 (req 36) — โหมดยืนยัน (confirmForBill): ยิงบัตรสมาชิกที่ช่องสแกน POS
+ * แล้วโมดูลบัตรนี้เด้งขึ้นมาทันที ให้พนักงานเทียบ ชื่อ-รูป-เลขสมาชิก-ยอดคงเหลือ
+ * กับบัตรจริงก่อนกดยืนยันเข้าบิล — ปุ่มพิมพ์/ดาวน์โหลดถูกแทนด้วยปุ่มยืนยัน
  */
-export function MemberCardModal({ member, onClose }: { member: MemberCardData; onClose: () => void }) {
+export function MemberCardModal({
+  member,
+  onClose,
+  confirmForBill = false,
+  onConfirm,
+  confirmLabel = "ยืนยันใช้กับบิลนี้",
+  confirmHint,
+}: {
+  member: MemberCardData;
+  onClose: () => void;
+  /** true = โหมดยืนยันตอนสแกนบัตร (ปุ่มยืนยันแทนปุ่มพิมพ์) */
+  confirmForBill?: boolean;
+  onConfirm?: () => void;
+  /** ข้อความปุ่มยืนยัน (ปรับตามบริบท เช่น เติม/ถอนเงิน) */
+  confirmLabel?: string;
+  /** ข้อความบอกเหตุผลที่บัตรเด้ง (default อธิบายการสแกน) */
+  confirmHint?: string;
+}) {
   const [busy, setBusy] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState("");
   const barcodeDataUrl = code128DataUrl(member.memberNumber, { height: 54, moduleWidth: 2, padding: 10 });
   const displayName = `${member.firstName} ${member.lastName}`.trim();
+  const suspended = member.status === "suspended";
 
   useEffect(() => {
     let alive = true;
@@ -63,15 +88,25 @@ export function MemberCardModal({ member, onClose }: { member: MemberCardData; o
   // Print while the modal stays mounted — the @media print rules keyed on
   // body:has(#member-card) isolate the card onto a clean cut-ready page.
   const printCard = () => window.print();
-  return <div className="modal-backdrop" onClick={onClose}><div className="member-card-modal" onClick={(event) => event.stopPropagation()}>
+  return <div className="modal-backdrop" onClick={onClose}><div className={`member-card-modal${confirmForBill ? " confirm-mode" : ""}`} onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label={confirmForBill ? "ยืนยันข้อมูลสมาชิกก่อนทำรายการ" : "บัตรสมาชิก"}>
     <div className="modal-heading">
       <div>
-        <span className="eyebrow">MEMBER WALLET CARD</span>
-        <h2>บัตรสมาชิก</h2>
-        <p>{displayName} · บัตรใช้ยืนยันตัวตนที่เคาน์เตอร์ — มีทั้งบาร์โค้ดและคิวอาร์โค้ดในใบเดียว</p>
+        <span className="eyebrow">{confirmForBill ? "MEMBER VERIFICATION · SCAN" : "MEMBER WALLET CARD"}</span>
+        <h2>{confirmForBill ? "ยืนยันข้อมูลสมาชิก" : "บัตรสมาชิก"}</h2>
+        <p>{confirmForBill
+          ? `สแกนบัตรของ ${displayName} แล้ว — เทียบชื่อ รูป เลขสมาชิก และยอดคงเหลือบนบัตรกับหน้าจอนี้ ก่อนนำไปใช้ทำรายการ`
+          : `${displayName} · บัตรใช้ยืนยันตัวตนที่เคาน์เตอร์ — มีทั้งบาร์โค้ดและคิวอาร์โค้ดในใบเดียว`}</p>
       </div>
       <button className="icon-button" onClick={onClose} aria-label="ปิดหน้าต่าง"><X size={17} /></button>
     </div>
+    {confirmForBill && (
+      <div className={`member-verify-strip${suspended ? " suspended" : ""}`}>
+        {suspended ? <ShieldAlert size={15} /> : <ScanLine size={15} />}
+        <span>{confirmHint ?? (suspended
+          ? "บัตรใบนี้ถูกระงับการใช้จ่าย — ตรวจสอบกับสมาชิกและผู้บริหารก่อน หากยืนยันจะยังชำระด้วยเงินสด/QR ได้แต่หักบัญชีไม่ได้"
+          : "ตรวจสอบว่าเป็นสมาชิกที่ถูกต้องแล้วกดยืนยัน — ยอดในบัญชียังไม่ถูกหักจนกว่าจะกดชำระเงินท้ายบิล")}{member.creditLimit != null ? <> · วงเงินซื้อ/วัน {money(member.creditLimit)}</> : null}</span>
+      </div>
+    )}
     <div className="member-card-stage">
       <div className="member-card" id="member-card">
         <div className="member-card-top">
@@ -86,7 +121,7 @@ export function MemberCardModal({ member, onClose }: { member: MemberCardData; o
             <div className="member-card-name">{displayName}</div>
             <div className="member-card-number">{member.memberNumber}</div>
             <div className="member-card-meta">
-              <span>สมาชิกตั้งแต่ {formatCardDate(member.createdAt)}</span>
+              {member.createdAt ? <span>สมาชิกตั้งแต่ {formatCardDate(member.createdAt)}</span> : <span className="now">พร้อมใช้จ่ายที่เคาน์เตอร์</span>}
               <span className={member.status === "active" ? "ok" : "suspended"}>{member.status === "active" ? "ใช้จ่ายได้ปกติ" : "ระงับการใช้จ่าย"}</span>
             </div>
           </div>
@@ -103,14 +138,19 @@ export function MemberCardModal({ member, onClose }: { member: MemberCardData; o
         </div>
         <div className="member-card-foot">
           <small>ยื่นบัตรนี้ให้สแกน หรือแจ้งหมายเลขสมาชิก ที่เคาน์เตอร์เพื่อใช้ยอดเงินสวัสดิการ</small>
-          <small>ยอดคงเหลือ <b>{money(member.balance)}</b> ณ วันออกบัตร</small>
+          <small>ยอดคงเหลือ <b>{money(member.balance)}</b>{confirmForBill ? " ณ ตอนสแกนบัตร" : " ณ วันออกบัตร"}</small>
         </div>
       </div>
     </div>
-    <div className="member-card-note"><CreditCard size={15} /> สมาชิกไม่มีบัญชีเข้าสู่ระบบแอป — บัตรใบนี้ใช้ระบุตัวตนที่เคาน์เตอร์ · ทุกครั้งที่สแกนบัตร พนักงานจะเห็นข้อมูลสมาชิกเพื่อยืนยันก่อนหักยอดเสมอ</div>
+    <div className="member-card-note"><CreditCard size={15} /> {confirmForBill ? "ทุกครั้งที่ยิงบัตรสมาชิก ระบบจะเด้งข้อมูลบัตรขึ้นมาให้ตรวจสอบเสมอ — ยืนยันเฉพาะเมื่อข้อมูลตรงกับลูกค้าที่ยื่นบัตรเท่านั้น" : "สมาชิกไม่มีบัญชีเข้าสู่ระบบแอป — บัตรใบนี้ใช้ระบุตัวตนที่เคาน์เตอร์ · ทุกครั้งที่สแกนบัตร พนักงานจะเห็นข้อมูลสมาชิกเพื่อยืนยันก่อนหักยอดเสมอ"}</div>
     <div className="modal-actions">
-      <button className="outline-button" disabled={busy} onClick={downloadCard}><Download size={16} /> {busy ? "กำลังสร้างรูป..." : "ดาวน์โหลดรูปบัตร"}</button>
-      <button className="primary-button" onClick={printCard}><Printer size={16} /> พิมพ์บัตรสมาชิก</button>
+      {confirmForBill ? <>
+        <button className="outline-button" onClick={onClose}><X size={16} /> ไม่ใช่สมาชิกนี้</button>
+        <button className="primary-button" disabled={busy} onClick={() => onConfirm?.()}><UserCheck size={16} /> {confirmLabel}</button>
+      </> : <>
+        <button className="outline-button" disabled={busy} onClick={downloadCard}><Download size={16} /> {busy ? "กำลังสร้างรูป..." : "ดาวน์โหลดรูปบัตร"}</button>
+        <button className="primary-button" onClick={printCard}><Printer size={16} /> พิมพ์บัตรสมาชิก</button>
+      </>}
     </div>
   </div></div>;
 }

@@ -1,23 +1,16 @@
-import { useTheme } from "next-themes";
 import { Toaster as Sonner, type ToasterProps } from "sonner";
 
-const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme();
-
-  return (
-    <Sonner
-      theme={theme as ToasterProps["theme"]}
-      className="toaster group"
-      style={
-        {
-          "--normal-bg": "var(--popover)",
-          "--normal-text": "var(--popover-foreground)",
-          "--normal-border": "var(--border)",
-        } as React.CSSProperties
-      }
-      {...props}
-    />
-  );
-};
+/**
+ * Round 37 — toast notifications ใช้ธีมของแอปโดยตรง
+ * (แอปนี้เป็น light theme แบบกำหนดเอง ไม่ได้ใช้ next-themes — สี/ฟอนต์
+ * ทั้งหมดจัดการที่ index.css ผ่าน [data-sonner-toast] แทน CSS vars)
+ */
+const Toaster = ({ ...props }: ToasterProps) => (
+  <Sonner
+    theme="light"
+    className="toaster group"
+    {...props}
+  />
+);
 
 export { Toaster };

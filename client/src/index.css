@@ -3442,3 +3442,37 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
   .pw-meter-rules { gap: 4px 8px; }
   .dev-account-count { font-size: 10px; }
 }
+
+/* ── 37-1 (req 35): ส่วนแจ้งเตือน — toast (sonner) ธีมร้านค้าสวัสดิการ ──
+   เด้งมุมขวาล่างเหนือแผงสินค้า ฟอนต์ Sarabun สีเขียว/แดง/เหลืองตามระบบ */
+[data-sonner-toaster] { font-family: "Sarabun", "TH Sarabun New", system-ui, sans-serif; z-index: 400; }
+[data-sonner-toast] { border-radius: 12px; border: 1px solid #e2e8e2; background: #fff; color: var(--ink); box-shadow: 0 14px 38px rgba(35, 62, 52, .17), 0 3px 9px rgba(35, 62, 52, .07); font-size: 13px; line-height: 1.5; padding: 11px 13px; align-items: flex-start; gap: 9px; }
+[data-sonner-toast] [data-title] { font-weight: 700; font-size: 13.5px; letter-spacing: -.15px; }
+[data-sonner-toast] [data-description] { color: var(--muted); font-size: 11.5px; margin-top: 2px; line-height: 1.55; }
+[data-sonner-toast] [data-button] { border-radius: 8px; }
+[data-sonner-toast] [data-close-button] { background: #f4f7f4; border: 1px solid #e2e8e2; color: #7c806f; width: 20px; height: 20px; }
+[data-sonner-toast] [data-close-button]:hover { background: #edf3ee; }
+[data-sonner-toast][data-type="success"] { border-color: #c3e5cf; background: #f4fbf6; }
+[data-sonner-toast][data-type="success"] [data-title] { color: #1f6a4d; }
+[data-sonner-toast][data-type="success"] [data-icon] svg { color: var(--teal); }
+[data-sonner-toast][data-type="error"] { border-color: #eccdc9; background: #fdf5f3; }
+[data-sonner-toast][data-type="error"] [data-title] { color: #a3554f; }
+[data-sonner-toast][data-type="error"] [data-icon] svg { color: var(--red); }
+[data-sonner-toast][data-type="warning"] { border-color: #ecdcb4; background: #fdf9ee; }
+[data-sonner-toast][data-type="warning"] [data-title] { color: #8a6215; }
+[data-sonner-toast][data-type="warning"] [data-icon] svg { color: var(--amber); }
+[data-sonner-toast][data-type="info"] [data-icon] svg { color: var(--teal); }
+[data-sonner-toast][data-styled="true"] { border-radius: 12px; }
+@media (max-width: 640px) {
+  [data-sonner-toaster] { left: 12px !important; right: 12px !important; width: auto !important; }
+  [data-sonner-toast] { font-size: 12.5px; }
+}
+
+/* ── 37-2 (req 36): โหมดยืนยันบัตรสมาชิก — แถบเตือนใต้หัวโมดัล + เวทีบัตรโทนอ่อน ── */
+.member-verify-strip { display: flex; align-items: flex-start; gap: 8px; border: 1px solid #eddfb8; background: #fdf8ec; color: #8a6215; border-radius: 10px; padding: 9px 11px; font-size: 11.5px; line-height: 1.55; margin: 2px 0 12px; }
+.member-verify-strip svg { flex: 0 0 auto; margin-top: 1.5px; color: var(--amber); }
+.member-verify-strip.suspended { border-color: #eccdc9; background: #fdf3f2; color: #8f4b4b; }
+.member-verify-strip.suspended svg { color: var(--red); }
+.member-card-modal.confirm-mode .member-card-stage { background: repeating-linear-gradient(135deg, #f6faf7 0 14px, #f1f7f3 14px 28px); }
+.member-card-modal.confirm-mode .modal-heading p { color: #7c806f; }
+.member-card-identity .member-card-meta span.now { color: #3f8a6d; font-weight: 600; }

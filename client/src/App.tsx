@@ -31,7 +31,9 @@ function App() {
         // switchable
       >
         <TooltipProvider>
-          <Toaster />
+          {/* ROUND 37 (req 35) — ส่วนแจ้งเตือน: toast เด้งมุมขวาล่าง เหนือแผงสินค้า
+              ไม่บังปุ่มชำระเงิน (อยู่ซ้าย) และเลื่อนพ้นแถบช่วยเหลือด้านล่าง */}
+          <Toaster position="bottom-right" offset={{ bottom: 84, right: 18 }} gap={9} visibleToasts={4} closeButton duration={3200} />
           <Router />
         </TooltipProvider>
       </ThemeProvider>

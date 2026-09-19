@@ -1,9 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CircleHelp, PackageSearch, ScanLine, ShieldAlert, UserCheck, UserPlus, X } from "lucide-react";
+import { PackageSearch, ScanLine, UserPlus, X } from "lucide-react";
+import { toast } from "sonner";
 import type { SqliteProduct } from "../../../server/sqliteStore";
 import type { MemberLite } from "@/pages/pageData";
 import { money, scanMatches, smartMatchScore } from "@/pages/pageData";
 import { MemberAvatar } from "./MemberAvatar";
+import { MemberCardModal } from "./MemberCardModal";
+
+/**
+ * Round 37 (req 36) — ปิดประวัติการคีย์/ยิงของช่องกรอกข้อมูลทุกช่อง:
+ * เบราว์เซอร์ไม่ควรจำบาร์โค้ดที่เคยยิง (เดิมโผล่เป็น dropdown ประวัติ)
+ * — autoComplete="off" + ชื่อช่องสุ่มต่อเซสชัน ทำให้ไม่มีรายการที่ match ได้เลย
+ */
+function useNoHistoryName(prefix: string) {
+  const ref = useRef(`${prefix}-${Math.random().toString(36).slice(2, 10)}`);
+  return ref.current;
+}
 
 /**
  * Scan-first member selector — the cashier keys the member number or fires a
@@ -41,6 +53,7 @@ export function MemberScanPicker({
   const [pending, setPending] = useState<MemberLite | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const inputName = useNoHistoryName("pos-member-scan");
   const selected = members.find((member) => member.memberNumber === selectedNumber) ?? null;
 
   // Round 32-19 — smart ranking: exact > prefix (เลขสมาชิกตัดหน้า) > contains >
@@ -89,6 +102,10 @@ export function MemberScanPicker({
 
   const confirmPending = () => {
     if (!pending) return;
+    if (pending.status === "suspended") {
+      toast.error("บัตรนี้ถูกระงับการใช้จ่าย", { description: `${pending.firstName} ${pending.lastName} · ${pending.memberNumber} — ตรวจสอบกับผู้บริหารก่อนใช้รายการนี้` });
+      return;
+    }
     onSelect(pending);
     setPending(null);
     inputRef.current?.focus();
@@ -108,36 +125,7 @@ export function MemberScanPicker({
 
   return (
     <div className="member-scan-wrap" ref={wrapRef}>
-      {pending ? (
-        <div className="member-confirm-card" role="dialog" aria-label="ยืนยันตัวตนสมาชิกก่อนทำรายการ">
-          <div className="member-confirm-head">
-            <ShieldAlert size={16} />
-            <span>โปรดตรวจสอบข้อมูลสมาชิกก่อนใช้กับ{confirmContext}</span>
-          </div>
-          <div className="member-confirm-body">
-            <MemberAvatar member={pending} size={54} />
-            <div className="member-confirm-info">
-              <b>สมาชิก{pending.firstName} {pending.lastName}</b>
-              <small>เลขสมาชิก <i>{pending.memberNumber}</i> · ประเภท {pending.type}</small>
-              <small>ยอดคงเหลือ <strong className={pending.balance < 0 ? "red-text" : ""}>{money(pending.balance)}</strong>{pending.status === "suspended" ? <> · <em>ระงับการใช้จ่าย</em></> : null}</small>
-              {/* ROUND 34 (req 23.2) — วงเงินซื้อสินค้าต่อวันของสมาชิกที่เลือก (ชำระหักบัญชี) */}
-              {pending.creditLimit != null ? (
-                <small className="member-limit-line" title="ยอดซื้อรวมต่อวันของสมาชิกนี้ (ชำระหักบัญชี) ห้ามเกินวงเงิน — ระบบตรวจตอนยืนยันบิล">
-                  <CircleHelp size={11} /> วงเงินซื้อ/วัน {money(pending.creditLimit)}
-                </small>
-              ) : null}
-            </div>
-          </div>
-          <div className="member-confirm-actions">
-            <button type="button" className="outline-button" onClick={() => { setPending(null); inputRef.current?.focus(); }}>
-              <X size={15} /> ไม่ใช่สมาชิกนี้
-            </button>
-            <button type="button" className="primary-button" autoFocus onClick={confirmPending}>
-              <UserCheck size={15} /> ยืนยันใช้รายการนี้
-            </button>
-          </div>
-        </div>
-      ) : selected ? (
+      {selected ? (
         <div className="member-scan-chip">
           <div className="member-avatar">
             <MemberAvatar member={selected} size={30} rounded={false} />
@@ -165,7 +153,12 @@ export function MemberScanPicker({
             <input
               ref={inputRef}
               id={inputId}
+              name={inputName}
               value={term}
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
               onChange={(event) => {
                 setTerm(event.target.value);
                 setOpen(true);
@@ -247,6 +240,17 @@ export function MemberScanPicker({
           )}
         </div>
       )}
+      {/* ROUND 37 (req 36) — ยิงบัตรสมาชิกเข้าช่องเลือกสมาชิก → บัตรเด้งขึ้นมา
+          เต็มรูปแบบ (รูป + บาร์โค้ด + QR + ยอดคงเหลือ) ให้ยืนยันก่อนใช้จริง */}
+      {pending && (
+        <MemberCardModal
+          member={pending}
+          confirmForBill
+          confirmLabel={`ยืนยันใช้กับ${confirmContext}`}
+          onClose={() => { setPending(null); inputRef.current?.focus(); }}
+          onConfirm={confirmPending}
+        />
+      )}
     </div>
   );
 }
@@ -274,6 +278,7 @@ export function ProductScanPicker({
   const [missed, setMissed] = useState("");
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const inputName = useNoHistoryName("pos-product-scan");
   const selected = products.find((product) => product.id === selectedId) ?? null;
 
   // Round 32-19 — smart ranking for products: barcode/SKU exact หรือท้ายรหัส
@@ -364,7 +369,12 @@ export function ProductScanPicker({
           <ScanLine size={16} />
           <input
             ref={inputRef}
+            name={inputName}
             value={term}
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
             autoFocus={autoFocus}
             onChange={(event) => {
               setTerm(event.target.value);

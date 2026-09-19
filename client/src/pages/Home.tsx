@@ -48,6 +48,7 @@ import {
   WalletCards,
   X,
 } from "lucide-react";
+import { toast } from "sonner";
 
 import type { MemberLite, Role, View } from "./pageData";
 import type { MemberTransactionRow, SaleHistoryEntry } from "../../../server/sqliteStore";
@@ -909,6 +910,45 @@ function AppShell({ user, brand, onLogout }: { user: User; brand?: BrandSettings
   // Header count pill + bell red dot include member alerts; the sidebar
   // nav-badge on สต็อกสินค้า intentionally stays stock-only.
   const notifCount = lowStock.length + expiring.length + memberLowBalance.length;
+  // ROUND 37 (req 35) — แจ้งเตือนเชิงรุก: ตอนเปิดระบบสรุปครั้งเดียวว่ามีอะไร
+  // ต้องดู และระหว่างใช้งานถ้ามีรายการ “ใหม่” (ขายจนต่ำกว่าจุดสั่งซื้อ /
+  // สมาชิกยอดต่ำลง) toast เด้งทันทีโดยไม่ต้องเปิดกระดิ่ง
+  const notifiedAlertsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const keys: string[] = [];
+    lowStock.forEach((row) => keys.push(`low-${row.productId}`));
+    expiring.forEach((row) => keys.push(`exp-${row.id}`));
+    memberLowBalance.forEach((member) => keys.push(`bal-${member.memberNumber}`));
+    if (keys.length === 0) return;
+    const fresh = keys.filter((key) => !notifiedAlertsRef.current.has(key));
+    if (fresh.length === 0) return;
+    const isBoot = notifiedAlertsRef.current.size === 0;
+    fresh.forEach((key) => notifiedAlertsRef.current.add(key));
+    if (isBoot) {
+      const parts: string[] = [];
+      if (lowStock.length > 0) parts.push(`สต็อกต่ำ ${lowStock.length} รายการ`);
+      if (expiring.length > 0) parts.push(`ใกล้หมดอายุ ${expiring.length} รายการ`);
+      if (memberLowBalance.length > 0) parts.push(`สมาชิกยอดคงเหลือต่ำ ${memberLowBalance.length} รายการ`);
+      toast.info("การแจ้งเตือนของระบบ", { description: `${parts.join(" · ")} — ดูรายละเอียดได้ที่กระดิ่งมุมขวาบน`, duration: 5200 });
+      return;
+    }
+    let shown = 0;
+    fresh.forEach((key) => {
+      if (shown >= 3) return;
+      shown += 1;
+      if (key.startsWith("low-")) {
+        const row = lowStock.find((entry) => `low-${entry.productId}` === key);
+        if (row) toast.warning("สต็อกต่ำกว่าจุดสั่งซื้อ", { description: `${row.name} เหลือ ${row.stock} ${row.unit} · ต่ำกว่าจุดสั่งซื้อ ${row.reorderPoint}`, duration: 5000 });
+      } else if (key.startsWith("exp-")) {
+        const row = expiring.find((entry) => `exp-${entry.id}` === key);
+        if (row) toast.warning("สินค้าใกล้หมดอายุ", { description: `${row.name}${row.expiry ? ` · หมดอายุ ${formatThaiDate(row.expiry)}` : ""}`, duration: 5000 });
+      } else {
+        const member = memberLowBalance.find((entry) => `bal-${entry.memberNumber}` === key);
+        if (member) toast.warning("สมาชิกยอดคงเหลือต่ำ", { description: `${member.firstName} ${member.lastName} · ${member.memberNumber} · คงเหลือ ${money(member.balance)}`, duration: 5000 });
+      }
+    });
+    if (fresh.length > shown) toast.info(`+ การแจ้งเตือนใหม่อีก ${fresh.length - shown} รายการ`, { description: "ดูรายการทั้งหมดได้ที่กระดิ่งแจ้งเตือนมุมขวาบน" });
+  }, [lowStock, expiring, memberLowBalance]);
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
