@@ -2534,3 +2534,113 @@ th { font-weight: 600; }
   .dash-tab-body .category-report, .dash-tab-body .export-list { overflow: visible; }
   .report-workbench, .dash-tab-body { display: block; overflow: visible; }
 }
+
+/* ============================================================
+   ROUND 28 — ① รายการเอนทิตีกลับเป็นแถวง่าย กวาดตาเร็ว
+   (รายการคงคลัง / สมาชิกทั้งหมด / บัญชีผู้ใช้ทั้งหมด /
+   เซสชันที่ใช้งานอยู่ — หนึ่งรายการต่อหนึ่งแถว กดแถวเข้าดูรายละเอียด)
+   ② รายงาน — ตารางยอดขายเต็มชุดเห็นครบทุกคอลัมน์ + กำหนดช่วงเวลาได้จริง
+   ③ ตั้งค่า — ส่วนแก้ไขกางเต็มหน้า การ์ดเรียง 2 คอลัมน์ ไม่ต้องเลื่อนลงเลือก
+   ============================================================ */
+
+/* (1) ตารางแถวเอนทิตี — อ่านเรียงคอลัมน์ คล้ายบิล/Log ที่กวาดตาได้ */
+.entity-table { width: 100%; border-collapse: collapse; font-size: 12px; min-width: 780px; }
+.entity-table th { position: sticky; top: 0; z-index: 2; background: #fafcfb; color: #6f7365; font-size: 10.5px; font-weight: 600; letter-spacing: .2px; padding: 9px 10px; border-top: 1px solid #f1f2ee; border-bottom: 1px solid #e6ece8; white-space: nowrap; }
+.entity-table td { padding: 9px 10px; border-bottom: 1px solid #f1f3f0; vertical-align: middle; color: #6b7163; }
+.entity-table tbody tr { transition: background .12s ease; }
+.entity-table tbody tr:not(.table-state-row):hover { background: #f4faf7; }
+.entity-table tbody tr:last-child td { border-bottom: 0; }
+.entity-table tr.clickable { cursor: pointer; }
+.entity-table .cell-strong { font-size: 12.5px; font-weight: 600; color: #3f5449; }
+.entity-table .cell-sub { display: block; font-size: 10.5px; color: #7d8172; margin-top: 2px; font-weight: 400; }
+.entity-table .cell-mono { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11.5px; color: #4c5a50; white-space: nowrap; }
+.entity-table .cell-num { text-align: right; font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12px; color: #33513f; white-space: nowrap; }
+.entity-table td.num { text-align: right; }
+.entity-table .cell-strong.negative, .entity-table .cell-num.negative { color: #c26162; }
+.entity-table .row-chevron { color: #a6b3ab; display: inline-flex; transition: transform .15s ease, color .15s ease; }
+.entity-table tbody tr:hover .row-chevron { color: var(--teal); transform: translateX(2px); }
+.entity-table .row-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; white-space: nowrap; }
+.entity-table .mini-button { padding: 5px 9px; font-size: 10.5px; border-radius: 8px; }
+.entity-table .user-role-badge, .entity-table .session-current-tag { white-space: nowrap; }
+
+/* แถวสมาชิก — เน้นยอดเงินเป็นตัวเลขหลักที่สุดท้ายก่อนปุ่มเปิด */
+.entity-table.rows-members .cell-num { font-size: 12.5px; font-weight: 600; }
+
+/* แถวสต็อก — จำนวนคงเหลือเด่น ต่ำกว่าจุดสั่งซื้อเป็นสีแดง */
+.entity-table.rows-stock .cell-qty { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12.5px; font-weight: 700; color: #33513f; white-space: nowrap; }
+.entity-table.rows-stock .cell-qty.low { color: #c26162; }
+
+/* เซสชัน — แถวเดียวเรียบ ตัดการ์ดซ้อนชั้นเดิม */
+.entity-table.rows-sessions { min-width: 720px; }
+.session-table-note { display: flex; justify-content: space-between; gap: 10px; color: #7d8172; font-size: 10.5px; padding: 8px 2px 0; flex: 0 0 auto; flex-wrap: wrap; }
+
+/* คอลัมน์รอง — จอแคบซ่อนก่อน ให้แถวสั้นลงแต่ยังอ่านได้ */
+@media (max-width: 860px) {
+  .entity-table .hide-sm { display: none; }
+  .entity-table { min-width: 620px; }
+  .entity-table.rows-sessions { min-width: 560px; }
+}
+
+/* (2) รายงาน — ตารางยอดขายเต็มชุด: ทุกคอลัมน์เห็นครบ + แถวรวมติดขอบล่าง */
+.report-sales-table { min-width: 740px; }
+.report-sales-table th { white-space: nowrap; }
+.report-sales-table th.num, .report-sales-table td.num { text-align: right; }
+.report-sales-table td { padding: 8px 10px; }
+.report-sales-table .row-label { font-size: 12px; font-weight: 600; color: #3f5449; white-space: nowrap; }
+.report-sales-table .row-sub { display: block; font-size: 10px; color: #7d8172; font-weight: 400; margin-top: 1px; }
+.report-sales-table .num { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11.5px; color: #4c5a50; white-space: nowrap; }
+.report-sales-table .num strong { color: #33513f; font-weight: 700; font-size: 12px; }
+.report-sales-table .profit-pos { color: #3d8c71; }
+.report-sales-table .profit-neg { color: #c26162; }
+.report-sales-table tfoot td { position: sticky; bottom: 0; background: #f6faf8; border-top: 2px solid #dcebe3; border-bottom: 0; font-weight: 700; color: #33513f; white-space: nowrap; }
+.report-sales-table tfoot .num { color: #33513f; }
+.report-sales-table tr.clickable:hover td { background: #f4faf7; }
+/* แถบสัดส่วนยอดขายบาง ๆ ใต้ป้ายวันที่ — คงสัญชาตญาณบอกขนาดโดยไม่กินพื้นที่ */
+.sales-bar { display: block; height: 4px; border-radius: 4px; background: #eef4f1; margin-top: 5px; overflow: hidden; max-width: 150px; }
+.sales-bar i { display: block; height: 100%; background: #66b99c; border-radius: inherit; }
+.sales-bar.blue i { background: #80b3d5; }
+.sales-bar.amber i { background: #d8ae64; }
+.sales-bar.purple i { background: #ae96d3; }
+
+/* ช่วงเวลาแบบกำหนดเอง — เลือกวันเริ่ม/สิ้นสุดแล้วกรองทันที */
+.range-picker { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; flex: 0 0 auto; }
+.range-picker span { color: #7d8172; font-size: 11px; font-weight: 600; }
+.range-picker input[type="date"] { height: 32px; border: 1px solid #dbe7e2; border-radius: 8px; padding: 0 9px; font-family: inherit; font-size: 12px; color: #4c5a50; background: #fff; outline: none; }
+.range-picker input[type="date"]:focus { border-color: #9bcdba; box-shadow: 0 0 0 3px #eaf6f1; }
+.range-picker .range-sep { color: #a6b3ab; font-size: 11px; }
+.range-picker .range-hint { color: #8b8f80; font-size: 10.5px; font-weight: 400; }
+
+/* (3) ตั้งค่า — ส่วนแก้ไขกางเต็มหน้า: การ์ดเรียง 2 คอลัมน์ ทุกช่องเห็นในจอเดียว */
+.settings-content { max-width: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-content: start; }
+.settings-content > .settings-card { min-width: 0; }
+.settings-single { grid-column: 1 / -1; max-width: 980px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.settings-content > .settings-save-bar, .settings-content > .notice-bar { grid-column: 1 / -1; }
+.settings-card { padding: 18px 20px; }
+.settings-heading { padding-bottom: 12px; }
+.form-grid { gap: 13px; padding-top: 13px; }
+.brand-live-preview { margin-top: 13px; }
+@media (max-width: 1100px) {
+  .settings-content { grid-template-columns: 1fr; }
+}
+/* เดสก์ท็อปล็อคจอ — ยกเลิก scroll ภายในของ settings (เนื้อหา 2 คอลัมน์พอดีจอ) */
+@media (min-width: 1101px) and (min-height: 700px) {
+  .app-shell:not(.pos-terminal) .settings-content { overflow-y: hidden; }
+}
+
+/* พิมพ์ — ตารางแถวเปิดเต็ม */
+@media print {
+  .entity-table .row-actions { display: none; }
+  .range-picker { display: none; }
+}
+
+/* แถวเซสชันปัจจุบัน — เส้นเน้นซ้าย + พื้นหลังอ่อน (สไตล์เดียวกับการ์ดเดิม) */
+.entity-table.rows-sessions tbody tr.current td { background: #f4fbf8; }
+.entity-table.rows-sessions tbody tr.current:hover td { background: #eef8f3; }
+.entity-table.rows-sessions tbody tr.current td:first-child { box-shadow: inset 3px 0 0 #57b391; }
+.entity-table .session-id { font-size: 10px; }
+.entity-table .cell-sub.lock-countdown { color: #b8863d; margin-top: 3px; }
+/* หน้าผู้ใช้ระบบ: ตารางบัญชีกินส่วนใหญ่ ตารางเซสชันกินส่วนน้อยกว่า */
+@media (min-width: 1101px) {
+  .app-shell:not(.pos-terminal) .page-content > section.table-panel.session-panel { flex: .62 1 0; }
+  .app-shell:not(.pos-terminal) .page-content > section.table-panel.user-list-panel { flex: 1.45 1 0; }
+}
