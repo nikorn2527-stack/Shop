@@ -47,6 +47,11 @@ import {
   setSettings,
   stockCount,
   stockCountLots,
+  listOrderItems,
+  addOrderItem,
+  updateOrderItem,
+  removeOrderItem,
+  clearOrderList,
   unlockAppUser,
   updateAppUser,
   updateMember,
@@ -167,6 +172,23 @@ const stockCountLotsInput = z.object({
     .array(z.object({ lotId: z.number().int(), countedQty: z.number().int().min(0) }))
     .min(1, "กรุณาระบุจำนวนที่นับได้อย่างน้อย 1 Lot"),
   note: z.string().optional(),
+  actor: z.string().optional(),
+  actorRole: z.string().optional(),
+});
+
+// Round 32-15 — รายการสั่งซื้อ (สะสมสินค้าที่จะสั่งเข้า กันตกหล่น)
+const orderAddInput = z.object({
+  productId: z.number().int(),
+  qty: z.number().positive().optional(),
+  note: z.string().max(500).optional(),
+  actor: z.string().optional(),
+  actorRole: z.string().optional(),
+});
+
+const orderUpdateInput = z.object({
+  id: z.number().int().min(1),
+  qty: z.number().positive().optional(),
+  note: z.string().max(500).nullable().optional(),
   actor: z.string().optional(),
   actorRole: z.string().optional(),
 });
@@ -596,6 +618,34 @@ export const appRouter = router({
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input);
         return withStoreErrors(() => stockCountLots(getWelfareDb(), { ...input, actor, actorRole }));
+      }),
+    // Round 32-15 — รายการสั่งซื้อ: สะสมรายการที่จะสั่งเข้า เพื่อกันตกหล่นก่อนสั่งจริง
+    orderList: publicProcedure
+      .input(z.unknown().optional())
+      .query(() => withStoreErrors(() => listOrderItems(getWelfareDb()))),
+    orderAdd: publicProcedure
+      .input(orderAddInput)
+      .mutation(({ ctx, input }) => {
+        const { actor, actorRole } = resolveActor(ctx, input);
+        return withStoreErrors(() => addOrderItem(getWelfareDb(), { ...input, actor, actorRole }));
+      }),
+    orderUpdate: publicProcedure
+      .input(orderUpdateInput)
+      .mutation(({ ctx, input }) => {
+        const { actor, actorRole } = resolveActor(ctx, input);
+        return withStoreErrors(() => updateOrderItem(getWelfareDb(), { ...input, actor, actorRole }));
+      }),
+    orderRemove: publicProcedure
+      .input(z.object({ id: z.number().int().min(1), actor: z.string().optional(), actorRole: z.string().optional() }))
+      .mutation(({ ctx, input }) => {
+        const { actor, actorRole } = resolveActor(ctx, input);
+        return withStoreErrors(() => removeOrderItem(getWelfareDb(), { ...input, actor, actorRole }));
+      }),
+    orderClear: publicProcedure
+      .input(z.object({ actor: z.string().optional(), actorRole: z.string().optional() }).optional())
+      .mutation(({ ctx, input }) => {
+        const { actor, actorRole } = resolveActor(ctx, input ?? {});
+        return withStoreErrors(() => clearOrderList(getWelfareDb(), { actor, actorRole }));
       }),
   }),
 

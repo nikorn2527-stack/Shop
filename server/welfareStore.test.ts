@@ -81,9 +81,10 @@ function tableCount(database: SqliteDb, table: string) {
 describe("welfare store seeding", () => {
   it("seeds products, members, lots, audit logs and a 30-day sales history", () => {
     const database = freshDb();
-    expect(listProducts(database)).toHaveLength(8);
+    // Round 32-18 — seed เดิม 8 รายการ + สินค้าตัวอย่างทดสอบยิงบาร์โค้ดอีก 5 รายการ
+    expect(listProducts(database)).toHaveLength(13);
     expect(listMembers(database)).toHaveLength(5);
-    expect(listStockRows(database)).toHaveLength(8);
+    expect(listStockRows(database)).toHaveLength(13);
     expect(tableCount(database, "sales")).toBeGreaterThan(300);
     expect(tableCount(database, "audit_logs")).toBe(4);
     const members = new Map(listMembers(database).map((member) => [member.memberNumber, member.balance]));
@@ -762,9 +763,10 @@ describe("product archive", () => {
 
     expect(listProducts(database).some((item) => item.id === masks.id)).toBe(false);
     const everything = listProducts(database, true);
-    expect(everything).toHaveLength(8);
-    expect(everything.findIndex((item) => item.id === masks.id)).toBe(7);
-    expect(everything.slice(0, 7).every((item) => item.active === 1)).toBe(true);
+    expect(everything).toHaveLength(13);
+    // เรียง active ก่อน — สินค้าที่ปิดการขายจะอยู่ท้ายสุด (ตำแหน่ง 12)
+    expect(everything.findIndex((item) => item.id === masks.id)).toBe(12);
+    expect(everything.slice(0, 12).every((item) => item.active === 1)).toBe(true);
 
     const maskLot = listStockRows(database).find((row) => row.productId === masks.id);
     expect(maskLot?.status).toBe("ปิดการขาย");

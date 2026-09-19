@@ -142,3 +142,72 @@ export async function downloadReportPdf(config: ReportDocConfig) {
     document.body.removeChild(stage);
   }
 }
+
+/**
+ * Round 32-25 — สั่งพิมพ์รายงานโดยตรง: เปิดเอกสารรายงานแบบเดียวกับ PDF (กระดาษ A4
+ * หัวเรื่อง ตาราง แถวรวม) ผ่าน iframe ที่ซ่อนไว้แล้วเรียกคำสั่งพิมพ์ของเบราว์เซอร์ —
+ * ไม่ต้องดาวน์โหลดไฟล์มาเปิดเอง ใช้เครื่องพิมพ์เริ่มต้นของระบบได้ทันที
+ */
+export function printReportDoc(config: ReportDocConfig) {
+  const numeric = new Set(config.numericCols ?? []);
+  const metaRows = (config.meta ?? []).map(([label, text]) => `<div class="meta-item"><span>${escapeHtml(label)}</span><b>${escapeHtml(text)}</b></div>`).join("");
+  const bodyRows = config.rows
+    .map((row) => `<tr>${row.map((cell, index) => `<td${numeric.has(index) ? ' class="num"' : ""}>${escapeHtml(cell)}</td>`).join("")}</tr>`)
+    .join("");
+  const totalsRow = config.totalsRow
+    ? `<tfoot><tr>${config.totalsRow.map((cell, index) => `<td${numeric.has(index) ? ' class="num"' : ""}>${escapeHtml(cell)}</td>`).join("")}</tr></tfoot>`
+    : "";
+  const headCells = config.columns.map((column) => `<th>${escapeHtml(column)}</th>`).join("");
+  const html = `<!DOCTYPE html>
+<html lang="th"><head><meta charset="utf-8" /><title>${escapeHtml(config.title)}</title>
+<style>
+  @page { size: A4; margin: 12mm; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Sarabun", "TH Sarabun New", "Leelawadee UI", Tahoma, sans-serif; color: #26251f; background: #fff; }
+  .doc { padding: 4px 2px; }
+  .rd-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0d7a55; padding-bottom: 8px; }
+  .rd-brand { display: flex; align-items: center; gap: 9px; }
+  .rd-brand img { width: 38px; height: 38px; object-fit: contain; border-radius: 9px; }
+  .rd-mark { width: 38px; height: 38px; border-radius: 9px; background: #0d7a55; color: #fff; display: grid; place-items: center; font-size: 19px; font-weight: 700; }
+  .rd-brand b { font-size: 14px; }
+  .rd-brand small { display: block; color: #6f7466; font-size: 10px; }
+  .rd-stamp { font-size: 10px; color: #6f7466; text-align: right; }
+  h1 { font-size: 17px; margin: 12px 0 2px; }
+  .rd-title p { margin: 0 0 8px; color: #5c6156; font-size: 11px; }
+  .rd-meta { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 6px 0 10px; }
+  .meta-item { font-size: 11px; color: #5c6156; }
+  .meta-item b { color: #26251f; margin-left: 5px; }
+  table { width: 100%; border-collapse: collapse; font-size: 10.5px; }
+  th { background: #0d7a55; color: #fff; text-align: left; padding: 6px 7px; white-space: nowrap; }
+  th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td { padding: 5px 7px; border-bottom: 1px solid #e6e9e2; }
+  tbody tr:nth-child(even) { background: #f7faf8; }
+  tfoot td { font-weight: 700; background: #ecf5ef; border-top: 2px solid #0d7a55; }
+  .rd-note { margin-top: 8px; font-size: 10px; color: #6f7466; }
+  .rd-foot { margin-top: 14px; border-top: 1px solid #dfe4da; padding-top: 6px; font-size: 9.5px; color: #84897b; display: flex; justify-content: space-between; }
+</style></head>
+<body><div class="doc">
+  <div class="rd-head">
+    <div class="rd-brand">${config.brandLogo ? `<img src="${config.brandLogo}" alt="" />` : `<span class="rd-mark">ร</span>`}<div><b>${escapeHtml(config.brandName)}</b><small>ระบบร้านค้าสวัสดิการ · Welfare Store</small></div></div>
+    <div class="rd-stamp">พิมพ์เมื่อ ${thaiStamp(new Date())}</div>
+  </div>
+  <div class="rd-title"><h1>${escapeHtml(config.title)}</h1>${config.periodLabel ? `<p>${escapeHtml(config.periodLabel)}</p>` : ""}</div>
+  ${metaRows ? `<div class="rd-meta">${metaRows}</div>` : ""}
+  <table><thead><tr>${headCells}</tr></thead><tbody>${bodyRows}</tbody>${totalsRow}</table>
+  ${config.footnote ? `<div class="rd-note">${escapeHtml(config.footnote)}</div>` : ""}
+  <div class="rd-foot"><span>พิมพ์จากระบบร้านค้าสวัสดิการ</span><span>เอกสารรายงาน A4</span></div>
+</div>
+<script>window.addEventListener("load", () => { setTimeout(() => window.print(), 150); });</script>
+</body></html>`;
+  const frame = document.createElement("iframe");
+  frame.setAttribute("aria-hidden", "true");
+  frame.style.position = "fixed";
+  frame.style.right = "0";
+  frame.style.bottom = "0";
+  frame.style.width = "0";
+  frame.style.height = "0";
+  frame.style.border = "0";
+  frame.srcdoc = html;
+  document.body.appendChild(frame);
+  window.setTimeout(() => { frame.remove(); }, 60_000);
+}

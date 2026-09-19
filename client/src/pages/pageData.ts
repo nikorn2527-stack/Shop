@@ -226,3 +226,27 @@ export function scanMatches(value: string | null | undefined, input: string): bo
   const needle = value.trim().toLowerCase();
   return needle !== "" && scanCandidates(input).includes(needle);
 }
+
+/**
+ * Round 32-19 — ค้นหาแบบฉลาด: ให้คะแนนว่า `value` (เลขสมาชิก / SKU / บาร์โค้ด / ชื่อ)
+ * ตรงกับคำค้น `input` แค่ไหน — รองรับพิมพ์บางส่วน (เลขสมาชิกตัดหน้า), ตัวเลข 3 ตัวท้าย
+ * ของบาร์โค้ด/SKU, และคำ/ตัวอักษรในชื่อ ยิ่งตรงมากคะแนนยิ่งสูง (บวกเข้า candidate
+ * ปกติของ scanCandidates เช่น QR URL ด้วย)
+ */
+export function smartMatchScore(value: string | null | undefined, input: string): number {
+  if (!value) return 0;
+  const needle = value.trim().toLowerCase();
+  const raw = input.trim().toLowerCase();
+  if (!needle || !raw) return 0;
+  let best = 0;
+  const seen: Record<string, boolean> = {};
+  for (const candidate of [raw, ...scanCandidates(input)]) {
+    if (candidate === "" || seen[candidate]) continue;
+    seen[candidate] = true;
+    if (candidate === needle) best = Math.max(best, 100);
+    else if (needle.startsWith(candidate)) best = Math.max(best, candidate.length >= 3 ? 82 : 60);
+    else if (needle.includes(candidate)) best = Math.max(best, candidate.length >= 3 ? 62 : 40);
+    else if (needle.endsWith(candidate) && candidate.length >= 2) best = Math.max(best, 52); // เลข 3 ตัวท้าย SKU/บาร์โค้ด
+  }
+  return best;
+}

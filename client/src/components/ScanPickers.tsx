@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { PackageSearch, ScanLine, ShieldAlert, UserCheck, UserPlus, X } from "lucide-react";
 import type { SqliteProduct } from "../../../server/sqliteStore";
 import type { MemberLite } from "@/pages/pageData";
-import { money, scanCandidates, scanMatches } from "@/pages/pageData";
+import { money, scanMatches, smartMatchScore } from "@/pages/pageData";
 import { MemberAvatar } from "./MemberAvatar";
 
 /**
@@ -43,20 +43,27 @@ export function MemberScanPicker({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const selected = members.find((member) => member.memberNumber === selectedNumber) ?? null;
 
+  // Round 32-19 — smart ranking: exact > prefix (เลขสมาชิกตัดหน้า) > contains >
+  // digits-tail (3 ตัวท้าย) — ชื่อ-สกุลก็จับได้ แล้วเรียงคะแนนสูงขึ้นก่อน
   const suggestions = useMemo(() => {
     const q = term.trim();
     if (q === "") return members.slice(0, 6);
-    const candidates = scanCandidates(q);
-    const lowered = q.toLowerCase();
     return members
-      .filter(
-        (member) =>
-          candidates.includes(member.memberNumber.toLowerCase()) ||
-          `${member.firstName} ${member.lastName}`.toLowerCase().includes(lowered) ||
-          member.firstName.toLowerCase().includes(lowered) ||
-          member.lastName.toLowerCase().includes(lowered),
-      )
-      .slice(0, 6);
+      .map((member) => ({
+        member,
+        score: Math.max(
+          smartMatchScore(member.memberNumber, q),
+          Math.max(
+            smartMatchScore(`${member.firstName} ${member.lastName}`, q),
+            smartMatchScore(member.firstName, q),
+            smartMatchScore(member.lastName, q),
+          ) * 0.9,
+        ),
+      }))
+      .filter((entry) => entry.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 6)
+      .map((entry) => entry.member);
   }, [members, term]);
 
   useEffect(() => {
@@ -209,7 +216,7 @@ export function MemberScanPicker({
             <div className="member-option disabled">
               <div>
                 <b>ไม่พบเลขสมาชิกที่คีย์</b>
-                <small>ตรวจอีกครั้ง หรือลงทะเบียนผ่านเมนู “เพิ่มสมาชิกใหม่” ทางซ้าย</small>
+                <small>ลองคีย์เฉพาะตัวเลข (เช่น 092) หรือชื่อ · ลงทะเบียนใหม่ได้ที่ POS (F6)</small>
               </div>
             </div>
           ) : (
@@ -263,19 +270,24 @@ export function ProductScanPicker({
   const inputRef = useRef<HTMLInputElement | null>(null);
   const selected = products.find((product) => product.id === selectedId) ?? null;
 
+  // Round 32-19 — smart ranking for products: barcode/SKU exact หรือท้ายรหัส
+  // 3 ตัว (เช่น 017 → 8850000000017) + ชื่อ/คำ ก็จับได้
   const suggestions = useMemo(() => {
     const q = term.trim();
     if (q === "") return products.slice(0, 6);
-    const candidates = scanCandidates(q);
-    const lowered = q.toLowerCase();
     return products
-      .filter(
-        (product) =>
-          candidates.includes(product.sku.toLowerCase()) ||
-          (product.barcode ? candidates.includes(product.barcode.toLowerCase()) : false) ||
-          product.name.toLowerCase().includes(lowered),
-      )
-      .slice(0, 6);
+      .map((product) => ({
+        product,
+        score: Math.max(
+          smartMatchScore(product.barcode, q),
+          smartMatchScore(product.sku, q),
+          smartMatchScore(product.name, q) * 0.85,
+        ),
+      }))
+      .filter((entry) => entry.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 6)
+      .map((entry) => entry.product);
   }, [products, term]);
 
   useEffect(() => {

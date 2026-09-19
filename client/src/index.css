@@ -3121,3 +3121,119 @@ th { font-weight: 600; }
 .rd-table tfoot td { background: #e7f2ec !important; border-top: 2px solid #2f7c5f; border-bottom: 0; font-weight: 700; color: #1f3a2e; }
 .rd-note { margin-top: 12px; color: #6d7a6d; font-size: 9.5px; line-height: 1.55; }
 .rd-foot { margin-top: auto; padding-top: 22px; color: #8a948a; font-size: 9px; border-top: 1px dashed #d8e2da; margin-top: 22px; display: flex; justify-content: space-between; }
+
+/* ═══ ROUND 32 — POS พิมพ์จำนวนตรงๆ + ปุ่มลัดครบ F1-F8 + สมาชิกใหม่ที่ POS + รายงาน/สต็อก/ค้นหาฉลาด ═══ */
+
+/* ── 32-13: ช่องจำนวนในบิล — พิมพ์ทับได้เลย เคอร์เซอร์รออยู่หลังเพิ่มสินค้า ── */
+.cart-item .qty-control { min-width: 108px; }
+.cart-item .qty-input {
+  width: 44px; text-align: center; font-weight: 700; font-size: 12.5px; font-variant-numeric: tabular-nums;
+  color: #1f3a2e; background: #f4faf7; border: 1px solid #d5e6dd; border-radius: 7px;
+  padding: 4px 3px; font-family: inherit; line-height: 1.2;
+}
+.cart-item .qty-input:focus { outline: none; border-color: var(--teal); background: #fff; box-shadow: 0 0 0 3px rgba(45, 138, 108, .14); }
+.cart-items-head .head-hint { display: block; font-size: 8.5px; font-style: normal; font-weight: 500; color: #93a296; letter-spacing: 0; }
+
+/* ── 32-14: ปุ่มรางซ้าย POS — สีต่างกันชัดๆ มองปุ๊ดรู้ปุ๊ะ + ป้าย F ครบทุกปุ่ม ── */
+.pos-rail .rail-btn.rail-scan { background: rgba(255, 255, 255, .16); border-color: rgba(255, 255, 255, .3); color: #f2f7ee; }
+.pos-rail .rail-btn.rail-customer { background: rgba(94, 234, 212, .16); border-color: rgba(94, 234, 212, .42); color: #b8f5e4; }
+.pos-rail .rail-btn.rail-deposit { background: rgba(52, 211, 153, .2); border-color: rgba(52, 211, 153, .5); color: #a7f3d0; }
+.pos-rail .rail-btn.rail-deposit b { color: #d9fce9; }
+.pos-rail .rail-btn.rail-deposit:hover, .pos-rail .rail-btn.rail-deposit.active { background: #0f9f6e; border-color: #0f9f6e; color: #fff; }
+.pos-rail .rail-btn.rail-deposit.active b, .pos-rail .rail-btn.rail-deposit:hover b { color: #fff; }
+.pos-rail .rail-btn.rail-withdraw { background: rgba(251, 191, 36, .16); border-color: rgba(251, 191, 36, .45); color: #fde68a; }
+.pos-rail .rail-btn.rail-withdraw b { color: #fdf0c8; }
+.pos-rail .rail-btn.rail-withdraw:hover, .pos-rail .rail-btn.rail-withdraw.active { background: #c78416; border-color: #c78416; color: #fff; }
+.pos-rail .rail-btn.rail-withdraw.active b, .pos-rail .rail-btn.rail-withdraw:hover b { color: #fff; }
+.pos-rail .rail-btn.rail-special { background: rgba(192, 132, 252, .17); border-color: rgba(192, 132, 252, .46); color: #e3d0fb; }
+.pos-rail .rail-btn.rail-special b { color: #efe3fd; }
+.pos-rail .rail-btn.rail-special:hover, .pos-rail .rail-btn.rail-special.active { background: #7c4fc0; border-color: #7c4fc0; color: #fff; }
+.pos-rail .rail-btn.rail-special.active b, .pos-rail .rail-btn.rail-special:hover b { color: #fff; }
+.pos-rail .rail-btn.rail-hold { background: rgba(231, 216, 176, .14); border-color: rgba(231, 216, 176, .4); color: #ecdfb8; }
+.pos-rail .rail-btn.rail-register { background: rgba(64, 216, 158, .24); border-color: rgba(64, 216, 158, .55); color: #b7f8dd; }
+.pos-rail .rail-btn.rail-register b { color: #ddfcf0; }
+.pos-rail .rail-btn.rail-register:hover { background: #0fae7a; border-color: #0fae7a; color: #fff; }
+.pos-rail .rail-btn.rail-register:hover b { color: #fff; }
+.pos-rail .rail-btn.rail-manage { background: rgba(250, 204, 21, .14); border-color: rgba(250, 204, 21, .42); color: #fef3c0; }
+.pos-rail .rail-btn.rail-manage b { color: #fdf6d8; }
+.pos-rail .rail-btn.rail-manage:hover { background: #a18507; border-color: #a18507; color: #fff; }
+.pos-rail .rail-btn.rail-manage:hover b { color: #fff; }
+.pos-rail .rail-btn.rail-register kbd, .pos-rail .rail-btn.rail-manage kbd, .pos-rail .rail-btn.rail-hold kbd { background: rgba(0, 0, 0, .22); color: inherit; border-color: rgba(255, 255, 255, .2); }
+
+/* แถบลัดล่าง POS — สีตามปุ่มบนราง */
+.shortcut-strip > button.strip-deposit { border-color: rgba(18, 154, 105, .4); color: #0e7d56; background: #eafaf3; }
+.shortcut-strip > button.strip-deposit:hover { background: #d7f4e6; border-color: #12996a; }
+.shortcut-strip > button.strip-withdraw { border-color: rgba(199, 132, 22, .42); color: #9a6c12; background: #fdf5e3; }
+.shortcut-strip > button.strip-withdraw:hover { background: #faecc9; border-color: #c78416; }
+.shortcut-strip > button.strip-special { border-color: rgba(124, 79, 192, .35); color: #6b4394; background: #f4edfc; }
+.shortcut-strip > button.strip-special:hover { background: #ebdefa; border-color: #7c4fc0; }
+.shortcut-strip > button.strip-hold { border-color: rgba(140, 120, 60, .35); color: #7a6a3d; background: #f8f4e4; }
+.shortcut-strip > button.strip-register { border-color: rgba(15, 174, 122, .45); color: #0b8a61; background: #e5f9f0; }
+.shortcut-strip > button.strip-register:hover { background: #d0f3e3; border-color: #0fae7a; }
+.shortcut-strip > button.strip-manage { border-color: rgba(161, 133, 7, .4); color: #8a7119; background: #fdf8d8; }
+.shortcut-strip > button.strip-manage:hover { background: #faf0b8; border-color: #a18507; }
+
+/* ── 32-22/23: การ์ด KPI รายงานเตี้ยลง + หน่วยการ์ด ── */
+.report-cards-compact { gap: 8px; margin-bottom: 10px; }
+.report-cards-compact .report-card { padding: 9px 13px; display: flex; flex-direction: column; gap: 2px; }
+.report-cards-compact .report-card strong { font-size: 19px; margin-top: 3px; }
+.report-cards-compact .report-card .card-unit { font-size: 11px; font-style: normal; font-weight: 500; color: #7c8171; margin-left: 2px; }
+
+/* ── 32-21/25: แท็บย่อยในการส่งออก + ปุ่มพิมพ์ ── */
+.export-topic-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 10px; border-bottom: 1px solid #e8eeea; padding-bottom: 10px; }
+.export-topic-tabs button { display: inline-flex; align-items: center; gap: 6px; border: 1px solid #e2eae5; background: #fbfdfc; border-radius: 999px; padding: 7px 14px; font-size: 12px; font-weight: 600; color: #67705f; cursor: pointer; transition: .15s ease; }
+.export-topic-tabs button small { font-weight: 500; color: #97a093; font-size: 10px; }
+.export-topic-tabs button:hover { border-color: #b5d8c9; color: var(--teal-dark); }
+.export-topic-tabs button.active { background: var(--teal); border-color: var(--teal); color: #fff; box-shadow: 0 4px 10px rgba(45, 138, 108, .24); }
+.export-topic-tabs button.active small { color: rgba(255, 255, 255, .82); }
+.export-topic-body { min-height: 0; }
+.export-row-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.export-row .file-icon.print { background: #e9f6ef; color: var(--teal); border-color: #cbe8d9; }
+.export-row button:hover .file-icon.print { background: var(--teal); color: #fff; }
+@media (max-width: 980px) { .export-row-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* 32-23: แถบการเงินสมาชิกในแท็บธุรกรรม (ข้อมูลเติม/ถอนจาก Log ย้ายมารวมที่นี่) */
+.tx-log-strip { display: flex; align-items: center; gap: 8px; margin: 8px 0 10px; padding: 8px 12px; border: 1px dashed #d8e4dc; border-radius: 9px; background: #fbfdfb; color: #6d7a6d; font-size: 11px; flex-wrap: wrap; }
+.tx-log-strip svg { color: var(--teal); flex: 0 0 auto; }
+.tx-log-strip b { font-weight: 700; }
+
+/* ── 32-15: รายการสั่งซื้อ (สต็อกเป็นแท็บ) ── */
+.stock-workbench { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.stock-workbench .dash-tab small { font-size: 9.5px; font-weight: 500; color: #93a296; margin-left: 4px; }
+.stock-workbench .dash-tab.active small { color: rgba(255, 255, 255, .8); }
+.order-add-row { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; margin: 10px 0; }
+.order-add-row .form-scan-picker { flex: 1 1 380px; min-width: 0; }
+.order-add-hint { display: inline-flex; align-items: center; gap: 6px; color: #7c8171; font-size: 10.5px; padding-bottom: 6px; }
+.order-qty-input, .order-note-input {
+  font-family: inherit; font-size: 12px; color: #23301f; background: #f6faf7; border: 1px solid #dbe7e0;
+  border-radius: 7px; padding: 5px 8px;
+}
+.order-qty-input { width: 62px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+.order-note-input { width: 100%; min-width: 150px; font-weight: 500; }
+.order-qty-input:focus, .order-note-input:focus { outline: none; border-color: var(--teal); background: #fff; box-shadow: 0 0 0 3px rgba(45, 138, 108, .13); }
+.order-footer-note { display: flex; gap: 8px; align-items: flex-start; margin-top: 10px; color: #7c8171; font-size: 10.5px; line-height: 1.6; }
+.order-footer-note svg { flex: 0 0 auto; margin-top: 1px; color: var(--teal); }
+.order-list-panel .table-wrap { overflow: auto; }
+.mini-button.order-add-btn { border-color: #e3c98f; color: #8a6d1d; background: #fdf6e0; }
+.mini-button.order-add-btn:hover { border-color: #c78416; background: #faecc9; }
+.cell-unit { color: #6f7365; font-weight: 500; white-space: nowrap; }
+
+/* ── 32-27: ตัวเลือกขนาด/ปริมาณ (เลือกหน่วยจากลิสต์ กันคีย์ .g/กรัม ผิด) ── */
+.size-preset-field { display: flex; flex-direction: column; gap: 6px; }
+.size-preset-row { display: flex; gap: 7px; }
+.size-preset-row input[type="number"] { flex: 1; min-width: 0; }
+.size-preset-row select { flex: 0 0 108px; }
+.size-preset-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.size-preset-chips button { border: 1px solid #e0e9e4; background: #f8fbf9; color: #5e6a58; border-radius: 999px; padding: 3px 10px; font-size: 10.5px; font-weight: 600; cursor: pointer; font-family: inherit; transition: .14s ease; }
+.size-preset-chips button:hover { border-color: var(--teal); color: var(--teal-dark); background: #eef8f3; }
+
+/* ── 32-28: หัวคอลัมน์ตารางเอนทิตี — บรรทัดเดียว ไม่ตกบรรทัดที่ 2 ── */
+.entity-table th { white-space: nowrap; }
+.entity-table .cell-qty { white-space: nowrap; }
+
+/* ── 32-20: รอบตัดยอดเป็นแท็บของตัวเอง (Dashboard) ── */
+.dash-tab-body > .cutoff-widget { flex: 1; align-content: flex-start; }
+.dash-tab-body > .cutoff-widget .cutoff-report { max-width: 420px; }
+
+/* ── 32-16: โมดัลลงทะเบียนสมาชิกที่ POS ── */
+.pos-register-modal .form-grid { max-width: none; }

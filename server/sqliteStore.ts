@@ -318,6 +318,14 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
       expires_at TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS order_list_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+      qty REAL NOT NULL DEFAULT 1,
+      note TEXT,
+      created_by TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
   `);
   ensureColumn(db, "members", "phone", "TEXT");
   ensureColumn(db, "members", "type", "TEXT NOT NULL DEFAULT 'สมาชิก'");
@@ -777,6 +785,105 @@ export function stockCountLots(db: SqliteDb, input: StockCountLotsInput): StockC
       lots: results,
     };
   });
+}
+
+// --- order list (รายการสั่งซื้อ — round 32-15) --------------------------------
+
+export type SqliteOrderItem = {
+  id: number;
+  productId: number;
+  sku: string;
+  name: string;
+  unit: string;
+  category: string;
+  cost: number;
+  stock: number;
+  reorderPoint: number;
+  qty: number;
+  note: string | null;
+  createdBy: string | null;
+  createdAt: string;
+};
+
+const ORDER_ITEM_SELECT = `SELECT o.id, o.qty, o.note, o.created_by AS createdBy, o.created_at AS createdAt, p.id AS productId, p.sku, p.name, p.unit, p.category, p.cost, p.stock, p.reorder_point AS reorderPoint FROM order_list_items o JOIN products p ON p.id = o.product_id`;
+
+export function listOrderItems(db: SqliteDb): SqliteOrderItem[] {
+  return db.prepare(`${ORDER_ITEM_SELECT} ORDER BY o.id ASC`).all() as SqliteOrderItem[];
+}
+
+export type OrderAddInput = {
+  productId: number;
+  qty?: number;
+  note?: string;
+  actor?: string;
+  actorRole?: string;
+};
+
+/** Adds (or merges +qty when the product is already on the list) an order row. */
+export function addOrderItem(db: SqliteDb, input: OrderAddInput): SqliteOrderItem[] {
+  const qty = input.qty === undefined ? 1 : input.qty;
+  if (!Number.isFinite(qty) || qty <= 0) throw new StoreError("จำนวนที่จะสั่งซื้อต้องมากกว่า 0");
+  const product = getProductById(db, input.productId);
+  if (!product) throw new StoreError(`ไม่พบสินค้ารหัส ${input.productId} ในระบบ`);
+  const actor = input.actor?.trim() || "เจ้าหน้าที่ร้านค้า";
+  runInTransaction(db, () => {
+    const existing = db.prepare(`SELECT id, qty FROM order_list_items WHERE product_id = ?`).get(input.productId) as { id: number; qty: number } | undefined;
+    const note = input.note?.trim() || null;
+    if (existing) {
+      db.prepare(`UPDATE order_list_items SET qty = ?, note = COALESCE(?, note) WHERE id = ?`).run(existing.qty + qty, note, existing.id);
+    } else {
+      db.prepare(`INSERT INTO order_list_items (product_id, qty, note, created_by) VALUES (?, ?, ?, ?)`).run(input.productId, qty, note, actor);
+    }
+    logAction(db, "ขอสั่งซื้อสินค้า", actor, `${product.name} · ${qty} ${product.unit} · คงเหลือ ${product.stock} ${product.unit}`, "amber", input.actorRole ?? null, formatDateTime());
+  });
+  return listOrderItems(db);
+}
+
+export type OrderUpdateInput = {
+  id: number;
+  qty?: number;
+  note?: string | null;
+  actor?: string;
+  actorRole?: string;
+};
+
+export function updateOrderItem(db: SqliteDb, input: OrderUpdateInput): SqliteOrderItem[] {
+  const existing = db.prepare(`${ORDER_ITEM_SELECT} WHERE o.id = ?`).get(input.id) as SqliteOrderItem | undefined;
+  if (!existing) throw new StoreError("ไม่พบรายการสั่งซื้อนี้ในระบบ (อาจถูกลบไปแล้ว)");
+  if (input.qty !== undefined && (!Number.isFinite(input.qty) || input.qty <= 0)) throw new StoreError("จำนวนที่จะสั่งซื้อต้องมากกว่า 0");
+  const actor = input.actor?.trim() || "เจ้าหน้าที่ร้านค้า";
+  runInTransaction(db, () => {
+    db.prepare(`UPDATE order_list_items SET qty = ?, note = ? WHERE id = ?`).run(
+      input.qty ?? existing.qty,
+      input.note === undefined ? existing.note : input.note,
+      input.id,
+    );
+    logAction(db, "แก้ไขรายการสั่งซื้อ", actor, `${existing.name} · ${input.qty ?? existing.qty} ${existing.unit}`, "blue", input.actorRole ?? null, formatDateTime());
+  });
+  return listOrderItems(db);
+}
+
+export function removeOrderItem(db: SqliteDb, input: { id: number; actor?: string; actorRole?: string }): SqliteOrderItem[] {
+  const existing = db.prepare(`${ORDER_ITEM_SELECT} WHERE o.id = ?`).get(input.id) as SqliteOrderItem | undefined;
+  if (!existing) return listOrderItems(db);
+  const actor = input.actor?.trim() || "เจ้าหน้าที่ร้านค้า";
+  runInTransaction(db, () => {
+    db.prepare(`DELETE FROM order_list_items WHERE id = ?`).run(input.id);
+    logAction(db, "ถอดออกจากรายการสั่งซื้อ", actor, `${existing.name} · ${existing.qty} ${existing.unit}`, "purple", input.actorRole ?? null, formatDateTime());
+  });
+  return listOrderItems(db);
+}
+
+/** Clears the whole list — used after the order has been placed/received. */
+export function clearOrderList(db: SqliteDb, input: { actor?: string; actorRole?: string }): SqliteOrderItem[] {
+  const items = listOrderItems(db);
+  if (items.length === 0) return items;
+  const actor = input.actor?.trim() || "เจ้าหน้าที่ร้านค้า";
+  runInTransaction(db, () => {
+    db.prepare(`DELETE FROM order_list_items`).run();
+    logAction(db, "ล้างรายการสั่งซื้อ", actor, `ล้าง ${items.length} รายการ (สั่งซื้อ/ตรวจสอบแล้ว)`, "green", input.actorRole ?? null, formatDateTime());
+  });
+  return listOrderItems(db);
 }
 
 export type UpdateProductInput = {
@@ -2295,6 +2402,19 @@ const SEED_PRODUCTS: { sku: string; barcode: string; name: string; category: str
   { sku: "ICE-004", barcode: "8850000000086", name: "น้ำแข็งถุงเล็ก", category: "ของใช้", emoji: "🧊", color: "cyan", unit: "ถุง", price: 10, cost: 6, stock: 35, reorderPoint: 40 },
 ];
 
+/**
+ * Round 32-18 — สินค้าตัวอย่างสำหรับทดสอบการยิงบาร์โค้ด (สินค้าปกติมีบาร์โค้ดครบ
+ * ไม่เกี่ยวกับสินค้าไม่มีบาร์โค้ด) · แทรกแบบ idempotent ผ่าน INSERT OR IGNORE
+ * เพื่อให้ฐานข้อมูลเดิมที่ใช้งานอยู่ก็ได้รายการทดสอบด้วย
+ */
+const SEED_TEST_PRODUCTS: { sku: string; barcode: string; name: string; category: string; emoji: string; color: string; unit: string; price: number; cost: number; stock: number; reorderPoint: number }[] = [
+  { sku: "SNK-011", barcode: "8850101100015", name: "ขนมเคี้ยวกรอบรสชีส", category: "อาหาร", emoji: "🍪", color: "amber", unit: "แพ็ก", price: 20, cost: 14, stock: 54, reorderPoint: 20 },
+  { sku: "SNK-012", barcode: "8850101100022", name: "วุ้นมะพร้าวแช่เย็น", category: "อาหาร", emoji: "🍮", color: "rose", unit: "ถุง", price: 10, cost: 6, stock: 70, reorderPoint: 24 },
+  { sku: "DRK-005", barcode: "8850101100039", name: "ชาเขียวขวดพร้อมดื่ม", category: "เครื่องดื่ม", emoji: "🍵", color: "mint", unit: "ขวด", price: 25, cost: 17, stock: 38, reorderPoint: 12 },
+  { sku: "HYG-034", barcode: "8850101100046", name: "แปรงฟันสมุนไพร", category: "ของใช้", emoji: "🪥", color: "orange", unit: "ชิ้น", price: 35, cost: 24, stock: 22, reorderPoint: 10 },
+  { sku: "FD-016", barcode: "8850101100053", name: "โจ๊กหมูกระป๋อง", category: "อาหาร", emoji: "🍲", color: "sky", unit: "กระป๋อง", price: 22, cost: 15, stock: 40, reorderPoint: 12 },
+];
+
 /** Seed expiry anchored to today so demo data (และเทส expirySoon) ไม่หมดอายุไปตามเวลาจริง */
 const seedExpiryFromToday = (offsetDays: number) => {
   const date = new Date();
@@ -2311,6 +2431,11 @@ const SEED_STOCK_LOTS: { sku: string; lot: string; expiry: string | null; qty: n
   { sku: "HYG-032", lot: "HM-2606-03", expiry: "2028-06-04", qty: 28, cost: 24, receivedAt: "2026-06-28 13:10:00" },
   { sku: "HYG-033", lot: "MSK-2606-01", expiry: "2029-06-30", qty: 86, cost: 14, receivedAt: "2026-06-28 13:25:00" },
   { sku: "ICE-004", lot: "รับรายวัน", expiry: null, qty: 35, cost: 6, receivedAt: "2026-09-17 05:30:00" },
+  { sku: "SNK-011", lot: "TS-SNK-01", expiry: seedExpiryFromToday(120), qty: 54, cost: 14, receivedAt: "2026-09-10 09:00:00" },
+  { sku: "SNK-012", lot: "TS-SNK-02", expiry: seedExpiryFromToday(30), qty: 70, cost: 6, receivedAt: "2026-09-10 09:05:00" },
+  { sku: "DRK-005", lot: "TS-DRK-05", expiry: seedExpiryFromToday(180), qty: 38, cost: 17, receivedAt: "2026-09-10 09:10:00" },
+  { sku: "HYG-034", lot: "TS-HYG-34", expiry: seedExpiryFromToday(400), qty: 22, cost: 24, receivedAt: "2026-09-10 09:15:00" },
+  { sku: "FD-016", lot: "TS-FD-16", expiry: seedExpiryFromToday(200), qty: 40, cost: 15, receivedAt: "2026-09-10 09:20:00" },
 ];
 
 const SEED_MEMBERS: { memberNumber: string; firstName: string; lastName: string; type: string; balance: number; status: "active" | "suspended" }[] = [
@@ -2437,8 +2562,21 @@ export function seedWelfareStoreData(db: SqliteDb) {
   }
   if (countRows(db, "products") === 0) {
     const insertProduct = db.prepare(`INSERT INTO products (sku, barcode, name, category, emoji, color, unit, price, cost, stock, reorder_point, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`);
-    for (const product of SEED_PRODUCTS) {
+    for (const product of [...SEED_PRODUCTS, ...SEED_TEST_PRODUCTS]) {
       insertProduct.run(product.sku, product.barcode, product.name, product.category, product.emoji, product.color, product.unit, product.price, product.cost, product.stock, product.reorderPoint);
+    }
+  } else {
+    // Round 32-18 — ฐานข้อมูลที่มีข้อมูลอยู่แล้วก็ได้สินค้าทดสอบยิงบาร์โค้ด (idempotent)
+    const insertTest = db.prepare(`INSERT OR IGNORE INTO products (sku, barcode, name, category, emoji, color, unit, price, cost, stock, reorder_point, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`);
+    for (const product of SEED_TEST_PRODUCTS) {
+      const info = insertTest.run(product.sku, product.barcode, product.name, product.category, product.emoji, product.color, product.unit, product.price, product.cost, product.stock, product.reorderPoint);
+      if (info.changes > 0) {
+        const created = db.prepare(`SELECT id FROM products WHERE sku = ?`).get(product.sku) as { id: number } | undefined;
+        if (created) {
+          db.prepare(`INSERT INTO stock_lots (product_id, lot, expiry_date, qty, cost, received_at) VALUES (?, ?, ?, ?, ?, ?)`)
+            .run(created.id, `TEST-${product.sku}`, null, product.stock, product.cost, new Date().toISOString().slice(0, 19).replace("T", " "));
+        }
+      }
     }
   }
   if (countRows(db, "stock_lots") === 0) {
