@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 
 import type { Role, View } from "@/pages/pageData";
-import { canAccessView, money, navItems } from "@/pages/pageData";
+import { canAccessView, isAdminRole, money, navItems } from "@/pages/pageData";
 import { formatLastActivity } from "@/pages/viewFormat";
 import { trpc } from "@/lib/trpc";
 
@@ -74,7 +74,7 @@ export function GlobalSearch({ role, open, onClose, onNavigate, onOpenMember, on
       { key: "quick-register", label: "ลงทะเบียนสมาชิก", icon: UserPlus, view: "members" },
       { key: "quick-reports", label: "ดูรายงานยอดขาย", icon: BarChart3, view: "reports" },
     ];
-    if (role === "admin") {
+    if (isAdminRole(role)) {
       actions.push({ key: "quick-settings", label: "ตั้งค่าระบบ", icon: Settings2, view: "settings" });
       actions.push({ key: "quick-logs", label: "ระบบ Log", icon: Activity, view: "logs" });
     }
@@ -87,7 +87,7 @@ export function GlobalSearch({ role, open, onClose, onNavigate, onOpenMember, on
       { id: "users", label: "ผู้ใช้ระบบ", caption: "จัดการสิทธิ์และบัญชี", icon: UserCog },
       { id: "logs", label: "ระบบ Log", caption: "ประวัติการใช้งาน", icon: Activity },
     ];
-    const all = [...navItems, ...(role === "admin" ? extra : [])];
+    const all = [...navItems, ...(isAdminRole(role) ? extra : [])];
     return all.filter((item) => canAccessView(role, item.id));
   }, [role]);
 

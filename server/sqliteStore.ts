@@ -200,6 +200,8 @@ export type StoreSettings = {
   dailyCutOffMode: "auto" | "manual";
   /** "HH:MM" เวลาตัดยอดของรอบอัตโนมัติ (เช่น "02:00" = รอบวันวิ่ง 02:00→02:00 ของวันถัดไป) */
   dailyCutOffTime: string;
+  /** ROUND 36 (ข้อ 31) — ประตูบัญชีผู้พัฒนา (dev): ปิดอยู่ (false) = บัญชี dev เข้าสู่ระบบไม่ได้ทั้งหมด */
+  devAccess: boolean;
 };
 
 /**
@@ -350,6 +352,8 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
   ensureColumn(db, "audit_logs", "actor_role", "TEXT");
   ensureColumn(db, "sale_items", "unit", "TEXT");
   ensureColumn(db, "app_users", "failed_attempts", "INTEGER NOT NULL DEFAULT 0");
+  // ROUND 36 (ข้อ 31) — บังคับเปลี่ยนรหัสผ่านครั้งแรก: 1 = บัญชีใหม่/รหัสที่ผู้บริหารตั้งให้ ต้องเปลี่ยนก่อนใช้งาน
+  ensureColumn(db, "app_users", "must_change_password", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn(db, "products", "size", "TEXT");
   ensureColumn(db, "products", "image_url", "TEXT");
   ensureColumn(db, "products", "quick_pick", "INTEGER NOT NULL DEFAULT 0");
@@ -392,7 +396,8 @@ function ensureColumn(db: SqliteDb, table: string, column: string, definition: s
 }
 
 export function seedSqliteDemoData(db: SqliteDb) {
-  seedAppUsers(db);
+  // ROUND 36 (ข้อ 31) — ไม่ seed บัญชีผู้ใช้แล้ว: ฐานข้อมูลใหม่ต้องลงทะเบียน
+  // ผู้บริหารหลักผ่าน SetupView ก่อน (setupInitialAdmin) เพื่อบังคับเปลี่ยนรหัสผ่าน
   const insertMember = db.prepare(`INSERT OR IGNORE INTO members (member_number, first_name, last_name, id_card, balance, status) VALUES (?, ?, ?, ?, ?, ?)`);
   insertMember.run("M-000218", "อรทัย", "ส.", null, 1240, "active");
   insertMember.run("M-000092", "พิมพ์ชนก", "ร.", null, 0, "suspended");
@@ -2059,6 +2064,7 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   expiryAlertDays: 30,
   dailyCutOffMode: "auto",
   dailyCutOffTime: "00:00",
+  devAccess: false,
 };
 
 const SETTINGS_KEY = "app_settings";
@@ -2231,17 +2237,57 @@ export function setSettings(db: SqliteDb, patch: Partial<StoreSettings>, actor =
 
 // --- app users & local sessions ---------------------------------------------
 
+/** Login account role for the welfare store app itself (local session auth). */
+export type AppUserRole = "staff" | "admin" | "dev";
+
+/** Thai display label for an app user role (audit log actorRole / UI badges). */
+export function appRoleThai(role: AppUserRole): string {
+  return role === "admin" ? "ผู้บริหาร" : role === "dev" ? "ผู้พัฒนา" : "เจ้าหน้าที่";
+}
+
+// ROUND 36 (ข้อ 31) — กฎความแข็งแรงของรหัสผ่าน (มิเรอร์กันทั้ง server และ client/src/components/PasswordMeter.tsx)
+const PW_HAS_LETTER = /[A-Za-z\u0E00-\u0E7F]/;
+const PW_HAS_DIGIT = /[0-9]/;
+const PW_HAS_SYMBOL = /[^A-Za-z0-9\u0E00-\u0E7F\s]/;
+
+/** Minimum password length per role — dev accounts need the strongest secrets. */
+export function passwordMinLength(role: AppUserRole = "staff"): number {
+  return role === "dev" ? 12 : 8;
+}
+
+/**
+ * Validates a password against the store's strength policy and returns Thai
+ * issue strings (empty array = strong enough). ทุกบทบาท: ยาว ≥ 8 + มีตัวอักษร +
+ * มีตัวเลข · บทบาท dev: ยาว ≥ 12 + ต้องมีสัญลักษณ์พิเศษด้วย
+ */
+export function validatePasswordStrength(password: string, role: AppUserRole = "staff"): string[] {
+  if (typeof password !== "string" || password === "") return ["กรุณาระบุรหัสผ่าน"];
+  const issues: string[] = [];
+  const minLength = passwordMinLength(role);
+  if (password.length < minLength) {
+    issues.push(`รหัสผ่านต้องมีความยาวอย่างน้อย ${minLength} ตัวอักษร`);
+  }
+  if (!PW_HAS_LETTER.test(password)) issues.push("รหัสผ่านต้องมีตัวอักษรอย่างน้อย 1 ตัว");
+  if (!PW_HAS_DIGIT.test(password)) issues.push("รหัสผ่านต้องมีตัวเลขอย่างน้อย 1 ตัว");
+  if (role === "dev" && !PW_HAS_SYMBOL.test(password)) {
+    issues.push("รหัสผ่านบัญชีผู้พัฒนา (dev) ต้องมีสัญลักษณ์พิเศษอย่างน้อย 1 ตัว เช่น ! @ # $");
+  }
+  return issues;
+}
+
 /** Login account for the welfare store app itself (local session auth). */
 export type AppUser = {
   id: number;
   username: string;
   passwordHash: string;
   displayName: string;
-  role: "staff" | "admin";
+  role: AppUserRole;
   active: number;
   createdAt: string;
   failedAttempts: number;
   lockedUntil: string | null;
+  /** ROUND 36 (ข้อ 31) — 1 = ต้องเปลี่ยนรหัสผ่านก่อนเริ่มใช้งาน (บัญชีใหม่/รหัสที่ผู้บริหารตั้งให้) */
+  mustChangePassword: number;
 };
 
 const SCRYPT_SALT_BYTES = 16;
@@ -2277,7 +2323,7 @@ export function verifyPassword(plain: string, stored: string): boolean {
   }
 }
 
-const APP_USER_SELECT = `SELECT id, username, password_hash AS passwordHash, display_name AS displayName, role, active, created_at AS createdAt, failed_attempts AS failedAttempts, locked_until AS lockedUntil FROM app_users`;
+const APP_USER_SELECT = `SELECT id, username, password_hash AS passwordHash, display_name AS displayName, role, active, created_at AS createdAt, failed_attempts AS failedAttempts, locked_until AS lockedUntil, must_change_password AS mustChangePassword FROM app_users`;
 
 // --- login rate limiting (failed-password lockout) ----------------------------
 
@@ -2360,7 +2406,7 @@ export function createAppSession(db: SqliteDb, userId: number): { sessionId: str
 /** Resolves an active, unexpired session to its (active) app user. */
 export function authenticateAppSession(db: SqliteDb, sessionId: string): AppUser | undefined {
   return db.prepare(
-    `SELECT u.id, u.username, u.password_hash AS passwordHash, u.display_name AS displayName, u.role, u.active, u.created_at AS createdAt, u.failed_attempts AS failedAttempts, u.locked_until AS lockedUntil
+    `SELECT u.id, u.username, u.password_hash AS passwordHash, u.display_name AS displayName, u.role, u.active, u.created_at AS createdAt, u.failed_attempts AS failedAttempts, u.locked_until AS lockedUntil, u.must_change_password AS mustChangePassword
      FROM app_sessions s JOIN app_users u ON u.id = s.user_id
      WHERE s.id = ? AND s.expires_at > ? AND u.active = 1`,
   ).get(sessionId, formatDateTime()) as AppUser | undefined;
@@ -2378,7 +2424,7 @@ export type AppSessionSummary = {
   sessionId: string;
   username: string;
   displayName: string;
-  role: "staff" | "admin";
+  role: AppUserRole;
   active: number;
   createdAt: string;
   expiresAt: string;
@@ -2452,14 +2498,16 @@ export type AppUserSummary = {
   id: number;
   username: string;
   displayName: string;
-  role: "staff" | "admin";
+  role: AppUserRole;
   active: number;
   createdAt: string;
   failedAttempts: number;
   lockedUntil: string | null;
+  /** ROUND 36 (ข้อ 31) — 1 = บัญชีนี้ยังต้องเปลี่ยนรหัสผ่านก่อนเริ่มใช้งาน */
+  mustChangePassword: number;
 };
 
-const APP_USER_SUMMARY_SELECT = `SELECT id, username, display_name AS displayName, role, active, created_at AS createdAt, failed_attempts AS failedAttempts, locked_until AS lockedUntil FROM app_users`;
+const APP_USER_SUMMARY_SELECT = `SELECT id, username, display_name AS displayName, role, active, created_at AS createdAt, failed_attempts AS failedAttempts, locked_until AS lockedUntil, must_change_password AS mustChangePassword FROM app_users`;
 
 function getAppUserSummaryById(db: SqliteDb, userId: number): AppUserSummary | undefined {
   return db.prepare(`${APP_USER_SUMMARY_SELECT} WHERE id = ?`).get(userId) as AppUserSummary | undefined;
@@ -2496,10 +2544,105 @@ export type CreateAppUserInput = {
   username: string;
   password: string;
   displayName: string;
-  role: "staff" | "admin";
+  role: AppUserRole;
   actor?: string;
   actorRole?: string | null;
 };
+
+/** Counts every login account (any role, any status) — 0 = ระบบยังไม่ถูกตั้งค่าครั้งแรก. */
+export function countAppUsers(db: SqliteDb): number {
+  return (db.prepare(`SELECT COUNT(*) AS count FROM app_users`).get() as { count: number }).count;
+}
+
+export type SetupInitialAdminInput = {
+  username: string;
+  displayName: string;
+  password: string;
+  storeName?: string;
+};
+
+/**
+ * ROUND 36 (ข้อ 31) — ลงทะเบียนครั้งแรก: ใช้ได้เฉพาะระบบที่ยังไม่มีบัญชีผู้ใช้เลย
+ * (ฐานข้อมูลใหม่) สร้างบัญชีผู้บริหารหลักพร้อมตั้ง must_change_password = 1
+ * ให้เจ้าของร้านต้องเปลี่ยนรหัสผ่านอีกครั้งหลังลงทะเบียน เพื่อยืนยันว่าไม่มีผู้อื่นรู้รหัส
+ */
+export function setupInitialAdmin(db: SqliteDb, input: SetupInitialAdminInput): AppUserSummary {
+  if (countAppUsers(db) > 0) {
+    throw new StoreError("ระบบถูกตั้งค่าผู้บริหารไว้แล้ว · ไม่สามารถลงทะเบียนซ้ำได้");
+  }
+  const username = input.username?.trim() ?? "";
+  if (!username) throw new StoreError("กรุณาระบุชื่อผู้ใช้");
+  if (/\s/.test(username)) throw new StoreError("ชื่อผู้ใช้ห้ามมีช่องว่าง");
+  if (username.length > 30) throw new StoreError("ชื่อผู้ใช้ต้องไม่เกิน 30 ตัวอักษร");
+  if (db.prepare(`SELECT id FROM app_users WHERE LOWER(username) = LOWER(?)`).get(username)) {
+    throw new StoreError("มีชื่อผู้ใช้นี้ในระบบแล้ว");
+  }
+  const displayName = input.displayName?.trim() ?? "";
+  if (!displayName) throw new StoreError("กรุณาระบุชื่อ-นามสกุลผู้บริหาร");
+  const issues = validatePasswordStrength(input.password, "admin");
+  if (issues.length > 0) throw new StoreError(issues.join(" · "));
+  const createdAt = formatDateTime();
+  const result = db.prepare(
+    `INSERT INTO app_users (username, password_hash, display_name, role, active, created_at, must_change_password) VALUES (?, ?, ?, 'admin', 1, ?, 1)`,
+  ).run(username, hashPassword(input.password), displayName, createdAt);
+  const storeName = input.storeName?.trim() ?? "";
+  if (storeName) {
+    setSettings(db, { storeName, appName: storeName }, displayName, "ผู้บริหาร");
+  }
+  logAction(db, "ตั้งค่าระบบครั้งแรก", displayName, `สร้างบัญชีผู้บริหารหลัก @${username} · ชื่อร้าน ${storeName || "-"}`, "green", "ผู้บริหาร", createdAt);
+  return getAppUserSummaryById(db, Number(result.lastInsertRowid))!;
+}
+
+export type ChangeOwnPasswordInput = {
+  userId: number;
+  currentPassword: string;
+  newPassword: string;
+  /** เซสชันที่ผู้ใช้กำลังใช้อยู่ (จากคุกกี้) — จะไม่ถูกยกเลิกไปด้วย */
+  keepSessionId?: string;
+  actor?: string;
+  actorRole?: string | null;
+};
+
+/**
+ * ROUND 36 (ข้อ 31) — ผู้ใช้เปลี่ยนรหัสผ่านของตัวเอง: ตรวจรหัสปัจจุบัน + กฎความแข็งแรง
+ * + ห้ามซ้ำของเดิม แล้วล้างธง must_change_password · ยกเลิกเซสชันอื่นทั้งหมด
+ * เหลือเฉพาะเซสชันที่ใช้อยู่ (keepSessionId)
+ */
+export function changeOwnPassword(db: SqliteDb, input: ChangeOwnPasswordInput): { success: boolean; revokedSessions: number } {
+  const user = db.prepare(`${APP_USER_SELECT} WHERE id = ?`).get(input.userId) as AppUser | undefined;
+  if (!user) throw new StoreError("ไม่พบบัญชีผู้ใช้นี้");
+  if (!verifyPassword(input.currentPassword ?? "", user.passwordHash)) {
+    throw new StoreError("รหัสผ่านปัจจุบันไม่ถูกต้อง");
+  }
+  const issues = validatePasswordStrength(input.newPassword, user.role);
+  if (issues.length > 0) throw new StoreError(issues.join(" · "));
+  if (verifyPassword(input.newPassword, user.passwordHash)) {
+    throw new StoreError("รหัสผ่านใหม่ต้องไม่ซ้ำกับรหัสผ่านปัจจุบัน");
+  }
+  const forced = user.mustChangePassword === 1;
+  const actor = input.actor?.trim() || user.displayName;
+  const actorRole = input.actorRole?.trim() || appRoleThai(user.role);
+  const createdAt = formatDateTime();
+  const doomed = (db
+    .prepare(`SELECT id FROM app_sessions WHERE user_id = ? AND expires_at > ?`)
+    .all(input.userId, formatDateTime()) as { id: string }[])
+    .filter((session) => session.id !== input.keepSessionId);
+  runInTransaction(db, () => {
+    db.prepare(`UPDATE app_users SET password_hash = ?, must_change_password = 0, failed_attempts = 0, locked_until = NULL WHERE id = ?`).run(hashPassword(input.newPassword), input.userId);
+    const deleteSession = db.prepare(`DELETE FROM app_sessions WHERE id = ?`);
+    for (const session of doomed) deleteSession.run(session.id);
+    logAction(
+      db,
+      "เปลี่ยนรหัสผ่าน",
+      actor,
+      forced ? "เปลี่ยนรหัสผ่านบังคับครั้งแรกเสร็จสิ้น · ยกเลิกเซสชันอื่นทั้งหมด" : "เปลี่ยนรหัสผ่านเรียบร้อย · ยกเลิกเซสชันอื่นทั้งหมด",
+      "green",
+      actorRole,
+      createdAt,
+    );
+  });
+  return { success: true, revokedSessions: doomed.length };
+}
 
 /** Creates a login account with a scrypt-hashed password and audits it. */
 export function createAppUser(db: SqliteDb, input: CreateAppUserInput): AppUserSummary {
@@ -2510,28 +2653,31 @@ export function createAppUser(db: SqliteDb, input: CreateAppUserInput): AppUserS
   if (db.prepare(`SELECT id FROM app_users WHERE LOWER(username) = LOWER(?)`).get(username)) {
     throw new StoreError("มีชื่อผู้ใช้นี้ในระบบแล้ว");
   }
-  if (typeof input.password !== "string" || input.password.length < 4) {
-    throw new StoreError("รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร");
+  // ROUND 36 (ข้อ 31) — กฎความแข็งแรงของรหัสผ่านตามบทบาท (dev เข้มที่สุด)
+  const strengthIssues = validatePasswordStrength(input.password ?? "", input.role);
+  if (strengthIssues.length > 0) {
+    throw new StoreError(strengthIssues.join(" · "));
   }
   const displayName = input.displayName?.trim() ?? "";
   if (!displayName) throw new StoreError("กรุณาระบุชื่อ-นามสกุลผู้ใช้");
   const createdAt = formatDateTime();
-  const result = db.prepare(`INSERT INTO app_users (username, password_hash, display_name, role, active, created_at) VALUES (?, ?, ?, ?, 1, ?)`).run(
+  // ROUND 36 — บัญชีใหม่ทุกบทบาทต้องเปลี่ยนรหัสผ่านเมื่อเข้าสู่ระบบครั้งแรก
+  const result = db.prepare(`INSERT INTO app_users (username, password_hash, display_name, role, active, created_at, must_change_password) VALUES (?, ?, ?, ?, 1, ?, 1)`).run(
     username,
     hashPassword(input.password),
     displayName,
     input.role,
     createdAt,
   );
-  const roleThai = input.role === "admin" ? "ผู้บริหาร" : "เจ้าหน้าที่";
-  logAction(db, "เพิ่มผู้ใช้ระบบ", input.actor?.trim() || "ผู้บริหาร", `${username} · ${displayName} · สิทธิ์ ${roleThai}`, "green", input.actorRole ?? null, createdAt);
+  const roleThai = appRoleThai(input.role);
+  logAction(db, "เพิ่มผู้ใช้ระบบ", input.actor?.trim() || "ผู้บริหาร", `${username} · ${displayName} · สิทธิ์ ${roleThai} · ผู้ใช้ใหม่ต้องเปลี่ยนรหัสผ่านเมื่อเข้าสู่ระบบครั้งแรก`, "green", input.actorRole ?? null, createdAt);
   return getAppUserSummaryById(db, Number(result.lastInsertRowid))!;
 }
 
 export type UpdateAppUserInput = {
   userId: number;
   displayName?: string;
-  role?: "staff" | "admin";
+  role?: AppUserRole;
   active?: boolean;
   password?: string;
   actor?: string;
@@ -2546,8 +2692,13 @@ export function updateAppUser(db: SqliteDb, input: UpdateAppUserInput): AppUserS
     throw new StoreError("กรุณาระบุชื่อ-นามสกุลผู้ใช้");
   }
   const newPassword = typeof input.password === "string" && input.password !== "" ? input.password : undefined;
-  if (newPassword !== undefined && newPassword.length < 4) {
-    throw new StoreError("รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร");
+  // ROUND 36 (ข้อ 31) — รหัสที่ผู้บริหารตั้งให้ผู้อื่น ต้องผ่านกฎความแข็งแรงตามบทบาท
+  // เป้าหมาย (บทบาทจะเปลี่ยนพร้อมกันก็ใช้บทบาทใหม่เลย)
+  if (newPassword !== undefined) {
+    const strengthIssues = validatePasswordStrength(newPassword, input.role ?? user.role);
+    if (strengthIssues.length > 0) {
+      throw new StoreError(strengthIssues.join(" · "));
+    }
   }
 
   const nextDisplayName = input.displayName !== undefined && input.displayName.trim() !== user.displayName ? input.displayName.trim() : undefined;
@@ -2602,9 +2753,10 @@ export function updateAppUser(db: SqliteDb, input: UpdateAppUserInput): AppUserS
       );
     }
     if (newPassword !== undefined) {
-      db.prepare(`UPDATE app_users SET password_hash = ? WHERE id = ?`).run(hashPassword(newPassword), input.userId);
+      // ROUND 36 — ตั้งรหัสใหม่ = บังคับให้ผู้ใช้เปลี่ยนอีกครั้งเมื่อเข้าสู่ระบบครั้งถัดไป
+      db.prepare(`UPDATE app_users SET password_hash = ?, must_change_password = 1 WHERE id = ?`).run(hashPassword(newPassword), input.userId);
       // The plaintext password must never appear anywhere in the audit trail.
-      logAction(db, "ตั้งรหัสผ่านใหม่", actor, `${user.username} · ตั้งรหัสผ่านใหม่`, "amber", input.actorRole ?? null, createdAt);
+      logAction(db, "ตั้งรหัสผ่านใหม่", actor, `${user.username} · ตั้งรหัสผ่านใหม่ · ผู้ใช้ต้องเปลี่ยนรหัสผ่านอีกครั้งเมื่อเข้าสู่ระบบครั้งถัดไป`, "amber", input.actorRole ?? null, createdAt);
     }
   });
   return getAppUserSummaryById(db, input.userId)!;
@@ -2718,21 +2870,9 @@ const SEED_AUDIT_LOGS: { action: string; actor: string; actorRole: string; detai
   { action: "ถอนเงินสมาชิก", actor: "น.ส.กัญญาณัฐ พ.", actorRole: "เจ้าหน้าที่", detail: "M-000092 · ฿200.00 · ถอนเพื่อถอนฟัน", tone: "purple", createdAt: "2026-09-17 12:06:00" },
 ];
 
-const SEED_APP_USERS: { username: string; password: string; displayName: string; role: "staff" | "admin" }[] = [
-  { username: "kanyanat", password: "1234", displayName: "กัญญาณัฐ พ.", role: "staff" },
-  { username: "woraphot", password: "1234", displayName: "วรพจน์ ด.", role: "admin" },
-];
-
-/** Idempotent demo login accounts — inserts only usernames that are still missing. */
-export function seedAppUsers(db: SqliteDb) {
-  const lookup = db.prepare(`SELECT id FROM app_users WHERE username = ?`);
-  const insert = db.prepare(`INSERT INTO app_users (username, password_hash, display_name, role, active, created_at) VALUES (?, ?, ?, ?, 1, ?)`);
-  for (const user of SEED_APP_USERS) {
-    if (!lookup.get(user.username)) {
-      insert.run(user.username, hashPassword(user.password), user.displayName, user.role, formatDateTime());
-    }
-  }
-}
+// ROUND 36 (ข้อ 31) — SEED_APP_USERS + seedAppUsers ถูกลบออก: ฐานข้อมูลใหม่เริ่มด้วย
+// ศูนย์บัญชีผู้ใช้เสมอ หน้าลงทะเบียนผู้บริหารหลัก (SetupView) จะโผล่มาเอง (ฐาน
+// ข้อมูลเดิมที่มีผู้ใช้อยู่แล้วไม่กระทบ — INSERT OR IGNORE เดิมก็ไม่เคยเขียนซ้ำ)
 
 /** Deterministic pseudo-random generator so seeded history is reproducible. */
 function createRng(seed: number) {
@@ -2805,7 +2945,9 @@ function seedHistoricalSales(db: SqliteDb) {
  * history. Each table only seeds when it is still empty.
  */
 export function seedWelfareStoreData(db: SqliteDb) {
-  seedAppUsers(db);
+  // ROUND 36 (ข้อ 31) — ไม่ seed บัญชีผู้ใช้: ฐานข้อมูลใหม่ (countAppUsers === 0)
+  // ต้องลงทะเบียนผู้บริหารหลักผ่าน SetupView → setupInitialAdmin แล้วบังคับ
+  // เปลี่ยนรหัสผ่านก่อนเข้าใช้งานจริง
   const insertMember = db.prepare(`INSERT OR IGNORE INTO members (member_number, first_name, last_name, id_card, balance, status, type) VALUES (?, ?, ?, ?, ?, ?, ?)`);
   for (const member of SEED_MEMBERS) {
     insertMember.run(member.memberNumber, member.firstName, member.lastName, null, member.balance, member.status, member.type);

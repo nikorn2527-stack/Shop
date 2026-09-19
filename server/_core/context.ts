@@ -30,7 +30,8 @@ function toDrizzleUser(user: {
   id: number;
   username: string;
   displayName: string;
-  role: "staff" | "admin";
+  role: "staff" | "admin" | "dev";
+  mustChangePassword?: number | boolean;
   createdAt: string;
 }): User {
   // created_at is stored as "YYYY-MM-DD HH:mm:ss"; Date parses it as local time
@@ -42,7 +43,10 @@ function toDrizzleUser(user: {
     name: user.displayName,
     email: null,
     loginMethod: "local",
-    role: user.role === "admin" ? "admin" : "user",
+    // dev accounts get admin-level access; appRole keeps the real identity.
+    role: user.role === "admin" || user.role === "dev" ? "admin" : "user",
+    appRole: user.role,
+    mustChangePassword: Boolean(user.mustChangePassword),
     createdAt,
     updatedAt: createdAt,
     lastSignedIn: createdAt,

@@ -3,7 +3,8 @@ import type { LucideIcon } from "lucide-react";
 import { BarChart3, LayoutDashboard, PackageSearch, ShoppingCart, UsersRound } from "lucide-react";
 
 export type View = "dashboard" | "pos" | "stock" | "members" | "reports" | "settings" | "logs" | "users";
-export type Role = "staff" | "admin";
+/** ROUND 36 (ข้อ 31) — เพิ่ม "dev": บัญชีผู้พัฒนา มีสิทธิ์ระดับผู้บริหารแต่แสดงตัวตนต่างกัน */
+export type Role = "staff" | "admin" | "dev";
 export type CartItem = { id: number; name: string; price: number; qty: number; unit: string; special?: boolean; variant?: string; step?: number };
 
 /** Round 31-12 — money-mode product price tier (ขายเป็นเงิน เช่น น้ำแข็ง ฿1 = 200 ก.) */
@@ -85,8 +86,18 @@ export function addTierItem(items: CartItem[], product: Product, tier: PriceTier
   return [...items, { id: product.id, name: tier.label ? `${product.name} · ${tier.label}` : product.name, price: tier.price, qty: tier.qty, unit: product.unit, variant, step: tier.qty }];
 }
 
+/** ROUND 36 — dev ได้สิทธิ์ระดับผู้บริหาร (เข้าถึง ตั้งค่า/ผู้ใช้/Log ได้) */
+export function isAdminRole(role: Role): boolean {
+  return role === "admin" || role === "dev";
+}
+
+/** ป้ายบทบาทสั้นภาษาไทย (ใช้กับ actorRole ที่ส่งให้ backend และข้อความ UI) */
+export function roleThaiLabel(role: Role): string {
+  return role === "admin" ? "ผู้บริหาร" : role === "dev" ? "ผู้พัฒนา" : "เจ้าหน้าที่";
+}
+
 export function canAccessView(role: Role, view: View) {
-  return role === "admin" || !["settings", "logs", "users"].includes(view);
+  return isAdminRole(role) || !["settings", "logs", "users"].includes(view);
 }
 
 export function isStockAlert(stock: number, reorderLevel = 10) {

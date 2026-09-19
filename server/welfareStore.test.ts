@@ -5,8 +5,10 @@ import { join } from "node:path";
 import {
   LOGIN_MAX_FAILURES,
   authenticateAppSession,
+  changeOwnPassword,
   checkout,
   clearLoginFailures,
+  countAppUsers,
   createAppSession,
   createAppUser,
   createSqliteStore,
@@ -40,12 +42,14 @@ import {
   setMemberNumberMode,
   setProductActive,
   setSettings,
+  setupInitialAdmin,
   stockCount,
   stockCountLots,
   unlockAppUser,
   updateAppUser,
   updateMember,
   updateProduct,
+  validatePasswordStrength,
   verifyPassword,
   walletTx,
 } from "./sqliteStore";
@@ -61,7 +65,19 @@ afterEach(() => {
 function freshDb() {
   db = createSqliteStore();
   seedWelfareStoreData(db);
+  seedTestUsers(db);
   return db;
+}
+
+/**
+ * ROUND 36 (ข้อ 31) — seedWelfareStoreData ไม่สร้างบัญชีผู้ใช้อีกแล้ว (ฐานข้อมูลใหม่
+ * ต้องลงทะเบียนผู้บริหารหลักเอง) ชุดเทสจึงหยิบบัญชีเดโมเดิม (รหัส 1234) มาเป็น
+ * fixture เอง เหมือนฐานข้อมูลจริงที่สร้างมาก่อนกฎความแข็งแรงของรหัสผ่าน
+ */
+function seedTestUsers(database: SqliteDb) {
+  const insert = database.prepare(`INSERT INTO app_users (username, password_hash, display_name, role, active, created_at, must_change_password) VALUES (?, ?, ?, ?, 1, ?, 0)`);
+  insert.run("kanyanat", hashPassword("1234"), "กัญญาณัฐ พ.", "staff", "2026-09-01 08:00:00");
+  insert.run("woraphot", hashPassword("1234"), "วรพจน์ ด.", "admin", "2026-09-01 08:05:00");
 }
 
 function productBySku(database: SqliteDb, sku: string): SqliteProduct {
@@ -972,21 +988,16 @@ describe("authentication", () => {
     expect(verifyPassword("1234", "scrypt$$")).toBe(false);
   });
 
-  it("seeds both demo login users idempotently via seedSqliteDemoData", () => {
+  it("no longer seeds login accounts — a fresh database starts with zero users (setup wizard shows)", () => {
     db = createSqliteStore();
+    seedWelfareStoreData(db);
     seedSqliteDemoData(db);
 
-    const staff = findAppUserByUsername(db, "kanyanat");
-    expect(staff).toMatchObject({ username: "kanyanat", displayName: "กัญญาณัฐ พ.", role: "staff", active: 1 });
-    expect(verifyPassword("1234", staff!.passwordHash)).toBe(true);
-
-    const admin = findAppUserByUsername(db, "woraphot");
-    expect(admin).toMatchObject({ username: "woraphot", displayName: "วรพจน์ ด.", role: "admin", active: 1 });
-    expect(verifyPassword("1234", admin!.passwordHash)).toBe(true);
-
-    expect(tableCount(db, "app_users")).toBe(2);
-    seedSqliteDemoData(db);
-    expect(tableCount(db, "app_users")).toBe(2);
+    // ROUND 36 (ข้อ 31) — การ seed ไม่แตะตาราง app_users อีกต่อไป: ระบบใหม่ต้อง
+    // ลงทะเบียนผู้บริหารหลักผ่าน setupInitialAdmin เท่านั้น
+    expect(countAppUsers(db)).toBe(0);
+    expect(findAppUserByUsername(db, "kanyanat")).toBeUndefined();
+    expect(findAppUserByUsername(db, "woraphot")).toBeUndefined();
   });
 
   it("round-trips a session and rejects unknown session ids", () => {
@@ -1157,7 +1168,7 @@ describe("user management", () => {
     expect(users.map((user) => user.username)).toEqual(["kanyanat", "woraphot"]);
     expect(users.map((user) => user.id)).toEqual([...users.map((user) => user.id)].sort((a, b) => a - b));
     for (const user of users) {
-      expect(Object.keys(user).sort()).toEqual(["active", "createdAt", "displayName", "failedAttempts", "id", "lockedUntil", "role", "username"]);
+      expect(Object.keys(user).sort()).toEqual(["active", "createdAt", "displayName", "failedAttempts", "id", "lockedUntil", "mustChangePassword", "role", "username"]);
     }
     expect(JSON.stringify(users)).not.toContain("scrypt");
   });
@@ -1166,47 +1177,50 @@ describe("user management", () => {
     const database = freshDb();
     const created = createAppUser(database, {
       username: "somchai.j",
-      password: "secret9",
+      password: "secret99",
       displayName: " สมชาย ใจดี ",
       role: "staff",
       actor: "นายวรพจน์ ด.",
       actorRole: "ผู้บริหาร",
     });
 
-    expect(created).toMatchObject({ id: expect.any(Number), username: "somchai.j", displayName: "สมชาย ใจดี", role: "staff", active: 1 });
+    expect(created).toMatchObject({ id: expect.any(Number), username: "somchai.j", displayName: "สมชาย ใจดี", role: "staff", active: 1, mustChangePassword: 1 });
     expect(created.createdAt).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/);
 
     const row = database.prepare(`SELECT password_hash AS passwordHash FROM app_users WHERE id = ?`).get(created.id) as { passwordHash: string };
     expect(row.passwordHash.startsWith("scrypt$")).toBe(true);
-    expect(verifyPassword("secret9", row.passwordHash)).toBe(true);
+    expect(verifyPassword("secret99", row.passwordHash)).toBe(true);
     expect(verifyPassword("wrongpass", row.passwordHash)).toBe(false);
 
     const latest = listAuditLogs(database, 1)[0];
     expect(latest.action).toBe("เพิ่มผู้ใช้ระบบ");
     expect(latest.actor).toBe("นายวรพจน์ ด.");
     expect(latest.actorRole).toBe("ผู้บริหาร");
-    expect(latest.detail).toBe("somchai.j · สมชาย ใจดี · สิทธิ์ เจ้าหน้าที่");
+    expect(latest.detail).toBe("somchai.j · สมชาย ใจดี · สิทธิ์ เจ้าหน้าที่ · ผู้ใช้ใหม่ต้องเปลี่ยนรหัสผ่านเมื่อเข้าสู่ระบบครั้งแรก");
     expect(latest.tone).toBe("green");
     expect(listAppUsers(database)).toHaveLength(3);
   });
 
   it("rejects duplicate usernames, including different casing", () => {
     const database = freshDb();
-    const attempt = (username: string) => createAppUser(database, { username, password: "1234", displayName: "ทดสอบ ระบบ", role: "staff" });
+    const attempt = (username: string) => createAppUser(database, { username, password: "pass1234", displayName: "ทดสอบ ระบบ", role: "staff" });
     expect(() => attempt("kanyanat")).toThrowError(/มีชื่อผู้ใช้นี้ในระบบแล้ว/);
     expect(() => attempt("Kanyanat")).toThrowError(/มีชื่อผู้ใช้นี้ในระบบแล้ว/);
     expect(() => attempt("WORAPHOT")).toThrowError(/มีชื่อผู้ใช้นี้ในระบบแล้ว/);
     expect(tableCount(database, "app_users")).toBe(2);
   });
 
-  it("validates username format, password length and display name with Thai errors", () => {
+  it("validates username format, password strength and display name with Thai errors", () => {
     const database = freshDb();
-    const base = { password: "1234", displayName: "ทดสอบ ระบบ", role: "staff" as const };
+    const base = { password: "pass1234", displayName: "ทดสอบ ระบบ", role: "staff" as const };
     expect(() => createAppUser(database, { ...base, username: "สมชาย" })).toThrowError(/ชื่อผู้ใช้ต้องเป็นตัวอักษรอังกฤษ ตัวเลข จุด หรือขีดล่าง ความยาว 3-30 ตัวอักษร/);
     expect(() => createAppUser(database, { ...base, username: "ab" })).toThrowError(/ชื่อผู้ใช้ต้องเป็นตัวอักษรอังกฤษ/);
     expect(() => createAppUser(database, { ...base, username: "a".repeat(31) })).toThrowError(/ชื่อผู้ใช้ต้องเป็นตัวอักษรอังกฤษ/);
-    expect(() => createAppUser(database, { username: "new.user", password: "123", displayName: "ทดสอบ ระบบ", role: "staff" })).toThrowError(/รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร/);
-    expect(() => createAppUser(database, { username: "new.user", password: "1234", displayName: "   ", role: "staff" })).toThrowError(/กรุณาระบุชื่อ-นามสกุลผู้ใช้/);
+    // ROUND 36 — รหัสอ่อนเกินไป: สั้น / ไม่มีตัวอักษร / ไม่มีตัวเลข (ข้อความรวมทุกปัญหา)
+    expect(() => createAppUser(database, { username: "new.user", password: "123", displayName: "ทดสอบ ระบบ", role: "staff" })).toThrowError(/ความยาวอย่างน้อย 8 ตัวอักษร/);
+    expect(() => createAppUser(database, { username: "new.user", password: "12345678", displayName: "ทดสอบ ระบบ", role: "staff" })).toThrowError(/ต้องมีตัวอักษรอย่างน้อย 1 ตัว/);
+    expect(() => createAppUser(database, { username: "new.user", password: "abcdefgh", displayName: "ทดสอบ ระบบ", role: "staff" })).toThrowError(/ต้องมีตัวเลขอย่างน้อย 1 ตัว/);
+    expect(() => createAppUser(database, { username: "new.user", password: "pass1234", displayName: "   ", role: "staff" })).toThrowError(/กรุณาระบุชื่อ-นามสกุลผู้ใช้/);
     expect(tableCount(database, "app_users")).toBe(2);
   });
 
@@ -1247,7 +1261,7 @@ describe("user management", () => {
     expect(tableCount(database, "app_users")).toBe(2);
 
     // A second active admin frees the first one to be demoted.
-    const second = createAppUser(database, { username: "admin.two", password: "1234", displayName: "ผู้บริหาร สอง", role: "admin" });
+    const second = createAppUser(database, { username: "admin.two", password: "admin2pass", displayName: "ผู้บริหาร สอง", role: "admin" });
     const demoted = updateAppUser(database, { userId: woraphot.id, role: "staff" });
     expect(demoted.role).toBe("staff");
 
@@ -1261,26 +1275,153 @@ describe("user management", () => {
     const kanyanat = findAppUserByUsername(database, "kanyanat")!;
     const readHash = () => (database.prepare(`SELECT password_hash AS passwordHash FROM app_users WHERE id = ?`).get(kanyanat.id) as { passwordHash: string }).passwordHash;
 
-    const updated = updateAppUser(database, { userId: kanyanat.id, password: "newpass" });
+    const updated = updateAppUser(database, { userId: kanyanat.id, password: "newpass99" });
     expect(updated.username).toBe("kanyanat");
-    expect(verifyPassword("newpass", readHash())).toBe(true);
+    expect(verifyPassword("newpass99", readHash())).toBe(true);
     expect(verifyPassword("1234", readHash())).toBe(false);
 
     const latest = listAuditLogs(database, 1)[0];
     expect(latest.action).toBe("ตั้งรหัสผ่านใหม่");
-    expect(latest.detail).toBe("kanyanat · ตั้งรหัสผ่านใหม่");
-    expect(latest.detail).not.toContain("newpass");
+    expect(latest.detail).toBe("kanyanat · ตั้งรหัสผ่านใหม่ · ผู้ใช้ต้องเปลี่ยนรหัสผ่านอีกครั้งเมื่อเข้าสู่ระบบครั้งถัดไป");
+    expect(latest.detail).not.toContain("newpass99");
     // Only the password changed → no "แก้ไขผู้ใช้ระบบ" entry was written.
     expect(listAuditLogs(database, 200).some((entry) => entry.action === "แก้ไขผู้ใช้ระบบ")).toBe(false);
+
+    // ROUND 36 — ตั้งรหัสใหม่ = บังคับให้เปลี่ยนอีกครั้งตอนเข้าสู่ระบบครั้งถัดไป
+    expect((database.prepare(`SELECT must_change_password AS flag FROM app_users WHERE id = ?`).get(kanyanat.id) as { flag: number }).flag).toBe(1);
 
     // Empty password strings are treated as "no change".
     const logsBefore = tableCount(database, "audit_logs");
     updateAppUser(database, { userId: kanyanat.id, password: "" });
-    expect(verifyPassword("newpass", readHash())).toBe(true);
+    expect(verifyPassword("newpass99", readHash())).toBe(true);
     expect(tableCount(database, "audit_logs")).toBe(logsBefore);
 
-    // Short passwords are rejected.
-    expect(() => updateAppUser(database, { userId: kanyanat.id, password: "abc" })).toThrowError(/รหัสผ่านต้องมีอย่างน้อย 4 ตัวอักษร/);
+    // Weak passwords are rejected with the joined strength-policy issues.
+    expect(() => updateAppUser(database, { userId: kanyanat.id, password: "abc" })).toThrowError(/ความยาวอย่างน้อย 8 ตัวอักษร/);
+  });
+});
+
+// ROUND 36 (ข้อ 31) — ลงทะเบียนครั้งแรก + บังคับเปลี่ยนรหัสผ่าน + บัญชี dev
+describe("first-time setup (setupInitialAdmin)", () => {
+  it("creates the first admin on an empty database with must_change_password and an audit log", () => {
+    db = createSqliteStore();
+    seedWelfareStoreData(db);
+    expect(countAppUsers(db)).toBe(0);
+
+    const owner = setupInitialAdmin(db, { username: "owner", displayName: "เจ้าของร้าน ท.", password: "firstpass1", storeName: "ร้านทดสอบสวัสดิการ" });
+
+    expect(owner).toMatchObject({ username: "owner", displayName: "เจ้าของร้าน ท.", role: "admin", active: 1, mustChangePassword: 1 });
+    expect(countAppUsers(db)).toBe(1);
+    const row = db.prepare(`SELECT password_hash AS passwordHash FROM app_users WHERE username = 'owner'`).get() as { passwordHash: string };
+    expect(verifyPassword("firstpass1", row.passwordHash)).toBe(true);
+    // storeName ถูกนำไปตั้งเป็นชื่อร้าน + ชื่อแอปด้วย
+    expect(getSettings(db).storeName).toBe("ร้านทดสอบสวัสดิการ");
+    expect(getSettings(db).appName).toBe("ร้านทดสอบสวัสดิการ");
+    const latest = listAuditLogs(db, 1)[0];
+    expect(latest).toMatchObject({ action: "ตั้งค่าระบบครั้งแรก", actor: "เจ้าของร้าน ท.", actorRole: "ผู้บริหาร", tone: "green" });
+    expect(latest.detail).toContain("@owner");
+    expect(latest.detail).toContain("ชื่อร้าน ร้านทดสอบสวัสดิการ");
+  });
+
+  it("refuses a second registration once any account exists", () => {
+    const database = freshDb(); // มี kanyanat + woraphot อยู่แล้ว
+    expect(() => setupInitialAdmin(database, { username: "owner2", displayName: "คนที่สอง", password: "secondpass1" }))
+      .toThrowError(/ระบบถูกตั้งค่าผู้บริหารไว้แล้ว · ไม่สามารถลงทะเบียนซ้ำได้/);
+    expect(countAppUsers(database)).toBe(2);
+  });
+
+  it("validates username, display name and password strength with Thai errors", () => {
+    db = createSqliteStore();
+    expect(() => setupInitialAdmin(db, { username: "  ", displayName: "เจ้าของร้าน", password: "firstpass1" })).toThrowError(/กรุณาระบุชื่อผู้ใช้/);
+    expect(() => setupInitialAdmin(db, { username: "own er", displayName: "เจ้าของร้าน", password: "firstpass1" })).toThrowError(/ชื่อผู้ใช้ห้ามมีช่องว่าง/);
+    expect(() => setupInitialAdmin(db, { username: "a".repeat(31), displayName: "เจ้าของร้าน", password: "firstpass1" })).toThrowError(/ชื่อผู้ใช้ต้องไม่เกิน 30 ตัวอักษร/);
+    expect(() => setupInitialAdmin(db, { username: "owner", displayName: "   ", password: "firstpass1" })).toThrowError(/กรุณาระบุชื่อ-นามสกุลผู้บริหาร/);
+    // รหัสอ่อน: สั้น → บอกครบทุกปัญหาในข้อความเดียว
+    expect(() => setupInitialAdmin(db, { username: "owner", displayName: "เจ้าของร้าน", password: "abc1" }))
+      .toThrowError(/ความยาวอย่างน้อย 8 ตัวอักษร/);
+    expect(() => setupInitialAdmin(db, { username: "owner", displayName: "เจ้าของร้าน", password: "12345678" }))
+      .toThrowError(/ต้องมีตัวอักษรอย่างน้อย 1 ตัว/);
+    expect(countAppUsers(db)).toBe(0);
+  });
+});
+
+describe("change own password (forced first change)", () => {
+  const currentPassword = "legacy123";
+  const newPassword = "brandnew99";
+  function userWithPendingChange(database: SqliteDb) {
+    const created = createAppUser(database, { username: "new.staff", password: currentPassword, displayName: "พนักงาน ใหม่", role: "staff" });
+    expect(created.mustChangePassword).toBe(1);
+    return created;
+  }
+
+  it("rejects a wrong current password, a same-as-old new password and weak passwords", () => {
+    const database = freshDb();
+    const user = userWithPendingChange(database);
+
+    expect(() => changeOwnPassword(database, { userId: user.id, currentPassword: "wrongpass1", newPassword })).toThrowError(/รหัสผ่านปัจจุบันไม่ถูกต้อง/);
+    expect(() => changeOwnPassword(database, { userId: user.id, currentPassword, newPassword: currentPassword })).toThrowError(/รหัสผ่านใหม่ต้องไม่ซ้ำกับรหัสผ่านปัจจุบัน/);
+    expect(() => changeOwnPassword(database, { userId: user.id, currentPassword, newPassword: "short1" })).toThrowError(/ความยาวอย่างน้อย 8 ตัวอักษร/);
+    expect(() => changeOwnPassword(database, { userId: 999, currentPassword, newPassword })).toThrowError(/ไม่พบบัญชีผู้ใช้นี้/);
+    // ไม่มีอะไรเปลี่ยน
+    expect(verifyPassword(currentPassword, (database.prepare(`SELECT password_hash AS passwordHash FROM app_users WHERE id = ?`).get(user.id) as { passwordHash: string }).passwordHash)).toBe(true);
+  });
+
+  it("clears the flag, rewrites the hash and revokes every other session but the current one", () => {
+    const database = freshDb();
+    const user = userWithPendingChange(database);
+
+    const mine = createAppSession(database, user.id);
+    const otherDevice = createAppSession(database, user.id);
+    const staffSession = createAppSession(database, findAppUserByUsername(database, "kanyanat")!.id);
+
+    const result = changeOwnPassword(database, { userId: user.id, currentPassword, newPassword, keepSessionId: mine.sessionId });
+    expect(result).toEqual({ success: true, revokedSessions: 1 }); // เฉพาะ otherDevice — เซสชันที่ใช้อยู่ถูกไว้
+
+    // ธงบังคับเปลี่ยนรหัสถูกล้าง + รหัสเก่าใช้ไม่ได้อีก
+    const row = database.prepare(`SELECT password_hash AS passwordHash, must_change_password AS flag FROM app_users WHERE id = ?`).get(user.id) as { passwordHash: string; flag: number };
+    expect(row.flag).toBe(0);
+    expect(verifyPassword(newPassword, row.passwordHash)).toBe(true);
+    expect(verifyPassword(currentPassword, row.passwordHash)).toBe(false);
+
+    // เซสชันที่ใช้อยู่ยังมีชีวิต · เซสชันอื่นของบัญชีนี้ถูกยกเลิก · เซสชันคนอื่นไม่กระทบ
+    expect(authenticateAppSession(database, mine.sessionId)).toMatchObject({ username: "new.staff" });
+    expect(authenticateAppSession(database, otherDevice.sessionId)).toBeUndefined();
+    expect(authenticateAppSession(database, staffSession.sessionId)).toMatchObject({ username: "kanyanat" });
+
+    const latest = listAuditLogs(database, 1)[0];
+    expect(latest).toMatchObject({ action: "เปลี่ยนรหัสผ่าน", actor: "พนักงาน ใหม่", actorRole: "เจ้าหน้าที่", tone: "green" });
+    expect(latest.detail).toContain("เปลี่ยนรหัสผ่านบังคับครั้งแรกเสร็จสิ้น");
+    expect(latest.detail).toContain("ยกเลิกเซสชันอื่นทั้งหมด");
+  });
+});
+
+describe("dev accounts (role \"dev\")", () => {
+  it("requires a 12+ character password with letters, digits AND a symbol", () => {
+    const database = freshDb();
+    expect(() => createAppUser(database, { username: "devhelp", password: "devpass123", displayName: "ผู้พัฒนา ระบบ", role: "dev" }))
+      .toThrowError(/ความยาวอย่างน้อย 12 ตัวอักษร/);
+    expect(() => createAppUser(database, { username: "devhelp", password: "devpass1234", displayName: "ผู้พัฒนา ระบบ", role: "dev" }))
+      .toThrowError(/สัญลักษณ์พิเศษอย่างน้อย 1 ตัว/);
+
+    const created = createAppUser(database, { username: "devhelp", password: "devPass#2026!", displayName: "ผู้พัฒนา ระบบ", role: "dev" });
+    expect(created).toMatchObject({ username: "devhelp", role: "dev", active: 1, mustChangePassword: 1 });
+    // บัญชี dev ไหลผ่าน listAppSessions / listAppUsers ตามปกติ
+    const session = createAppSession(database, created.id);
+    expect(authenticateAppSession(database, session.sessionId)).toMatchObject({ username: "devhelp", role: "dev" });
+    expect(listAppUsers(database).map((user) => user.role)).toContain("dev");
+    const latest = listAuditLogs(database, 1)[0];
+    expect(latest.detail).toContain("สิทธิ์ ผู้พัฒนา");
+  });
+
+  it("validatePasswordStrength mirrors the policy per role", () => {
+    expect(validatePasswordStrength("")).toEqual(["กรุณาระบุรหัสผ่าน"]);
+    expect(validatePasswordStrength("abc12345")).toEqual([]);
+    expect(validatePasswordStrength("abc1234")).toEqual(["รหัสผ่านต้องมีความยาวอย่างน้อย 8 ตัวอักษร"]);
+    expect(validatePasswordStrength("abcdefgh")).toEqual(["รหัสผ่านต้องมีตัวเลขอย่างน้อย 1 ตัว"]);
+    expect(validatePasswordStrength("12345678")).toEqual(["รหัสผ่านต้องมีตัวอักษรอย่างน้อย 1 ตัว"]);
+    expect(validatePasswordStrength("devpass1234!", "dev")).toEqual([]);
+    expect(validatePasswordStrength("devpass123", "dev")).toContain("รหัสผ่านต้องมีความยาวอย่างน้อย 12 ตัวอักษร");
+    expect(validatePasswordStrength("devpass12345", "dev")).toEqual(["รหัสผ่านบัญชีผู้พัฒนา (dev) ต้องมีสัญลักษณ์พิเศษอย่างน้อย 1 ตัว เช่น ! @ # $"]);
   });
 });
 

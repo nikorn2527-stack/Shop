@@ -9,8 +9,11 @@ import { getWelfareDb } from "./welfareStore";
 import {
   LOGIN_MAX_FAILURES,
   StoreError,
+  appRoleThai,
+  changeOwnPassword,
   checkout,
   clearLoginFailures,
+  countAppUsers,
   createAppSession,
   createAppUser,
   createProduct,
@@ -49,6 +52,7 @@ import {
   setMemberStatus,
   setProductActive,
   setSettings,
+  setupInitialAdmin,
   stockCount,
   stockCountLots,
   listOrderItems,
@@ -92,7 +96,7 @@ function resolveActor(ctx: TrpcContext, input: { actor?: string; actorRole?: str
   if (ctx.user) {
     return {
       actor: ctx.user.name ?? "ผู้ใช้ระบบ",
-      actorRole: ctx.user.role === "admin" ? "ผู้บริหาร" : "เจ้าหน้าที่",
+      actorRole: ctx.user.role === "admin" ? (ctx.user.appRole === "dev" ? "ผู้พัฒนา" : "ผู้บริหาร") : "เจ้าหน้าที่",
     };
   }
   return { actor: input.actor, actorRole: input.actorRole };
@@ -360,6 +364,8 @@ const settingsPatchInput = z
     expiryAlertDays: z.number().int().min(1).max(365).optional(),
     dailyCutOffMode: z.enum(["auto", "manual"]).optional(),
     dailyCutOffTime: z.string().regex(/^([01]?\d|2[0-3]):[0-5]\d$/, "รูปแบบเวลาต้องเป็น HH:MM").optional(),
+    // ROUND 36 (ข้อ 31) — ประตูบัญชีผู้พัฒนา (dev): ปิดไว้เป็นค่าเริ่มต้น เปิดเฉพาะเมื่อจำเป็น
+    devAccess: z.boolean().optional(),
   })
   .nullish();
 
@@ -368,17 +374,30 @@ const authLoginInput = z.object({
   password: z.string().min(1, "กรุณากรอกรหัสผ่าน"),
 });
 
+// ROUND 36 (ข้อ 31) — ลงทะเบียนครั้งแรก: ใช้ได้เฉพาะระบบที่ยังไม่มีบัญชีผู้ใช้เลย
+const authSetupInput = z.object({
+  username: z.string().min(1).max(30).regex(/^[^\s]+$/, "ชื่อผู้ใช้ห้ามมีช่องว่าง"),
+  displayName: z.string().min(1),
+  password: z.string().min(1),
+  storeName: z.string().max(80).optional(),
+});
+
+const authChangePasswordInput = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(1),
+});
+
 const userCreateInput = z.object({
   username: z.string().min(1, "กรุณาระบุชื่อผู้ใช้"),
   password: z.string().min(1, "กรุณากรอกรหัสผ่าน"),
   displayName: z.string().min(1, "กรุณาระบุชื่อ-นามสกุล"),
-  role: z.enum(["staff", "admin"]),
+  role: z.enum(["staff", "admin", "dev"]),
 });
 
 const userUpdateInput = z.object({
   userId: z.number().int().positive(),
   displayName: z.string().optional(),
-  role: z.enum(["staff", "admin"]).optional(),
+  role: z.enum(["staff", "admin", "dev"]).optional(),
   active: z.boolean().optional(),
   password: z.string().optional(),
 });
@@ -388,6 +407,47 @@ export const appRouter = router({
   system: systemRouter,
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
+    /** ROUND 36 (ข้อ 31) — สถานะลงทะเบียนครั้งแรก: needsSetup = ยังไม่มีบัญชีผู้ใช้เลย */
+    setupStatus: publicProcedure.query(() => withStoreErrors(() => ({ needsSetup: countAppUsers(getWelfareDb()) === 0 }))),
+    /** ROUND 36 (ข้อ 31) — ลงทะเบียนผู้บริหารหลัก (ระบบใหม่เท่านั้น) แล้วเข้าสู่ระบบทันที */
+    setup: publicProcedure
+      .input(authSetupInput)
+      .mutation(({ ctx, input }) =>
+        withStoreErrors(() => {
+          const db = getWelfareDb();
+          const user = setupInitialAdmin(db, input);
+          const roleThai = "ผู้บริหาร";
+          const session = createAppSession(db, user.id);
+          ctx.res.cookie(COOKIE_NAME, session.sessionId, {
+            httpOnly: true,
+            path: "/",
+            sameSite: "lax",
+            secure: isSecureRequest(ctx.req),
+            maxAge: 7 * 24 * 60 * 60 * 1000,
+          });
+          logAction(db, "เข้าสู่ระบบ", user.displayName, `${user.username} · สิทธิ์ ${roleThai}`, "blue", roleThai);
+          return { id: user.id, username: user.username, displayName: user.displayName, role: user.role, mustChangePassword: true };
+        }),
+      ),
+    /** ROUND 36 (ข้อ 31) — เปลี่ยนรหัสผ่านของตัวเอง (บังคับตอน first login / ตั้งใหม่โดยผู้บริหาร) */
+    changePassword: publicProcedure
+      .input(authChangePasswordInput)
+      .mutation(({ ctx, input }) =>
+        withStoreErrors(() => {
+          if (!ctx.user) {
+            throw new TRPCError({ code: "UNAUTHORIZED", message: "กรุณาเข้าสู่ระบบก่อนเปลี่ยนรหัสผ่าน" });
+          }
+          const { actor, actorRole } = resolveActor(ctx, {});
+          return changeOwnPassword(getWelfareDb(), {
+            userId: ctx.user.id,
+            currentPassword: input.currentPassword,
+            newPassword: input.newPassword,
+            keepSessionId: readAppSessionCookie(ctx.req),
+            actor,
+            actorRole,
+          });
+        }),
+      ),
     login: publicProcedure
       .input(authLoginInput)
       .mutation(({ ctx, input }) =>
@@ -416,8 +476,16 @@ export const appRouter = router({
                   : "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง",
             });
           }
+          // ROUND 36 (ข้อ 31) — ประตูบัญชีผู้พัฒนา (dev): ตรวจหลังรหัสผ่านถูกต้อง
+          // แล้วเท่านั้น เพื่อไม่เปิดช่องให้เดารหัสผ่านของบัญชี dev จากข้อความปฏิเสธ
+          if (user.role === "dev" && !getSettings(db).devAccess) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "การเข้าใช้งานสำหรับผู้พัฒนา (dev) ถูกปิดอยู่ · ให้ผู้บริหารเปิดได้ที่ ตั้งค่า → สิทธิ์และความปลอดภัย",
+            });
+          }
           clearLoginFailures(db, user.id);
-          const roleThai = user.role === "admin" ? "ผู้บริหาร" : "เจ้าหน้าที่";
+          const roleThai = appRoleThai(user.role);
           const session = createAppSession(db, user.id);
           ctx.res.cookie(COOKIE_NAME, session.sessionId, {
             httpOnly: true,
@@ -426,8 +494,13 @@ export const appRouter = router({
             secure: isSecureRequest(ctx.req),
             maxAge: 7 * 24 * 60 * 60 * 1000,
           });
-          logAction(db, "เข้าสู่ระบบ", user.displayName, `${user.username} · สิทธิ์ ${roleThai}`, "blue", roleThai);
-          return { id: user.id, username: user.username, displayName: user.displayName, role: user.role };
+          // บัญชี dev คือการเข้าถึงพิเศษ — บันทึกสีแดงและขึ้นต้นรายละเอียดด้วย DEV
+          if (user.role === "dev") {
+            logAction(db, "เข้าสู่ระบบ", user.displayName, `DEV · ${user.username} · สิทธิ์ ${roleThai}`, "red", roleThai);
+          } else {
+            logAction(db, "เข้าสู่ระบบ", user.displayName, `${user.username} · สิทธิ์ ${roleThai}`, "blue", roleThai);
+          }
+          return { id: user.id, username: user.username, displayName: user.displayName, role: user.role, mustChangePassword: user.mustChangePassword === 1 };
         }),
       ),
     logout: publicProcedure.mutation(({ ctx }) => {
@@ -438,7 +511,7 @@ export const appRouter = router({
           const db = getWelfareDb();
           deleteAppSession(db, sessionId);
           if (ctx.user) {
-            const roleThai = ctx.user.role === "admin" ? "ผู้บริหาร" : "เจ้าหน้าที่";
+            const roleThai = ctx.user.role === "admin" ? (ctx.user.appRole === "dev" ? "ผู้พัฒนา" : "ผู้บริหาร") : "เจ้าหน้าที่";
             logAction(db, "ออกจากระบบ", ctx.user.name ?? "ผู้ใช้ระบบ", `${ctx.user.openId} · สิทธิ์ ${roleThai}`, "green", roleThai);
           }
         }

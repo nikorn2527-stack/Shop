@@ -3348,3 +3348,97 @@ th { font-weight: 600; }
 
 /* (6) แถววงเงินบนการ์ดยืนยันสมาชิกที่ POS (ก่อนหักบัญชี) */
 .member-confirm-info small.member-limit-line { display: flex; align-items: center; gap: 4px; color: #8870af; font-weight: 600; cursor: help; }
+
+/* ═══ ROUND 35 — ข้อ 29-30 จากผู้ใช้: หัวตาราง/ข้อมูลเยื้องคนละฝั่ง + ไอเท็บารายเมนูที่เลือกอ่านไม่เห็น ═══ */
+
+/* ── 35-29: หัวตารางเอนทิตีต้องชิดฝั่งเดียวกับข้อมูลในคอลัมน์เดียวกัน
+   เดิมกฎมีแค่ .entity-table td.num { text-align: right } — หัว (th.num)
+   กลับชิดซ้ายตามค่าเริ่มต้น ทำให้ "คงเหลือ/ราคาขาย/ล็อต" กับตัวเลขอยู่คนละฝั่ง ── */
+.entity-table th { text-align: left; }
+.entity-table th.num { text-align: right; }
+
+/* ── 35-30: รายการเมนูที่เลือก — พื้นหลังเขียวอ่อน (ROUND 23) แต่ตัวหนังสือ b
+   และไอคอนยังค้างสีขาวจากยุคพื้นหลังเขียวเข้ม (ROUND 18) จนกลืนหาย
+   ให้สืบทอดสีเขียวเข้มจากปุ่มแทน เห็นชัดทั้งชื่อเมนูและไอคอน ── */
+nav button.active b { color: inherit; }
+nav button.active svg { color: inherit; }
+nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: none; }
+
+/* ═══ ROUND 36 — ข้อ 31: ลงทะเบียนครั้งแรก + บังคับเปลี่ยนรหัสผ่าน + Dev Access ═══ */
+/* (หมายเหตุ: ROUND 35 ถูกใช้ไปกับข้อ 29-30 — บล็อกนี้จึงเป็น ROUND 36 ตามลำดับ) */
+
+/* ── 36-1: หน้าลงทะเบียนผู้บริหารหลัก (SetupView) — ใช้โครง login-card เดิม
+   เพิ่มหัวเรื่อง + ช่องชื่อร้านที่มีไอคอนนำหน้า ── */
+.setup-head { margin: 14px 0 4px; text-align: left; }
+.setup-head h1 { margin: 0; color: #3e5d51; font-size: 19px; font-weight: 700; }
+.setup-head p { margin: 4px 0 0; color: #7c806f; font-size: 11.5px; line-height: 1.5; }
+.setup-field-hint { display: block; margin-top: 4px; font-size: 10px; font-weight: 500; color: #8f947f; }
+.setup-store-input { display: flex; align-items: center; gap: 7px; margin-top: 6px; }
+.setup-store-input svg { color: #9aa89e; flex: 0 0 auto; }
+.setup-store-input input { flex: 1; min-width: 0; margin-top: 0; }
+
+/* ── 36-2: หน้าบังคับเปลี่ยนรหัสผ่าน (ForceChangeView) ── */
+.force-change-head { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; margin: 14px 0 2px; text-align: left; }
+.force-change-icon { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 11px; color: #a6791f; background: #fdf4e0; margin-bottom: 2px; }
+.force-change-head h1 { margin: 0; color: #3e5d51; font-size: 18px; font-weight: 700; line-height: 1.35; }
+.force-change-head p { margin: 0; color: #7c806f; font-size: 11px; line-height: 1.55; }
+.force-change-identity { display: flex; align-items: center; gap: 10px; background: #fafcfb; border: 1px solid #edf2f0; border-radius: 10px; padding: 9px 11px; margin: 12px 0 2px; }
+.force-change-identity .role-avatar { width: 34px; height: 34px; font-size: 14px; }
+.force-change-identity b { display: block; color: #42594f; font-size: 13px; }
+.force-change-identity small { display: flex; align-items: center; gap: 5px; color: #7c806f; font-size: 10px; margin-top: 2px; flex-wrap: wrap; }
+.force-change-logout { display: inline-flex; align-items: center; gap: 5px; margin: 14px auto 0; padding: 7px 12px; border: 0; border-radius: 8px; background: none; color: #9aa194; font-size: 10.5px; font-weight: 600; cursor: pointer; transition: .14s ease; }
+.force-change-logout:hover { color: #b05457; background: #fdf3f3; }
+
+/* ── 36-3: ตัววัดความแข็งแรงของรหัสผ่าน (PasswordMeter) ── */
+.pw-meter { margin-top: 2px; background: #fafcfb; border: 1px solid #edf2f0; border-radius: 10px; padding: 10px 11px; }
+.pw-meter-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pw-meter-head span { color: #7c806f; font-size: 10px; font-weight: 600; }
+.pw-meter-head b { font-size: 10px; font-weight: 700; color: #b05457; }
+.pw-meter-head b[data-score="3"] { color: #a6791f; }
+.pw-meter-head b[data-score="4"] { color: #3f8a6d; }
+.pw-meter-bar { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; margin: 7px 0 8px; }
+.pw-meter-bar i { height: 4px; border-radius: 3px; background: #e6ece8; transition: background .18s ease; }
+.pw-meter-bar i.s1 { background: #d98d89; }
+.pw-meter-bar i.s2 { background: #dcae6b; }
+.pw-meter-bar i.s3 { background: #a3c98f; }
+.pw-meter-bar i.s4 { background: #3f8a6d; }
+.pw-meter-rules { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.pw-meter-rules li { display: inline-flex; align-items: center; gap: 4px; color: #9aa194; font-size: 9.5px; font-weight: 500; }
+.pw-meter-rules li[data-ok="true"] { color: #3f8a6d; }
+.pw-meter-rules li svg { flex: 0 0 auto; }
+
+/* ── 36-4: ป้าย DEV สีแดง — sidebar role card / topbar / ผู้ใช้ที่กำลังเปลี่ยนรหัส ── */
+.dev-role-badge { display: inline-flex; align-items: center; margin-left: 6px; padding: 1.5px 6px; border-radius: 20px; background: #bd6c65; color: #fff; font-family: "IBM Plex Mono", monospace; font-size: 8.5px; font-weight: 700; letter-spacing: .8px; font-style: normal; vertical-align: middle; line-height: 1.5; }
+.role-card .dev-role-badge, .force-change-identity .dev-role-badge { transform: translateY(-1px); }
+.role-card .role-avatar.dev, .profile-pill .profile-avatar.dev, .force-change-identity .role-avatar.dev { background: #f7e3e1; color: #a95d57; }
+.permission-chip.dev { color: #a95d57; border-color: #f0d9d6; background: #fdf4f3; }
+
+/* ── 36-5: ตารางผู้ใช้ระบบ — ป้ายสิทธิ์ dev สีแดง + แถบรอเปลี่ยนรหัสผ่าน ── */
+.user-role-badge.dev { color: #b05457; background: #fdf0ee; }
+.rows-users .pw-pending-tag { display: inline-flex; align-items: center; gap: 3px; margin-top: 3px; color: #a6791f; font-weight: 600; }
+.rows-users .pw-pending-tag::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: #dcae6b; }
+.role-matrix-card.dev { border-color: #f0d9d6; background: #fdf9f8; }
+.role-matrix-card.dev .role-matrix-head .role-avatar { background: #f7e3e1; color: #a95d57; }
+
+/* ── 36-6: การ์ด Dev Access ในแท็บสิทธิ์ (ตั้งค่า) — โทนแดงอ่อนเตือนความปลอดภัย ── */
+.dev-warning-card { border-color: #f0d9d6; box-shadow: 0 1px 2px rgba(169, 93, 87, .05); }
+.dev-warning-card .settings-heading h2 { color: #a95d57; }
+.dev-access-warning { display: flex; align-items: flex-start; gap: 8px; background: #fdf4f3; border: 1px solid #f3dcdc; border-radius: 9px; padding: 10px 11px; color: #8a5a55; font-size: 10.5px; line-height: 1.6; margin-bottom: 11px; }
+.dev-access-warning svg { color: #bd6c65; flex: 0 0 auto; margin-top: 2px; }
+.dev-status-line { display: flex; align-items: center; gap: 7px; margin-top: 10px; color: #7c806f; font-size: 10.5px; font-weight: 600; }
+.dev-status-line i { width: 8px; height: 8px; border-radius: 50%; background: #9aa194; flex: 0 0 auto; }
+.dev-status-line.on { color: #b05457; }
+.dev-status-line.on i { background: #bd6c65; box-shadow: 0 0 0 3px #fdf0ee; }
+.dev-account-count { margin-top: 8px; color: #7c806f; font-size: 10.5px; line-height: 1.7; }
+.dev-account-count b { color: #42594f; }
+.link-button { padding: 0; border: 0; background: none; color: #3f8a6d; font-size: inherit; font-weight: 700; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.link-button:hover { color: #2f6b53; }
+
+/* ── 36-7: มือถือ 480px — การ์ดทั้งสองหน้าใหม่ไม่ล้นขอบ ── */
+@media (max-width: 480px) {
+  .login-card.setup-card, .login-card.force-change-card { padding: 26px 20px; }
+  .setup-head h1 { font-size: 17px; }
+  .force-change-head h1 { font-size: 16px; }
+  .pw-meter-rules { gap: 4px 8px; }
+  .dev-account-count { font-size: 10px; }
+}

@@ -99,21 +99,23 @@ export function LoginView({ brand, onAuthed }: { brand?: BrandSettings | null | 
             <LogIn size={16} /> {loginMutation.isPending ? "กำลังตรวจสอบ…" : "เข้าสู่ระบบ"}
           </button>
         </form>
-        <div className="login-demo">
-          <span>บัญชีทดลองสำหรับทดสอบระบบ</span>
-          <div className="login-demo-row">
-            {DEMO_ACCOUNTS.map((account) => (
-              <button
-                key={account.username}
-                type="button"
-                className={account.admin ? "login-demo-btn admin" : "login-demo-btn"}
-                onClick={() => fillDemo(account)}
-              >
-                {account.admin ? <Crown size={13} /> : <UserRound size={13} />} {account.label}
-              </button>
-            ))}
+        {import.meta.env.DEV && (
+          <div className="login-demo">
+            <span>บัญชีทดลองสำหรับทดสอบระบบ (โหมดพัฒนาเท่านั้น)</span>
+            <div className="login-demo-row">
+              {DEMO_ACCOUNTS.map((account) => (
+                <button
+                  key={account.username}
+                  type="button"
+                  className={account.admin ? "login-demo-btn admin" : "login-demo-btn"}
+                  onClick={() => fillDemo(account)}
+                >
+                  {account.admin ? <Crown size={13} /> : <UserRound size={13} />} {account.label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        )}
         <div className="login-scope-note" role="note">
           <IdCard size={15} />
           <span>ระบบนี้สำหรับ<b>เจ้าหน้าที่และผู้บริหารร้านค้า</b>เท่านั้น · สมาชิกสวัสดิการไม่มีการเข้าสู่ระบบ — ใช้สิทธิ์ที่เคาน์เตอร์ด้วยหมายเลขสมาชิก</span>
