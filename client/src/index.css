@@ -57,7 +57,7 @@ nav button.active small { color: #70a392; }
 .secure-badge { display: flex; gap: 9px; align-items: flex-start; border-top: 1px solid var(--line); padding: 16px 6px 16px; color: #848b6e; }
 .secure-badge b, .secure-badge small { display: block; }
 .secure-badge b { color: #557469; font-size: 11px; }
-.secure-badge small { color: #9aaa a5; color: #7d826f; font-size: 11px; margin-top: 3px; }
+.secure-badge small { color: #7d826f; font-size: 11px; margin-top: 3px; }
 .sidebar-version { color: #848876; font-family: "IBM Plex Mono", monospace; font-size: 10px; padding: 0 6px; }
 .main-shell { flex: 1; min-width: 0; }
 .topbar { height: 72px; background: rgba(255,255,255,.82); border-bottom: 1px solid var(--line); padding: 0 38px; display: flex; align-items: center; justify-content: space-between; gap: 20px; position: sticky; top: 0; z-index: 5; backdrop-filter: blur(12px); }
@@ -70,7 +70,13 @@ nav button.active small { color: #70a392; }
 kbd { font-family: "IBM Plex Mono", monospace; font-size: 10px; color: #868b7c; background: #f3f4f1; border: 1px solid #e9eae5; border-radius: 4px; padding: 2px 4px; white-space: nowrap; }
 .top-icon { width: 32px; height: 32px; border: 0; color: #808475; background: transparent; position: relative; display: grid; place-items: center; border-radius: 8px; }
 .top-icon:hover { background: #f2f7f5; }
-.top-icon i { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: #d68157; top: 4px; right: 4px; border: 2px solid #fff; }
+/* ROUND 44 (user) — กระดิ่งแจ้งเตือนเด่นชัด: ตัวเลขจำนวนแดง + จุดกระเพื่อม
+   แทนจุด 6px สีพีชเดิมที่มองแทบไม่เห็น — ผู้ใช้ขอให้เห็นจำนวนทันทีที่มองหน้าจอ */
+.notif-bell.has-alert { color: #b3484a; }
+.notif-bell.has-alert:hover { background: #fbeceb; color: #99393b; }
+.notif-badge { position: absolute; top: -5px; right: -6px; min-width: 18px; height: 18px; padding: 0 4px; display: grid; place-items: center; border-radius: 999px; background: #d1524f; color: #fff; font-size: 10.5px; font-weight: 700; line-height: 1; letter-spacing: -.2px; border: 2px solid #fff; box-shadow: 0 2px 8px rgba(209, 82, 79, .5); pointer-events: none; z-index: 1; }
+.notif-badge::before { content: ""; position: absolute; inset: -2px; border-radius: 999px; background: rgba(209, 82, 79, .55); animation: notif-ping 1.9s cubic-bezier(0, 0, .2, 1) infinite; z-index: -1; }
+@keyframes notif-ping { 0% { transform: scale(1); opacity: .7; } 75%, 100% { transform: scale(2.05); opacity: 0; } }
 .profile-pill { display: flex; align-items: center; gap: 8px; padding-left: 3px; min-width: 145px; }
 .profile-avatar { width: 32px; height: 32px; }
 .mobile-menu { display: none; border: 0; background: transparent; color: #547066; }
@@ -784,7 +790,7 @@ nav button:active:not(:disabled),
   .toggle-row-controls { flex-basis: 100%; justify-content: space-between; }
 }
 
-@media (prefers-reduced-motion: reduce) { .threshold-input { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .threshold-input { transition: none; } .notif-badge::before { animation: none; } }
 
 /* --- Round 10 (main) — login lockout UI -------------------------------- */
 .notice-bar.warn { color: #8a6d2f; background: #fff8ec; border-color: #f3e4c6; }

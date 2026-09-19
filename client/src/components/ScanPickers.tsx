@@ -22,6 +22,9 @@ function useNoHistoryName(prefix: string) {
  * barcode/QR gun into the box (scanners end with Enter, which commits).
  * Shows a short suggestion list while typing; exact code wins instantly.
  *
+ * Round 44 (user) — รายการสมาชิกโชว์เฉพาะตอน "ค้นหา" เท่านั้น: โฟกัสช่องเปล่า ๆ
+ * ไม่เด้ง dropdown — เริ่มพิมพ์หรือสแกน (มีตัวอักษร) จึงโชว์ตัวเลือกให้เลือก
+ *
  * requireConfirm — after ANY pick (scan / key / click), a verification card
  * with the member's photo, name, number and balance shows up first. The
  * member only lands on the bill once the cashier presses ยืนยัน — protects
@@ -159,9 +162,13 @@ export function MemberScanPicker({
               spellCheck={false}
               onChange={(event) => {
                 setTerm(event.target.value);
-                setOpen(true);
+                // Round 44 — เปิดรายการเฉพาะตอนมีคำค้นจริง (คีย์/สแกน)
+                setOpen(event.target.value.trim() !== "");
               }}
-              onFocus={() => setOpen(true)}
+              onFocus={() => {
+                // Round 44 — ช่องเปล่าโฟกัสเฉย ๆ ไม่โชว์ dropdown จนกว่าจะเริ่มค้นหา
+                if (term.trim() !== "") setOpen(true);
+              }}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
                   event.preventDefault();
@@ -176,7 +183,9 @@ export function MemberScanPicker({
                 type="button"
                 className="scan-clear"
                 onClick={() => {
+                  // Round 44 — ล้างคำค้น = ปิดรายการด้วย (ช่องเปล่าต้องเงียบ)
                   setTerm("");
+                  setOpen(false);
                   inputRef.current?.focus();
                 }}
                 aria-label="ล้างช่องค้นหาสมาชิก"
