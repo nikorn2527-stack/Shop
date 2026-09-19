@@ -15,6 +15,7 @@ import {
   createAppUser,
   createProduct,
   dailySalesRows,
+  deleteProduct,
   dashboardStats,
   deleteAppSession,
   deleteMember,
@@ -180,6 +181,8 @@ const productCreateInput = z.object({
   name: z.string().min(1, "กรุณาระบุชื่อสินค้า"),
   sku: z.string().optional(),
   barcode: z.string().optional(),
+  size: z.string().optional(),
+  imageUrl: z.string().nullable().optional(),
   unit: z.string().optional(),
   price: z.number().positive("ราคาขายต้องมากกว่า 0"),
   cost: z.number().min(0).optional(),
@@ -196,6 +199,9 @@ const productCreateInput = z.object({
 const productUpdateInput = z.object({
   productId: z.number().int(),
   name: z.string().optional(),
+  barcode: z.string().nullable().optional(),
+  size: z.string().nullable().optional(),
+  imageUrl: z.string().nullable().optional(),
   unit: z.string().optional(),
   price: z.number().optional(),
   cost: z.number().optional(),
@@ -209,6 +215,12 @@ const productUpdateInput = z.object({
 const productSetActiveInput = z.object({
   productId: z.number().int(),
   active: z.boolean(),
+  actor: z.string().optional(),
+  actorRole: z.string().optional(),
+});
+
+const productDeleteInput = z.object({
+  productId: z.number().int(),
   actor: z.string().optional(),
   actorRole: z.string().optional(),
 });
@@ -489,6 +501,17 @@ export const appRouter = router({
             throw new TRPCError({ code: "FORBIDDEN", message: "การปิด/เปิดการขายสินค้าต้องใช้สิทธิ์ผู้บริหาร" });
           }
           return setProductActive(getWelfareDb(), { ...input, actor, actorRole });
+        });
+      }),
+    delete: publicProcedure
+      .input(productDeleteInput)
+      .mutation(({ ctx, input }) => {
+        const { actor, actorRole } = resolveActor(ctx, input);
+        return withStoreErrors(() => {
+          if (!isAdminCtx(ctx, input)) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "การลบสินค้าต้องใช้สิทธิ์ผู้บริหาร" });
+          }
+          return deleteProduct(getWelfareDb(), { ...input, actor, actorRole });
         });
       }),
   }),

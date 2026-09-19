@@ -62,6 +62,8 @@ export type SqliteProduct = {
   color: string | null;
   unit: string;
   price: number;
+  size: string | null;
+  imageUrl: string | null;
   cost: number;
   stock: number;
   reorderPoint: number;
@@ -293,6 +295,8 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
   ensureColumn(db, "audit_logs", "actor_role", "TEXT");
   ensureColumn(db, "sale_items", "unit", "TEXT");
   ensureColumn(db, "app_users", "failed_attempts", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "products", "size", "TEXT");
+  ensureColumn(db, "products", "image_url", "TEXT");
   ensureColumn(db, "app_users", "locked_until", "TEXT");
   // Backfill units for sale_items rows written before the column existed (idempotent).
   db.prepare("UPDATE sale_items SET unit = (SELECT p.unit FROM products p WHERE p.id = sale_items.product_id) WHERE unit IS NULL").run();
@@ -419,19 +423,21 @@ export function listAuditLogs(db: SqliteDb, limit = 200): SqliteAuditLog[] {
 
 export function listProducts(db: SqliteDb, includeInactive = false): SqliteProduct[] {
   if (includeInactive) {
-    return db.prepare(`SELECT id, sku, barcode, name, category, emoji, color, unit, price, cost, stock, reorder_point AS reorderPoint, active, created_at AS createdAt FROM products ORDER BY active DESC, id`).all() as unknown as SqliteProduct[];
+    return db.prepare(`SELECT id, sku, barcode, name, category, emoji, color, size, image_url AS imageUrl, unit, price, cost, stock, reorder_point AS reorderPoint, active, created_at AS createdAt FROM products ORDER BY active DESC, id`).all() as unknown as SqliteProduct[];
   }
-  return db.prepare(`SELECT id, sku, barcode, name, category, emoji, color, unit, price, cost, stock, reorder_point AS reorderPoint, active, created_at AS createdAt FROM products WHERE active = 1 ORDER BY id`).all() as unknown as SqliteProduct[];
+  return db.prepare(`SELECT id, sku, barcode, name, category, emoji, color, size, image_url AS imageUrl, unit, price, cost, stock, reorder_point AS reorderPoint, active, created_at AS createdAt FROM products WHERE active = 1 ORDER BY id`).all() as unknown as SqliteProduct[];
 }
 
 function getProductById(db: SqliteDb, productId: number): SqliteProduct | undefined {
-  return db.prepare(`SELECT id, sku, barcode, name, category, emoji, color, unit, price, cost, stock, reorder_point AS reorderPoint, active, created_at AS createdAt FROM products WHERE id = ?`).get(productId) as SqliteProduct | undefined;
+  return db.prepare(`SELECT id, sku, barcode, name, category, emoji, color, size, image_url AS imageUrl, unit, price, cost, stock, reorder_point AS reorderPoint, active, created_at AS createdAt FROM products WHERE id = ?`).get(productId) as SqliteProduct | undefined;
 }
 
 export type CreateProductInput = {
   name: string;
   sku?: string;
   barcode?: string;
+  size?: string;
+  imageUrl?: string | null;
   unit?: string;
   price: number;
   cost?: number;
@@ -468,13 +474,15 @@ export function createProduct(db: SqliteDb, input: CreateProductInput): SqlitePr
   if (db.prepare(`SELECT id FROM products WHERE sku = ?`).get(sku)) {
     throw new StoreError(`รหัสสินค้า ${sku} ถูกใช้แล้ว กรุณาระบุรหัสอื่น`);
   }
-  const result = db.prepare(`INSERT INTO products (sku, barcode, name, category, emoji, color, unit, price, cost, stock, reorder_point, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`).run(
+  const result = db.prepare(`INSERT INTO products (sku, barcode, name, category, emoji, color, size, image_url, unit, price, cost, stock, reorder_point, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`).run(
     sku,
     input.barcode?.trim() || null,
     name,
     input.category?.trim() || "ของใช้",
     input.emoji ?? null,
     input.color ?? null,
+    input.size?.trim() || null,
+    input.imageUrl || null,
     input.unit?.trim() || "ชิ้น",
     round2(input.price),
     round2(input.cost ?? 0),
@@ -672,6 +680,9 @@ export function stockCountLots(db: SqliteDb, input: StockCountLotsInput): StockC
 export type UpdateProductInput = {
   productId: number;
   name?: string;
+  barcode?: string | null;
+  size?: string | null;
+  imageUrl?: string | null;
   unit?: string;
   price?: number;
   cost?: number;
@@ -732,6 +743,21 @@ export function updateProduct(db: SqliteDb, input: UpdateProductInput): SqlitePr
     values.push(normalizeEmoji(input.emoji));
     changedLabels.push("สัญลักษณ์");
   }
+  if (input.barcode !== undefined && (input.barcode?.trim() || null) !== product.barcode) {
+    assignments.push("barcode = ?");
+    values.push(input.barcode?.trim() || null);
+    changedLabels.push("บาร์โค้ด");
+  }
+  if (input.size !== undefined && (input.size?.trim() || null) !== product.size) {
+    assignments.push("size = ?");
+    values.push(input.size?.trim() || null);
+    changedLabels.push("ขนาด");
+  }
+  if (input.imageUrl !== undefined && (input.imageUrl || null) !== product.imageUrl) {
+    assignments.push("image_url = ?");
+    values.push(input.imageUrl || null);
+    changedLabels.push("รูปสินค้า");
+  }
 
   const displayName = input.name?.trim() || product.name;
   const changeSummary = changedLabels.length > 0 ? `แก้ไข: ${changedLabels.join(", ")}` : "ตรวจสอบข้อมูลแล้ว · ไม่มีการเปลี่ยนแปลง";
@@ -744,6 +770,35 @@ export function updateProduct(db: SqliteDb, input: UpdateProductInput): SqlitePr
     logAction(db, "แก้ไขสินค้า", input.actor?.trim() || "เจ้าหน้าที่ร้านค้า", detail, "blue", input.actorRole ?? null, formatDateTime());
   });
   return getProductById(db, input.productId)!;
+}
+
+export type DeleteProductInput = {
+  productId: number;
+  actor?: string;
+  actorRole?: string;
+};
+
+/**
+ * Permanently removes a product and its remaining lots from the catalog.
+ * Sale history keeps its own name/price snapshot, so old bills stay intact.
+ */
+export function deleteProduct(db: SqliteDb, input: DeleteProductInput): { deleted: true; name: string; sku: string } {
+  const product = getProductById(db, input.productId);
+  if (!product) throw new StoreError(`ไม่พบสินค้ารหัส ${input.productId} ในระบบ`);
+  const saleRefs = db.prepare(`SELECT COUNT(*) AS n FROM sale_items WHERE product_id = ?`).get(input.productId) as { n: number };
+  runInTransaction(db, () => {
+    db.prepare(`DELETE FROM stock_lots WHERE product_id = ?`).run(input.productId);
+    db.prepare(`DELETE FROM products WHERE id = ?`).run(input.productId);
+    logAction(
+      db,
+      "ลบสินค้า",
+      input.actor?.trim() || "ระบบ",
+      `${product.name} (${product.sku}) · เหลือ ${product.stock} ${product.unit} ในคลัง · ปรากฏในประวัติขาย ${saleRefs.n} รายการ`,
+      "red",
+      input.actorRole ?? null,
+    );
+  });
+  return { deleted: true, name: product.name, sku: product.sku };
 }
 
 export type SetProductActiveInput = {

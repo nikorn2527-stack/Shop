@@ -15,6 +15,10 @@ export type Product = {
   unit: string;
   color: string;
   emoji: string;
+  /** Optional pack size, e.g. "500 ml" / "300 g" — shown under the product name. */
+  size?: string | null;
+  /** Real product photo (data URL). Falls back to emoji when absent. */
+  imageUrl?: string | null;
 };
 
 /** Real member essentials for the POS member dropdown (from trpc.member.list). */
@@ -95,4 +99,92 @@ export function loadHeldBills(): HeldBill[] {
   } catch {
     return [];
   }
+}
+
+// --- Scan / search code normalization ---------------------------------------
+// Every lookup box in the app accepts: hand-typed text, a barcode-gun burst, or
+// a QR payload. QR payloads arrive in many shapes (raw id, "MEMBER:M-000001",
+// full URLs, even JSON), so every search path funnels through these helpers.
+
+/** Strips characters barcode/QR payloads never carry and collapses whitespace. */
+function cleanScanRaw(raw: string) {
+  return raw.replace(/[\u0000-\u001f]+/g, " ").trim();
+}
+
+/** Keys we check inside decoded JSON / URL-query payloads. */
+const SCAN_PAYLOAD_KEYS = ["memberNumber", "member", "memberNo", "m", "sku", "productCode", "code", "barcode", "id", "bill", "orderNumber", "order"] as const;
+
+function firstPayloadValue(payload: Record<string, unknown>) {
+  for (const key of SCAN_PAYLOAD_KEYS) {
+    const value = payload[key];
+    if (typeof value === "string" && value.trim() !== "") return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+  return null;
+}
+
+/**
+ * Normalizes a scanned or typed code to comparable candidates:
+ * e.g. "https://x/m/M-000001?foo" -> ["https://x/m/m-000001?foo", "m-000001", "000001"]
+ * Callers match with `scanMatches(value, input)` (case-insensitive).
+ */
+export function scanCandidates(raw: string): string[] {
+  const cleaned = cleanScanRaw(raw);
+  if (cleaned === "") return [];
+  const lowered = cleaned.toLowerCase();
+  const out = new Set<string>([lowered]);
+  // JSON payload: {"memberNumber":"M-000001"}
+  if (lowered.startsWith("{")) {
+    try {
+      const parsed = JSON.parse(cleaned) as Record<string, unknown>;
+      const value = firstPayloadValue(parsed);
+      if (value) out.add(value.toLowerCase());
+    } catch {
+      /* not JSON — treat as plain text */
+    }
+  }
+  // URL payload: https://host/path/M-000001?member=M-000001
+  if (lowered.includes("://") || lowered.includes("www.")) {
+    try {
+      const url = new URL(cleaned);
+      url.searchParams.forEach((value) => { if (value) out.add(value.toLowerCase()); });
+      const lastSegment = url.pathname.split("/").filter(Boolean).pop();
+      if (lastSegment) out.add(decodeURIComponent(lastSegment).toLowerCase());
+    } catch {
+      /* not a URL — fall through */
+    }
+  }
+  // "MEMBER:M-000001" / "SKU;DRK-001" / "M-000001," — take the last token
+  const tokens = lowered.split(/[:;|,>]/).map((token) => token.trim()).filter(Boolean);
+  if (tokens.length > 1) out.add(tokens[tokens.length - 1]);
+  // digits-only variant (strip letter prefixes, dashes, zeros)
+  const digits = lowered.replace(/[^0-9]/g, "");
+  if (digits.length >= 4) out.add(digits);
+  return Array.from(out);
+}
+
+/**
+ * Shrinks a picked photo (JPG/PNG/WEBP) into a compact JPEG data URL so real
+ * product photos can live inside the SQLite row without bloating the DB.
+ */
+export async function compressImageToDataUrl(file: File, maxEdge = 480, quality = 0.72): Promise<string> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+  const width = Math.max(1, Math.round(bitmap.width * scale));
+  const height = Math.max(1, Math.round(bitmap.height * scale));
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("canvas unavailable");
+  ctx.drawImage(bitmap, 0, 0, width, height);
+  bitmap.close();
+  return canvas.toDataURL("image/jpeg", quality);
+}
+
+/** True when any normalized form of `input` equals the normalized `value`. */
+export function scanMatches(value: string | null | undefined, input: string): boolean {
+  if (!value) return false;
+  const needle = value.trim().toLowerCase();
+  return needle !== "" && scanCandidates(input).includes(needle);
 }
