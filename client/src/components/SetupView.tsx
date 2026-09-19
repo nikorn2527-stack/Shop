@@ -148,7 +148,7 @@ export function SetupView({ brand, onAuthed }: { brand?: BrandSettings | null | 
           <ShieldCheck size={15} />
           <span>หลังลงทะเบียน ระบบจะให้ตั้งรหัสผ่านใหม่อีกครั้งในครั้งแรกที่เข้าใช้งาน เพื่อยืนยันว่าไม่มีผู้อื่นรู้รหัสของคุณ</span>
         </div>
-        <p className="login-footer">v1.0.0 · ระบบร้านค้าสวัสดิการ</p>
+        <p className="login-footer">v1.0.0 · ระบบร้านค้าสวัสดิการ<span className="powered-line">⚡ Powered by <b>PNG TEAM</b></span></p>
       </div>
     </div>
   );

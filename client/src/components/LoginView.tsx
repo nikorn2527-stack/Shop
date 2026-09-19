@@ -120,7 +120,7 @@ export function LoginView({ brand, onAuthed }: { brand?: BrandSettings | null | 
           <IdCard size={15} />
           <span>ระบบนี้สำหรับ<b>เจ้าหน้าที่และผู้บริหารร้านค้า</b>เท่านั้น · สมาชิกสวัสดิการไม่มีการเข้าสู่ระบบ — ใช้สิทธิ์ที่เคาน์เตอร์ด้วยหมายเลขสมาชิก</span>
         </div>
-        <p className="login-footer">v1.0.0 · ระบบร้านค้าสวัสดิการ</p>
+        <p className="login-footer">v1.0.0 · ระบบร้านค้าสวัสดิการ<span className="powered-line">⚡ Powered by <b>PNG TEAM</b></span></p>
       </div>
     </div>
   );

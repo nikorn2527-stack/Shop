@@ -3680,3 +3680,34 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 /* ROUND 38 — เติมเล็กน้อย: บรรทัดฟอนต์บนการ์ดสไตล์ + แถวปุ่มถ่ายรูป */
 .ui-style-card .style-font-hint { color: #99a094; font-family: "IBM Plex Mono", monospace; font-size: 9px; letter-spacing: .2px; }
 .ui-style-card.active .style-font-hint { color: var(--teal); }
+
+/* ============================================================
+   ROUND 39 — ⚡ Powered by PNG TEAM (branding ทุกจุดที่ผู้ใช้เห็น)
+   ============================================================ */
+/* 1) หน้าจอก่อนเข้าระบบ (login / setup / force-change) */
+.login-footer .powered-line { display: block; margin-top: 4px; font-size: 10px; color: #9a9e8c; letter-spacing: .2px; }
+.login-footer .powered-line b { color: #5f8474; font-weight: 700; }
+/* 2) sidebar ใต้บรรทัดเวอร์ชัน */
+.sidebar-powered { margin-top: 3px; padding: 0 6px; font-size: 10px; color: #848876; letter-spacing: .2px; }
+.sidebar-powered b { color: #5f8474; font-weight: 700; }
+/* 3) footer หลักของแอป */
+.app-footer .footer-powered { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; color: #828b76; }
+.app-footer .footer-powered b { color: #5f8474; font-weight: 700; letter-spacing: .3px; }
+/* 4) ใบเสร็จ (พิมพ์/PDF/รูป) */
+.receipt-powered { display: block; margin-top: 5px; font-size: 8.5px; color: #9aa294; letter-spacing: .4px; }
+/* 5) statement / เอกสารสมาชิก */
+.statement-foot { }
+/* ธีมสไตล์อื่น — ให้ ⚡ PNG TEAM ตามแนวสีของสไตล์นั้น */
+[data-style="apple"] .login-footer .powered-line b,
+[data-style="apple"] .sidebar-powered b,
+[data-style="apple"] .app-footer .footer-powered b { color: #4a7a9e; }
+[data-style="microsoft"] .login-footer .powered-line b,
+[data-style="microsoft"] .sidebar-powered b,
+[data-style="microsoft"] .app-footer .footer-powered b { color: #3d6d94; }
+[data-style="android"] .login-footer .powered-line b,
+[data-style="android"] .sidebar-powered b,
+[data-style="android"] .app-footer .footer-powered b { color: #6d5b93; }
+@media (max-width: 820px) {
+  .app-footer .footer-powered { order: 3; font-size: 9.5px; }
+  .sidebar-powered { text-align: center; }
+}

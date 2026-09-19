@@ -164,7 +164,7 @@ export function StatementModal({ member, transactions, onClose }: { member: Stat
           <div><span>ลงชื่อสมาชิก</span><i /></div>
           <div><span>วันที่</span><i /></div>
         </div>
-        <div className="statement-foot">เอกสารนี้ออกโดยระบบร้านค้าสวัสดิการ</div>
+        <div className="statement-foot">เอกสารนี้ออกโดยระบบร้านค้าสวัสดิการ · ⚡ Powered by PNG TEAM</div>
       </div>
     </div>
     <div className="statement-actions modal-actions">

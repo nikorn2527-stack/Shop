@@ -131,7 +131,7 @@ export function ForceChangeView({ user, brand, onDone, onLogout }: { user: User;
         <button type="button" className="force-change-logout" disabled={logoutMutation.isPending} onClick={() => { if (!logoutMutation.isPending) logoutMutation.mutate(); }}>
           <LogOut size={13} /> ออกจากระบบ
         </button>
-        <p className="login-footer">v1.0.0 · ระบบร้านค้าสวัสดิการ</p>
+        <p className="login-footer">v1.0.0 · ระบบร้านค้าสวัสดิการ<span className="powered-line">⚡ Powered by <b>PNG TEAM</b></span></p>
       </div>
     </div>
   );
