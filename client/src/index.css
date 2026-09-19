@@ -3965,3 +3965,9 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
   body:has(#member-card) .member-card-name.fit-xs { font-size: 10.5px; }
   body:has(#member-card) .member-card-number { font-size: 18px; }
 }
+
+/* ROUND 45 — ตั้งค่า: หมวดครบ 12 แท็บ ให้ลงมาหลายแถวแทนการเลื่อนแนวนอน
+   (เดิม overflow-x: auto ทำให้แท็บท้าย ๆ ถูกตัดหายไปนอกเฟรมโดยไม่รู้ว่ามีต่อ)
+   + สรุปยอดขาย: ปุ่ม CSV/Excel/PDF ขึ้นทุกมุมมองแล้ว (จัดการที่ Home.tsx) */
+.settings-nav { flex-wrap: wrap; overflow-x: visible; row-gap: 6px; padding-bottom: 11px; }
+.settings-nav button { margin: 0; }
