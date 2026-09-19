@@ -1816,12 +1816,22 @@ body { max-width: 100vw; overflow-x: hidden; overflow-x: clip; min-height: 0; }
   .pos-terminal .cart-heading h2 { font-size: 13.5px; }
 }
 
-/* (9) Phones ≤560px — rail hidden (standard sidebar + hamburger remains),
-       the strip becomes the fixed 4-button dock, scan hero trims down. */
+/* (9) Phones ≤560px — ROUND 42 (user 43): single entry point mandate — the
+       in-bill shortcut strip is gone, so the LEFT RAIL itself becomes the
+       fixed bottom dock on phones (same buttons, same F-key meaning, just
+       laid out horizontally above the safe-area). สแกน/เมนู hidden here:
+       the scan input is on screen anyway and the hamburger opens the menu. */
 @media (max-width: 560px) {
-  .pos-rail { display: none; }
-  .pos-terminal .shortcut-strip { grid-template-columns: repeat(4, 1fr); }
-  .pos-mobile-bar { bottom: calc(72px + env(safe-area-inset-bottom, 0px)); }
+  .pos-rail { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; width: auto; flex: 0 0 auto; flex-direction: row; align-items: stretch; gap: 5px; padding: 6px 8px calc(7px + env(safe-area-inset-bottom, 0px)); border-right: 0; border-top: 1px solid rgba(255, 255, 255, .16); overflow-x: auto; overflow-y: hidden; box-shadow: 0 -8px 22px rgba(20, 50, 38, .18); scrollbar-width: none; }
+  .pos-rail::-webkit-scrollbar { display: none; }
+  .pos-rail .rail-brand, .pos-rail .rail-spacer, .pos-rail .rail-scan, .pos-rail .rail-exit { display: none; }
+  .pos-rail .rail-btn { flex: 1 1 0; min-width: 46px; min-height: 52px; padding: 6px 2px 5px; border-radius: 10px; }
+  .pos-rail .rail-btn kbd { display: none; }
+  .pos-rail .rail-btn b { font-size: 9px; line-height: 1.2; white-space: nowrap; }
+  .pos-rail .rail-btn svg { width: 20px; height: 20px; }
+  .pos-rail .rail-badge { top: 2px; right: 4px; }
+  .pos-terminal .main-shell { padding-bottom: calc(74px + env(safe-area-inset-bottom, 0px)); }
+  .pos-mobile-bar { bottom: calc(82px + env(safe-area-inset-bottom, 0px)); }
   .scan-hero { height: 50px; border-radius: 12px; }
   .scan-hero input { font-size: 13.5px; }
   .scan-hero kbd, .scan-hero .scan-live { display: none; }
@@ -3853,4 +3863,61 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
   .scan-drop-thumb { width: 30px; height: 30px; }
   .scan-drop-info b { font-size: 12px; }
   .scan-drop-info small { font-size: 10px; }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   ROUND 42 (user "1-4 ทำได้เลย") — 3 ส่วน:
+   ① POS จุดเข้าเดียว: shortcut-strip ใต้บิลถูกลบ — แถบ rail ซ้ายคือ
+      ทางเข้าเดียว (มือถือ ≤560px กลายเป็น dock ล่าง — อยู่ใน block (9) ด้านบน)
+   ② ตั้งค่า → การเชื่อมต่อ: สถานะ + LAN URL + dual-mode roadmap
+   ③ ตั้งค่า → ใบเสร็จ: ขนาดกระดาษสลิป 58/72/80 มม. (data-paper-width บน <html>)
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ① เคลียร์ตัวช่วยเก่าของ strip ที่ตอนนี้ไม่มีอยู่แล้ว (กันความสับสน) */
+.pos-terminal .shortcut-strip { display: none; }
+
+/* ② ตั้งค่า → ขนาดกระดาษสลิป (ใน printer-card ก่อนแถวทดสอบพิมพ์) */
+.paper-width-block { margin-top: 13px; padding-top: 13px; border-top: 1px dashed #e2ebe7; }
+.paper-width-head b { display: block; color: #547066; font-size: 12px; }
+.paper-width-head small { display: block; color: #7e8274; font-size: 10.5px; line-height: 1.55; margin-top: 3px; }
+.paper-width-block .number-mode-grid { margin: 10px 0 0; }
+.windows-card { border-left: 3px solid #6f7d2c; }
+
+/* ③ แท็บการเชื่อมต่อ — การ์ดสถานะ 3 ช่อง + แถวเซิร์ฟเวอร์ + รายการ URL ของ LAN */
+.net-stat-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+.net-stat { border: 1px solid #e4ece9; border-radius: 10px; padding: 11px 12px; background: #fff; min-width: 0; }
+.net-stat small { display: block; color: #83887a; font-size: 10px; }
+.net-stat b { display: block; color: #4e5a4f; font-size: 12.5px; margin-top: 4px; font-family: "IBM Plex Mono", monospace; word-break: break-all; line-height: 1.4; }
+.net-stat > span { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; color: #8a8f7d; font-size: 9.5px; margin-top: 6px; }
+.net-stat .link-inline { border: 0; background: transparent; color: var(--teal); font-size: 9.5px; display: inline-flex; align-items: center; gap: 3px; cursor: pointer; padding: 0; font-weight: 600; }
+.net-stat .link-inline:hover { text-decoration: underline; }
+.net-server-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 9px 11px; border-radius: 9px; background: #f6faf8; border: 1px solid #e2eee8; color: #7ca895; }
+.net-server-row b { color: #517263; font-size: 11px; }
+.net-server-row small { display: block; color: #82877a; font-size: 9.5px; margin-top: 2px; }
+.lan-url-list { display: flex; flex-direction: column; gap: 7px; margin-top: 4px; }
+.lan-url-row { display: flex; align-items: center; gap: 9px; border: 1px solid #e4ece9; background: #fff; border-radius: 9px; padding: 8px 11px; }
+.lan-url-row code { flex: 1; color: #3f6d59; font-family: "IBM Plex Mono", monospace; font-size: 11.5px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.lan-url-ip { color: #83887a; font-size: 10px; white-space: nowrap; font-family: "IBM Plex Mono", monospace; }
+.lan-steps { margin-top: 14px; }
+.dual-mode-note { display: flex; align-items: flex-start; gap: 7px; margin-top: 4px; padding: 9px 11px; border-radius: 9px; background: #eff9f4; border: 1px solid #d5ece2; color: #3f8d70; font-size: 10.5px; line-height: 1.6; }
+.dual-mode-note svg { color: #2f8c6d; flex-shrink: 0; margin-top: 1px; }
+@media (max-width: 820px) { .net-stat-grid { grid-template-columns: 1fr; } .lan-url-row { flex-wrap: wrap; } }
+
+/* ④ การพิมพ์ตามขนาดกระดาษที่เลือก (ตั้งค่า → ใบเสร็จ) — data-paper-width
+      บน <html> มาจาก applyPaperWidth() · 72 มม. = พฤติกรรมเดิมไม่แตะกฎเดิมเลย
+      58 มม.: ใบเสร็จ 54 มม. + ขอบหน้า 2 มม. = เต็มความกว้างกระดาษ 58 มม.
+      80 มม.: ใบเสร็จ 76 มม. + ขอบหน้า 2 มม. = เต็มความกว้างกระดาษ 80 มม. */
+@media print {
+  html[data-paper-width="58"]:has(#receipt-paper) .receipt-modal { width: 54mm; }
+  html[data-paper-width="58"]:has(#receipt-paper) .receipt-paper { font-size: 9.5px; }
+  html[data-paper-width="80"]:has(#receipt-paper) .receipt-modal { width: 76mm; }
+  html[data-paper-width="80"]:has(#receipt-paper) .receipt-paper { font-size: 11.5px; }
+  /* สลิปเติม/ถอนเงิน (พิมพ์จาก modal ผลลัพธ์) — px ใกล้เคียง: 58≈200px · 72≈270px · 80≈300px */
+  html[data-paper-width="58"]:has(#wallet-slip) .wallet-slip { width: 200px; }
+  html[data-paper-width="72"]:has(#wallet-slip) .wallet-slip { width: 270px; }
+  html[data-paper-width="80"]:has(#wallet-slip) .wallet-slip { width: 300px; }
+  /* สลิปทดสอบเครื่องพิมพ์ (ตั้งค่า → ใบเสร็จ) */
+  html[data-paper-width="58"]:has(#printer-test-slip) .printer-test-slip { width: 200px; }
+  html[data-paper-width="72"]:has(#printer-test-slip) .printer-test-slip { width: 270px; }
+  html[data-paper-width="80"]:has(#printer-test-slip) .printer-test-slip { width: 300px; }
 }

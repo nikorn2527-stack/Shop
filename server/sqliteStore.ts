@@ -210,6 +210,8 @@ export type StoreSettings = {
   backupIntervalHours: number;
   /** ROUND 38 (ข้อ 39) — จำนวนไฟล์สำรองที่เก็บสูงสุด (3-60) — เกินจากนี้ลบไฟล์เก่าสุด */
   backupKeepCount: number;
+  /** ROUND 42 (ข้อ 32 ตอนที่ 3 — ข้อ 4) — ความกว้างกระดาษสลิปเครื่องพิมพ์: "58" (สลิปเล็ก) | "72" (มาตรฐานเดิม) | "80" (สลิปใหญ่) */
+  receiptPaperWidth: "58" | "72" | "80";
 };
 
 /**
@@ -2079,6 +2081,8 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   backupAutoEnabled: true,
   backupIntervalHours: 24,
   backupKeepCount: 14,
+  // ROUND 42 — เครื่องพิมพ์สลิป: ค่าเริ่มต้น 72mm ตรงกับขนาดที่ระบบใช้อยู่แล้ว
+  receiptPaperWidth: "72",
 };
 
 const SETTINGS_KEY = "app_settings";

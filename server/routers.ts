@@ -384,6 +384,8 @@ const settingsPatchInput = z
     backupAutoEnabled: z.boolean().optional(),
     backupIntervalHours: z.number().int().min(1).max(168).optional(),
     backupKeepCount: z.number().int().min(3).max(60).optional(),
+    // ROUND 42 (ข้อ 32 ตอนที่ 3 — ข้อ 4) — ความกว้างกระดาษสลิปเครื่องพิมพ์ 58/72/80 มม.
+    receiptPaperWidth: z.enum(["58", "72", "80"]).optional(),
   })
   .nullish();
 
