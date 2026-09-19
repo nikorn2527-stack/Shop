@@ -132,6 +132,7 @@ const memberListInput = z
 const memberDetailInput = z.object({ memberNumber: z.string().min(1) });
 
 const memberRegisterInput = z.object({
+  prename: z.string().max(30, "คำนำหน้ายาวเกินไป").optional(),
   firstName: z.string().min(1, "กรุณาระบุชื่อสมาชิก"),
   lastName: z.string().min(1, "กรุณาระบุนามสกุลสมาชิก"),
   citizenId: z.string().optional(),
@@ -163,6 +164,7 @@ const memberWalletInput = z.object({
 
 const memberUpdateInput = z.object({
   memberNumber: z.string().min(1),
+  prename: z.string().max(30, "คำนำหน้ายาวเกินไป").nullish(),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   idCard: z.string().nullish(),

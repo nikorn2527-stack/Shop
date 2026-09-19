@@ -24,14 +24,16 @@ describe("importTool — เทมเพลต + parse วนกลับ", () =
       const sheet = parsed.sheets[0];
       expect(sheet.totalRows).toBe(3);
       if (kind === "members") {
+        // Round 43 — เทมเพลตเพิ่มคอลัมน์ คำนำหน้า (1) ต่อจากเลขสมาชิก
         const mapping = sheet.suggestedMapping as Record<string, number>;
-        expect(mapping.firstName).toBe(1);
+        expect(mapping.firstName).toBe(2);
         expect(mapping.memberNumber).toBe(0);
-        expect(mapping.lastName).toBe(2);
-        expect(mapping.balance).toBe(3);
-        expect(mapping.creditLimit).toBe(4);
-        expect(mapping.status).toBe(5);
-        expect(mapping.phone).toBe(6);
+        expect(mapping.prename).toBe(1);
+        expect(mapping.lastName).toBe(3);
+        expect(mapping.balance).toBe(4);
+        expect(mapping.creditLimit).toBe(5);
+        expect(mapping.status).toBe(6);
+        expect(mapping.phone).toBe(7);
       } else {
         const mapping = sheet.suggestedMapping as Record<string, number>;
         expect(mapping.name).toBe(1);

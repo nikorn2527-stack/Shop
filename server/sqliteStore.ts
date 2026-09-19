@@ -19,6 +19,8 @@ export class StoreError extends Error {
 export type SqliteMember = {
   id: number;
   memberNumber: string;
+  /** คำนำหน้าชื่อ (นาย/นาง/นางสาว/…) — null = ไม่มี */
+  prename?: string | null;
   firstName: string;
   lastName: string;
   idCard: string | null;
@@ -47,6 +49,8 @@ export type SqliteTransaction = {
 export type SqliteMemberSummary = {
   id: number;
   memberNumber: string;
+  /** คำนำหน้าชื่อ — null = ไม่มี */
+  prename?: string | null;
   firstName: string;
   lastName: string;
   type: string;
@@ -371,6 +375,8 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
   ensureColumn(db, "products", "price_tiers", "TEXT");
   ensureColumn(db, "members", "photo_url", "TEXT");
   ensureColumn(db, "members", "gender", "TEXT");
+  // Round 43 — คำนำหน้าชื่อสมาชิก (นาย/นาง/นางสาว/ด.ช./... ) NULL = ไม่มี
+  ensureColumn(db, "members", "prename", "TEXT");
   // Req 23.2 — วงเงินซื้อสินค้าต่อวันของสมาชิก (NULL = ไม่จำกัด)
   ensureColumn(db, "members", "credit_limit", "REAL");
   ensureColumn(db, "member_transactions", "actor", "TEXT");
@@ -419,7 +425,7 @@ export function seedSqliteDemoData(db: SqliteDb) {
 }
 
 export function getMemberDetail(db: SqliteDb, memberNumber: string, transactionLimit = 50) {
-  const member = db.prepare(`SELECT id, member_number as memberNumber, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, credit_limit as creditLimit FROM members WHERE member_number = ?`).get(memberNumber) as SqliteMember | undefined;
+  const member = db.prepare(`SELECT id, member_number as memberNumber, prename, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, credit_limit as creditLimit FROM members WHERE member_number = ?`).get(memberNumber) as SqliteMember | undefined;
   if (!member) return undefined;
   const transactions = db.prepare(`SELECT id, member_number as memberNumber, type, detail, amount, payment_method as paymentMethod, balance_after as balanceAfter, created_at as createdAt FROM member_transactions WHERE member_number = ? ORDER BY created_at DESC, id DESC LIMIT ?`).all(memberNumber, transactionLimit) as unknown as SqliteTransaction[];
   return { member, transactions };
@@ -1216,7 +1222,7 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
 
   let member: SqliteMember | undefined;
   if (isWallet) {
-    member = db.prepare(`SELECT id, member_number as memberNumber, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, photo_url as photoUrl, gender, credit_limit as creditLimit FROM members WHERE member_number = ?`).get(input.memberNumber!.trim()) as SqliteMember | undefined;
+    member = db.prepare(`SELECT id, member_number as memberNumber, prename, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, photo_url as photoUrl, gender, credit_limit as creditLimit FROM members WHERE member_number = ?`).get(input.memberNumber!.trim()) as SqliteMember | undefined;
     if (!member) throw new StoreError(`ไม่พบสมาชิก ${input.memberNumber} ในระบบ`);
     if (member.status !== "active") throw new StoreError(`สมาชิกถูกระงับการใช้งาน · ${member.memberNumber}`);
     if (member.balance < total) throw new StoreError(`ยอดเงินคงเหลือไม่พอ · ยอดชำระ ${money(total)} คงเหลือ ${money(member.balance)}`);
@@ -1233,7 +1239,7 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
   } else if (input.memberNumber?.trim()) {
     // Cash / QR bills can still be tied to a member — the receipt then shows
     // ผู้ทำรายการ + ยอดคงเหลือล่าสุด of that member (no deduction happens).
-    member = db.prepare(`SELECT id, member_number as memberNumber, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, photo_url as photoUrl, gender, credit_limit as creditLimit FROM members WHERE member_number = ?`).get(input.memberNumber.trim()) as SqliteMember | undefined;
+    member = db.prepare(`SELECT id, member_number as memberNumber, prename, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, photo_url as photoUrl, gender, credit_limit as creditLimit FROM members WHERE member_number = ?`).get(input.memberNumber.trim()) as SqliteMember | undefined;
   }
 
   const now = new Date();
@@ -1296,7 +1302,7 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
       total,
       paymentMethod: input.paymentMethod,
       memberNumber: member?.memberNumber ?? null,
-      memberName: member ? `${member.firstName} ${member.lastName}`.trim() : null,
+      memberName: member ? [member.prename, member.firstName, member.lastName].filter(Boolean).join(" ") : null,
       balanceAfter,
       cashier,
     };
@@ -1321,7 +1327,7 @@ export function salesList(db: SqliteDb, input: SalesListInput = {}): SaleHistory
     params.push(`%${search}%`, `%${search}%`);
   }
   const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
-  const sales = db.prepare(`SELECT s.id, s.order_number AS orderNumber, s.payment_method AS paymentMethod, s.member_number AS memberNumber, s.subtotal, s.discount, s.total, s.cashier, s.created_at AS createdAt, m.first_name || ' ' || m.last_name AS memberName FROM sales s LEFT JOIN members m ON m.member_number = s.member_number${where} ORDER BY s.created_at DESC, s.id DESC LIMIT ?`).all(...params, limit) as unknown as {
+  const sales = db.prepare(`SELECT s.id, s.order_number AS orderNumber, s.payment_method AS paymentMethod, s.member_number AS memberNumber, s.subtotal, s.discount, s.total, s.cashier, s.created_at AS createdAt, CASE WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sales s LEFT JOIN members m ON m.member_number = s.member_number${where} ORDER BY s.created_at DESC, s.id DESC LIMIT ?`).all(...params, limit) as unknown as {
     id: number;
     orderNumber: string;
     paymentMethod: string;
@@ -1369,7 +1375,7 @@ export function salesList(db: SqliteDb, input: SalesListInput = {}): SaleHistory
 
 // --- members & wallet -------------------------------------------------------
 
-const MEMBER_SELECT = `SELECT id, member_number as memberNumber, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, photo_url as photoUrl, gender, credit_limit as creditLimit FROM members WHERE member_number = ?`;
+const MEMBER_SELECT = `SELECT id, member_number as memberNumber, prename, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, photo_url as photoUrl, gender, credit_limit as creditLimit FROM members WHERE member_number = ?`;
 
 function getMemberByNumber(db: SqliteDb, memberNumber: string): SqliteMember | undefined {
   return db.prepare(MEMBER_SELECT).get(memberNumber) as SqliteMember | undefined;
@@ -1387,7 +1393,7 @@ export function listMembers(db: SqliteDb, search?: string, status?: "active" | "
     params.push(status);
   }
   const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
-  return db.prepare(`SELECT m.id, m.member_number AS memberNumber, m.first_name AS firstName, m.last_name AS lastName, m.type, m.balance, m.status, m.created_at AS createdAt, m.photo_url AS photoUrl, m.gender, m.credit_limit AS creditLimit, (SELECT MAX(t.created_at) FROM member_transactions t WHERE t.member_number = m.member_number) AS lastTransactionAt FROM members m${where} ORDER BY m.member_number`).all(...params) as unknown as SqliteMemberSummary[];
+  return db.prepare(`SELECT m.id, m.member_number AS memberNumber, m.prename AS prename, m.first_name AS firstName, m.last_name AS lastName, m.type, m.balance, m.status, m.created_at AS createdAt, m.photo_url AS photoUrl, m.gender, m.credit_limit AS creditLimit, (SELECT MAX(t.created_at) FROM member_transactions t WHERE t.member_number = m.member_number) AS lastTransactionAt FROM members m${where} ORDER BY m.member_number`).all(...params) as unknown as SqliteMemberSummary[];
 }
 
 function nextMemberSequence(db: SqliteDb, prefix: string) {
@@ -1415,6 +1421,7 @@ function generateMemberNumber(db: SqliteDb, mode: "running" | "year" | "manual",
 }
 
 export type RegisterMemberInput = {
+  prename?: string;
   firstName: string;
   lastName: string;
   citizenId?: string;
@@ -1440,8 +1447,9 @@ export function registerMember(db: SqliteDb, input: RegisterMemberInput) {
   const initialDeposit = input.initialDeposit ? round2(input.initialDeposit) : 0;
   const createdAt = formatDateTime();
   runInTransaction(db, () => {
-    db.prepare(`INSERT INTO members (member_number, first_name, last_name, id_card, phone, type, balance, status, created_at, photo_url, gender) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)`).run(
+    db.prepare(`INSERT INTO members (member_number, prename, first_name, last_name, id_card, phone, type, balance, status, created_at, photo_url, gender) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)`).run(
       memberNumber,
+      input.prename?.trim() || null,
       firstName,
       lastName,
       input.citizenId?.trim() || null,
@@ -1535,7 +1543,7 @@ export function walletTx(db: SqliteDb, input: WalletTxInput) {
   });
   return {
     memberNumber: member.memberNumber,
-    memberName: `${member.firstName} ${member.lastName}`.trim(),
+    memberName: [member.prename, member.firstName, member.lastName].filter(Boolean).join(" "),
     type: input.type,
     amount,
     balanceBefore: member.balance,
@@ -1546,6 +1554,7 @@ export function walletTx(db: SqliteDb, input: WalletTxInput) {
 
 export type UpdateMemberInput = {
   memberNumber: string;
+  prename?: string | null;
   firstName?: string;
   lastName?: string;
   idCard?: string | null;
@@ -1574,6 +1583,11 @@ export function updateMember(db: SqliteDb, input: UpdateMemberInput): SqliteMemb
   const values: (string | number | null)[] = [];
   const changedLabels: string[] = [];
   const normalizeOptional = (value: string | null | undefined) => value?.trim() || null;
+  if (input.prename !== undefined && normalizeOptional(input.prename) !== (member.prename ?? null)) {
+    assignments.push("prename = ?");
+    values.push(normalizeOptional(input.prename));
+    changedLabels.push("คำนำหน้า");
+  }
   if (input.firstName != null && input.firstName.trim() !== member.firstName) {
     assignments.push("first_name = ?");
     values.push(input.firstName.trim());
@@ -1642,7 +1656,7 @@ export function deleteMember(db: SqliteDb, input: DeleteMemberInput): { memberNu
   const history = db.prepare(`SELECT COUNT(*) AS count FROM member_transactions WHERE member_number = ?`).get(member.memberNumber) as { count: number };
   if (history.count > 0) throw new StoreError("สมาชิกมีประวัติธุรกรรมในระบบ · ใช้การระงับการใช้งานแทนการลบ");
 
-  const displayName = `${member.firstName} ${member.lastName}`.trim();
+  const displayName = [member.prename, member.firstName, member.lastName].filter(Boolean).join(" ");
   runInTransaction(db, () => {
     db.prepare(`DELETE FROM members WHERE member_number = ?`).run(member.memberNumber);
     logAction(db, "ลบสมาชิก", input.actor?.trim() || "เจ้าหน้าที่ร้านค้า", `${member.memberNumber} · ${displayName}`, "red", input.actorRole ?? null, formatDateTime());

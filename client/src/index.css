@@ -833,7 +833,9 @@ tr.locked-row .user-avatar { background: #f6ecd4; color: #a97f2e; }
 .member-card-brand small { display: block; font-size: 7.5px; color: #757b61; margin-top: 1px; }
 .member-card-type { font-size: 7.5px; font-weight: 600; color: #3d8c71; background: #ffffff; border: 1px solid #cfe4db; border-radius: 20px; padding: 3px 8px; white-space: nowrap; }
 .member-card-body { flex: 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; padding: 4px 0 2px; }
-.member-card-name { font-size: 14.5px; font-weight: 700; color: #2e463d; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.member-card-name { font-size: 14.5px; font-weight: 700; color: #2e463d; line-height: 1.32; white-space: normal; word-break: break-word; overflow-wrap: anywhere; max-height: 2.7em; overflow: hidden; }
+.member-card-name.fit-sm { font-size: 12.5px; }
+.member-card-name.fit-xs { font-size: 11px; }
 .member-card-number { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 21px; font-weight: 600; letter-spacing: 1.5px; color: var(--teal); margin-top: 2px; font-variant-numeric: tabular-nums; }
 .member-card-meta { display: flex; justify-content: space-between; gap: 8px; margin-top: 5px; font-size: 9px; color: #666b57; }
 .member-card-meta .ok { color: #4b9d7f; font-weight: 600; }
@@ -1261,7 +1263,7 @@ td small { font-size: 11px; }
 .statement-summary .st-out { color: #a06bc9; }
 .statement-summary .st-buy { color: #b8863d; }
 
-.statement-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.statement-table { width: 100%; border-collapse: collapse; font-size: 11px; table-layout: fixed; min-width: 0; }
 .statement-table th { text-align: left; color: #f2f7f5; background: #2d8a6c; font-weight: 600; font-size: 10.5px; padding: 7px 9px; }
 .statement-table th:first-child { border-radius: 6px 0 0 0; }
 .statement-table th:last-child { border-radius: 0 6px 0 0; }
@@ -1298,6 +1300,13 @@ td small { font-size: 11px; }
   .statement-head { flex-direction: column; }
   .statement-title { text-align: left; }
   .statement-hint { display: none; }
+  .statement-table { font-size: 10px; }
+  .statement-table th { padding: 6px 5px; font-size: 9.5px; }
+  .statement-table td { padding: 5.5px 5px; }
+  .statement-table th:nth-child(1), .statement-table td.st-time { width: 92px; }
+  .statement-table th:nth-child(2) { width: 62px; }
+  .statement-table th:nth-child(4), .statement-table th:nth-child(5) { width: 68px; }
+  .statement-table td.st-time { white-space: normal; }
 }
 
 /* (4) Print — isolate the statement onto a clean A4 page
@@ -3920,4 +3929,33 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
   html[data-paper-width="58"]:has(#printer-test-slip) .printer-test-slip { width: 200px; }
   html[data-paper-width="72"]:has(#printer-test-slip) .printer-test-slip { width: 270px; }
   html[data-paper-width="80"]:has(#printer-test-slip) .printer-test-slip { width: 300px; }
+}
+
+/* ============================================================
+   ROUND 43 — สมาชิกและบัญชี / รายละเอียด: แก้ 4 จุดตามรายงานร้าน
+   (1) บัตรสมาชิก: ชื่อยาวไม่ถูกตัด — ตัดบรรทัดได้ 2 แถว + ย่อฟอนต์เป็นขั้น
+       (.fit-sm/.fit-xs ตั้งจาก JS ตามความยาวชื่อ) + รอฟอนต์ก่อนบันทึกรูป
+   (2) คำนำหน้าชื่อสมาชิก — ฟอร์มแก้ไข/ลงทะเบียน + datalist เสนอคำนำหน้า
+   (3) รายงานยอดเงินคงเหลือสมาชิก: ตาราง 5 คอลัมน์ fix layout ไม่ล้นกระดาษ
+   (4) โลโก้/ชื่อแบรนด์ในฟอร์ม ตาม ตั้งค่า → ชื่อร้านและโลโก้ (เหมือนใบเสร็จ)
+   ============================================================ */
+
+/* (3) ตาราง statement — กำหนดความกว้างคอลัมน์ตายตัว (หน้าจอ + พิมพ์)
+       เวลา/ประเภท/จำนวนเงิน/ยอดคงเหลือ พอดี รายละเอียดยืดหยุ่น + ตัดคำได้ */
+.statement-table th:nth-child(1), .statement-table td.st-time { width: 104px; }
+.statement-table th:nth-child(2) { width: 72px; }
+.statement-table th:nth-child(4), .statement-table th:nth-child(5) { width: 80px; }
+.statement-table td.st-detail { overflow-wrap: anywhere; }
+.statement-table .st-type { max-width: 100%; box-sizing: border-box; }
+
+/* (4) โลโก้แบรนด์บนบัตรสมาชิก + รายงาน statement — ขนาดพอดีช่อง ไม่บิดสัดส่วน */
+.member-card-brand .brand-logo.member-card-logo { width: 22px; height: 22px; border-radius: 6px; object-fit: contain; background: #fff; border: 1px solid #cfe4db; flex: 0 0 auto; }
+.statement-brand .brand-logo.statement-logo { width: 34px; height: 34px; border-radius: 9px; object-fit: contain; background: #fff; border: 1px solid #dfe9e5; flex: 0 0 auto; }
+
+/* (1) พิมพ์บัตร — ชื่อ 2 บรรทัดยังต้องอยู่ในกรอบ 54 มม.: ย่อฟอนต์ลงตามขั้น */
+@media print {
+  body:has(#member-card) .member-card-name { max-height: 3em; }
+  body:has(#member-card) .member-card-name.fit-sm { font-size: 11.5px; }
+  body:has(#member-card) .member-card-name.fit-xs { font-size: 10.5px; }
+  body:has(#member-card) .member-card-number { font-size: 18px; }
 }

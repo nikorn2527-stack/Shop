@@ -34,6 +34,8 @@ export type Product = {
 /** Real member essentials for the POS member dropdown (from trpc.member.list). */
 export type MemberLite = {
   memberNumber: string;
+  /** คำนำหน้าชื่อ (นาย/นาง/นางสาว/…) — null/undefined = ไม่มี */
+  prename?: string | null;
   firstName: string;
   lastName: string;
   type: string;
@@ -263,4 +265,12 @@ export function smartMatchScore(value: string | null | undefined, input: string)
     else if (needle.endsWith(candidate) && candidate.length >= 2) best = Math.max(best, 52); // เลข 3 ตัวท้าย SKU/บาร์โค้ด
   }
   return best;
+}
+
+/** Round 43 — คำนำหน้าชื่อที่เสนอในฟอร์ม (datalist) — พิมพ์อื่นได้เสมอ */
+export const PRENAME_OPTIONS = ["นาย", "นาง", "นางสาว", "ด.ช.", "ด.ญ.", "แพทย์หญิง", "พ.อ.", "พ.ญ.", "พ.ต.", "พ.ต.ญ.", "ร.ท.", "ร.ท.ญ."];
+
+/** ชื่อเต็มพร้อมคำนำหน้า — "นางสาว สมหญิง มั่นคง" (ไม่มีคำนำหน้า = ชื่อ นามสกุลตามเดิม) */
+export function memberFullName(member: { prename?: string | null; firstName?: string | null; lastName?: string | null }): string {
+  return [member.prename?.trim() || "", member.firstName?.trim() || "", member.lastName?.trim() || ""].filter(Boolean).join(" ");
 }

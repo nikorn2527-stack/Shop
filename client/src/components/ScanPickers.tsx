@@ -3,7 +3,7 @@ import { PackageSearch, ScanLine, X } from "lucide-react";
 import { toast } from "sonner";
 import type { SqliteProduct } from "../../../server/sqliteStore";
 import type { MemberLite } from "@/pages/pageData";
-import { money, scanMatches, smartMatchScore } from "@/pages/pageData";
+import { money, memberFullName, scanMatches, smartMatchScore } from "@/pages/pageData";
 import { MemberAvatar } from "./MemberAvatar";
 import { MemberCardModal } from "./MemberCardModal";
 
@@ -65,7 +65,7 @@ export function MemberScanPicker({
         score: Math.max(
           smartMatchScore(member.memberNumber, q),
           Math.max(
-            smartMatchScore(`${member.firstName} ${member.lastName}`, q),
+            smartMatchScore(memberFullName(member), q),
             smartMatchScore(member.firstName, q),
             smartMatchScore(member.lastName, q),
           ) * 0.9,
@@ -101,7 +101,7 @@ export function MemberScanPicker({
   const confirmPending = () => {
     if (!pending) return;
     if (pending.status === "suspended") {
-      toast.error("บัตรนี้ถูกระงับการใช้จ่าย", { description: `${pending.firstName} ${pending.lastName} · ${pending.memberNumber} — ตรวจสอบกับผู้บริหารก่อนใช้รายการนี้` });
+      toast.error("บัตรนี้ถูกระงับการใช้จ่าย", { description: `${memberFullName(pending)} · ${pending.memberNumber} — ตรวจสอบกับผู้บริหารก่อนใช้รายการนี้` });
       return;
     }
     onSelect(pending);
@@ -130,7 +130,7 @@ export function MemberScanPicker({
           </div>
           <div className="member-scan-info">
             <b>
-              {selected.memberNumber} · สมาชิก{selected.firstName} {selected.lastName}
+              {selected.memberNumber} · สมาชิก{memberFullName(selected)}
             </b>
             <small>ยอดคงเหลือ {money(selected.balance)}{selected.creditLimit != null ? ` · วงเงิน/วัน ${money(selected.creditLimit)}` : ""}</small>
           </div>
@@ -223,7 +223,7 @@ export function MemberScanPicker({
                 <MemberAvatar member={member} size={34} />
                 <div>
                   <b>
-                    {member.memberNumber} · สมาชิก{member.firstName} {member.lastName}
+                    {member.memberNumber} · สมาชิก{memberFullName(member)}
                   </b>
                   <small>ยอดคงเหลือ {money(member.balance)}</small>
                 </div>

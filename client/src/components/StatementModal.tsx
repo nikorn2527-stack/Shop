@@ -4,6 +4,8 @@ import { jsPDF } from "jspdf";
 import { Download, FileText, Printer, X } from "lucide-react";
 import { money } from "../pages/pageData";
 import { WALLET_TX_META } from "../pages/viewFormat";
+import { trpc } from "@/lib/trpc";
+import { brandInitial } from "@/theme";
 
 /** A wallet transaction row as returned by member.detail (DESC order, ≤50). */
 export type StatementTx = {
@@ -18,6 +20,8 @@ export type StatementTx = {
 /** Member fields the statement document renders. */
 export type StatementMember = {
   memberNumber: string;
+  /** คำนำหน้าชื่อ — null = ไม่มี */
+  prename?: string | null;
   firstName: string;
   lastName: string;
   type: string;
@@ -55,7 +59,11 @@ function formatStatementTime(value: string) {
  */
 export function StatementModal({ member, transactions, onClose }: { member: StatementMember; transactions: StatementTx[]; onClose: () => void }) {
   const [busy, setBusy] = useState(false);
-  const displayName = `${member.firstName} ${member.lastName}`.trim();
+  // Round 43 — แบรนด์ตามที่ผู้บริหารตั้งใน ตั้งค่า → ชื่อร้านและโลโก้ (เหมือนใบเสร็จ)
+  const settingsQuery = trpc.settings.get.useQuery(undefined);
+  const brandName = (settingsQuery.data?.appName ?? "").trim() || "ร้านค้าสวัสดิการ";
+  const brandLogo = settingsQuery.data?.appLogo ?? "";
+  const displayName = [member.prename?.trim() || "", member.firstName, member.lastName].filter(Boolean).join(" ");
   const generatedAt = useMemo(() => new Date(), []);
 
   // member.detail returns DESC (newest first); a statement reads oldest → newest.
@@ -74,6 +82,8 @@ export function StatementModal({ member, transactions, onClose }: { member: Stat
     setBusy(true);
     try {
       // A4 portrait at document scale — html2canvas keeps Thai glyphs perfect.
+      // Round 43 — รอฟอนต์ (Sarabun) พร้อมก่อน กันตัวอักษรไทยตกหล่นในไฟล์ PDF
+      if (document.fonts?.ready) await document.fonts.ready;
       const canvas = await html2canvas(element, { scale: 2, backgroundColor: "#ffffff" });
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
       const pageWidth = pdf.internal.pageSize.getWidth();
@@ -119,7 +129,7 @@ export function StatementModal({ member, transactions, onClose }: { member: Stat
     <div className="statement-stage">
       <div className="statement-paper" id="member-statement">
         <div className="statement-head">
-          <div className="statement-brand"><span className="statement-brand-mark">ส</span><div><b>ร้านค้าสวัสดิการ</b><small>Welfare Store · ระบบร้านค้า</small></div></div>
+          <div className="statement-brand">{brandLogo ? <img className="brand-logo statement-logo" src={brandLogo} alt={brandName} /> : <span className="statement-brand-mark">{brandInitial(brandName)}</span>}<div><b>{brandName}</b><small>Welfare Store · ระบบร้านค้า</small></div></div>
           <div className="statement-title">
             <b>รายงานยอดเงินคงเหลือและประวัติการทำรายการ</b>
             <small>ออกเมื่อ {formatFullThaiDate(generatedAt.toISOString())} · Statement {member.memberNumber}</small>

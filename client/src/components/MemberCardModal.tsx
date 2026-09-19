@@ -5,10 +5,14 @@ import { Barcode, CreditCard, Download, Printer, QrCode as QrIcon, ScanLine, Shi
 import { money } from "../pages/pageData";
 import { code128DataUrl } from "../barcode";
 import { MemberAvatar } from "./MemberAvatar";
+import { trpc } from "@/lib/trpc";
+import { brandInitial } from "@/theme";
 
 /** Fields the wallet card actually renders (subset of the member record). */
 export type MemberCardData = {
   memberNumber: string;
+  /** คำนำหน้าชื่อ (นาย/นาง/นางสาว/…) — null = ไม่มี */
+  prename?: string | null;
   firstName: string;
   lastName: string;
   type: string;
@@ -61,9 +65,16 @@ export function MemberCardModal({
 }) {
   const [busy, setBusy] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState("");
+  // Round 43 — แบรนด์ตามที่ผู้บริหารตั้งใน ตั้งค่า → ชื่อร้านและโลโก้ (เหมือนใบเสร็จ)
+  const settingsQuery = trpc.settings.get.useQuery(undefined);
+  const brandName = (settingsQuery.data?.appName ?? "").trim() || "ร้านค้าสวัสดิการ";
+  const brandLogo = settingsQuery.data?.appLogo ?? "";
   const barcodeDataUrl = code128DataUrl(member.memberNumber, { height: 54, moduleWidth: 2, padding: 10 });
-  const displayName = `${member.firstName} ${member.lastName}`.trim();
+  const displayName = [member.prename?.trim() || "", member.firstName, member.lastName].filter(Boolean).join(" ");
   const suspended = member.status === "suspended";
+  // Round 43 (บั๊กชื่อถูกตัด) — ชื่อยาวย่อฟอนต์เป็นขั้น และรับ 2 บรรทัดได้ใน CSS
+  const nameLength = displayName.length;
+  const nameFit = nameLength > 36 ? " fit-xs" : nameLength > 26 ? " fit-sm" : "";
 
   useEffect(() => {
     let alive = true;
@@ -78,6 +89,8 @@ export function MemberCardModal({
     if (!element) return;
     setBusy(true);
     try {
+      // Round 43 — รอฟอนต์ (Sarabun) พร้อมก่อนเสมอ กัน html2canvas วาดข้อความไทยตกหล่น
+      if (document.fonts?.ready) await document.fonts.ready;
       const canvas = await html2canvas(element, { scale: 2, backgroundColor: "#ffffff" });
       const link = document.createElement("a");
       link.download = `card-${member.memberNumber}.png`;
@@ -110,7 +123,7 @@ export function MemberCardModal({
     <div className="member-card-stage">
       <div className="member-card" id="member-card">
         <div className="member-card-top">
-          <div className="member-card-brand"><span>ส</span><div><b>ร้านค้าสวัสดิการ</b><small>Welfare Store</small></div></div>
+          <div className="member-card-brand">{brandLogo ? <img className="brand-logo member-card-logo" src={brandLogo} alt={brandName} /> : <span>{brandInitial(brandName)}</span>}<div><b>{brandName}</b><small>Welfare Store</small></div></div>
           <span className="member-card-type">{member.type}</span>
         </div>
         <div className="member-card-body">
@@ -118,7 +131,7 @@ export function MemberCardModal({
             <MemberAvatar member={member} size={82} />
           </div>
           <div className="member-card-identity">
-            <div className="member-card-name">{displayName}</div>
+            <div className={`member-card-name${nameFit}`}>{displayName}</div>
             <div className="member-card-number">{member.memberNumber}</div>
             <div className="member-card-meta">
               {member.createdAt ? <span>สมาชิกตั้งแต่ {formatCardDate(member.createdAt)}</span> : <span className="now">พร้อมใช้จ่ายที่เคาน์เตอร์</span>}
