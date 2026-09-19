@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { TRPCClientError } from "@trpc/client";
 import {
-  ArrowDownToLine, ArrowUpFromLine, Camera, Check, CircleAlert, CircleHelp, CreditCard, FileImage, IdCard, ImagePlus, LayoutGrid, Minus, Pause, Plus, Printer, QrCode, RotateCcw, ScanLine, Search, ShieldCheck, SlidersHorizontal, Sparkles, Star, ShoppingCart, Trash2, Upload, WalletCards, X,
+  ArrowDownToLine, ArrowUpFromLine, Camera, Check, CircleAlert, CircleHelp, CreditCard, FileImage, History, IdCard, ImagePlus, LayoutGrid, Minus, PackageSearch, Pause, Plus, Printer, QrCode, RotateCcw, ScanLine, Search, ShieldCheck, SlidersHorizontal, Sparkles, Star, ShoppingCart, Trash2, Upload, WalletCards, X,
 } from "lucide-react";
 import { toast } from "sonner";
 import type { CartItem, HeldBill, MemberLite, Product, Role } from "./pageData";
@@ -44,6 +44,9 @@ type CheckoutReceipt = {
 };
 
 type PaymentMethod = "เงินสด" | "QR / สแกน" | "หักบัญชีสมาชิก";
+
+/** ROUND 41 — แถวรายการให้เลือกใต้ช่องสแกน: สินค้า หรือ สมาชิก */
+type ScanRow = { kind: "product"; product: StoreProduct } | { kind: "member"; member: MemberLite };
 
 const SPECIAL_SHORTCUT = "สินค้าไม่ระบุตายตัว";
 
@@ -107,6 +110,17 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
   // Round 32-13 — จำนวนแบบพิมพ์ตรงๆ: แต่ละแถวบิลเป็นช่องจำนวนที่เคอร์เซอร์รออยู่
   // หลังเพิ่มสินค้า (พิมพ์เลข = ตั้งจำนวนทันที) + ยิงบาร์โค้ดใส่ช่องจำนวนก็ได้
   const [qtyDrafts, setQtyDrafts] = useState<Record<string, string>>({});
+  // ROUND 41 — ช่องสแกนหลัก = ช่องค้นหา: พิมพ์แล้วมีรายการ (สินค้า + สมาชิก) โชว์
+  // ใต้ช่องให้เลือก · ว่าง+โฟกัส = ประวัติรายการที่เพิ่งเลือก (เพิ่มซ้ำได้ในหนึ่งแตะ)
+  const [scanOpen, setScanOpen] = useState(false);
+  const [scanHighlight, setScanHighlight] = useState(-1);
+  const [recentScanIds, setRecentScanIds] = useState<number[]>(() => {
+    try {
+      const raw = localStorage.getItem("png-scan-recent-v1");
+      const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+      return Array.isArray(parsed) ? parsed.filter((id): id is number => typeof id === "number") : [];
+    } catch { return []; }
+  });
   // Round 32-16 — ลงทะเบียนสมาชิกใหม่ + พิมพ์บัตร อยู่ที่ POS จุดเดียว
   const [registerOpen, setRegisterOpen] = useState(false);
   const [registerForm, setRegisterForm] = useState({ firstName: "", lastName: "", idCard: "", phone: "", type: "สมาชิก", gender: "ไม่ระบุ" as "ชาย" | "หญิง" | "ไม่ระบุ", photoUrl: "", memberNumber: "", initialBalance: "" });
@@ -125,6 +139,7 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
   // re-selects after every add, and refocuses when the cashier returns to the
   // window — so a barcode can be fired at any moment without touching the mouse.
   const scanRef = useRef<HTMLInputElement | null>(null);
+  const scanHeroRef = useRef<HTMLDivElement | null>(null);
   // ROUND 37 (req 36) — ช่องคีย์ POS ไม่เก็บประวัติ: ชื่อช่องสุ่มต่อเซสชัน
   // (คู่กับ autoComplete="off") ทำให้เบราว์เซอร์ไม่ดึงบาร์โค้ดที่
   // เคยมีคนยิง/คีย์ ขึ้นมาเป็น dropdown ประวัติอีกต่อไป
@@ -160,16 +175,48 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
   })), [productsQuery.data]);
   const members = membersQuery.data ?? [];
   const selectedMember: MemberLite | null = members.find((member) => member.memberNumber === selectedMemberNumber) ?? null;
-  const filtered = useMemo(() => products.filter((product) => (category === "ทั้งหมด" || product.category === category) && (query.trim() === "" || smartMatchScore(product.name, query) > 0 || smartMatchScore(product.sku, query) > 0 || smartMatchScore(product.barcode, query) > 0)), [category, products, query]);
-  // Round 31-12 — shortcuts: quickPick products take over the rail; typing a
-  // search still reaches EVERY product (fallback = all when none flagged).
+  // ROUND 41 — รายการให้เลือกใต้ช่องสแกน: สินค้า (ชื่อ/SKU/บาร์โค้ด) + สมาชิก
+  // (เลข/ชื่อ) เรียงตามคะแนน smart match เหมือนช่องเลือกสมาชิก — ช่องว่าง = ประวัติ
+  const scanSuggestions = useMemo(() => {
+    const q = query.trim();
+    if (q === "") return [] as StoreProduct[];
+    return products
+      .map((product) => ({ product, score: Math.max(smartMatchScore(product.barcode, q), smartMatchScore(product.sku, q), smartMatchScore(product.name, q) * 0.92) }))
+      .filter((entry) => entry.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 8)
+      .map((entry) => entry.product);
+  }, [products, query]);
+  const scanMemberSuggestions = useMemo(() => {
+    const q = query.trim();
+    if (q === "") return [] as MemberLite[];
+    return members
+      .map((member) => ({ member, score: Math.max(smartMatchScore(member.memberNumber, q), Math.max(smartMatchScore(`${member.firstName} ${member.lastName}`, q), smartMatchScore(member.firstName, q), smartMatchScore(member.lastName, q)) * 0.9) }))
+      .filter((entry) => entry.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 4)
+      .map((entry) => entry.member);
+  }, [members, query]);
+  const recentScanProducts = useMemo(() => recentScanIds.map((id) => products.find((product) => product.id === id)).filter((product): product is StoreProduct => Boolean(product)).slice(0, 8), [products, recentScanIds]);
+  const scanRows = useMemo<ScanRow[]>(() => (query.trim() !== "" ? [...scanSuggestions.map((product) => ({ kind: "product" as const, product })), ...scanMemberSuggestions.map((member) => ({ kind: "member" as const, member }))] : recentScanProducts.map((product) => ({ kind: "product" as const, product }))), [query, recentScanProducts, scanMemberSuggestions, scanSuggestions]);
+  const pushRecentScan = (id: number) => setRecentScanIds((ids) => {
+    const next = [id, ...ids.filter((entry) => entry !== id)].slice(0, 8);
+    try { localStorage.setItem("png-scan-recent-v1", JSON.stringify(next)); } catch { /* storage เต็ม/ถูกบล็อก — ใช้เฉพาะรอบเซสชันนี้ */ }
+    return next;
+  });
+  const clearRecentScan = () => {
+    setRecentScanIds([]);
+    try { localStorage.removeItem("png-scan-recent-v1"); } catch { /* ignore */ }
+  };
   const shortcuts = useMemo(() => products.filter((product) => product.quickPick === 1), [products]);
+  // ROUND 41 — แผงลัดหน้าร้านคงเป็นสินค้าที่หยิบบ่อยตามหมวดเสมอ (ผลค้นหาจากช่อง
+  // สแกนย้ายไปโชว์เป็นรายการใต้ช่องแทน — แผงขวาไม่ถูกดันเป็นผลค้นหาอีกต่อไป)
   const panelList = useMemo(() => {
-    if (query.trim() !== "") return filtered;
-    if (shortcuts.length === 0) return filtered;
+    const byCategory = category === "ทั้งหมด" ? products : products.filter((product) => product.category === category);
+    if (shortcuts.length === 0) return byCategory;
     const inCategory = category === "ทั้งหมด" ? shortcuts : shortcuts.filter((product) => product.category === category);
     return inCategory.length > 0 || category === "ทั้งหมด" ? inCategory : shortcuts;
-  }, [category, filtered, query, shortcuts]);
+  }, [category, products, shortcuts]);
   const sampleCodes = useMemo(() => products.filter((product) => product.barcode).slice(0, 3), [products]);
   const subtotal = calculateCartSubtotal(cart);
   const discountValue = Math.max(0, Number(discount) || 0);
@@ -304,6 +351,7 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
       return;
     }
     setCart((items) => addScannedItem(items, product));
+    pushRecentScan(product.id);
     clearNotices();
     setMessage(`เพิ่ม ${product.name} แล้ว · พิมพ์จำนวนที่ช่องจำนวนได้เลย (หรือสแกนซ้ำ = +1)`);
     toast.success("เพิ่มสินค้าเข้าบิลแล้ว", { description: `${product.name} · ยิงซ้ำ = +1 หรือพิมพ์จำนวนที่ช่องจำนวนได้เลย`, duration: 1800 });
@@ -318,6 +366,7 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
     }
     clearNotices();
     setCart((items) => addTierItem(items, product, tier));
+    pushRecentScan(product.id);
     setMessage(`เพิ่ม ${product.name} · ${tier.label} ${money(tier.price)} แล้ว · พิมพ์กรัมเพิ่มที่ช่องจำนวนได้`);
     toast.success("เพิ่มสินค้าเข้าบิลแล้ว", { description: `${product.name} · ${tier.label} ${money(tier.price)} · พิมพ์จำนวนเพิ่มที่ช่องจำนวนได้`, duration: 1800 });
     focusQtyInput(`v-${product.id}-${tier.label}`);
@@ -409,39 +458,35 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
     updateQty(product.id, delta);
   };
   const runShortcut = (name: string) => { setShortcut(name); setMessage(`${name === SPECIAL_SHORTCUT ? "เพิ่มรายการพิเศษ" : name}: เปิดหน้าต่างทำรายการเรียบร้อย`); };
-  // Enter in the scan hero = pull the trigger: an exact barcode/SKU match lands
-  // in the bill instantly (scanner behaviour); otherwise typing filters the
-  // quick-pick grid on the right and Enter picks it when exactly one is left.
+  // ROUND 41 — Enter ที่ช่องสแกน: บาร์โค้ด/SKU ตรง = ลงบิลทันที (นิสัยเครื่องสแกน)
+  // ส่วนพิมพ์ค้นหา = เลือกจากรายการใต้ช่อง (ลูกศร ↑↓ + Enter หรือคลิก)
+  const closeScanDrop = () => { setScanOpen(false); setScanHighlight(-1); };
+  const pickScanProduct = (product: Product) => { addProduct(product); setQuery(""); closeScanDrop(); focusScan(); };
+  const pickScanMember = (member: MemberLite) => { setQuery(""); closeScanDrop(); openMemberVerify(member); };
   const handleScanSubmit = () => {
-    const code = query.trim();
-    if (!code) return;
-    const exact = products.find((product) => scanMatches(product.barcode, code) || scanMatches(product.sku, code));
-    if (exact) {
-      addProduct(exact);
-      setQuery("");
-      focusScan();
+    if (scanHighlight >= 0 && scanRows[scanHighlight]) {
+      const row = scanRows[scanHighlight];
+      if (row.kind === "member") pickScanMember(row.member);
+      else pickScanProduct(row.product);
       return;
     }
+    const code = query.trim();
+    if (!code) { closeScanDrop(); return; }
+    const exact = products.find((product) => scanMatches(product.barcode, code) || scanMatches(product.sku, code));
+    if (exact) { pickScanProduct(exact); return; }
     // ROUND 37 (req 36) — ยิงบัตรสมาชิกที่ช่องสแกนหลัก → เด้งโมดูลบัตรให้ยืนยันข้อมูลก่อนเข้าบิล
     // (สแกนเนอร์จบด้วย Enter เหมือนสินค้า — ต้องตรวจสมาชิกก่อน heuristic การค้นหาสินค้า)
     const memberHit = members.find((member) => scanMatches(member.memberNumber, code));
-    if (memberHit) {
-      openMemberVerify(memberHit);
+    if (memberHit) { pickScanMember(memberHit); return; }
+    if (scanSuggestions.length === 1 && scanMemberSuggestions.length === 0) { pickScanProduct(scanSuggestions[0]); return; }
+    if (scanSuggestions.length + scanMemberSuggestions.length > 1) {
+      setScanOpen(true);
+      setScanHighlight(0);
+      setMessage(`พบ ${scanSuggestions.length + scanMemberSuggestions.length} รายการสำหรับ "${code}" · เลือกจากรายการใต้ช่องสแกน (↑↓ แล้ว Enter หรือคลิก)`);
       return;
     }
-    if (filtered.length === 1) {
-      addProduct(filtered[0]);
-      setQuery("");
-      focusScan();
-      return;
-    }
-    if (filtered.length > 1) {
-      setMessage(`พบ ${filtered.length} รายการสำหรับ "${code}" · เลือกจากแผงด้านขวา หรือยิงบาร์โค้ดเต็ม`);
-      toast.info(`พบ ${filtered.length} รายการ`, { description: "เลือกจากแผงด้านขวา หรือยิงบาร์โค้ด/SKU เต็มเพื่อเพิ่มทันที" });
-      return;
-    }
-    setError(`ไม่พบสินค้าสำหรับ "${code}" · ลองยิงบาร์โค้ดจริง เช่น ${sampleCodes[0]?.barcode ?? "8850000000017"} หรือรหัส SKU เช่น DRK-001`);
-    toast.error("ไม่พบสินค้า", { description: `ลองยิงบาร์โค้ดจริง เช่น ${sampleCodes[0]?.barcode ?? "8850000000017"} หรือรหัส SKU เช่น DRK-001`, duration: 4200 });
+    setError(`ไม่พบสินค้าหรือสมาชิกสำหรับ "${code}" · ลองยิงบาร์โค้ดจริง เช่น ${sampleCodes[0]?.barcode ?? "8850000000017"} หรือรหัส SKU เช่น DRK-001`);
+    toast.error("ไม่พบรายการที่ค้นหา", { description: `ลองยิงบาร์โค้ดจริง เช่น ${sampleCodes[0]?.barcode ?? "8850000000017"} หรือรหัส SKU เช่น DRK-001`, duration: 4200 });
   };
   const handleSlip = (file?: File) => { if (!file) return; setSlipName(file.name); setSlipPreview(URL.createObjectURL(file)); setMessage(`แนบสลิป ${file.name} แล้ว · พร้อมบันทึกไปกับรายการ`); };
   const completePayment = (method: PaymentMethod) => {
@@ -646,6 +691,7 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
           if (walletStep === "confirm") { setWalletStep("form"); return; }
         }
         if (shortcut) { setShortcut(""); return; }
+        if (scanOpen) { setScanOpen(false); setScanHighlight(-1); return; }
         if (query) { setQuery(""); }
         focusScan();
       }
@@ -663,18 +709,70 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
     window.addEventListener("focus", onWindowFocus);
     return () => window.removeEventListener("focus", onWindowFocus);
   }, []);
+  // ROUND 41 — คลิกนอกช่องสแกน = ปิดรายการให้เลือก · แถวที่ไฮไลต์ต้องเสมอมองเห็น
+  useEffect(() => {
+    const onDoc = (event: MouseEvent) => {
+      if (scanHeroRef.current && !scanHeroRef.current.contains(event.target as Node)) { setScanOpen(false); setScanHighlight(-1); }
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+  useEffect(() => {
+    if (scanHighlight < 0) return;
+    document.querySelector(".scan-drop-row.active")?.scrollIntoView({ block: "nearest" });
+  }, [scanHighlight]);
   return <>
     <SectionHeader eyebrow="หน้าร้าน / จุดขายสินค้า" title="POS · ขายสินค้า" description="สแกนบาร์โค้ดที่ช่องด้านบน · สินค้าไม่มีบาร์โค้ดปรับจำนวนได้ที่การ์ดด้านขวา · สรุปยอดและปุ่มชำระเงินล็อคอยู่ด้านล่างตลอดเวลา" action={<div className="pos-status"><span className="live-dot" /> จุดขายที่ 01 · เปิดให้บริการ</div>} />
     <div className="pos-layout">
       <section className="panel cart-panel" ref={cartPanelRef}>
         <div className="pos-head">
-        <div className="scan-hero">
+        <div className="scan-hero" ref={scanHeroRef}>
           <ScanLine size={22} className="scan-hero-icon" />
-          <input ref={scanRef} name={`${formNoiseRef.current}-scan`} value={query} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); handleScanSubmit(); } }} placeholder="สแกนบาร์โค้ด / ชื่อสินค้า แล้วกด Enter · ยิงซ้ำ = เพิ่มจำนวน…" autoFocus aria-label="ช่องสแกนบาร์โค้ดและค้นหาสินค้า" title="ช่องนี้ไม่เก็บประวัติการยิง — ทุกรายการเริ่มใหม่เสมอ" />
-          {query ? <button type="button" className="scan-clear" onClick={() => { setQuery(""); focusScan(); }} aria-label="ล้างคำค้นหา"><X size={15} /></button> : <span className="scan-live"><span className="live-dot" /> พร้อมสแกน</span>}
+          <input ref={scanRef} name={`${formNoiseRef.current}-scan`} value={query} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} onChange={(event) => { setQuery(event.target.value); setScanOpen(true); setScanHighlight(-1); }} onFocus={() => setScanOpen(true)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); handleScanSubmit(); return; } if (event.key === "ArrowDown" && scanRows.length > 0) { event.preventDefault(); setScanOpen(true); setScanHighlight((current) => Math.min(current + 1, scanRows.length - 1)); return; } if (event.key === "ArrowUp" && scanRows.length > 0) { event.preventDefault(); setScanHighlight((current) => Math.max(current - 1, 0)); return; } if (event.key === "Escape" && scanOpen) { event.preventDefault(); event.stopPropagation(); closeScanDrop(); } }} placeholder="สแกน/ค้นหา สินค้าหรือสมาชิก · พิมพ์แล้วเลือกจากรายการใต้ช่อง · ยิงบาร์โค้ดเต็ม = เพิ่มทันที" autoFocus aria-label="ช่องสแกนบาร์โค้ดและค้นหาสินค้าหรือสมาชิก" title="ค้นหาสินค้า (ชื่อ/SKU/บาร์โค้ด) และสมาชิก (เลข/ชื่อ) — เลือกจากรายการใต้ช่อง · ไม่เก็บประวัติการคีย์ในเบราว์เซอร์" />
+          {query ? <button type="button" className="scan-clear" onClick={() => { setQuery(""); setScanHighlight(-1); focusScan(); }} aria-label="ล้างคำค้นหา"><X size={15} /></button> : <span className="scan-live"><span className="live-dot" /> พร้อมสแกน</span>}
           <kbd>Enter</kbd>
+          {scanOpen && (query.trim() !== "" || recentScanProducts.length > 0) && (
+            <div className="scan-drop" role="listbox" aria-label="รายการให้เลือกจากช่องสแกน">
+              {query.trim() === "" ? (
+                <>
+                  <div className="scan-drop-head"><span><History size={13} /> รายการที่เพิ่งเลือก · แตะเพื่อเพิ่มซ้ำ</span><button type="button" onClick={clearRecentScan}>ล้างประวัติ</button></div>
+                  {recentScanProducts.map((product, index) => (
+                    <button type="button" className={`scan-drop-row${scanHighlight === index ? " active" : ""}`} key={`recent-${product.id}`} role="option" aria-selected={scanHighlight === index} onClick={() => pickScanProduct(product)}>
+                      <span className="scan-drop-thumb">{product.imageUrl ? <img src={product.imageUrl} alt="" /> : <span>{product.emoji}</span>}</span>
+                      <div className="scan-drop-info"><b>{product.name}</b><small>{product.sku} · คงเหลือ {formatBillQty(product.stock, product.unit)}{product.sellMode === "money" ? " · ขายเป็นราคาตามขนาด" : ""}</small></div>
+                      <strong className="scan-drop-price">{money(product.price)}</strong>
+                    </button>
+                  ))}
+                </>
+              ) : scanSuggestions.length === 0 && scanMemberSuggestions.length === 0 ? (
+                <div className="scan-drop-empty"><Search size={17} /><b>ไม่พบสินค้าหรือสมาชิก “{query.trim()}”</b><small>ลองยิงบาร์โค้ดเต็ม หรือพิมพ์ชื่อสินค้า / รหัส SKU / เลขสมาชิก</small></div>
+              ) : (
+                <>
+                  {scanSuggestions.length > 0 && <div className="scan-drop-head"><span><PackageSearch size={13} /> สินค้า · {scanSuggestions.length} รายการ</span></div>}
+                  {scanSuggestions.map((product, index) => (
+                    <button type="button" className={`scan-drop-row${scanHighlight === index ? " active" : ""}`} key={`product-${product.id}`} role="option" aria-selected={scanHighlight === index} onClick={() => pickScanProduct(product)}>
+                      <span className="scan-drop-thumb">{product.imageUrl ? <img src={product.imageUrl} alt="" /> : <span>{product.emoji}</span>}</span>
+                      <div className="scan-drop-info"><b>{product.name}</b><small>{product.sku}{product.barcode ? ` · ${product.barcode}` : " · ไม่มีบาร์โค้ด"} · คงเหลือ {formatBillQty(product.stock, product.unit)}{product.sellMode === "money" ? " · ขายเป็นราคาตามขนาด" : ""}</small></div>
+                      <strong className="scan-drop-price">{money(product.price)}</strong>
+                    </button>
+                  ))}
+                  {scanMemberSuggestions.length > 0 && <div className="scan-drop-head"><span><IdCard size={13} /> สมาชิก · {scanMemberSuggestions.length} รายการ</span></div>}
+                  {scanMemberSuggestions.map((member, index) => {
+                    const rowIndex = scanSuggestions.length + index;
+                    return (
+                      <button type="button" className={`scan-drop-row member${scanHighlight === rowIndex ? " active" : ""}`} key={`member-${member.memberNumber}`} role="option" aria-selected={scanHighlight === rowIndex} disabled={member.status === "suspended"} onClick={() => pickScanMember(member)}>
+                        <MemberAvatar member={member} size={30} />
+                        <div className="scan-drop-info"><b>{member.memberNumber} · สมาชิก{member.firstName} {member.lastName}</b><small>ยอดคงเหลือ {money(member.balance)}</small></div>
+                        {member.status === "suspended" ? <span className="suspended-tag">ระงับ</span> : <span className="scan-drop-kind">สมาชิก</span>}
+                      </button>
+                    );
+                  })}
+                </>
+              )}
+            </div>
+          )}
         </div>
-        <div className="member-select-wrap"><MemberScanPicker members={members} selectedNumber={selectedMemberNumber} onSelect={(member) => { setSelectedMemberNumber(member ? member.memberNumber : null); clearNotices(); focusScan(); }} requireConfirm confirmContext="บิลนี้" inputId="pos-member-input" onNewMember={openRegister} /></div>
+        <div className="member-select-wrap"><MemberScanPicker members={members} selectedNumber={selectedMemberNumber} onSelect={(member) => { setSelectedMemberNumber(member ? member.memberNumber : null); clearNotices(); focusScan(); }} requireConfirm confirmContext="บิลนี้" inputId="pos-member-input" /></div>
         </div>
         <div className="cart-mid" ref={cartMidRef}>
         {heldBills.length > 0 && <div className="held-chips" aria-label="บิลที่ถูกพักไว้">{heldBills.map((bill) => <div className="held-chip" key={bill.id}><Pause size={13} /><b>{bill.items.reduce((sum, item) => sum + item.qty, 0)} ชิ้น</b><time>{holdTimeLabel(bill.savedAt)}</time><button type="button" className="chip-restore" onClick={() => restoreHeld(bill.id)} aria-label="เรียกคืนบิลที่พักไว้" title="เรียกคืนบิลนี้"><RotateCcw size={14} /></button><button type="button" className="chip-discard" onClick={() => discardHeld(bill.id)} aria-label="ยกเลิกบิลที่พักไว้" title="ยกเลิกบิลนี้"><X size={13} /></button></div>)}</div>}
@@ -683,13 +781,13 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
         <div className="cart-foot"><div className="cart-totals"><div><span>ยอดรวมสินค้า</span><strong>{money(subtotal)}</strong></div><div><span>ส่วนลดสมาชิก</span><strong className="discount discount-edit">- ฿<input type="number" min="0" step="0.01" value={discount} onChange={(event) => setDiscount(event.target.value)} aria-label="ส่วนลด (บาท)" /></strong></div><div className="total-line"><span>ยอดที่ต้องชำระ</span><strong>{money(payable)}</strong></div></div><div className="payment-actions"><button className="pay-button member-pay" disabled={payDisabled} onClick={() => { if (selectedMember) completePayment("หักบัญชีสมาชิก"); else { setError("กรุณาเลือกสมาชิกก่อนชำระแบบหักบัญชี"); toast.error("ยังไม่ได้เลือกสมาชิก", { description: "ยิงบัตรสมาชิกที่ช่องสแกน หรือกด F1 เพื่อเลือกสมาชิกก่อน" }); } }}><CreditCard size={18} /> หักบัญชีสมาชิก</button><div className="pay-split"><button disabled={payDisabled} onClick={() => completePayment("เงินสด")}><span className="pay-icon cash"><WalletCards size={16} /></span> เงินสด</button><button disabled={payDisabled} onClick={() => completePayment("QR / สแกน")}><span className="pay-icon qr"><QrCode size={16} /></span> QR / สแกน</button></div></div>{isAdminRole(role) && <div className="admin-pos-note"><Sparkles size={14} /><span>ผู้บริหารสามารถแก้ไขราคา/ตรวจสอบรายการก่อนปิดบิล</span></div>}<div className={`cart-status-line${error ? " error" : message ? " ok" : ""}`} role="status" aria-live="polite">{error ? <><CircleAlert size={14} /> <span className="cart-status-text">{error}</span> <button onClick={() => setError("")} aria-label="ปิดข้อความแจ้งเหตุ"><X size={13} /></button></> : message ? <><Check size={14} /> <span className="cart-status-text">{message}</span></> : <><span className="live-dot" /> <span className="cart-status-text">{idleStatus}</span></>}</div></div>
       </section>
       <aside className="panel product-panel quick-pick-panel">
-        <div className="quick-pick-head"><div><h2>แผงลัดหน้าร้าน</h2><p>{query.trim() ? "กำลังค้นหาทุกสินค้า — ยิงบาร์โค้ดหรือพิมพ์ชื่อ/รหัสเพื่อเลือก" : shortcuts.length > 0 ? "สินค้าที่หยิบบ่อย (กดการ์ดเพิ่มเข้าบิล) — กด “จัดแผง” เพื่อเพิ่ม/นำออกเอง" : "กดการ์ดหรือปุ่ม + เพื่อเพิ่ม · กด “จัดแผง” เพื่อเลือกเฉพาะของที่หยิบบ่อยขึ้นมา"}</p></div><span className="quick-pick-count">{panelList.length} รายการ</span><button type="button" className="outline-button compact quick-manage-open-btn" onClick={() => { setQuickManageOpen(true); setQuickManageSearch(""); setQuickManageNotice(""); }} title="เพิ่ม/นำออก สินค้าที่ขึ้นแผงนี้"><Star size={14} /> จัดแผง</button></div>
+        <div className="quick-pick-head"><div><h2>แผงลัดหน้าร้าน</h2><p>{shortcuts.length > 0 ? "สินค้าที่หยิบบ่อย (กดการ์ดเพิ่มเข้าบิล) — กด “จัดแผง” เพื่อเพิ่ม/นำออกเอง · ค้นหาทำที่ช่องสแกนด้านบน" : "กดการ์ดหรือปุ่ม + เพื่อเพิ่ม · กด “จัดแผง” เพื่อเลือกเฉพาะของที่หยิบบ่อยขึ้นมา · ค้นหาทำที่ช่องสแกนด้านบน"}</p></div><span className="quick-pick-count">{panelList.length} รายการ</span><button type="button" className="outline-button compact quick-manage-open-btn" onClick={() => { setQuickManageOpen(true); setQuickManageSearch(""); setQuickManageNotice(""); }} title="เพิ่ม/นำออก สินค้าที่ขึ้นแผงนี้"><Star size={14} /> จัดแผง</button></div>
         <div className="category-tabs">{["ทั้งหมด", "อาหาร", "เครื่องดื่ม", "ของใช้"].map((item) => <button className={category === item ? "active" : ""} key={item} onClick={() => setCategory(item)}>{item}</button>)}</div>
         <div className="product-scroll">{productsQuery.isLoading ? <div className="product-grid" aria-busy="true">{Array.from({ length: 6 }, (_, index) => <div aria-hidden="true" className="product-card skeleton-card" key={`skeleton-${index}`}><div className="product-art"><span className="skeleton-avatar" /></div><div className="product-card-info"><span className="skeleton-cell-w" /><span className="skeleton-cell-n" /><span className="skeleton-price" /></div></div>)}</div> : productsQuery.isError ? <div className="inline-message error"><CircleAlert size={15} /> โหลดรายการสินค้าไม่สำเร็จ · {getErrorMessage(productsQuery.error)}</div> : panelList.length === 0 ? <div className="pos-loading"><Search size={26} /><b>ไม่พบสินค้าตามเงื่อนไข</b><span>ลองเปลี่ยนคำค้นหาหรือหมวดหมู่</span></div> : <div className="product-grid">{panelList.map((product) => { const tiers = product.sellMode === "money" ? parsePriceTiers(product.priceTiers) : []; if (tiers.length > 0) { return <div className={`product-card money-card${qtyInBill(product.id) > 0 ? " in-bill" : ""}`} key={product.id} aria-label={`${product.name} — สินค้าขายเป็นราคา เลือกขนาดที่ปุ่มราคา`} title={`${product.name} · ขายเป็นราคาตามขนาด`}><div className={`product-art ${product.color}`}>{product.imageUrl ? <img className="product-art-img" src={product.imageUrl} alt="" /> : <span>{product.emoji}</span>}{product.stock <= 10 && <i>เหลือ {formatBillQty(product.stock, product.unit)}</i>}{qtyInBill(product.id) > 0 && <b className="pick-qty-badge">{formatBillQty(qtyInBill(product.id), product.unit)}</b>}</div><div className="product-card-info"><b>{product.name}</b><small>{product.unit} · คงเหลือ {formatBillQty(product.stock, product.unit)}</small></div><div className="tier-stepper" onClick={(event) => event.stopPropagation()}>{tiers.map((tier) => <button type="button" className="tier-button" key={tier.label} disabled={product.stock < tier.qty} onClick={() => addTier(product, tier)} aria-label={`เพิ่ม ${product.name} ${tier.label} ${money(tier.price)}`}><b>฿{tier.price}</b><small>{tier.label}</small></button>)}</div></div>; } return <div className={`product-card${qtyInBill(product.id) > 0 ? " in-bill" : ""}`} key={product.id} role="button" tabIndex={0} aria-label={`เพิ่ม ${product.name} เข้าบิล`} onClick={() => addProduct(product)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); addProduct(product); } }}><div className={`product-art ${product.color}`}>{product.imageUrl ? <img className="product-art-img" src={product.imageUrl} alt="" /> : <span>{product.emoji}</span>}{product.stock <= 10 && <i>เหลือ {product.stock}</i>}{qtyInBill(product.id) > 0 && <b className="pick-qty-badge">{qtyInBill(product.id)}</b>}</div><div className="product-card-info"><b>{product.name}</b><small>{product.size ? `${product.size} · ` : ""}{product.unit} · คงเหลือ {product.stock}</small><strong>{money(product.price)}</strong></div><div className="pick-stepper" onClick={(event) => event.stopPropagation()}><button type="button" aria-label={`ลดจำนวน ${product.name} ในบิล`} disabled={qtyInBill(product.id) === 0} onClick={() => bumpPick(product, -1)}><Minus size={13} /></button><span className={qtyInBill(product.id) === 0 ? "pick-qty zero" : "pick-qty"} aria-label={`จำนวน ${product.name} ในบิล`}>{qtyInBill(product.id)}</span><button type="button" aria-label={`เพิ่มจำนวน ${product.name} ในบิล`} disabled={product.stock <= 0 || qtyInBill(product.id) >= product.stock} onClick={() => bumpPick(product, 1)}><Plus size={13} /></button></div></div>; })}</div>}</div>
         <div className="pos-help"><CircleHelp size={15} /><span>ตัวอย่างบาร์โค้ด {sampleCodes[0]?.barcode ?? "8850000000017"} · รหัส SKU เช่น DRK-001 · พิมพ์เลข 3 ตัวท้ายก็ค้นเจอ · เพิ่มแล้วพิมพ์จำนวนที่ช่องจำนวนได้เลย</span></div>
       </aside>
     </div>
-    <div className="shortcut-strip"><button className="strip-deposit" onClick={() => runShortcut("เติมเงิน")}><ArrowDownToLine size={17} /><span>เติมเงิน</span><kbd>F2</kbd></button><button className="strip-withdraw" onClick={() => runShortcut("ถอนเงิน")}><ArrowUpFromLine size={17} /><span>ถอนเงิน</span><kbd>F3</kbd></button><button className="strip-special" onClick={() => runShortcut(SPECIAL_SHORTCUT)}><SlidersHorizontal size={17} /><span>รายการพิเศษ</span><kbd>F4</kbd></button><button className="strip-hold" onClick={holdBill}><Pause size={17} /><span>พักบิล</span><kbd>F5</kbd>{heldBills.length > 0 && <i className="dock-badge">{heldBills.length}</i>}</button><button className="strip-register" onClick={openRegister}><IdCard size={17} /><span>สมาชิกใหม่</span><kbd>F6</kbd></button><button className="strip-manage" onClick={() => { setQuickManageOpen(true); setQuickManageSearch(""); setQuickManageNotice(""); }}><Star size={17} /><span>จัดแผง</span><kbd>F7</kbd></button></div>
+    <div className="shortcut-strip"><button className="strip-deposit" onClick={() => runShortcut("เติมเงิน")}><ArrowDownToLine size={17} /><span>เติมเงิน</span><kbd>F2</kbd></button><button className="strip-withdraw" onClick={() => runShortcut("ถอนเงิน")}><ArrowUpFromLine size={17} /><span>ถอนเงิน</span><kbd>F3</kbd></button><button className="strip-special" onClick={() => runShortcut(SPECIAL_SHORTCUT)}><SlidersHorizontal size={17} /><span>รายการพิเศษ</span><kbd>F4</kbd></button><button className="strip-hold" onClick={holdBill}><Pause size={17} /><span>พักบิล</span><kbd>F5</kbd>{heldBills.length > 0 && <i className="dock-badge">{heldBills.length}</i>}</button><button className="strip-manage" onClick={() => { setQuickManageOpen(true); setQuickManageSearch(""); setQuickManageNotice(""); }}><Star size={17} /><span>จัดแผง</span><kbd>F7</kbd></button></div>
     {cart.length > 0 && !receiptOpen && <div className="pos-mobile-bar"><span className="pos-mobile-count"><ShoppingCart size={15} /> {cartPieces} รายการ</span><strong>{money(payable)}</strong><button onClick={() => cartPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}><CreditCard size={16} /> ชำระเงิน</button></div>}
     {receiptOpen && receipt && <ReceiptModal receipt={receipt} onClose={startNewSale} onNewSale={startNewSale} onPrinted={() => { setMessage("ส่งใบเสร็จไปพิมพ์แล้ว"); toast.info("ส่งใบเสร็จไปพิมพ์แล้ว", { description: `บิล ${receipt.orderNumber} · ตรวจเครื่องพิมพ์ที่เคาน์เตอร์`, duration: 2600 }); }} autoPrint={settingsQuery.data?.autoPrintReceipt === true} />}{cardForNew && <MemberCardModal member={cardForNew} onClose={() => setCardForNew(null)} />}{scanMember && <MemberCardModal member={scanMember} confirmForBill onClose={() => { setScanMember(null); focusScan(); }} onConfirm={confirmScanMember} />}{registerCameraOpen && <CameraCaptureModal open title="ถ่ายรูปสมาชิกใหม่" hint="สำหรับบัตรสมาชิก — รูปจะเข้าฟอร์มลงทะเบียนทันที (ยังไม่บันทึกจนกดบันทึก)" onClose={() => setRegisterCameraOpen(false)} onCapture={(dataUrl) => { setRegisterForm((current) => ({ ...current, photoUrl: dataUrl })); setError(""); }} />}{registerOpen && <div className="modal-backdrop" onClick={() => setRegisterOpen(false)}><div className="form-modal pos-register-modal" role="dialog" aria-modal="true" aria-label="ลงทะเบียนสมาชิกใหม่" onClick={(event) => event.stopPropagation()}><div className="modal-heading"><div><span className="eyebrow">MEMBER REGISTRATION · POS</span><h2>ลงทะเบียนสมาชิกใหม่ + พิมพ์บัตร</h2><p>จุดเดียวสำหรับสมัชิกใหม่ (F6) — บันทึกเสร็จระบบเปิดบัตรให้พิมพ์ทันที และเลือกเข้าบิลนี้ให้อัตโนมัติ</p></div><button className="icon-button" onClick={() => setRegisterOpen(false)} aria-label="ปิดหน้าต่าง"><X size={17} /></button></div><div className="member-number-preview"><span><IdCard size={16} /> {numberMode === "manual" ? "โหมดกำหนดหมายเลขสมาชิกด้วยตนเอง" : `หมายเลขสมาชิกถัดไป (${numberMode === "year" ? "ขึ้นต้นด้วยปี" : "รันเลขต่อเนื่อง"})`}</span><b>{nextNumber}</b></div><div className="form-grid compact-form"><label>ชื่อ *<input id="pos-register-first-name" value={registerForm.firstName} onChange={(event) => setRegisterForm({ ...registerForm, firstName: event.target.value })} placeholder="ชื่อ" /></label><label>นามสกุล *<input value={registerForm.lastName} onChange={(event) => setRegisterForm({ ...registerForm, lastName: event.target.value })} placeholder="นามสกุล" /></label><label>ประเภทสมาชิก<select value={registerForm.type} onChange={(event) => setRegisterForm({ ...registerForm, type: event.target.value })}><option>สมาชิก</option><option>เจ้าหน้าที่</option></select></label><label>เพศ<select value={registerForm.gender} onChange={(event) => setRegisterForm({ ...registerForm, gender: event.target.value as "ชาย" | "หญิง" | "ไม่ระบุ" })}><option value="ไม่ระบุ">ไม่ระบุ</option><option value="ชาย">ชาย</option><option value="หญิง">หญิง</option></select></label><label className="wide">รูปสมาชิก (สำหรับบัตร)<div className="member-photo-uploader">{registerForm.photoUrl ? <><img className="member-photo-preview" src={registerForm.photoUrl} alt="รูปสมาชิกที่เลือก" /><div className="member-photo-actions"><div className="photo-action-row"><button type="button" className="outline-button compact" onClick={() => setRegisterCameraOpen(true)}><Camera size={15} /> ถ่ายใหม่จากกล้อง</button><button type="button" className="danger-outline-button compact" onClick={() => setRegisterForm({ ...registerForm, photoUrl: "" })}><Trash2 size={15} /> ลบรูป</button></div></div></> : <><label className="upload-drop member-photo-drop" htmlFor="pos-register-photo"><ImagePlus size={17} /><span><b>เลือกรูปสมาชิก</b><small>ไม่ใส่ก็ได้ — บัตรจะใช้รูป{registerForm.gender === "ชาย" ? "ชาย" : registerForm.gender === "หญิง" ? "หญิง" : "เริ่มต้น"}แทน</small></span><input id="pos-register-photo" type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={onRegisterPhotoPick} /></label><button type="button" className="outline-button compact camera-hint-inline" onClick={() => setRegisterCameraOpen(true)}><Camera size={15} /> หรือถ่ายรูปจากกล้องเลย — เครื่องไหนมีเว็บแคมใช้ได้เลย</button></>}</div></label><label>เบอร์โทรศัพท์<input value={registerForm.phone} onChange={(event) => setRegisterForm({ ...registerForm, phone: event.target.value })} placeholder="เช่น 08x-xxx-xxxx" /></label><label className="wide">เลขที่บัตรประชาชน<input value={registerForm.idCard} onChange={(event) => setRegisterForm({ ...registerForm, idCard: event.target.value })} placeholder="-" /></label>{numberMode === "manual" && <label className="wide">หมายเลขสมาชิก *<input value={registerForm.memberNumber} onChange={(event) => setRegisterForm({ ...registerForm, memberNumber: event.target.value })} placeholder="กำหนดหมายเลขเอง เช่น VIP-001" /></label>}<label className="wide">เงินเริ่มต้น (ถ้ามี)<input type="number" min="0" value={registerForm.initialBalance} onChange={(event) => setRegisterForm({ ...registerForm, initialBalance: event.target.value })} placeholder="เว้นว่างได้ หากยังไม่เติมเงิน" /></label></div><div className="initial-balance-note"><ShieldCheck size={15} /> บันทึกเสร็จ → บัตรสมาชิกเปิดขึ้นมาให้พิมพ์ทันที (บาร์โค้ด + QR + รูป) และเลือกเข้าบิลนี้ให้อัตโนมัติ</div>{error && <div className="notice-bar error"><CircleAlert size={16} /> {error}<button onClick={() => setError("")}><X size={14} /></button></div>}<div className="modal-actions"><button className="outline-button" onClick={() => setRegisterOpen(false)}><X size={16} /> ยกเลิก</button><button className="primary-button" disabled={registerMutation.isPending} onClick={submitRegister}><IdCard size={16} /> {registerMutation.isPending ? "กำลังบันทึก…" : "บันทึก + เปิดบัตร"}</button></div></div></div>}{quickManageOpen && <div className="modal-backdrop" onClick={() => setQuickManageOpen(false)}><div className="form-modal quick-manage-modal" role="dialog" aria-modal="true" aria-label="จัดแผงลัดหน้าร้าน" onClick={(event) => event.stopPropagation()}><div className="modal-heading"><div><span className="eyebrow">POS SHORTCUT RAIL</span><h2>จัดแผงลัดหน้าร้าน</h2><p>เลือกสินค้าที่หยิบขายบ่อยขึ้นแผงด้านขวา — ทั้งที่มีบาร์โค้ดและไม่มี · ค้นหาแล้วกดปุ่มดาวเพื่อขึ้นแผง/นำออก</p></div><button className="icon-button" onClick={() => setQuickManageOpen(false)} aria-label="ปิดหน้าต่าง"><X size={17} /></button></div><div className="quick-manage-tools"><div className="search-field"><Search size={16} /><input autoFocus value={quickManageSearch} onChange={(event) => setQuickManageSearch(event.target.value)} placeholder="ค้นหาชื่อสินค้า หรือรหัส SKU / บาร์โค้ด" /></div><span className="quick-manage-count">{shortcuts.length} รายการบนแผง</span></div><div className="quick-manage-list" role="list">{products.filter((product) => product.name.toLowerCase().includes(quickManageSearch.toLowerCase()) || product.sku.toLowerCase().includes(quickManageSearch.toLowerCase()) || (product.barcode ?? "").includes(quickManageSearch)).slice(0, 40).map((product) => { const active = product.quickPick === 1; return <div className={`quick-manage-row${active ? " active" : ""}`} key={product.id} role="listitem"><span className="quick-manage-thumb">{product.imageUrl ? <img src={product.imageUrl} alt="" /> : <span>{product.emoji}</span>}</span><div className="quick-manage-info"><b>{product.name}</b><small>{product.sku}{product.barcode ? ` · ${product.barcode}` : " · ไม่มีบาร์โค้ด"}{product.sellMode === "money" ? " · ขายเป็นราคา" : ""}</small></div><button type="button" className={active ? "primary-button compact" : "outline-button compact"} disabled={quickPickMutation.isPending} onClick={() => quickPickMutation.mutate({ productId: product.id, quickPick: active ? 0 : 1, actor: cashier, actorRole })} aria-pressed={active} title={active ? "นำออกจากแผงลัด" : "ขึ้นแผงลัดหน้าร้าน"}><Star size={14} /> {active ? "อยู่บนแผง" : "ขึ้นแผง"}</button></div>; })}</div>{quickManageNotice && <div className="notice-bar"><Check size={16} /> {quickManageNotice}<button onClick={() => setQuickManageNotice("")}><X size={14} /></button></div>}<div className="initial-balance-note"><LayoutGrid size={15} /><span>แผงลัดคือการ์ดสินค้าที่ขึ้นหน้า POS ทันที — เหมาะกับของที่ลูกค้าซื้อบ่อยและไม่ต้องยิงบาร์โค้ดทุกครั้ง · สินค้าขายเป็นราคา (เช่น น้ำแข็ง) ตั้งช่องราคาได้ที่หน้าสต็อก → เพิ่มไอเทมสินค้า</span></div><div className="modal-actions"><button className="primary-button" onClick={() => setQuickManageOpen(false)}><Check size={16} /> เสร็จสิ้น</button></div></div></div>}<ConfirmDialog open={cancelOpen} title="ยืนยันการยกเลิกรายการขาย?" description="สินค้าที่อยู่ในบิลนี้จะถูกล้างออก และยังไม่บันทึกเป็นธุรกรรม (บิลที่พักไว้จะไม่ถูกกระทบ)" confirmLabel="ยืนยันยกเลิกบิล" onCancel={() => setCancelOpen(false)} onConfirm={() => { setCart([]); setCancelOpen(false); setMessage("ยกเลิกรายการขายแล้ว"); toast.info("ยกเลิกรายการขายแล้ว", { description: "ล้างบิลปัจจุบันทิ้ง — เริ่มรายการใหม่ได้ทันที" }); }} />{shortcut && <div className="modal-backdrop" onClick={() => { if (walletStep !== "success") setShortcut(""); }}><div className="form-modal wallet-modal" role="dialog" aria-modal="true" aria-label={shortcutTitle} onClick={(event) => event.stopPropagation()}><div className="modal-heading"><div><span className="eyebrow">{shortcut === "เติมเงิน" ? (walletStep === "success" ? "WALLET SLIP · DEPOSIT" : walletStep === "confirm" ? "CONFIRM · DEPOSIT" : "WALLET DEPOSIT") : shortcut === "ถอนเงิน" ? (walletStep === "success" ? "WALLET SLIP · WITHDRAWAL" : walletStep === "confirm" ? "CONFIRM · WITHDRAWAL" : "WALLET WITHDRAWAL") : "SPECIAL LINE ITEM"}</span><h2>{(shortcut === "เติมเงิน" || shortcut === "ถอนเงิน") && walletStep === "success" ? (shortcut === "เติมเงิน" ? "สลิปเติมเงิน" : "สลิปถอนเงิน") : shortcutTitle}</h2><p>{shortcut === SPECIAL_SHORTCUT ? "รายการตามจริง · ไม่ตัดสต็อก เช่น ของชั่ง ค่าบริการ" : walletStep === "form" ? "เลือกสมาชิกและระบุจำนวนเงิน · ระบบจะให้ยืนยันรายละเอียดก่อนบันทึกทุกครั้ง" : walletStep === "confirm" ? "ตรวจสอบให้ถูกต้อง — ยอดเงินจะยังไม่เข้า/ออกจากบัญชีสมาชิกจนกว่าจะกดยืนยัน" : "รายการถูกบันทึกลงประวัติธุรกรรมของสมาชิกเรียบร้อยแล้ว"}</p></div><button className="icon-button" onClick={() => { if (walletStep !== "success") setShortcut(""); }} aria-label="ปิดหน้าต่าง"><X size={17} /></button></div><div className="wallet-modal-body">{shortcut === SPECIAL_SHORTCUT && <div className="wallet-form special-form"><div className="wallet-heading"><span className="special-icon"><Sparkles size={16} /></span><div><b>เพิ่มรายการพิเศษเข้าบิล</b><small>สำหรับของชั่ง ค่าบริการ หรือรายการนอกแค็ตตาล็อก · ไม่ตัดสต็อก</small></div></div><label>ชื่อรายการ<input value={specialName} onChange={(event) => setSpecialName(event.target.value)} placeholder="เช่น ข้าวราดแกงนอกรายการ / ค่าฝากของ" onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submitSpecial(); } }} /></label><div className="special-grid"><label>ราคา/หน่วย (฿)<input type="number" min="0" step="0.01" value={specialPrice} onChange={(event) => setSpecialPrice(event.target.value)} placeholder="0.00" onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submitSpecial(); } }} /></label><label>จำนวน<input type="number" min="1" step="1" value={specialQty} onChange={(event) => setSpecialQty(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submitSpecial(); } }} /></label><label>หน่วย<input value={specialUnit} onChange={(event) => setSpecialUnit(event.target.value)} placeholder="รายการ" onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submitSpecial(); } }} /></label></div><button className="primary-button" disabled={!(specialName.trim() && Number(specialPrice) > 0)} onClick={submitSpecial}><Plus size={16} /> เพิ่มเข้าบิล</button></div>}{(shortcut === "เติมเงิน" || shortcut === "ถอนเงิน") && walletStep === "form" && <div className="wallet-form"><div className="wallet-heading"><span>{shortcut === "เติมเงิน" ? <ArrowDownToLine size={16} /> : <ArrowUpFromLine size={16} />}</span><div><b>{shortcut === "เติมเงิน" ? "เติมเงินเข้าบัญชีสมาชิก" : "ถอนเงินจากบัญชีสมาชิก"}</b><small>ขั้นตอนที่ 1 จาก 2 · กรอกข้อมูล แล้วกด “ต่อไป” เพื่อตรวจสอบก่อนบันทึก</small></div></div><div className="wallet-picker-row"><MemberScanPicker members={members} selectedNumber={walletMemberNumber || selectedMemberNumber} onSelect={(member) => setWalletMemberNumber(member ? member.memberNumber : "")} placeholder="คีย์เลขสมาชิก หรือยิงบาร์โค้ด / คิวอาร์โค้ด" confirmContext="การเติม/ถอนเงินนี้" /></div><label>จำนวนเงิน (฿)<input type="number" min="0" step="0.01" value={walletAmount} onChange={(event) => setWalletAmount(event.target.value)} placeholder="0.00" /></label><label>หมายเหตุ<input value={walletNote} onChange={(event) => setWalletNote(event.target.value)} placeholder={shortcut === "เติมเงิน" ? "เช่น เติมเงินสดที่เคาน์เตอร์" : "เช่น ถอนเพื่อใช้จ่ายส่วนตัว"} /></label><button className="primary-button" disabled={!(Number(walletAmount) > 0) || !(walletMemberNumber || selectedMemberNumber)} onClick={submitWallet}><ShieldCheck size={16} /> ต่อไป: ตรวจสอบรายการ</button></div>}{(shortcut === "เติมเงิน" || shortcut === "ถอนเงิน") && walletStep === "confirm" && walletTarget && <div className="wallet-confirm"><div className="wallet-confirm-warning"><ShieldCheck size={16} /><span>ยอดเงินจะยังไม่ถูกบันทึกเข้าบัญชี จนกว่าจะกด “ยืนยันการทำรายการ”</span></div><div className="wallet-confirm-member"><MemberAvatar member={walletTarget} size={58} /><div><b>สมาชิก{walletTarget.firstName} {walletTarget.lastName}</b><small>เลขสมาชิก <i>{walletTarget.memberNumber}</i> · ประเภท {walletTarget.type}</small></div></div><div className="wallet-confirm-rows"><div><span>ประเภทรายการ</span><b className={shortcut === "เติมเงิน" ? "green-text" : "amber-text"}>{shortcut}</b></div><div><span>จำนวนเงิน</span><b>{money(Number(walletAmount))}</b></div><div><span>ยอดคงเหลือก่อนรายการ</span><b>{money(walletTarget.balance)}</b></div><div><span>ยอดคงเหลือหลังยืนยัน</span><b className={walletAfterPreview < 0 ? "red-text" : ""}>{money(walletAfterPreview)}</b></div><div><span>ผู้ทำรายการ</span><b>{cashier} · {actorRole}</b></div>{walletNote.trim() && <div><span>หมายเหตุ</span><b>{walletNote.trim()}</b></div>}{slipName && <div><span>หลักฐานแนบ</span><b><FileImage size={13} /> {slipName}</b></div>}</div>{walletAfterPreview < 0 && <div className="notice-bar error"><CircleAlert size={16} /> ยอดเงินคงเหลือไม่พอสำหรับถอนจำนวนนี้ — ลดจำนวนเงินหรือย้อนกลับแก้ไข<button onClick={() => setError("")}><X size={14} /></button></div>}<div className="wallet-confirm-actions"><button className="outline-button" onClick={() => setWalletStep("form")}><RotateCcw size={15} /> ย้อนกลับแก้ไข</button><button className="primary-button" disabled={walletMutation.isPending || walletAfterPreview < 0} onClick={confirmWallet}><Check size={16} /> {walletMutation.isPending ? "กำลังบันทึก…" : "ยืนยันการทำรายการ"}</button></div></div>}{(shortcut === "เติมเงิน" || shortcut === "ถอนเงิน") && walletStep === "success" && walletResult && <div className="wallet-success"><div className="receipt-paper wallet-slip" id="wallet-slip"><div className="receipt-success slip"><span>{shortcut === "เติมเงิน" ? <ArrowDownToLine size={22} /> : <ArrowUpFromLine size={22} />}</span><div><b>{shortcut === "เติมเงิน" ? "เติมเงินสำเร็จ" : "ถอนเงินสำเร็จ"}</b><small>บันทึกลงรายการธุรกรรมของสมาชิกแล้ว</small></div></div><div className="receipt-divider" /><div className="receipt-meta"><span>{shortcut === "เติมเงิน" ? "ใบยืนยันการเติมเงิน" : "ใบยืนยันการถอนเงิน"}</span><b>{walletDoneAt ? slipTimeLabel(walletDoneAt) : ""}</b></div><div className="receipt-customer"><span>สมาชิก</span><b>{walletResult.memberName} · {walletResult.memberNumber}</b></div><div className="receipt-line"><span>{shortcut === "เติมเงิน" ? "จำนวนเงินที่เติม" : "จำนวนเงินที่ถอน"}</span><b>{money(walletResult.amount)}</b></div><div className="receipt-line"><span>ยอดคงเหลือก่อนรายการ</span><b>{money(walletResult.balanceBefore)}</b></div><div className="receipt-total"><span>ยอดคงเหลือหลังรายการ</span><b>{money(walletResult.balanceAfter)}</b></div><div className="receipt-payment"><span>ผู้ทำรายการ</span><b>{cashier} · {actorRole}</b></div><div className="receipt-thanks">บันทึกเข้าระบบเรียบร้อย ตรวจสอบยอดได้ที่เมนูรายงาน · ประวัติธุรกรรม<br /><small>ข้อมูลถูกบันทึกในระบบ Log แล้ว</small></div></div><div className="wallet-success-actions"><button className="outline-button" onClick={() => window.print()}><Printer size={16} /> พิมพ์สลิป</button><button className="primary-button" onClick={finishWallet}><Check size={16} /> เสร็จสิ้น · เริ่มรายการใหม่</button></div></div>}{(shortcut === "เติมเงิน" || shortcut === "ถอนเงิน") && walletStep !== "success" && <div className="slip-uploader"><div className="slip-heading"><span><FileImage size={16} /> หลักฐานการโอน / สลิป</span><small>ไม่บังคับ</small></div>{slipPreview ? <div className="slip-preview"><img src={slipPreview} alt="ตัวอย่างสลิป" /><div><b>{slipName}</b><small>พร้อมแนบกับรายการ {shortcut}</small></div><button onClick={() => { setSlipPreview(""); setSlipName(""); }}><X size={14} /></button></div> : <label className="upload-drop" htmlFor="slip-upload"><Upload size={17} /><span><b>คลิกเพื่ออัปโหลดรูปสลิป</b><small>รองรับ JPG, PNG ขนาดไม่เกิน 10 MB</small></span><input id="slip-upload" type="file" accept="image/png,image/jpeg" onChange={(event) => handleSlip(event.target.files?.[0])} /></label>}</div>}</div><div className="wallet-modal-foot"><small>{(shortcut === "เติมเงิน" || shortcut === "ถอนเงิน") && walletStep !== "success" ? "Esc ย้อนหน้า · F2/F3/F4 สลับโหมด" : "Esc ปิดหน้าต่าง · F2/F3/F4 สลับโหมด"}</small><button type="button" className="outline-button" onClick={() => { if (walletStep === "success") finishWallet(); else setShortcut(""); }}>{(shortcut === "เติมเงิน" || shortcut === "ถอนเงิน") && walletStep === "success" ? "ปิดหน้าต่าง (ล้างรายการ)" : "ปิดหน้าต่าง"}</button></div></div></div>}</>;
 }

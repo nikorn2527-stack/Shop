@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { PackageSearch, ScanLine, UserPlus, X } from "lucide-react";
+import { PackageSearch, ScanLine, X } from "lucide-react";
 import { toast } from "sonner";
 import type { SqliteProduct } from "../../../server/sqliteStore";
 import type { MemberLite } from "@/pages/pageData";
@@ -31,7 +31,6 @@ export function MemberScanPicker({
   members,
   selectedNumber,
   onSelect,
-  onNewMember,
   inputId,
   placeholder = "คีย์เลขสมาชิก หรือยิงบาร์โค้ด / คิวอาร์โค้ด",
   emptyHint = "ยังไม่มีสมาชิกในระบบ · ลงทะเบียนก่อนใช้งาน",
@@ -41,7 +40,6 @@ export function MemberScanPicker({
   members: MemberLite[];
   selectedNumber: string | null;
   onSelect: (member: MemberLite | null) => void;
-  onNewMember?: () => void;
   inputId?: string;
   placeholder?: string;
   emptyHint?: string;
@@ -189,11 +187,6 @@ export function MemberScanPicker({
               <kbd>Enter</kbd>
             )}
           </div>
-          {onNewMember && (
-            <button type="button" className="outline-button member-new-btn" onClick={onNewMember}>
-              <UserPlus size={15} /> สมาชิกใหม่
-            </button>
-          )}
         </>
       )}
       {open && !selected && !pending && (
@@ -215,7 +208,7 @@ export function MemberScanPicker({
             <div className="member-option disabled">
               <div>
                 <b>ไม่พบเลขสมาชิกที่คีย์</b>
-                <small>ลองคีย์เฉพาะตัวเลข (เช่น 092) หรือชื่อ · ลงทะเบียนใหม่ได้ที่ POS (F6)</small>
+                <small>ลองคีย์เฉพาะตัวเลข (เช่น 092) หรือชื่อ · ลงทะเบียนใหม่ได้ที่ปุ่มสมาชิกใหม่บนแถบด้านซ้าย (F6)</small>
               </div>
             </div>
           ) : (
