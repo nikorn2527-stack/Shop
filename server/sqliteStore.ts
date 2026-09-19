@@ -1801,12 +1801,19 @@ const SEED_PRODUCTS: { sku: string; barcode: string; name: string; category: str
   { sku: "ICE-004", barcode: "8850000000086", name: "น้ำแข็งถุงเล็ก", category: "ของใช้", emoji: "🧊", color: "cyan", unit: "ถุง", price: 10, cost: 6, stock: 35, reorderPoint: 40 },
 ];
 
+/** Seed expiry anchored to today so demo data (และเทส expirySoon) ไม่หมดอายุไปตามเวลาจริง */
+const seedExpiryFromToday = (offsetDays: number) => {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDays);
+  return date.toISOString().slice(0, 10);
+};
+
 const SEED_STOCK_LOTS: { sku: string; lot: string; expiry: string | null; qty: number; cost: number; receivedAt: string }[] = [
   { sku: "DRK-001", lot: "CR-2608-01", expiry: "2027-08-18", qty: 124, cost: 4.2, receivedAt: "2026-08-20 09:12:00" },
   { sku: "DRK-002", lot: "CF-2607-02", expiry: "2027-03-10", qty: 42, cost: 13.5, receivedAt: "2026-08-15 10:40:00" },
-  { sku: "FD-014", lot: "ครัวกลาง-17", expiry: "2026-09-18", qty: 18, cost: 32, receivedAt: "2026-09-17 07:20:00" },
-  { sku: "DRK-003", lot: "ML-2608-08", expiry: "2026-09-30", qty: 65, cost: 9.5, receivedAt: "2026-08-22 08:55:00" },
-  { sku: "FD-015", lot: "BR-260917-A", expiry: "2026-09-20", qty: 9, cost: 18, receivedAt: "2026-09-17 06:45:00" },
+  { sku: "FD-014", lot: "ครัวกลาง-17", expiry: seedExpiryFromToday(12), qty: 18, cost: 32, receivedAt: "2026-09-17 07:20:00" },
+  { sku: "DRK-003", lot: "ML-2608-08", expiry: seedExpiryFromToday(25), qty: 65, cost: 9.5, receivedAt: "2026-08-22 08:55:00" },
+  { sku: "FD-015", lot: "BR-260917-A", expiry: seedExpiryFromToday(2), qty: 9, cost: 18, receivedAt: "2026-09-17 06:45:00" },
   { sku: "HYG-032", lot: "HM-2606-03", expiry: "2028-06-04", qty: 28, cost: 24, receivedAt: "2026-06-28 13:10:00" },
   { sku: "HYG-033", lot: "MSK-2606-01", expiry: "2029-06-30", qty: 86, cost: 14, receivedAt: "2026-06-28 13:25:00" },
   { sku: "ICE-004", lot: "รับรายวัน", expiry: null, qty: 35, cost: 6, receivedAt: "2026-09-17 05:30:00" },
