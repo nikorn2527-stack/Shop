@@ -29,6 +29,8 @@ export type SqliteMember = {
   createdAt: string;
   photoUrl: string | null;
   gender: string | null;
+  /** วงเงินซื้อสินค้าต่อวัน (req 23.2) — null = ไม่จำกัด */
+  creditLimit: number | null;
 };
 
 export type SqliteTransaction = {
@@ -54,6 +56,8 @@ export type SqliteMemberSummary = {
   lastTransactionAt: string | null;
   photoUrl: string | null;
   gender: string | null;
+  /** วงเงินซื้อสินค้าต่อวัน — null = ไม่จำกัด */
+  creditLimit: number | null;
 };
 
 export type SqliteProduct = {
@@ -326,6 +330,19 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
       created_by TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
+    CREATE TABLE IF NOT EXISTS limit_requests (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      member_number TEXT NOT NULL,
+      current_limit REAL,
+      requested_limit REAL NOT NULL,
+      reason TEXT,
+      status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
+      requested_by TEXT NOT NULL,
+      decided_by TEXT,
+      decided_at TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (member_number) REFERENCES members(member_number)
+    );
   `);
   ensureColumn(db, "members", "phone", "TEXT");
   ensureColumn(db, "members", "type", "TEXT NOT NULL DEFAULT 'สมาชิก'");
@@ -340,6 +357,8 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
   ensureColumn(db, "products", "price_tiers", "TEXT");
   ensureColumn(db, "members", "photo_url", "TEXT");
   ensureColumn(db, "members", "gender", "TEXT");
+  // Req 23.2 — วงเงินซื้อสินค้าต่อวันของสมาชิก (NULL = ไม่จำกัด)
+  ensureColumn(db, "members", "credit_limit", "REAL");
   ensureColumn(db, "member_transactions", "actor", "TEXT");
   // Backfill the new actor column from audit_logs (round 30): every wallet /
   // purchase transaction was logged with the same timestamp as its
@@ -385,7 +404,7 @@ export function seedSqliteDemoData(db: SqliteDb) {
 }
 
 export function getMemberDetail(db: SqliteDb, memberNumber: string, transactionLimit = 50) {
-  const member = db.prepare(`SELECT id, member_number as memberNumber, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt FROM members WHERE member_number = ?`).get(memberNumber) as SqliteMember | undefined;
+  const member = db.prepare(`SELECT id, member_number as memberNumber, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, credit_limit as creditLimit FROM members WHERE member_number = ?`).get(memberNumber) as SqliteMember | undefined;
   if (!member) return undefined;
   const transactions = db.prepare(`SELECT id, member_number as memberNumber, type, detail, amount, payment_method as paymentMethod, balance_after as balanceAfter, created_at as createdAt FROM member_transactions WHERE member_number = ? ORDER BY created_at DESC, id DESC LIMIT ?`).all(memberNumber, transactionLimit) as unknown as SqliteTransaction[];
   return { member, transactions };
@@ -1181,14 +1200,24 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
 
   let member: SqliteMember | undefined;
   if (isWallet) {
-    member = db.prepare(`SELECT id, member_number as memberNumber, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, photo_url as photoUrl, gender FROM members WHERE member_number = ?`).get(input.memberNumber!.trim()) as SqliteMember | undefined;
+    member = db.prepare(`SELECT id, member_number as memberNumber, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, photo_url as photoUrl, gender, credit_limit as creditLimit FROM members WHERE member_number = ?`).get(input.memberNumber!.trim()) as SqliteMember | undefined;
     if (!member) throw new StoreError(`ไม่พบสมาชิก ${input.memberNumber} ในระบบ`);
     if (member.status !== "active") throw new StoreError(`สมาชิกถูกระงับการใช้งาน · ${member.memberNumber}`);
     if (member.balance < total) throw new StoreError(`ยอดเงินคงเหลือไม่พอ · ยอดชำระ ${money(total)} คงเหลือ ${money(member.balance)}`);
+    // Req 23.2 — วงเงินซื้อสินค้าต่อวัน: wallet bills of TODAY plus this bill
+    // must stay within the member's credit limit (null = ไม่จำกัด).
+    if (member.creditLimit != null) {
+      const todayStart = `${formatDate(new Date())} 00:00:00`;
+      const usedRow = db.prepare(`SELECT ROUND(COALESCE(SUM(total), 0), 2) AS usedToday FROM sales WHERE member_number = ? AND payment_method = ? AND created_at >= ?`).get(member.memberNumber, WALLET_PAYMENT, todayStart) as { usedToday: number };
+      const usedToday = round2(usedRow.usedToday ?? 0);
+      if (round2(usedToday + total) > member.creditLimit) {
+        throw new StoreError(`เกินวงเงินซื้อสินค้าต่อวัน · วงเงิน ${money(member.creditLimit)} · ใช้ไปแล้ววันนี้ ${money(usedToday)} · บิลนี้ ${money(total)}`);
+      }
+    }
   } else if (input.memberNumber?.trim()) {
     // Cash / QR bills can still be tied to a member — the receipt then shows
     // ผู้ทำรายการ + ยอดคงเหลือล่าสุด of that member (no deduction happens).
-    member = db.prepare(`SELECT id, member_number as memberNumber, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, photo_url as photoUrl, gender FROM members WHERE member_number = ?`).get(input.memberNumber.trim()) as SqliteMember | undefined;
+    member = db.prepare(`SELECT id, member_number as memberNumber, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, photo_url as photoUrl, gender, credit_limit as creditLimit FROM members WHERE member_number = ?`).get(input.memberNumber.trim()) as SqliteMember | undefined;
   }
 
   const now = new Date();
@@ -1324,7 +1353,7 @@ export function salesList(db: SqliteDb, input: SalesListInput = {}): SaleHistory
 
 // --- members & wallet -------------------------------------------------------
 
-const MEMBER_SELECT = `SELECT id, member_number as memberNumber, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, photo_url as photoUrl, gender FROM members WHERE member_number = ?`;
+const MEMBER_SELECT = `SELECT id, member_number as memberNumber, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, photo_url as photoUrl, gender, credit_limit as creditLimit FROM members WHERE member_number = ?`;
 
 function getMemberByNumber(db: SqliteDb, memberNumber: string): SqliteMember | undefined {
   return db.prepare(MEMBER_SELECT).get(memberNumber) as SqliteMember | undefined;
@@ -1342,7 +1371,7 @@ export function listMembers(db: SqliteDb, search?: string, status?: "active" | "
     params.push(status);
   }
   const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
-  return db.prepare(`SELECT m.id, m.member_number AS memberNumber, m.first_name AS firstName, m.last_name AS lastName, m.type, m.balance, m.status, m.created_at AS createdAt, m.photo_url AS photoUrl, m.gender, (SELECT MAX(t.created_at) FROM member_transactions t WHERE t.member_number = m.member_number) AS lastTransactionAt FROM members m${where} ORDER BY m.member_number`).all(...params) as unknown as SqliteMemberSummary[];
+  return db.prepare(`SELECT m.id, m.member_number AS memberNumber, m.first_name AS firstName, m.last_name AS lastName, m.type, m.balance, m.status, m.created_at AS createdAt, m.photo_url AS photoUrl, m.gender, m.credit_limit AS creditLimit, (SELECT MAX(t.created_at) FROM member_transactions t WHERE t.member_number = m.member_number) AS lastTransactionAt FROM members m${where} ORDER BY m.member_number`).all(...params) as unknown as SqliteMemberSummary[];
 }
 
 function nextMemberSequence(db: SqliteDb, prefix: string) {
@@ -1455,7 +1484,7 @@ export type WalletTxInput = {
 export function walletTx(db: SqliteDb, input: WalletTxInput) {
   if (!(input.amount > 0)) throw new StoreError("จำนวนเงินต้องมากกว่า 0");
   const amount = round2(input.amount);
-  const member = db.prepare(`SELECT id, member_number as memberNumber, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt FROM members WHERE member_number = ?`).get(input.memberNumber?.trim()) as SqliteMember | undefined;
+  const member = db.prepare(`SELECT id, member_number as memberNumber, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, credit_limit as creditLimit FROM members WHERE member_number = ?`).get(input.memberNumber?.trim()) as SqliteMember | undefined;
   if (!member) throw new StoreError(`ไม่พบสมาชิก ${input.memberNumber} ในระบบ`);
   if (member.status !== "active") throw new StoreError(`สมาชิกถูกระงับการใช้งาน · ${member.memberNumber}`);
   if (input.type === "withdrawal" && member.balance < amount) {
@@ -1508,6 +1537,8 @@ export type UpdateMemberInput = {
   type?: string;
   gender?: string | null;
   photoUrl?: string | null;
+  /** วงเงินซื้อสินค้าต่อวัน — null = ไม่จำกัด (req 23.2) */
+  creditLimit?: number | null;
   actor?: string;
   actorRole?: string;
 };
@@ -1519,9 +1550,12 @@ export function updateMember(db: SqliteDb, input: UpdateMemberInput): SqliteMemb
   if (typeof input.firstName === "string" && !input.firstName.trim()) throw new StoreError("กรุณาระบุชื่อสมาชิก");
   if (typeof input.lastName === "string" && !input.lastName.trim()) throw new StoreError("กรุณาระบุนามสกุลสมาชิก");
   if (typeof input.type === "string" && !input.type.trim()) throw new StoreError("กรุณาระบุประเภทสมาชิก");
+  if (input.creditLimit !== undefined && input.creditLimit !== null && !(input.creditLimit > 0)) {
+    throw new StoreError("วงเงินซื้อสินค้าต่อวันต้องมากกว่า 0");
+  }
 
   const assignments: string[] = [];
-  const values: (string | null)[] = [];
+  const values: (string | number | null)[] = [];
   const changedLabels: string[] = [];
   const normalizeOptional = (value: string | null | undefined) => value?.trim() || null;
   if (input.firstName != null && input.firstName.trim() !== member.firstName) {
@@ -1559,6 +1593,11 @@ export function updateMember(db: SqliteDb, input: UpdateMemberInput): SqliteMemb
     values.push(input.photoUrl?.trim() || null);
     changedLabels.push("รูปสมาชิก");
   }
+  if (input.creditLimit !== undefined && input.creditLimit !== member.creditLimit) {
+    assignments.push("credit_limit = ?");
+    values.push(input.creditLimit === null ? null : round2(input.creditLimit));
+    changedLabels.push("วงเงินซื้อสินค้าต่อวัน");
+  }
 
   const displayName = `${input.firstName?.trim() || member.firstName} ${input.lastName?.trim() || member.lastName}`.trim();
   const changeSummary = changedLabels.length > 0 ? `แก้ไข: ${changedLabels.join(", ")}` : "ตรวจสอบข้อมูลแล้ว · ไม่มีการเปลี่ยนแปลง";
@@ -1593,6 +1632,163 @@ export function deleteMember(db: SqliteDb, input: DeleteMemberInput): { memberNu
     logAction(db, "ลบสมาชิก", input.actor?.trim() || "เจ้าหน้าที่ร้านค้า", `${member.memberNumber} · ${displayName}`, "red", input.actorRole ?? null, formatDateTime());
   });
   return { memberNumber: member.memberNumber, memberName: displayName };
+}
+
+// --- member credit limit (req 23.2): วงเงินซื้อสินค้าต่อวัน + การขอลดวงเงิน ---
+
+/** คำขอลดวงเงินของสมาชิก 1 รายการ (status: pending → approved / rejected) */
+export type LimitRequestRow = {
+  id: number;
+  memberNumber: string;
+  memberName: string | null;
+  /** วงเงิน ณ ตอนยื่นคำขอ (null = เดิมไม่จำกัด) */
+  currentLimit: number | null;
+  requestedLimit: number;
+  reason: string | null;
+  status: "pending" | "approved" | "rejected";
+  requestedBy: string;
+  decidedBy: string | null;
+  decidedAt: string | null;
+  createdAt: string;
+};
+
+const LIMIT_REQUEST_SELECT = `SELECT r.id, r.member_number AS memberNumber, NULLIF(TRIM(m.first_name || ' ' || m.last_name), '') AS memberName, r.current_limit AS currentLimit, r.requested_limit AS requestedLimit, r.reason, r.status, r.requested_by AS requestedBy, r.decided_by AS decidedBy, r.decided_at AS decidedAt, r.created_at AS createdAt FROM limit_requests r LEFT JOIN members m ON m.member_number = r.member_number`;
+
+function getLimitRequestById(db: SqliteDb, requestId: number): LimitRequestRow | undefined {
+  return db.prepare(`${LIMIT_REQUEST_SELECT} WHERE r.id = ?`).get(requestId) as LimitRequestRow | undefined;
+}
+
+export type RequestLimitReductionInput = {
+  memberNumber: string;
+  requestedLimit: number;
+  reason?: string;
+  actor?: string;
+  actorRole?: string;
+};
+
+/** Thai text of a limit for log details — null (unlimited) becomes "ไม่จำกัด". */
+function limitText(limit: number | null) {
+  return limit != null ? money(limit) : "ไม่จำกัด";
+}
+
+/**
+ * ยื่นคำขอลดวงเงินซื้อสินค้าต่อวันของสมาชิก (staff files it, admin decides).
+ * The member's live limit is NOT touched until the request is approved.
+ */
+export function requestLimitReduction(db: SqliteDb, input: RequestLimitReductionInput): LimitRequestRow {
+  const member = getMemberByNumber(db, input.memberNumber?.trim() ?? "");
+  if (!member) throw new StoreError(`ไม่พบสมาชิก ${input.memberNumber} ในระบบ`);
+  if (typeof input.requestedLimit !== "number" || !(input.requestedLimit > 0)) {
+    throw new StoreError("วงเงินที่ขอต้องมากกว่า 0");
+  }
+  if (input.requestedLimit > 1_000_000) {
+    throw new StoreError(`วงเงินที่ขอต้องไม่เกิน ${money(1_000_000)}`);
+  }
+  // It is a REDUCTION request: the target must be strictly below the current
+  // limit when one is set (a member without a limit may request any value).
+  if (member.creditLimit != null && input.requestedLimit >= member.creditLimit) {
+    throw new StoreError(`วงเงินที่ขอต้องน้อยกว่าวงเงินปัจจุบัน · วงเงินปัจจุบัน ${money(member.creditLimit)}`);
+  }
+  const existing = db.prepare(`SELECT id FROM limit_requests WHERE member_number = ? AND status = 'pending'`).get(member.memberNumber);
+  if (existing) throw new StoreError("มีคำขอลดวงเงินที่รอพิจารณาอยู่แล้ว");
+
+  const actor = input.actor?.trim() || "เจ้าหน้าที่ร้านค้า";
+  const reason = input.reason?.trim() || null;
+  const createdAt = formatDateTime();
+  const displayName = `${member.firstName} ${member.lastName}`.trim();
+  return runInTransaction(db, () => {
+    const result = db.prepare(`INSERT INTO limit_requests (member_number, current_limit, requested_limit, reason, status, requested_by, created_at) VALUES (?, ?, ?, ?, 'pending', ?, ?)`).run(
+      member.memberNumber,
+      member.creditLimit,
+      round2(input.requestedLimit),
+      reason,
+      actor,
+      createdAt,
+    );
+    logAction(
+      db,
+      "ขอลดวงเงิน",
+      actor,
+      `${member.memberNumber} · ${displayName} · จาก ${limitText(member.creditLimit)} เหลือ ${money(round2(input.requestedLimit))}${reason ? ` · เหตุผล: ${reason}` : ""}`,
+      "amber",
+      input.actorRole ?? null,
+      createdAt,
+    );
+    return getLimitRequestById(db, Number(result.lastInsertRowid))!;
+  });
+}
+
+export type DecideLimitRequestInput = {
+  requestId: number;
+  decision: "approve" | "reject";
+  actor?: string;
+  actorRole?: string;
+};
+
+/**
+ * พิจารณาคำขอลดวงเงิน (ผู้บริหารเท่านั้นที่เรียกผ่าน tRPC) — approve applies the
+ * requested limit to the member; reject keeps the member's current limit.
+ */
+export function decideLimitRequest(db: SqliteDb, input: DecideLimitRequestInput): LimitRequestRow {
+  const request = getLimitRequestById(db, input.requestId);
+  if (!request) throw new StoreError(`ไม่พบคำขอลดวงเงินรหัส ${input.requestId}`);
+  if (request.status !== "pending") throw new StoreError("คำขอลดวงเงินนี้ได้รับการพิจารณาไปแล้ว");
+
+  const actor = input.actor?.trim() || "ผู้บริหาร";
+  const decidedAt = formatDateTime();
+  // Prefer the member's LIVE values for the audit trail (the request row only
+  // keeps a snapshot of the limit back when it was filed).
+  const member = getMemberByNumber(db, request.memberNumber);
+  const displayName = member ? `${member.firstName} ${member.lastName}`.trim() : null;
+  const liveLimit = member?.creditLimit ?? request.currentLimit;
+  const namePart = displayName ? ` · ${displayName}` : "";
+
+  runInTransaction(db, () => {
+    if (input.decision === "approve") {
+      db.prepare(`UPDATE members SET credit_limit = ? WHERE member_number = ?`).run(request.requestedLimit, request.memberNumber);
+      db.prepare(`UPDATE limit_requests SET status = 'approved', decided_by = ?, decided_at = ? WHERE id = ?`).run(actor, decidedAt, request.id);
+      logAction(
+        db,
+        "อนุมัติลดวงเงิน",
+        actor,
+        `${request.memberNumber}${namePart} · ${limitText(liveLimit)} → ${money(request.requestedLimit)}`,
+        "green",
+        input.actorRole ?? null,
+        decidedAt,
+      );
+    } else {
+      db.prepare(`UPDATE limit_requests SET status = 'rejected', decided_by = ?, decided_at = ? WHERE id = ?`).run(actor, decidedAt, request.id);
+      logAction(
+        db,
+        "ปฏิเสธคำขอลดวงเงิน",
+        actor,
+        `${request.memberNumber}${namePart} · คงวงเงินเดิม ${limitText(liveLimit)}`,
+        "red",
+        input.actorRole ?? null,
+        decidedAt,
+      );
+    }
+  });
+  return getLimitRequestById(db, request.id)!;
+}
+
+export type ListLimitRequestsInput = {
+  status?: "pending" | "approved" | "rejected";
+  limit?: number;
+};
+
+/** คำขอลดวงเงินทั้งหมด — รายการที่รอพิจารณาขึ้นก่อน แล้วเรียงจากใหม่ไปเก่า */
+export function listLimitRequests(db: SqliteDb, input: ListLimitRequestsInput = {}): LimitRequestRow[] {
+  const limit = Math.max(1, Math.min(200, Math.floor(input.limit ?? 50)));
+  const where = input.status ? ` WHERE r.status = ?` : "";
+  const params = input.status ? ([input.status, limit] as (string | number)[]) : ([limit] as (string | number)[]);
+  return db.prepare(`${LIMIT_REQUEST_SELECT}${where} ORDER BY (r.status = 'pending') DESC, r.created_at DESC, r.id DESC LIMIT ?`).all(...params) as unknown as LimitRequestRow[];
+}
+
+/** จำนวนคำขอที่รอพิจารณา (ไม่สนใจ filter อื่น) — สำหรับ badge บนหน้ารายงาน */
+export function countPendingLimitRequests(db: SqliteDb): number {
+  const row = db.prepare(`SELECT COUNT(*) AS count FROM limit_requests WHERE status = 'pending'`).get() as { count: number };
+  return row.count;
 }
 
 // --- reports ----------------------------------------------------------------
@@ -1705,47 +1901,107 @@ export type MemberTransactionRow = {
   id: number;
   memberNumber: string;
   memberName: string | null;
-  type: "purchase" | "deposit" | "withdrawal";
+  type: "purchase" | "deposit" | "withdrawal" | "limit_request";
+  /** "tx" = รายการกระเงินเดิม · "limit" = คำขอลดวงเงิน (req 23.2) */
+  kind: "tx" | "limit";
   detail: string;
   amount: number;
   paymentMethod: string | null;
   balanceAfter: number | null;
   actor: string | null;
   createdAt: string;
+  /** limit rows only — สถานะคำขอ / เหตุผล / วงเงินเดิม / ผู้พิจารณา */
+  status?: "pending" | "approved" | "rejected" | null;
+  reason?: string | null;
+  currentLimit?: number | null;
+  decidedBy?: string | null;
 };
 
 export type MemberTransactionsInput = {
   memberNumber?: string;
-  type?: "purchase" | "deposit" | "withdrawal";
+  type?: "purchase" | "deposit" | "withdrawal" | "limit_request";
   from?: string;
   to?: string;
   limit?: number;
 };
 
-/** Member wallet ledger with the staff member (actor) who performed each entry. */
+/**
+ * Member wallet ledger with the staff member (actor) who performed each entry.
+ * Req 23.2 — คำขอลดวงเงินถูกรวมเข้ามาในประวัติเดียวกัน (kind "limit", type
+ * "limit_request") เมื่อไม่กรองชนิด หรือกรองเฉพาะ limit_request เท่านั้น
+ * ผลลัพธ์เรียงใหม่-เก่า แล้วค่อยตัดตาม limit
+ */
 export function memberTransactions(db: SqliteDb, input: MemberTransactionsInput = {}): MemberTransactionRow[] {
-  const conditions: string[] = [];
-  const params: (string | number)[] = [];
   const memberNumber = input.memberNumber?.trim();
-  if (memberNumber) {
-    conditions.push("t.member_number LIKE ?");
-    params.push(`%${memberNumber}%`);
-  }
-  if (input.type) {
-    conditions.push("t.type = ?");
-    params.push(input.type);
-  }
-  if (input.from && ISO_DATE_ONLY.test(input.from)) {
-    conditions.push("t.created_at >= ?");
-    params.push(`${input.from} 00:00:00`);
-  }
-  if (input.to && ISO_DATE_ONLY.test(input.to)) {
-    conditions.push("t.created_at <= ?");
-    params.push(`${input.to} 23:59:59`);
-  }
-  const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
   const limit = Math.max(1, Math.min(1000, Math.floor(input.limit ?? 300)));
-  return db.prepare(`SELECT t.id, t.member_number AS memberNumber, NULLIF(TRIM(m.first_name || ' ' || m.last_name), '') AS memberName, t.type, t.detail, t.amount, t.payment_method AS paymentMethod, t.balance_after AS balanceAfter, t.actor, t.created_at AS createdAt FROM member_transactions t LEFT JOIN members m ON m.member_number = t.member_number${where} ORDER BY t.created_at DESC, t.id DESC LIMIT ?`).all(...params, limit) as unknown as MemberTransactionRow[];
+  const rows: MemberTransactionRow[] = [];
+
+  // Regular wallet entries (purchase / deposit / withdrawal).
+  if (input.type !== "limit_request") {
+    const conditions: string[] = [];
+    const params: (string | number)[] = [];
+    if (memberNumber) {
+      conditions.push("t.member_number LIKE ?");
+      params.push(`%${memberNumber}%`);
+    }
+    if (input.type) {
+      conditions.push("t.type = ?");
+      params.push(input.type);
+    }
+    if (input.from && ISO_DATE_ONLY.test(input.from)) {
+      conditions.push("t.created_at >= ?");
+      params.push(`${input.from} 00:00:00`);
+    }
+    if (input.to && ISO_DATE_ONLY.test(input.to)) {
+      conditions.push("t.created_at <= ?");
+      params.push(`${input.to} 23:59:59`);
+    }
+    const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
+    const txRows = db.prepare(`SELECT t.id, t.member_number AS memberNumber, NULLIF(TRIM(m.first_name || ' ' || m.last_name), '') AS memberName, t.type, t.detail, t.amount, t.payment_method AS paymentMethod, t.balance_after AS balanceAfter, t.actor, t.created_at AS createdAt FROM member_transactions t LEFT JOIN members m ON m.member_number = t.member_number${where} ORDER BY t.created_at DESC, t.id DESC`).all(...params) as unknown as MemberTransactionRow[];
+    rows.push(...txRows.map((row) => ({ ...row, kind: "tx" as const })));
+  }
+
+  // การขอลดวงเงิน — merged into the same history (same member/date filters).
+  if (input.type === undefined || input.type === "limit_request") {
+    const conditions: string[] = [];
+    const params: (string | number)[] = [];
+    if (memberNumber) {
+      conditions.push("r.member_number LIKE ?");
+      params.push(`%${memberNumber}%`);
+    }
+    if (input.from && ISO_DATE_ONLY.test(input.from)) {
+      conditions.push("r.created_at >= ?");
+      params.push(`${input.from} 00:00:00`);
+    }
+    if (input.to && ISO_DATE_ONLY.test(input.to)) {
+      conditions.push("r.created_at <= ?");
+      params.push(`${input.to} 23:59:59`);
+    }
+    const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
+    const requestRows = db.prepare(`${LIMIT_REQUEST_SELECT}${where}`).all(...params) as unknown as LimitRequestRow[];
+    rows.push(
+      ...requestRows.map((request) => ({
+        // Offset keeps ids unique next to member_transactions ids (React keys).
+        id: 1_000_000 + request.id,
+        memberNumber: request.memberNumber,
+        memberName: request.memberName,
+        type: "limit_request" as const,
+        kind: "limit" as const,
+        detail: `ขอลดวงเงิน ${request.currentLimit != null ? `จาก ${money(request.currentLimit)}` : "จากไม่จำกัด"} เหลือ ${money(request.requestedLimit)}${request.reason ? ` · เหตุผล: ${request.reason}` : ""}`,
+        amount: request.requestedLimit,
+        paymentMethod: null,
+        balanceAfter: null,
+        actor: request.requestedBy,
+        createdAt: request.createdAt,
+        status: request.status,
+        reason: request.reason,
+        currentLimit: request.currentLimit,
+        decidedBy: request.decidedBy,
+      })),
+    );
+  }
+  rows.sort((a, b) => (a.createdAt === b.createdAt ? b.id - a.id : a.createdAt < b.createdAt ? 1 : -1));
+  return rows.slice(0, limit);
 }
 
 export function dashboardStats(db: SqliteDb, rangeDays = 30): DashboardStats {
@@ -2558,6 +2814,27 @@ export function seedWelfareStoreData(db: SqliteDb) {
     const insertTransaction = db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, actor, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
     for (const transaction of SEED_MEMBER_TRANSACTIONS) {
       insertTransaction.run(transaction.memberNumber, transaction.type, transaction.detail, transaction.amount, transaction.paymentMethod, transaction.balanceAfter, transaction.actor, transaction.createdAt);
+    }
+  }
+  // Req 23.2 — ตัวอย่างวงเงินซื้อสินค้าต่อวัน + คำขอลดวงเงิน (idempotent):
+  // หยิบสมาชิกจริง 3 รายแรกจากฐานข้อมูล ตั้งวงเงินกว้างๆ ที่ไม่กระทบการซื้อปกติ
+  // แล้วใส่คำขอรอพิจารณา 2 รายการ + อนุมัติแล้ว 1 รายการ (ไม่เขียน audit log
+  // เพื่อไม่ให้เกินจำนวน seed ที่เทสตรวจ)
+  if (countRows(db, "limit_requests") === 0) {
+    const demoMembers = db.prepare(`SELECT member_number AS memberNumber FROM members WHERE status = 'active' ORDER BY member_number LIMIT 3`).all() as unknown as { memberNumber: string }[];
+    if (demoMembers.length >= 3) {
+      const [memberA, memberB, memberC] = demoMembers;
+      const daysAgoStamp = (days: number, time: string) => `${formatDate(addDays(new Date(), -days))} ${time}`;
+      const setLimit = db.prepare(`UPDATE members SET credit_limit = ? WHERE member_number = ?`);
+      setLimit.run(5000, memberA.memberNumber);
+      setLimit.run(3000, memberB.memberNumber);
+      setLimit.run(10000, memberC.memberNumber);
+      const insertRequest = db.prepare(`INSERT INTO limit_requests (member_number, current_limit, requested_limit, reason, status, requested_by, decided_by, decided_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+      insertRequest.run(memberA.memberNumber, 5000, 3000, "ขอควบคุมการใช้จ่ายของตนเอง", "pending", "กัญญาณัฐ ส.", null, null, daysAgoStamp(2, "09:24:00"));
+      insertRequest.run(memberB.memberNumber, 3000, 1000, "ลดวงเงินชั่วคราวตามคำขอของสมาชิก", "pending", "กัญญาณัฐ ส.", null, null, daysAgoStamp(1, "14:05:00"));
+      insertRequest.run(memberC.memberNumber, 10000, 4000, "ปรับวงเงินให้เหมาะกับการใช้จ่ายจริง", "approved", "วรพจน์ ด.", "วรพจน์ ด.", daysAgoStamp(3, "16:40:00"), daysAgoStamp(4, "10:12:00"));
+      // คำขอที่อนุมัติไปแล้ว → วงเงินจริงของสมาชิกต้องเป็นค่าที่ขอ
+      setLimit.run(4000, memberC.memberNumber);
     }
   }
   if (countRows(db, "products") === 0) {

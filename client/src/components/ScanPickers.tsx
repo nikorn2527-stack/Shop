@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { PackageSearch, ScanLine, ShieldAlert, UserCheck, UserPlus, X } from "lucide-react";
+import { CircleHelp, PackageSearch, ScanLine, ShieldAlert, UserCheck, UserPlus, X } from "lucide-react";
 import type { SqliteProduct } from "../../../server/sqliteStore";
 import type { MemberLite } from "@/pages/pageData";
 import { money, scanMatches, smartMatchScore } from "@/pages/pageData";
@@ -120,6 +120,12 @@ export function MemberScanPicker({
               <b>สมาชิก{pending.firstName} {pending.lastName}</b>
               <small>เลขสมาชิก <i>{pending.memberNumber}</i> · ประเภท {pending.type}</small>
               <small>ยอดคงเหลือ <strong className={pending.balance < 0 ? "red-text" : ""}>{money(pending.balance)}</strong>{pending.status === "suspended" ? <> · <em>ระงับการใช้จ่าย</em></> : null}</small>
+              {/* ROUND 34 (req 23.2) — วงเงินซื้อสินค้าต่อวันของสมาชิกที่เลือก (ชำระหักบัญชี) */}
+              {pending.creditLimit != null ? (
+                <small className="member-limit-line" title="ยอดซื้อรวมต่อวันของสมาชิกนี้ (ชำระหักบัญชี) ห้ามเกินวงเงิน — ระบบตรวจตอนยืนยันบิล">
+                  <CircleHelp size={11} /> วงเงินซื้อ/วัน {money(pending.creditLimit)}
+                </small>
+              ) : null}
             </div>
           </div>
           <div className="member-confirm-actions">
@@ -140,7 +146,7 @@ export function MemberScanPicker({
             <b>
               {selected.memberNumber} · สมาชิก{selected.firstName} {selected.lastName}
             </b>
-            <small>ยอดคงเหลือ {money(selected.balance)}</small>
+            <small>ยอดคงเหลือ {money(selected.balance)}{selected.creditLimit != null ? ` · วงเงิน/วัน ${money(selected.creditLimit)}` : ""}</small>
           </div>
           <button
             type="button"

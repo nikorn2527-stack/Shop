@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import {
-  Activity, BarChart3, CalendarClock, CalendarDays, Check, CircleAlert, Crown, MoreHorizontal, PackageSearch, Printer, ReceiptText, ShieldCheck, ShoppingBag, X,
+  Activity, BarChart3, CalendarClock, CalendarDays, Check, CircleAlert, Crown, MoreHorizontal, PackageSearch, Printer, ReceiptText, ShieldCheck, ShoppingBag, Wallet, X,
 } from "lucide-react";
 import type { BusinessPeriodStatus, DayClosureRow } from "../../../server/sqliteStore";
 import type { Role, View } from "./pageData";
@@ -12,6 +12,62 @@ import { formatAxisLabel, formatThaiDate, formatTimeShort, parseBahtFromDetail }
 const THAI_WEEKDAYS = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."];
 const THAI_SHORT_MONTHS = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
 const RANGE_DAYS: Record<string, number> = { "7 วัน": 7, "30 วัน": 30, "12 เดือน": 365 };
+
+/** Round 34 — compact baht for on-chart chips: 14900 → "฿14.9k", 1200000 → "฿1.2M", 0 → "฿0". */
+function compactBaht(value: number) {
+  if (value <= 0) return "฿0";
+  const trim = (n: number) => (n >= 100 ? String(Math.round(n)) : n.toFixed(1).replace(/\.0$/, ""));
+  if (value >= 1_000_000) return `฿${trim(value / 1_000_000)}M`;
+  if (value >= 1000) return `฿${trim(value / 1000)}k`;
+  return `฿${Math.round(value)}`;
+}
+
+/**
+ * Round 34 — smooth monotone cubic path (Fritsch–Carlson). Returns an SVG "M … C …"
+ * path through every point that never overshoots past its neighbours, so flat
+ * zero-days can't fake a dip below the data the way a jagged polyline does.
+ */
+function buildSmoothPath(points: { x: number; y: number }[]) {
+  const n = points.length;
+  if (n === 0) return "";
+  if (n === 1) return `M ${points[0].x.toFixed(2)},${points[0].y.toFixed(2)}`;
+  const slopes: number[] = [];
+  for (let i = 0; i < n - 1; i += 1) {
+    const dx = points[i + 1].x - points[i].x;
+    slopes.push(dx > 0 ? (points[i + 1].y - points[i].y) / dx : 0);
+  }
+  const tangents: number[] = [slopes[0]];
+  for (let i = 1; i < n - 1; i += 1) {
+    tangents.push(slopes[i - 1] * slopes[i] <= 0 ? 0 : (slopes[i - 1] + slopes[i]) / 2);
+  }
+  tangents.push(slopes[n - 2]);
+  for (let i = 0; i < n - 1; i += 1) {
+    if (slopes[i] === 0) {
+      tangents[i] = 0;
+      tangents[i + 1] = 0;
+      continue;
+    }
+    const alpha = tangents[i] / slopes[i];
+    const beta = tangents[i + 1] / slopes[i];
+    const square = alpha * alpha + beta * beta;
+    if (square > 9) {
+      const tau = 3 / Math.sqrt(square);
+      tangents[i] = tau * alpha * slopes[i];
+      tangents[i + 1] = tau * beta * slopes[i];
+    }
+  }
+  let path = `M ${points[0].x.toFixed(2)},${points[0].y.toFixed(2)}`;
+  for (let i = 0; i < n - 1; i += 1) {
+    const dx = points[i + 1].x - points[i].x;
+    path += ` C ${(points[i].x + dx / 3).toFixed(2)},${(points[i].y + (tangents[i] * dx) / 3).toFixed(2)} ${(points[i + 1].x - dx / 3).toFixed(2)},${(points[i + 1].y + (tangents[i + 1] * dx) / 3).toFixed(2)} ${points[i + 1].x.toFixed(2)},${points[i + 1].y.toFixed(2)}`;
+  }
+  return path;
+}
+
+/** Tooltip delta cell — ↑ green (ดีขึ้น) / ↓ red-ish (ตามธรรมเนียมไทย), หรือข้อความจางถ้าไม่มีจุดเทียบ */
+const deltaChip = (delta: number | null, fallback: string) => (delta === null
+  ? <em className="muted">{fallback}</em>
+  : <em className={delta >= 0 ? "up" : "down"}>{delta >= 0 ? "↑" : "↓"} {Math.abs(delta).toFixed(1)}%</em>);
 
 type ChartPoint = { label: string; date: string; revenue: number; deposit: number };
 type DashTab = "sales" | "best" | "watch" | "activity" | "cutoff";
@@ -164,40 +220,58 @@ export function Dashboard({ setView, role, userName }: { setView: (view: View) =
         ...point,
       }));
     }
-    const maxValue = Math.max(...points.map((point) => point.revenue + point.deposit), 1);
+    // Round 34 — หนึ่งเส้นฮีโร่: สเกลดูจากยอดขายอย่างเดียว (เติมเงินย้ายไปแถบสรุป+ทูลทิป)
+    // พร้อมคำอธิบาย เฉลี่ย/สูงสุด/วันนี้ แทนเส้นเติมเงินสีม่วงที่แบนราบเหมือนข้อผิดพลาด
+    const maxValue = Math.max(...points.map((point) => point.revenue), 1);
     const step = Math.max(1000, Math.ceil(maxValue / 4 / 1000) * 1000);
     const axisMax = step * 4;
+    let maxIndex = 0;
+    points.forEach((point, index) => {
+      if (point.revenue > points[maxIndex].revenue) maxIndex = index;
+    });
+    const lastIndex = points.length - 1;
+    const now = new Date();
+    const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
     return {
       points,
       axisMax,
-      yLabels: [4, 3, 2, 1].map((multiplier) => formatAxisLabel(multiplier * step)).concat("0"),
+      maxIndex,
+      lastIndex,
+      isTodayLast: lastIndex >= 0 && points[lastIndex].date === todayKey,
+      avg: points.length > 0 ? points.reduce((sum, point) => sum + point.revenue, 0) / points.length : 0,
+      totalDeposit: points.reduce((sum, point) => sum + point.deposit, 0),
+      // ป้ายบนสุดของแกน y มี ฿ นำหน้า ให้รู้ทันทีว่าหน่วยเป็นเงิน
+      yLabels: [4, 3, 2, 1].map((multiplier) => `${multiplier === 4 ? "฿" : ""}${formatAxisLabel(multiplier * step)}`).concat("0"),
     };
   }, [stats, deposits, rangeDays]);
 
   const chartData = chart.points;
   const safeSelectedBar = Math.min(selectedBar, Math.max(chartData.length - 1, 0));
   const selected = chartData[safeSelectedBar];
-  // Round 31-11 — line chart geometry: revenue (teal) is the hero line, member
-  // deposits (lilac) a thin companion; the area under revenue gets a soft
-  // gradient fill. Hit-zones stay as HTML buttons for keyboard + tooltips.
+  const prevPoint = safeSelectedBar > 0 ? chartData[safeSelectedBar - 1] : null;
+  const vsPrev = selected && prevPoint && prevPoint.revenue > 0 ? ((selected.revenue - prevPoint.revenue) / prevPoint.revenue) * 100 : null;
+  const vsAvg = selected && chart.avg > 0 ? ((selected.revenue - chart.avg) / chart.avg) * 100 : null;
+  // Round 34 — เรขาคณิตเส้นเดียวเรียบลื่น (viewBox 1000×100 + preserveAspectRatio none):
+  // เส้นโค้งเป็น monotone cubic แนบข้อมูลโดยไม่หล่นต่ำกว่าค่าจริง ส่วนจุด/ป้ายเป็น HTML
+  // overlay (วงกลม SVG จะถูกยืดบี้เมื่อภาชน์ไม่รักษาสัดส่วน)
   const lineGeom = useMemo(() => {
     const count = chartData.length;
     if (count === 0) return null;
     const width = 1000;
     const height = 100;
+    const clampY = (value: number) => Math.min(Math.max(height - (value / chart.axisMax) * height, 1), height - 1);
     const xAt = (index: number) => ((index + 0.5) / count) * width;
-    const yAt = (value: number) => height - (value / chart.axisMax) * height;
-    const revenuePoints = chartData.map((point, index) => `${xAt(index).toFixed(2)},${Math.max(yAt(point.revenue), 1).toFixed(2)}`).join(" ");
-    const depositPoints = chartData.map((point, index) => `${xAt(index).toFixed(2)},${Math.max(yAt(point.deposit), 1).toFixed(2)}`).join(" ");
-    const areaPath = `M ${xAt(0).toFixed(2)},${height} L ${chartData.map((point, index) => `${xAt(index).toFixed(2)},${Math.max(yAt(point.revenue), 1).toFixed(2)}`).join(" L ")} L ${xAt(count - 1).toFixed(2)},${height} Z`;
+    const yPercent = (value: number) => Math.min(Math.max((1 - value / chart.axisMax) * 100, 1.5), 96.5);
+    const revenuePath = buildSmoothPath(chartData.map((point, index) => ({ x: xAt(index), y: clampY(point.revenue) })));
     return {
-      width, height, xAt, yAt, revenuePoints, depositPoints, areaPath,
+      width, height, xAt, yPercent,
+      revenuePath,
+      areaPath: `${revenuePath} L ${xAt(count - 1).toFixed(2)},${height} L ${xAt(0).toFixed(2)},${height} Z`,
+      avgY: chart.avg > 0 ? clampY(chart.avg) : null,
       selectedX: xAt(safeSelectedBar),
-      selectedY: Math.max(yAt(chartData[safeSelectedBar]?.revenue ?? 0), 1),
-      selectedDepositY: Math.max(yAt(chartData[safeSelectedBar]?.deposit ?? 0), 1),
-      labelStep: count > 20 ? Math.ceil(count / 8) : 1,
+      labelStep: count > 14 ? Math.ceil(count / 8) : 1,
     };
-  }, [chartData, chart.axisMax, safeSelectedBar]);
+  }, [chartData, chart.axisMax, chart.avg, safeSelectedBar]);
   const bestSellers = stats?.bestSellers ?? [];
   const bestSellersRanked = bestSellers.map((item, index) => ({
     name: item.name,
@@ -228,7 +302,66 @@ export function Dashboard({ setView, role, userName }: { setView: (view: View) =
           <span className="dash-tabbar-spacer" aria-hidden="true" />
         </div>
         <div className="dash-tab-body" role="tabpanel">
-          {tab === "sales" && <section className="panel chart-panel interactive-chart-panel"><div className="panel-heading"><div><h2>ยอดขายร้านค้า</h2><p>กราฟเส้นแนวโน้ม · เลือกช่วงเวลา แล้วชี้หรือกดจุดเพื่อดูรายละเอียด</p></div><div className="chart-controls">{["7 วัน", "30 วัน", "12 เดือน"].map((item) => <button className={range === item ? "active" : ""} onClick={() => { setRange(item); setSelectedBar(0); }} key={item}>{item}</button>)}</div></div><div className="chart-interactive-meta"><span><i className="dot teal" /> ยอดขายสินค้า</span><span><i className="dot lilac" /> เติมเงินสมาชิก</span><b>{loading ? "กำลังโหลดข้อมูลจากระบบ…" : selected ? `${selected.label} · ยอดขาย ${money(selected.revenue)}${selected.deposit > 0 ? ` (เติมเงิน ${money(selected.deposit)})` : ""}` : "ยังไม่มีข้อมูล"}</b></div><div className="chart-wrap chart-wrap-line">{lineGeom ? <><div className="y-labels">{chart.yLabels.map((label) => <span key={label}>{label}</span>)}</div><div className="line-chart" role="img" aria-label={`กราฟเส้นยอดขาย ${chartData.length} จุด ช่วง${range} สูงสุด ${money(Math.max(...chartData.map((point) => point.revenue), 0))}`}><svg viewBox={`0 0 ${lineGeom.width} ${lineGeom.height}`} preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="revenue-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="rgba(61,140,113,.30)" /><stop offset="100%" stopColor="rgba(61,140,113,0)" /></linearGradient></defs>{[0.25, 0.5, 0.75, 1].map((ratio) => <line key={ratio} className="line-grid" x1="0" x2={lineGeom.width} y1={lineGeom.height * (1 - ratio)} y2={lineGeom.height * (1 - ratio)} />)}<path className="line-area" d={lineGeom.areaPath} /><polyline className="line-deposit" points={lineGeom.depositPoints} /><polyline className="line-revenue" points={lineGeom.revenuePoints} /><line className="line-cursor" x1={lineGeom.selectedX} x2={lineGeom.selectedX} y1="0" y2={lineGeom.height} /><circle className="line-dot deposit" cx={lineGeom.selectedX} cy={lineGeom.selectedDepositY} r="2.2" /><circle className="line-dot revenue" cx={lineGeom.selectedX} cy={lineGeom.selectedY} r="3.2" /></svg><div className="line-hits">{chartData.map((point, index) => <button type="button" key={`${point.label}-${index}`} className={safeSelectedBar === index ? "selected" : ""} style={{ left: `${(index / chartData.length) * 100}%`, width: `${100 / chartData.length}%` }} onClick={() => setSelectedBar(index)} title={`${point.label}: ยอดขาย ${money(point.revenue)}${point.deposit > 0 ? ` (เติมเงิน ${money(point.deposit)})` : ""}`} aria-label={`${point.label} ยอดขาย ${money(point.revenue)}`} />)}</div></div><div className="line-x-labels">{chartData.map((point, index) => <span key={`${point.label}-x-${index}`} className={safeSelectedBar === index || lineGeom.labelStep === 1 || index % lineGeom.labelStep === 0 ? `show${safeSelectedBar === index ? " picked" : ""}` : ""}>{point.label}</span>)}</div></> : <div className="chart-empty-note">ยังไม่มีข้อมูลยอดขายในช่วงนี้</div>}</div><div className="chart-summary"><div><span>ยอดขายรวมช่วงนี้</span><strong>{money(stats?.totalSales ?? 0)}</strong></div><div><span>ค่าเฉลี่ยต่อวัน</span><strong>{money(stats?.avgDailySales ?? 0)}</strong></div><div><span>จำนวนบิล</span><strong>{(stats?.totalOrders ?? 0).toLocaleString("th-TH")} <small>บิล</small></strong></div></div></section>}
+          {/* Round 34 — กราฟยอดขายออกแบบใหม่: เส้นเดียวอ่านง่าย + คำอธิบายครบ (จุด/ป้ายค่า/
+              เส้นเฉลี่ย/แถบสุดสัปดาห์/ป้ายวันนี้ยังไม่ครบวัน/การ์ดสรุปจุดที่เลือก) */}
+          {tab === "sales" && <section className="panel chart-panel interactive-chart-panel">
+            <div className="panel-heading">
+              <div>
+                <h2>ยอดขายร้านค้า</h2>
+                <p>{rangeDays > 60 ? "กราฟยอดขายรายเดือน · แตะ/คลิกจุดเพื่อดูรายละเอียด" : "กราฟยอดขายรายวัน · แตะ/คลิกจุดเพื่อดูรายละเอียด · แถบสีอ่อน = สุดสัปดาห์"}</p>
+              </div>
+              <div className="chart-controls">{["7 วัน", "30 วัน", "12 เดือน"].map((item) => <button className={range === item ? "active" : ""} onClick={() => { setRange(item); setSelectedBar(0); }} key={item}>{item}</button>)}</div>
+            </div>
+            <div className="chart-interactive-meta">
+              <span><i className="dot teal" /> ยอดขายสินค้า (บาท/วัน)</span>
+              <span><i className="avg-dash" /> เส้นค่าเฉลี่ย</span>
+              <b>{loading ? "กำลังโหลดข้อมูลจากระบบ…" : selected ? `${selected.label} · ยอดขาย ${money(selected.revenue)}` : "ยังไม่มีข้อมูล"}</b>
+            </div>
+            <div className="chart-wrap chart-wrap-line">
+              {lineGeom ? <>
+                <div className="y-labels">{chart.yLabels.map((label) => <span key={label}>{label}</span>)}</div>
+                <div className="line-chart" role="img" aria-label={`กราฟยอดขาย ${chartData.length} จุด ช่วง${range} สูงสุด ${money(Math.max(...chartData.map((point) => point.revenue), 0))} ค่าเฉลี่ย ${money(chart.avg)}`}>
+                  {rangeDays <= 60 && chartData.map((point, index) => {
+                    const weekday = new Date(`${point.date}T00:00:00`).getDay();
+                    return weekday === 0 || weekday === 6 ? <div key={`weekend-${index}`} className="weekend-band" aria-hidden="true" style={{ left: `${(index / chartData.length) * 100}%`, width: `${100 / chartData.length}%` }} /> : null;
+                  })}
+                  <svg viewBox={`0 0 ${lineGeom.width} ${lineGeom.height}`} preserveAspectRatio="none" aria-hidden="true">
+                    <defs><linearGradient id="revenue-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="rgba(61,140,113,.32)" /><stop offset="100%" stopColor="rgba(61,140,113,0)" /></linearGradient></defs>
+                    {[0.25, 0.5, 0.75, 1].map((ratio) => <line key={ratio} className="line-grid" x1="0" x2={lineGeom.width} y1={lineGeom.height * (1 - ratio)} y2={lineGeom.height * (1 - ratio)} />)}
+                    <path className="line-area" d={lineGeom.areaPath} />
+                    <path className="line-revenue" d={lineGeom.revenuePath} />
+                    {lineGeom.avgY !== null && <line className="line-avg" x1="0" x2={lineGeom.width} y1={lineGeom.avgY} y2={lineGeom.avgY} />}
+                    <line className="line-cursor" x1={lineGeom.selectedX} x2={lineGeom.selectedX} y1="0" y2={lineGeom.height} />
+                  </svg>
+                  {chartData.map((point, index) => {
+                    if (chartData.length > 14 && index !== safeSelectedBar && index !== chart.maxIndex && index !== chart.lastIndex) return null;
+                    const classes = ["chart-dot", chart.maxIndex === index && point.revenue > 0 ? "max" : "", chart.isTodayLast && index === chart.lastIndex ? "today" : "", safeSelectedBar === index ? "selected" : ""].filter(Boolean).join(" ");
+                    return <div key={`dot-${index}`} className={classes} aria-hidden="true" style={{ left: `${((index + 0.5) / chartData.length) * 100}%`, top: `${lineGeom.yPercent(point.revenue)}%` }} />;
+                  })}
+                  {chartData.length <= 14 && chartData.map((point, index) => <div key={`value-${index}`} className="chart-value" aria-hidden="true" style={{ left: `${((index + 0.5) / chartData.length) * 100}%`, top: `${Math.max(lineGeom.yPercent(point.revenue), 16)}%` }}>{compactBaht(point.revenue)}</div>)}
+                  {chartData.length > 14 && (chartData[chart.maxIndex]?.revenue ?? 0) > 0 && <div className="chart-tag max" aria-hidden="true" style={{ left: `clamp(52px, ${((chart.maxIndex + 0.5) / chartData.length) * 100}%, calc(100% - 52px))`, top: `${Math.min(lineGeom.yPercent(chartData[chart.maxIndex].revenue) + 5, 78)}%` }}>สูงสุด {compactBaht(chartData[chart.maxIndex].revenue)}</div>}
+                  {chart.isTodayLast && <div className="chart-today-pill" aria-hidden="true">วันนี้ · ยังไม่ครบวัน</div>}
+                  {chart.avg > 0 && <div className="chart-avg-chip" aria-hidden="true" style={{ top: `${Math.min(Math.max(lineGeom.yPercent(chart.avg), 8), 86)}%` }}>เฉลี่ย {compactBaht(chart.avg)}</div>}
+                  {selected && <div className="chart-tooltip" style={{ left: `clamp(2px, calc(${((safeSelectedBar + 0.5) / chartData.length) * 100}% - 89px), calc(100% - 180px))`, top: ((safeSelectedBar + 0.5) / chartData.length) * 100 >= 80 ? 30 : 8 }}>
+                    <small>{formatThaiDate(selected.date)}</small>
+                    <b>{money(selected.revenue)}</b>
+                    <div className="tt-row"><span>{rangeDays > 60 ? "เทียบเดือนก่อน" : "เทียบเมื่อวาน"}</span>{deltaChip(vsPrev, prevPoint ? "—" : "จุดแรกของช่วง")}</div>
+                    <div className="tt-row"><span>เทียบค่าเฉลี่ย</span>{deltaChip(vsAvg, "—")}</div>
+                    {selected.deposit > 0 && <div className="tt-row deposit"><span>{rangeDays > 60 ? "เติมเงินในเดือนนี้" : "เติมเงินวันนี้"}</span><em>{money(selected.deposit)}</em></div>}
+                    {chart.isTodayLast && safeSelectedBar === chart.lastIndex && <div className="tt-today-note">วันนี้ · ยังไม่ครบวัน — ตัวเลขยังเพิ่มได้ตลอดวัน</div>}
+                  </div>}
+                  <div className="line-hits">{chartData.map((point, index) => <button type="button" key={`${point.label}-${index}`} className={safeSelectedBar === index ? "selected" : ""} style={{ left: `${(index / chartData.length) * 100}%`, width: `${100 / chartData.length}%` }} onClick={() => setSelectedBar(index)} title={`${point.label}: ยอดขาย ${money(point.revenue)}${point.deposit > 0 ? ` (เติมเงิน ${money(point.deposit)})` : ""}`} aria-label={`${point.label} ยอดขาย ${money(point.revenue)}`} />)}</div>
+                </div>
+                <div className="line-x-labels">{chartData.map((point, index) => <span key={`${point.label}-x-${index}`} className={safeSelectedBar === index || lineGeom.labelStep === 1 || index % lineGeom.labelStep === 0 ? `show${safeSelectedBar === index ? " picked" : ""}` : ""}>{point.label}</span>)}</div>
+              </> : <div className="chart-empty-note">ยังไม่มีข้อมูลยอดขายในช่วงนี้</div>}
+            </div>
+            <div className="chart-summary">
+              <div><span>ยอดขายรวมช่วงนี้</span><strong>{money(stats?.totalSales ?? 0)}</strong></div>
+              <div><span>ค่าเฉลี่ยต่อวัน</span><strong>{money(stats?.avgDailySales ?? 0)}</strong></div>
+              <div><span>จำนวนบิล</span><strong>{(stats?.totalOrders ?? 0).toLocaleString("th-TH")} <small>บิล</small></strong></div>
+              <div><span className="summary-with-icon"><Wallet size={12} /> เติมเงินรวมช่วงนี้</span><strong>{money(chart.totalDeposit)}</strong></div>
+            </div>
+          </section>}
           {tab === "best" && <section className="panel best-seller-panel"><div className="panel-heading"><div><h2>สินค้าขายดี 10 อันดับ</h2><p>สรุปจากรายการขายจริงในช่วง{range} · กดรายการเพื่อเลือกข้อมูล</p></div><div className="chart-controls small">{["จำนวนขาย", "ยอดขาย"].map((item) => <button className={bestMode === item ? "active" : ""} onClick={() => { setBestMode(item); setSelectedProduct(0); }} key={item}>{item}</button>)}</div></div><div className="product-ranking-chart">{loading ? <div className="table-loading"><BarChart3 size={22} /><b>กำลังโหลดอันดับสินค้าขายดี</b><span>สรุปจากรายการขายจริงในช่วง{range}</span></div> : bestSellersRanked.length === 0 ? <div className="table-loading"><BarChart3 size={22} /><b>ยังไม่มีข้อมูลการขาย</b><span>เริ่มขายสินค้าผ่าน POS เพื่อดูอันดับ</span></div> : bestSellersRanked.map(({ name, qtyLabel, total, emoji, width, rank }, index) => <button className={`product-rank-row ${selectedProduct === index ? "selected" : ""}`} key={name} onClick={() => setSelectedProduct(index)}><span className={`rank rank-0${rank}`}>{`0${rank}`}</span><span className="product-thumb">{emoji}</span><span className="seller-name"><b>{name}</b><small>{qtyLabel}</small><i className="rank-progress"><em style={{ width: `${width}%` }} /></i></span><strong>{total}</strong><MoreHorizontal size={17} className="muted-icon" /></button>)}</div><div className="ranking-insight"><BarChart3 size={15} /><span>{bestSellersRanked[selectedProduct]?.name ?? "สินค้าขายดี"} ทำยอดสูงสุดในมุมมอง{bestMode === "ยอดขาย" ? "มูลค่า" : "จำนวน"} · คลิกแถวเพื่อเลือกข้อมูล</span></div></section>}
           {tab === "watch" && <div className="inventory-alert-grid"><section className="panel alert-panel stock-alert-panel"><div className="alert-heading"><div><span className="eyebrow">ควรติดตามวันนี้</span><h2>สินค้าใกล้หมดสต็อก</h2><p>ช่วยวางแผนสั่งซื้อให้เพียงพอต่อการใช้งาน</p></div><span className="alert-count red">{lowStock.length}</span></div><div className="alert-list">{loading ? <div className="table-loading"><PackageSearch size={22} /><b>กำลังโหลดข้อมูลสต็อก</b><span>ดึงข้อมูลจากฐานข้อมูลสวัสดิการ</span></div> : lowStock.length === 0 ? <div className="table-loading"><PackageSearch size={22} /><b>สต็อกเพียงพอทุกรายการ</b><span>ไม่มีสินค้าที่ต่ำกว่าจุดสั่งซื้อ</span></div> : lowStock.map((row) => <button className="alert-row" key={row.id} onClick={() => setView("stock")}><span className="alert-item-icon red-bg"><PackageSearch size={15} /></span><span><b>{row.name}</b><small>เหลือ {row.stock} {row.unit} · สั่งซื้อแนะนำ {row.reorderPoint * 2} {row.unit}</small></span><span className="alert-arrow">→</span></button>)}</div><button className="alert-footer-action" onClick={() => setView("stock")}>ดูรายการและวางแผนสั่งซื้อ <span>→</span></button></section><section className="panel alert-panel expiry-alert-panel"><div className="alert-heading"><div><span className="eyebrow">ภายใน 30 วัน</span><h2>สินค้าใกล้หมดอายุ</h2><p>ตรวจสอบ Lot เพื่อวางแผนจัดจำหน่าย</p></div><span className="alert-count amber">{expirySoon.length}</span></div><div className="alert-list">{loading ? <div className="table-loading"><CalendarDays size={22} /><b>กำลังโหลดข้อมูลวันหมดอายุ</b><span>ตรวจสอบ Lot ที่ใกล้หมดอายุ</span></div> : expirySoon.length === 0 ? <div className="table-loading"><CalendarDays size={22} /><b>ไม่มีสินค้าใกล้หมดอายุ</b><span>ภายใน 30 วันข้างหน้า</span></div> : expirySoon.map((row) => <button className="alert-row" key={row.id} onClick={() => setView("stock")}><span className="alert-item-icon amber-bg"><CalendarDays size={15} /></span><span><b>{row.name}</b><small>หมดอายุ {formatThaiDate(row.expiry)} · Lot {row.lot} · เหลือ {row.qty} {row.unit}</small></span><span className="alert-arrow">→</span></button>)}</div><button className="alert-footer-action amber-action-text" onClick={() => setView("stock")}>เปิดรายงานวันหมดอายุ <span>→</span></button></section></div>}
           {tab === "activity" && <section className="panel"><div className="panel-heading"><div><h2>กิจกรรมล่าสุดในระบบ</h2><p>ธุรกรรมและการเปลี่ยนแปลงที่บันทึกอัตโนมัติ</p></div><Activity size={19} className="muted-icon" /></div><div className="dash-activity-scroll">{loading ? <div className="table-loading"><Activity size={22} /><b>กำลังโหลดกิจกรรมล่าสุด</b><span>ดึงข้อมูลจากระบบ Log</span></div> : recentActivities.length === 0 ? <div className="table-loading"><Activity size={22} /><b>ยังไม่มีกิจกรรม</b><span>รายการจะแสดงเมื่อมีการทำธุรกรรม</span></div> : <table className="log-table compact" aria-label="รายการกิจกรรมล่าสุด"><thead><tr><th aria-label="ระดับกิจกรรม" /><th>เวลา</th><th>ผู้ทำรายการ</th><th>กิจกรรม</th><th>รายละเอียด</th></tr></thead><tbody>{recentActivities.map((log) => <tr key={log.id}><td className="log-tone-cell"><i className={`log-dot-mini tone-${log.tone ?? "green"}`} aria-hidden="true" /></td><td><small className="cell-mono">{formatTimeShort(log.createdAt)}</small></td><td><b>{log.actor}</b><small>{log.actorRole === "admin" ? "ผู้บริหาร" : "เจ้าหน้าที่"}</small></td><td><b>{log.action}</b></td><td><span className="log-detail-text">{log.detail}</span></td></tr>)}</tbody></table>}</div>{role === "admin" ? <button className="alert-footer-action" onClick={() => setView("logs")}>ดูกิจกรรมทั้งหมดในระบบ Log <span>→</span></button> : <div className="ranking-insight"><ShieldCheck size={15} /><span>ข้อมูลทุกธุรกรรมถูกบันทึกในระบบ Log อัตโนมัติ · ประวัติฉบับเต็มเปิดได้โดยผู้บริหาร</span></div>}</section>}

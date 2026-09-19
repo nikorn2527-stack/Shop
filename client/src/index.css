@@ -2981,6 +2981,59 @@ th { font-weight: 600; }
 .line-x-labels span.show { visibility: visible; }
 .line-x-labels span.picked { color: var(--teal); font-weight: 700; }
 .chart-empty-note { flex: 1; display: grid; place-items: center; color: #8b9080; font-size: 11px; padding: 30px 0; }
+
+/* ═══ ROUND 34 — กราฟยอดขายออกแบบใหม่: เส้นเดียวอ่านง่าย + คำอธิบายครบ ═══ */
+/* ผู้ใช้บอกว่ากราฟเดิม "ออกแบบผิด ดูไม่เข้าใจ" — สองเส้นบนแกนเดียว (เส้นเติมเงินแบนราบ
+   ใกล้ศูนย์ เหมือนข้อมูลเสีย) ป้ายแกน x 9px มองแทบไม่เห็น และไม่มีคำอธิบายใดๆ
+   รอบใหม่นี้: เส้นยอดขายเดียวเรียบลื่น (monotone cubic) + จุด HTML + ป้ายค่า + เส้น
+   ค่าเฉลี่ย + แถบสุดสัปดาห์ + ป้าย "วันนี้ยังไม่ครบวัน" + การ์ดสรุปจุดที่เลือก */
+.chart-wrap-line { min-height: 200px; }
+.chart-wrap-line .y-labels { width: 34px; flex: 0 0 34px; font-size: 10px; }
+/* แก้ที่ค้างมาแต่เดิม: แถวป้ายแกน x เป็นลูก flex ร่วมแถวกับตัวกราฟ และป้ายวันที่
+   30 ช่อง (nowrap) ดันกราฟให้เหลือแค่ ~64px บนมือถือ — ให้ตัดไปเป็นแถวของตัวเอง
+   ใต้กราฟ ชิดซ้ายเท่าคอลัมน์แกน y (34+8) เพื่อป้ายตรงคอลัมน์จุดพอดีทุกความกว้าง */
+.chart-wrap-line { flex-wrap: wrap; }
+.chart-wrap-line .line-x-labels { flex: 0 0 calc(100% - 42px); margin-left: 42px; min-width: 0; }
+.line-chart .line-revenue { stroke-width: 2.6; }
+.line-chart .line-avg { stroke: #d9b56a; stroke-width: 1.5; stroke-dasharray: 6 5; vector-effect: non-scaling-stroke; }
+.weekend-band { position: absolute; top: 0; bottom: 0; background: rgba(214, 178, 106, .09); pointer-events: none; }
+.chart-dot { position: absolute; width: 8px; height: 8px; border-radius: 50%; background: #fff; border: 2px solid var(--teal); transform: translate(-50%, -50%); z-index: 3; pointer-events: none; box-shadow: 0 0 0 2px rgba(255, 255, 255, .7); transition: width .15s ease, height .15s ease; }
+.chart-dot.selected { width: 13px; height: 13px; z-index: 5; }
+.chart-dot.selected::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 2px solid rgba(86, 178, 148, .5); animation: chart-dot-pulse 1.5s ease-out infinite; }
+.chart-dot.max { border-color: #d9a13c; background: #ffe9bf; }
+.chart-dot.today { width: 9px; height: 9px; background: #fff; box-shadow: 0 0 0 2.5px #fff; }
+@keyframes chart-dot-pulse { from { transform: scale(.6); opacity: 1; } to { transform: scale(1.7); opacity: 0; } }
+.chart-value { position: absolute; z-index: 4; transform: translate(-50%, -21px); font: 600 9.5px "IBM Plex Mono", monospace; color: #4f7064; background: rgba(255, 255, 255, .85); border-radius: 4px; padding: 0 3px; text-shadow: 0 0 4px #fff; pointer-events: none; white-space: nowrap; }
+.chart-tag, .chart-avg-chip, .chart-today-pill { position: absolute; z-index: 5; white-space: nowrap; font-size: 9.5px; font-weight: 700; color: #8a6d2c; background: #fff; border: 1px solid #e7dfc6; border-radius: 999px; box-shadow: 0 2px 8px rgba(63, 79, 48, .12); pointer-events: none; }
+.chart-tag.max { padding: 2px 9px; transform: translate(-50%, 0); }
+.chart-avg-chip { padding: 2px 8px; transform: translateY(-50%); right: 6px; }
+.chart-today-pill { padding: 2.5px 9px; top: 4px; right: 4px; color: #a8731f; background: #fff8ea; border-color: #ecd9ad; }
+.chart-tooltip { position: absolute; top: 8px; z-index: 6; width: 178px; max-width: 60%; background: #fff; border: 1px solid #dfe7e1; border-radius: 10px; box-shadow: 0 10px 26px rgba(41, 66, 53, .18); padding: 9px 11px; font-size: 11px; pointer-events: none; }
+.chart-tooltip > small { display: block; color: #7c8171; font-size: 9.5px; }
+.chart-tooltip > b { display: block; color: #2f5346; font-size: 16.5px; margin: 2px 0 5px; letter-spacing: .2px; }
+.chart-tooltip .tt-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 3px 0; border-top: 1px dashed #edf1ec; color: #6d7365; }
+.chart-tooltip .tt-row em { font-style: normal; font-weight: 700; }
+.chart-tooltip .tt-row em.up { color: #3d8c71; }
+.chart-tooltip .tt-row em.down { color: #c26162; }
+.chart-tooltip .tt-row em.muted { color: #9aa08f; font-weight: 500; }
+.chart-tooltip .tt-row.deposit em { color: #8a76c9; font-weight: 600; }
+.chart-tooltip .tt-today-note { margin-top: 6px; padding-top: 6px; border-top: 1px dashed #edf1ec; color: #a8731f; font-size: 9.5px; font-weight: 600; }
+.avg-dash { display: inline-block; width: 15px; height: 0; border-top: 2px dashed #d9b56a; vertical-align: middle; }
+.line-x-labels span { font-size: 10px; }
+.line-x-labels span.picked { color: #fff; background: var(--teal); line-height: 1.1; padding: 2px 7px; border-radius: 999px; }
+.chart-panel .chart-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.chart-summary span.summary-with-icon { display: inline-flex; align-items: center; gap: 4px; color: #8a76c9; }
+.chart-summary span.summary-with-icon svg { flex: 0 0 auto; }
+@media (max-width: 860px) {
+  /* จอแคบ: ซ่อนป้ายค่า (จุดยังอยู่) + ซ่อนป้ายวันนี้ (ย้ายคำอธิบายไปในการ์ดสรุป) กันชนกัน */
+  .chart-value { display: none; }
+  .chart-today-pill { display: none; }
+  .chart-tooltip { width: 152px; }
+}
+@media (max-width: 640px) {
+  .chart-panel .chart-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .line-x-labels span.picked { padding-left: 4px; padding-right: 4px; }
+}
 @media (max-width: 1080px) { .cutoff-widget-stats { grid-template-columns: repeat(3, 1fr); } }
 @media (max-width: 640px) {
   .cutoff-widget-stats { grid-template-columns: repeat(2, 1fr); }
@@ -3254,3 +3307,44 @@ th { font-weight: 600; }
 /* ตัดเหลื่อม 3px ให้แท็บใบเสร็จพอดีจอเป๊ะ (ไม่เกิดแถบเลื่อนบางๆ) */
 .printer-card .printer-tips { margin-top: 8px; }
 .printer-card .printer-test-row { margin-top: 8px; padding: 9px 13px; }
+
+/* ═══ ROUND 34 — limit requests: การขอลดวงเงินซื้อสินค้าต่อวัน (req 23.2) ═══ */
+/* (1) การ์ดสรุปธุรกรรม 4 คอลัมน์ — มือถือ 2×2 (แทนที่ 3 คอลัมน์/1 แถวเดิม) */
+.tx-summary-cards { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+@media (max-width: 860px) {
+  .tx-summary-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.purple-text { color: #8870af; }
+
+/* (2) แถวคำขอลดวงเงินในตารางธุรกรรม — พื้นม่วงอ่อน + แถบซ้ายม่วง */
+.tx-table tr.tx-limit td { background: #fbf9fe; }
+.tx-table tr.tx-limit:hover td { background: #f6f0fb; }
+.tx-table tr.tx-limit td:first-child { box-shadow: inset 3px 0 0 0 #b3a1d1; }
+.tx-table .tx-limit-amount { display: block; color: #6f7562; font-family: "IBM Plex Mono", monospace; font-size: 11px; }
+.tx-table .tx-limit-amount small { font-family: inherit; font-size: 9px; color: #9a92b3; margin-top: 2px; }
+.tx-type-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
+.tx-type-cell .status-pill { font-size: 9.5px; padding: 3px 7px; }
+
+/* (3) ปุ่มพิจารณาคำขอ (ผู้บริหาร) — pill เขียว/แดงกะทัดรัด */
+.limit-act-row { display: flex; gap: 5px; }
+.limit-act { display: inline-flex; align-items: center; gap: 4px; border-radius: 20px; padding: 5px 10px; font-size: 10.5px; font-weight: 600; cursor: pointer; border: 1px solid; transition: .14s ease; white-space: nowrap; }
+.limit-act-approve { color: #3f8a6d; background: #edf8f3; border-color: #bfe3d4; }
+.limit-act-approve:hover { background: #ddf2e8; }
+.limit-act-reject { color: #bd6c65; background: #fff0f0; border-color: #efc4bf; }
+.limit-act-reject:hover { background: #ffe9e8; }
+.limit-act:disabled { opacity: .55; cursor: wait; }
+.limit-decide-modal { width: min(430px, 100%); }
+.limit-decide-modal .confirm-icon { color: #8870af; background: #f3edfb; }
+.limit-decide-modal .wallet-confirm-rows { margin-bottom: 11px; }
+.limit-decide-note { display: flex; align-items: flex-start; gap: 7px; color: #6f7562; background: #fafcfb; border: 1px solid #edf2f0; border-radius: 8px; margin-top: 2px; padding: 9px 10px; font-size: 10.5px; line-height: 1.55; }
+.limit-decide-modal .notice-bar { margin-top: 10px; }
+
+/* (4) ชิปวงเงินบนหัวรายละเอียดสมาชิก */
+.member-limit-chip { display: inline-flex; align-items: center; gap: 4px; margin-left: 7px; padding: 3px 8px; border-radius: 20px; background: #f3edfb; color: #8870af; font-size: 10px; font-weight: 600; white-space: nowrap; vertical-align: middle; }
+
+/* (5) โมดัลขอลดวงเงิน (หน้ารายละเอียดสมาชิก) — ใช้โครง form-modal เดิม */
+.limit-dialog .member-number-preview { margin-top: 12px; }
+.limit-dialog .wallet-confirm-rows { margin-top: 12px; }
+
+/* (6) แถววงเงินบนการ์ดยืนยันสมาชิกที่ POS (ก่อนหักบัญชี) */
+.member-confirm-info small.member-limit-line { display: flex; align-items: center; gap: 4px; color: #8870af; font-weight: 600; cursor: help; }
