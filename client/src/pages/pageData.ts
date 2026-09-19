@@ -4,7 +4,10 @@ import { BarChart3, LayoutDashboard, PackageSearch, ShoppingCart, UsersRound } f
 
 export type View = "dashboard" | "pos" | "stock" | "members" | "reports" | "settings" | "logs" | "users";
 export type Role = "staff" | "admin";
-export type CartItem = { id: number; name: string; price: number; qty: number; unit: string; special?: boolean };
+export type CartItem = { id: number; name: string; price: number; qty: number; unit: string; special?: boolean; variant?: string; step?: number };
+
+/** Round 31-12 — money-mode product price tier (ขายเป็นเงิน เช่น น้ำแข็ง ฿1 = 200 ก.) */
+export type PriceTier = { label: string; price: number; qty: number };
 
 export type Product = {
   id: number;
@@ -19,6 +22,12 @@ export type Product = {
   size?: string | null;
   /** Real product photo (data URL). Falls back to emoji when absent. */
   imageUrl?: string | null;
+  /** "money" = ขายเป็นราคาตามช่องราคา (น้ำแข็ง) · "unit" (default) = ขายตามหน่วยปกติ */
+  sellMode?: string | null;
+  /** JSON [{ label, price, qty }] — price tiers for sellMode "money" */
+  priceTiers?: string | null;
+  /** 1 = ขึ้นแผงลัดหน้าร้าน (POS shortcut rail) */
+  quickPick?: number;
 };
 
 /** Real member essentials for the POS member dropdown (from trpc.member.list). */
@@ -30,18 +39,47 @@ export type MemberLite = {
   balance: number;
   status: "active" | "suspended";
   lastTransactionAt: string | null;
+  photoUrl?: string | null;
+  gender?: string | null;
 };
 
 export function calculateCartSubtotal(items: CartItem[]) {
-  return items.reduce((sum, item) => sum + item.price * item.qty, 0);
+  // Variant lines (money-mode tiers) price PER SERVING while qty is in base
+  // units (grams) — one serving = step base units.
+  return items.reduce((sum, item) => sum + (item.variant ? item.price * (item.qty / (item.step || 1)) : item.price * item.qty), 0);
 }
 
 export function addScannedItem(items: CartItem[], product: Product) {
-  const existing = items.find((item) => item.id === product.id);
+  const existing = items.find((item) => item.id === product.id && !item.variant);
   if (existing) {
-    return items.map((item) => item.id === product.id ? { ...item, qty: item.qty + 1 } : item);
+    return items.map((item) => item.id === product.id && !item.variant ? { ...item, qty: item.qty + 1 } : item);
   }
   return [...items, { id: product.id, name: product.name, price: product.price, qty: 1, unit: product.unit }];
+}
+
+/** Parses the priceTiers JSON column — invalid entries are dropped silently. */
+export function parsePriceTiers(json?: string | null): PriceTier[] {
+  if (!json) return [];
+  try {
+    const parsed: unknown = JSON.parse(json);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((tier): tier is Record<string, unknown> => Boolean(tier) && typeof tier === "object")
+      .map((tier) => ({ label: String(tier.label ?? "").trim(), price: Number(tier.price), qty: Number(tier.qty) }))
+      .filter((tier) => Number.isFinite(tier.price) && tier.price > 0 && Number.isFinite(tier.qty) && tier.qty > 0);
+  } catch {
+    return [];
+  }
+}
+
+/** Money-mode product: one tap = one serving of that price tier (น้ำแข็ง ฿5 = 1,000 ก.). */
+export function addTierItem(items: CartItem[], product: Product, tier: PriceTier) {
+  const variant = tier.label || `฿${tier.price}`;
+  const existing = items.find((item) => item.id === product.id && item.variant === variant);
+  if (existing) {
+    return items.map((item) => (item.id === product.id && item.variant === variant ? { ...item, qty: item.qty + tier.qty } : item));
+  }
+  return [...items, { id: product.id, name: tier.label ? `${product.name} · ${tier.label}` : product.name, price: tier.price, qty: tier.qty, unit: product.unit, variant, step: tier.qty }];
 }
 
 export function canAccessView(role: Role, view: View) {

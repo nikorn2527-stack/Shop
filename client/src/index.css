@@ -2800,3 +2800,324 @@ th { font-weight: 600; }
   .tx-summary-cards { grid-template-columns: 1fr; }
   .tx-filter-bar .member-scan-wrap { max-width: none; }
 }
+
+/* ============================================================
+   ROUND 31 — ยืนยันก่อนตัดบัญชี · บัตรสมาชิกบาร์โค้ด/QR · ตัดยอดรายวัน
+   (all appended late in the file so scoped overrides win over
+   the old entity-card rules that collide with .member-card-*)
+   ============================================================ */
+
+/* --- 1) MemberAvatar — รูปสมาชิกจริง + เงาว์เพศเมื่อไม่มีรูป ------------- */
+.member-photo { object-fit: cover; display: block; border-radius: 10px; background: #eef3ef; flex: 0 0 auto; }
+.member-photo.round { border-radius: 50%; }
+.member-photo-fallback { display: grid; place-items: center; flex: 0 0 auto; border-radius: 10px; color: #fff; background: #9aa88f; position: relative; }
+.member-photo-fallback.round { border-radius: 50%; }
+.member-photo-fallback.male { background: linear-gradient(160deg, #4f8f75, #3d7a61); }
+.member-photo-fallback.female { background: linear-gradient(160deg, #b07a8c, #96606f); }
+.member-photo-fallback.neutral { background: linear-gradient(160deg, #8d9c85, #75846d); }
+.member-photo-fallback svg { opacity: .96; }
+.member-photo-fallback .avatar-initial { position: absolute; inset: 0; display: grid; place-items: center; font-style: normal; font-weight: 700; font-size: 13px; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,.25); }
+
+/* --- 2) บัตรสมาชิก — รูป + บาร์โค้ด + คิวอาร์โค้ด ---------------------- */
+/* the wallet card grew a photo column and a codes row: scoped overrides
+   neutralize the older aspect-locked / grid rules from earlier rounds */
+.member-card-modal .member-card { width: 334px; aspect-ratio: auto; min-height: 218px; padding: 14px 15px 11px; }
+.member-card-modal .member-card-body { display: flex; flex-direction: row; align-items: center; gap: 11px; }
+.member-card-modal .member-card-identity { flex: 1; min-width: 0; }
+.member-card-photo { flex: 0 0 auto; padding: 2px; background: #fff; border: 1px solid #d3e5dd; border-radius: 10px; box-shadow: 0 2px 6px rgba(40,70,58,.12); }
+.member-card-photo .member-photo, .member-card-photo .member-photo-fallback { border-radius: 8px; }
+.member-card-codes { display: grid; grid-template-columns: 1.55fr 1fr; gap: 8px; margin-top: 9px; }
+.member-card-barcode, .member-card-qr { background: #fff; border: 1px solid #d8e6df; border-radius: 8px; padding: 6px 5px 4px; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; }
+.member-card-barcode img { max-width: 100%; height: auto; display: block; }
+.member-card-qr img { width: 52px; height: 52px; display: block; }
+.member-card-barcode small, .member-card-qr small { font-size: 6.8px; color: #7b8170; display: flex; align-items: center; gap: 3px; letter-spacing: .2px; }
+.member-card-code-fallback { height: 54px; display: grid; place-items: center; color: #b9beac; font-size: 12px; }
+.member-card-modal .member-card-foot { border-top: 1px dashed #cfe4db; padding-top: 6px; display: flex; justify-content: space-between; gap: 10px; }
+.member-card-modal .member-card-name { font-size: 14px; }
+.member-card-modal .member-card-number { font-size: 19.5px; }
+.member-card-modal .member-card-meta { flex-wrap: wrap; }
+/* print: taller card fits the codes — keep CR80 width, let height breathe */
+@media print {
+  body:has(#member-card) .member-card { height: auto; min-height: 0; }
+}
+
+/* --- 3) ยืนยันตัวตนสมาชิกก่อนใช้รายการ (MemberScanPicker) -------------- */
+.member-confirm-card { border: 1px solid #f0d9a8; background: linear-gradient(180deg, #fffdf6, #fdf8ea); border-radius: 10px; padding: 10px 11px 11px; box-shadow: 0 3px 10px rgba(122, 96, 38, .08); }
+.member-confirm-head { display: flex; align-items: center; gap: 7px; color: #9a7328; font-size: 10.5px; font-weight: 600; padding-bottom: 8px; border-bottom: 1px dashed #ecd9ae; margin-bottom: 9px; }
+.member-confirm-head svg { flex: 0 0 auto; }
+.member-confirm-body { display: flex; align-items: center; gap: 10px; }
+.member-confirm-info { min-width: 0; }
+.member-confirm-info b { display: block; color: #4c4433; font-size: 12px; line-height: 1.3; }
+.member-confirm-info small { display: block; color: #7d7b64; font-size: 10px; margin-top: 2px; }
+.member-confirm-info small i { font-style: normal; font-family: "IBM Plex Mono", monospace; color: #557063; }
+.member-confirm-info strong { font-variant-numeric: tabular-nums; }
+.member-confirm-info em { color: #c26568; font-style: normal; font-weight: 600; }
+.member-confirm-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 10px; }
+.member-confirm-actions .outline-button, .member-confirm-actions .primary-button { height: 34px; font-size: 10.5px; }
+
+/* --- 4) เติม/ถอนเงิน — ขั้นยืนยัน + สลิปผลลัพธ์ ------------------------ */
+.wallet-confirm { display: flex; flex-direction: column; gap: 11px; }
+.wallet-confirm-warning { display: flex; align-items: flex-start; gap: 8px; background: #fff7e6; border: 1px solid #f0dcb0; color: #8a6a2c; border-radius: 9px; padding: 9px 11px; font-size: 11px; line-height: 1.5; }
+.wallet-confirm-warning svg { flex: 0 0 auto; margin-top: 1px; color: #b98a35; }
+.wallet-confirm-member { display: flex; align-items: center; gap: 11px; background: #fff; border: 1px solid #e3ece8; border-radius: 10px; padding: 10px 12px; }
+.wallet-confirm-member b { display: block; color: #3f4a41; font-size: 12.5px; }
+.wallet-confirm-member small { display: block; color: #7d8271; font-size: 10.5px; margin-top: 3px; }
+.wallet-confirm-member small i { font-style: normal; font-family: "IBM Plex Mono", monospace; color: #557063; }
+.wallet-confirm-rows { border: 1px solid #e4eee9; border-radius: 10px; overflow: hidden; background: #fff; }
+.wallet-confirm-rows > div { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 8.5px 12px; font-size: 11.5px; border-bottom: 1px solid #f0f4f1; }
+.wallet-confirm-rows > div:last-child { border-bottom: 0; }
+.wallet-confirm-rows > div:nth-child(even) { background: #fafcfb; }
+.wallet-confirm-rows span { color: #7e8473; }
+.wallet-confirm-rows b { color: #3d4a42; font-variant-numeric: tabular-nums; text-align: right; display: inline-flex; align-items: center; gap: 4px; }
+.wallet-confirm-actions { display: flex; gap: 8px; }
+.wallet-confirm-actions .outline-button, .wallet-confirm-actions .primary-button { flex: 1; height: 38px; }
+.wallet-success { display: flex; flex-direction: column; gap: 12px; }
+.wallet-slip { margin: 0 auto; width: 300px; max-width: 100%; }
+.wallet-success-actions { display: flex; gap: 8px; }
+.wallet-success-actions .outline-button, .wallet-success-actions .primary-button { flex: 1; }
+/* slip has its own print isolation — ปุ่มพิมพ์สลิปที่หน้าผลลัพธ์ */
+@media print {
+  body:has(#wallet-slip) .sidebar, body:has(#wallet-slip) .topbar, body:has(#wallet-slip) .app-footer,
+  body:has(#wallet-slip) .page-content > *:not(.modal-backdrop) { display: none !important; }
+  body:has(#wallet-slip) .app-shell { display: block; min-height: 0; }
+  body:has(#wallet-slip) .main-shell { min-width: 0; }
+  body:has(#wallet-slip) .page-content { max-width: none; margin: 0; padding: 0; animation: none; }
+  body:has(#wallet-slip) .modal-backdrop { position: static; display: block; padding: 0; background: none; backdrop-filter: none; animation: none; }
+  body:has(#wallet-slip) { min-height: 0 !important; height: auto !important; }
+  body:has(#wallet-slip) .wallet-modal .modal-heading, body:has(#wallet-slip) .wallet-modal-foot,
+  body:has(#wallet-slip) .wallet-success-actions { display: none !important; }
+  body:has(#wallet-slip) .form-modal.wallet-modal { box-shadow: none; border: 0; background: #fff; padding: 0; max-width: none; width: auto; }
+  body:has(#wallet-slip) .wallet-slip { box-shadow: none; border: 1px dashed #b8bdaa; }
+}
+
+/* --- 5) Sidebar — ปุ่มเพิ่มสมาชิกใหม่ (ย้ายจากปุ่มในหน้า POS) ---------- */
+.sidebar-register { display: flex; align-items: center; gap: 9px; width: calc(100% - 18px); margin: 10px 9px 4px; padding: 9px 11px; border: 1px solid #cfe7db; border-radius: 10px; background: linear-gradient(180deg, #f2faf5, #e9f6ef); color: #2f6a52; cursor: pointer; text-align: left; transition: .18s ease; }
+.sidebar-register:hover { border-color: #9ed3bd; background: linear-gradient(180deg, #eaf7f0, #ddf2e7); transform: translateY(-1px); box-shadow: 0 5px 12px rgba(53, 108, 85, .12); }
+.sidebar-register svg { flex: 0 0 auto; color: var(--teal); }
+.sidebar-register b { display: block; font-size: 11.5px; color: #2c6350; }
+.sidebar-register span { display: block; font-size: 9.5px; color: #6f9080; margin-top: 1px; }
+.pos-rail .rail-btn.member-rail { color: #2f7c5f; }
+
+/* --- 6) ตั้งค่ารอบตัดยอด (cutoff tab) ---------------------------------- */
+.cutoff-time-row { display: flex; gap: 14px; align-items: flex-start; margin-top: 12px; flex-wrap: wrap; }
+.cutoff-time-row label { display: block; color: #6f7a6e; font-size: 11px; }
+.cutoff-time-row input[type="time"] { display: block; margin-top: 5px; height: 38px; border: 1px solid #dde8e2; border-radius: 8px; padding: 0 10px; background: #fff; color: #47544b; font-size: 14px; font-family: "IBM Plex Mono", monospace; outline: none; }
+.cutoff-time-row input[type="time"]:focus { border-color: #8fc5b0; box-shadow: 0 0 0 3px #eaf6f1; }
+.cutoff-time-hint { flex: 1; min-width: 220px; display: flex; gap: 7px; align-items: flex-start; background: #f6faf7; border: 1px dashed #d5e6dc; border-radius: 8px; padding: 9px 11px; color: #74806f; font-size: 10.5px; line-height: 1.55; }
+.cutoff-time-hint svg { flex: 0 0 auto; color: #4b9d7f; margin-top: 1px; }
+.cutoff-period { display: flex; flex-direction: column; gap: 11px; }
+.cutoff-period-head { display: flex; flex-direction: column; gap: 5px; }
+.cutoff-period-head small { color: #7c8170; font-size: 10.5px; }
+.cutoff-period-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
+.cutoff-period-stats > div { background: #f8fbf9; border: 1px solid #e3ede7; border-radius: 9px; padding: 10px 12px 9px; }
+.cutoff-period-stats small { display: block; color: #7d8373; font-size: 10px; }
+.cutoff-period-stats strong { display: block; color: #35513f; font-size: 15px; margin-top: 4px; font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; }
+.cutoff-last { display: flex; gap: 8px; align-items: flex-start; background: #f4f8f5; border: 1px solid #dfeae2; border-radius: 9px; padding: 9px 11px; }
+.cutoff-last svg { flex: 0 0 auto; color: #7a86c9; margin-top: 2px; }
+.cutoff-last b { display: block; color: #4a5568; font-size: 11px; }
+.cutoff-last small { display: block; color: #7e8474; font-size: 10px; margin-top: 3px; line-height: 1.5; }
+.cutoff-period-loading { color: #828876; font-size: 11px; padding: 14px 2px; }
+
+/* --- 7) อัปโหลดรูปสมาชิก (ฟอร์มลงทะเบียน + แก้ไข) --------------------- */
+.member-photo-uploader { margin-top: 5px; }
+.member-photo-preview { width: 92px; border: 1px solid #dbe7e0; border-radius: 9px; padding: 4px; background: #fff; }
+.member-photo-actions { margin-top: 6px; display: flex; flex-direction: column; gap: 5px; align-items: stretch; }
+.member-photo-drop { padding: 12px 10px; }
+
+/* --- 8) responsive -------------------------------------------------- */
+@media (max-width: 980px) {
+  .cutoff-period-stats { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 560px) {
+  .wallet-confirm-actions, .wallet-success-actions { flex-direction: column; }
+  .member-confirm-actions { grid-template-columns: 1fr; }
+  .member-card-codes { grid-template-columns: 1fr; }
+  .cutoff-period-stats { grid-template-columns: 1fr 1fr; }
+}
+
+/* --- ROUND 31-① : cutoff widget (รอบตัดยอดบนหน้าภาพรวม) --------------- */
+.cutoff-widget { display: flex; align-items: stretch; gap: 14px; padding: 13px 16px; margin-bottom: 16px; flex-wrap: wrap; border-left: 3px solid var(--teal); }
+.cutoff-widget-main { flex: 1 1 460px; min-width: 0; display: flex; flex-direction: column; gap: 9px; }
+.cutoff-widget-head { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.cutoff-widget-icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 9px; background: #e9f6ef; color: var(--teal); flex: 0 0 auto; }
+.cutoff-widget-head b { display: block; font-size: 12.5px; color: #2f4a3d; }
+.cutoff-widget-head small { display: block; color: #7c8171; font-size: 10px; margin-top: 2px; }
+.cutoff-mode-pill { margin-left: auto; flex: 0 0 auto; font-size: 9.5px; font-weight: 700; letter-spacing: .3px; color: #4d7d9c; background: #ecf5fb; border: 1px solid #cfe4ef; border-radius: 20px; padding: 3px 9px; }
+.cutoff-mode-pill.manual { color: #8a6db0; background: #f5eefb; border-color: #e2d4f0; }
+.cutoff-widget-stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+.cutoff-widget-stats > div { background: #f8fbf9; border: 1px solid #e5eee8; border-radius: 8px; padding: 7px 10px; min-width: 0; }
+.cutoff-widget-stats small { display: block; color: #7f8473; font-size: 9.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cutoff-widget-stats strong { display: block; color: #3a4a40; font-size: 13px; margin-top: 3px; font-family: "IBM Plex Mono", monospace; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.cutoff-widget-stats strong.teal { color: var(--teal); }
+.cutoff-widget-actions { flex: 0 0 auto; display: flex; flex-direction: column; justify-content: center; gap: 7px; align-items: stretch; min-width: 172px; }
+.cutoff-trigger { height: 38px; }
+.cutoff-last-note { display: flex; align-items: center; justify-content: center; gap: 5px; color: #81887a; font-size: 9.5px; text-align: center; line-height: 1.45; }
+.cutoff-done-note { display: flex; align-items: center; justify-content: center; gap: 5px; color: #3f8a6d; font-size: 10px; font-weight: 600; }
+.cutoff-report { display: none; }
+.cutoff-widget .notice-bar { width: 100%; }
+
+/* --- ROUND 31-11 : line chart (กราฟเส้นยอดขาย) ------------------------ */
+.chart-wrap-line { display: flex; gap: 8px; align-items: stretch; flex: 1; min-height: 168px; }
+.chart-wrap-line .y-labels { display: flex; flex-direction: column; justify-content: space-between; text-align: right; }
+.line-chart { position: relative; flex: 1; min-width: 0; display: flex; align-items: stretch; }
+.line-chart svg { width: 100%; height: 100%; display: block; }
+.line-chart .line-grid { stroke: #edf1ee; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.line-chart .line-area { fill: url(#revenue-area); stroke: none; }
+.line-chart .line-revenue { fill: none; stroke: var(--teal); stroke-width: 2.4; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.line-chart .line-deposit { fill: none; stroke: #a78fd4; stroke-width: 1.6; stroke-dasharray: 5 4; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; opacity: .85; }
+.line-chart .line-cursor { stroke: #c3cfc7; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.line-chart .line-dot { vector-effect: non-scaling-stroke; }
+.line-chart .line-dot.revenue { fill: #fff; stroke: var(--teal); stroke-width: 2.4; }
+.line-chart .line-dot.deposit { fill: #fff; stroke: #a78fd4; stroke-width: 1.8; }
+.line-hits { position: absolute; inset: 0; display: flex; }
+.line-hits button { position: absolute; top: 0; bottom: 0; border: 0; background: transparent; padding: 0; cursor: pointer; }
+.line-hits button:hover { background: rgba(61, 140, 113, .06); }
+.line-hits button.selected { background: rgba(61, 140, 113, .1); }
+.line-hits button:focus-visible { outline: 2px solid var(--teal); outline-offset: -2px; }
+.line-x-labels { display: flex; margin-top: 5px; }
+.line-x-labels span { flex: 1; text-align: center; font-size: 9px; color: #8b9080; visibility: hidden; min-width: 0; white-space: nowrap; }
+.line-x-labels span.show { visibility: visible; }
+.line-x-labels span.picked { color: var(--teal); font-weight: 700; }
+.chart-empty-note { flex: 1; display: grid; place-items: center; color: #8b9080; font-size: 11px; padding: 30px 0; }
+@media (max-width: 1080px) { .cutoff-widget-stats { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 640px) {
+  .cutoff-widget-stats { grid-template-columns: repeat(2, 1fr); }
+  .cutoff-widget-actions { flex-direction: row; flex-wrap: wrap; }
+  .cutoff-widget-actions .outline-button, .cutoff-widget-actions .primary-button { flex: 1 1 140px; }
+}
+/* print the Z-report slip alone */
+@media print {
+  body:has(#cutoff-report) .sidebar, body:has(#cutoff-report) .topbar, body:has(#cutoff-report) .app-footer,
+  body:has(#cutoff-report) .page-content > * { display: none !important; }
+  body:has(#cutoff-report) .page-content > .cutoff-widget { display: block !important; }
+  body:has(#cutoff-report) .app-shell { display: block; min-height: 0; }
+  body:has(#cutoff-report) .main-shell { min-width: 0; }
+  body:has(#cutoff-report) .page-content { max-width: none; margin: 0; padding: 0; animation: none; }
+  body:has(#cutoff-report) { min-height: 0 !important; height: auto !important; }
+  body:has(#cutoff-report) .cutoff-widget { border: 0; padding: 0; margin: 0; }
+  body:has(#cutoff-report) .cutoff-widget-main, body:has(#cutoff-report) .cutoff-widget-actions,
+  body:has(#cutoff-report) .cutoff-widget .notice-bar { display: none !important; }
+  body:has(#cutoff-report) .cutoff-report { display: block; width: 300px; margin: 0 auto; border: 1px dashed #b8bdaa; box-shadow: none; }
+}
+
+/* --- ROUND 31-7 : เครื่องพิมพ์หน้าร้าน (settings → receipt tab) -------- */
+.printer-card { border-left: 3px solid var(--teal); }
+.printer-flow-steps { display: flex; flex-direction: column; gap: 9px; margin-top: 4px; }
+.printer-step { display: flex; gap: 10px; align-items: flex-start; background: #f8fbf9; border: 1px solid #e5eee8; border-radius: 9px; padding: 10px 12px; }
+.printer-step > b { flex: 0 0 auto; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 50%; background: var(--teal); color: #fff; font-size: 11px; font-weight: 700; }
+.printer-step div > b { display: block; color: #35493f; font-size: 11.5px; }
+.printer-step div > small { display: block; color: #7b8171; font-size: 10px; margin-top: 3px; line-height: 1.55; }
+.printer-test-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; background: #fff; border: 1px dashed #cfe0d6; border-radius: 9px; padding: 11px 13px; margin-top: 11px; flex-wrap: wrap; }
+.printer-test-row > div > b { display: block; color: #2f4a3d; font-size: 12px; }
+.printer-test-row > div > small { display: block; color: #7c8171; font-size: 10.5px; margin-top: 2px; }
+.printer-tips { margin-top: 11px; }
+.printer-tip-pills { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 7px; }
+.printer-tip-pills span { font-size: 10px; color: #617064; background: #f4f8f5; border: 1px solid #e0eae3; border-radius: 20px; padding: 4px 11px; }
+.printer-test-slip { display: none; }
+@media print {
+  body:has(#printer-test-slip) .sidebar, body:has(#printer-test-slip) .topbar, body:has(#printer-test-slip) .app-footer,
+  body:has(#printer-test-slip) .page-content > * { display: none !important; }
+  body:has(#printer-test-slip) .app-shell { display: block; min-height: 0; }
+  body:has(#printer-test-slip) .main-shell { min-width: 0; }
+  body:has(#printer-test-slip) .page-content { max-width: none; margin: 0; padding: 0; animation: none; }
+  body:has(#printer-test-slip) { min-height: 0 !important; height: auto !important; }
+  body:has(#printer-test-slip) .printer-test-slip { display: block; width: 300px; margin: 0 auto; border: 1px dashed #b8bdaa; box-shadow: none; }
+}
+
+/* --- ROUND 31-12 : แผงลัดหน้าร้าน + สินค้าขายเป็นราคา (น้ำแข็ง) -------- */
+.quick-manage-open-btn { flex: 0 0 auto; }
+.quick-pick-head { gap: 8px; flex-wrap: wrap; }
+.tier-stepper { display: flex; gap: 5px; padding: 0 8px 9px; flex-wrap: wrap; }
+.tier-button { flex: 1 1 0; min-width: 54px; border: 1px solid #bfdccd; background: #f0f8f4; border-radius: 8px; padding: 5px 4px 4px; display: flex; flex-direction: column; align-items: center; gap: 1px; cursor: pointer; transition: .15s ease; }
+.tier-button:hover:not(:disabled) { background: #e2f3e9; border-color: #8fc5b0; transform: translateY(-1px); }
+.tier-button:disabled { opacity: .45; cursor: not-allowed; }
+.tier-button b { color: #2f6a52; font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.tier-button small { color: #77857c; font-size: 8.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.product-card.money-card { cursor: default; }
+.product-card.money-card .product-card-info { padding-bottom: 5px; }
+.quick-manage-modal { width: min(560px, calc(100vw - 32px)); }
+.quick-manage-tools { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
+.quick-manage-tools .search-field { flex: 1; height: 36px; }
+.quick-manage-count { flex: 0 0 auto; color: #7d8373; font-size: 10.5px; background: #f4f8f5; border: 1px solid #e0eae3; border-radius: 20px; padding: 4px 11px; white-space: nowrap; }
+.quick-manage-list { margin-top: 10px; max-height: 320px; overflow-y: auto; border: 1px solid #e6eee9; border-radius: 10px; background: #fff; display: flex; flex-direction: column; }
+.quick-manage-row { display: flex; align-items: center; gap: 10px; padding: 8.5px 11px; border-bottom: 1px solid #f1f5f2; }
+.quick-manage-row:last-child { border-bottom: 0; }
+.quick-manage-row.active { background: #f3faf6; }
+.quick-manage-thumb { width: 34px; height: 34px; border-radius: 8px; background: #f2f7f4; display: grid; place-items: center; font-size: 17px; flex: 0 0 auto; overflow: hidden; }
+.quick-manage-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.quick-manage-info { flex: 1; min-width: 0; }
+.quick-manage-info b { display: block; color: #3d4a42; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.quick-manage-info small { display: block; color: #7f8473; font-size: 9.5px; margin-top: 2px; font-family: "IBM Plex Mono", monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.quickpick-toggle { display: inline-flex; align-items: center; gap: 6px; height: 35px; padding: 0 12px; border-radius: 8px; border: 1px solid #dbe7df; background: #fff; color: #71806f; font-size: 10.5px; cursor: pointer; transition: .15s ease; align-self: start; }
+.quickpick-toggle:hover { border-color: #a9d2c0; color: var(--teal); }
+.quickpick-toggle.on { background: #eaf7f0; border-color: #9ed3bd; color: #2f6a52; font-weight: 600; }
+.quickpick-toggle svg { color: #c9b45a; }
+.quickpick-toggle:not(.on) svg { color: #b3b9ab; }
+.tier-editor { border: 1px solid #dfeae3; background: #fafcfb; border-radius: 10px; padding: 11px 12px; display: flex; flex-direction: column; gap: 7px; }
+.tier-editor-head { display: flex; flex-direction: column; gap: 4px; }
+.tier-col-labels { display: grid; grid-template-columns: 1.2fr .7fr .9fr 26px; gap: 6px; }
+.tier-col-labels i { font-style: normal; color: #8a9184; font-size: 9px; }
+.tier-row { display: grid; grid-template-columns: 1.2fr .7fr .9fr 26px; gap: 6px; align-items: center; }
+.tier-row input { height: 34px; border: 1px solid #dde8e1; border-radius: 7px; padding: 0 9px; font-size: 11.5px; color: #47544b; background: #fff; outline: none; min-width: 0; }
+.tier-row input:focus { border-color: #8fc5b0; box-shadow: 0 0 0 3px #eaf6f1; }
+.tier-row .mini-button.danger { width: 26px; height: 26px; padding: 0; display: grid; place-items: center; }
+.tier-editor .mini-button { align-self: flex-start; }
+.tier-hint { color: #7d8373; font-size: 9.5px; line-height: 1.5; }
+.bag-helper { border: 1px dashed #cfe0d6; background: #f6faf7; border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 7px; }
+.bag-helper-row { display: flex; align-items: flex-end; gap: 8px; flex-wrap: wrap; }
+.bag-helper-row label { color: #74806f; font-size: 10px; flex: 0 0 auto; }
+.bag-helper-row label input { display: block; margin-top: 4px; height: 34px; width: 86px; border: 1px solid #dde8e1; border-radius: 7px; padding: 0 9px; font-size: 12px; color: #47544b; background: #fff; outline: none; font-family: "IBM Plex Mono", monospace; }
+.bag-helper-row b { color: #8a9184; padding-bottom: 9px; }
+.bag-helper small { color: #7d8373; font-size: 9.5px; }
+@media (max-width: 640px) {
+  .tier-stepper { flex-direction: column; }
+  .tier-button { width: 100%; flex-direction: row; justify-content: space-between; }
+}
+
+/* --- ROUND 31-8 : ThaiDatePicker (ปฏิทินภาษาไทย พ.ศ.) ------------------ */
+.thai-date-picker { position: relative; display: inline-flex; }
+.thai-date-field { display: inline-flex; align-items: center; gap: 7px; height: 35px; padding: 0 11px; border: 1px solid #dfe9e3; border-radius: 8px; background: #fff; color: #47544b; font-size: 11.5px; cursor: pointer; transition: .15s ease; white-space: nowrap; }
+.thai-date-field:hover { border-color: #a9d2c0; }
+.thai-date-field svg:first-child { color: var(--teal); }
+.thai-date-field .thai-date-caret { color: #98a094; transform: rotate(90deg); }
+.thai-date-pop { position: absolute; top: calc(100% + 6px); left: 0; z-index: 60; width: 246px; background: #fff; border: 1px solid #e2ebe6; border-radius: 12px; box-shadow: 0 14px 34px rgba(38, 62, 51, .18); padding: 10px 11px 11px; }
+.thai-date-nav { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 7px; }
+.thai-date-nav b { color: #2f4a3d; font-size: 12.5px; }
+.thai-date-nav button { width: 26px; height: 26px; display: grid; place-items: center; border: 1px solid #e4ede8; border-radius: 7px; background: #fff; color: #71806f; cursor: pointer; }
+.thai-date-nav button:hover { border-color: #a9d2c0; color: var(--teal); }
+.thai-date-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+.thai-date-grid button { height: 27px; border: 0; border-radius: 7px; background: transparent; color: #47544b; font-size: 11px; cursor: pointer; font-variant-numeric: tabular-nums; }
+.thai-date-grid button:hover:not(:disabled) { background: #eaf6f0; }
+.thai-date-grid button:disabled { color: #c9cec2; cursor: not-allowed; }
+.thai-date-grid button.today { color: var(--teal); font-weight: 700; }
+.thai-date-grid button.picked { background: var(--teal); color: #fff; font-weight: 700; }
+.thai-date-week { margin-bottom: 4px; }
+.thai-date-week span { text-align: center; color: #8a9184; font-size: 9px; padding: 3px 0; }
+.thai-date-foot { display: flex; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e4ece8; }
+.range-picker .thai-date-picker:first-child .thai-date-pop, .tx-date-range .thai-date-picker:first-child .thai-date-pop { left: 0; }
+.tx-date-range .thai-date-picker:last-child .thai-date-pop { left: auto; right: 0; }
+
+/* --- ROUND 31-10 : เอกสารรายงาน A4 (ออกจอ ใช้เฉพาะตอนจับภาพ) --------- */
+.report-doc { width: 794px; min-height: 1123px; background: #ffffff; color: #26312b; font-family: "Sarabun", "Leelawadee UI", Tahoma, sans-serif; padding: 46px 50px 40px; display: flex; flex-direction: column; box-sizing: border-box; }
+.rd-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding-bottom: 14px; border-bottom: 2.5px solid #2f7c5f; }
+.rd-brand { display: flex; align-items: center; gap: 11px; }
+.rd-brand img { width: 44px; height: 44px; object-fit: contain; border-radius: 10px; }
+.rd-mark { width: 44px; height: 44px; display: grid; place-items: center; background: #2f7c5f; color: #fff; border-radius: 10px; font-size: 20px; font-weight: 700; }
+.rd-brand b { display: block; font-size: 17px; color: #1f3a2e; }
+.rd-brand small { display: block; color: #6d7a6d; font-size: 10.5px; margin-top: 1px; }
+.rd-stamp { color: #7c857c; font-size: 10px; text-align: right; }
+.rd-title { margin-top: 22px; }
+.rd-title h1 { margin: 0; font-size: 21px; color: #1f3a2e; letter-spacing: .2px; }
+.rd-title p { margin: 6px 0 0; color: #5d6a5f; font-size: 11.5px; }
+.rd-meta { display: flex; flex-wrap: wrap; gap: 8px 26px; margin-top: 14px; padding: 11px 14px; background: #f3f8f5; border: 1px solid #dcebe2; border-radius: 8px; }
+.rd-meta > div { display: flex; gap: 7px; align-items: baseline; }
+.rd-meta span { color: #6d7a6d; font-size: 10.5px; }
+.rd-meta b { color: #273930; font-size: 11.5px; font-variant-numeric: tabular-nums; }
+.rd-table { width: 100%; border-collapse: collapse; margin-top: 18px; font-size: 10.5px; }
+.rd-table th { background: #2f7c5f; color: #fff; font-weight: 600; text-align: left; padding: 8px 10px; font-size: 10.5px; }
+.rd-table td { padding: 7.5px 10px; border-bottom: 1px solid #e4ece7; color: #33403a; font-variant-numeric: tabular-nums; }
+.rd-table tbody tr:nth-child(even) td { background: #f8fbf9; }
+.rd-table td.num, .rd-table th.num { text-align: right; }
+.rd-table tfoot td { background: #e7f2ec !important; border-top: 2px solid #2f7c5f; border-bottom: 0; font-weight: 700; color: #1f3a2e; }
+.rd-note { margin-top: 12px; color: #6d7a6d; font-size: 9.5px; line-height: 1.55; }
+.rd-foot { margin-top: auto; padding-top: 22px; color: #8a948a; font-size: 9px; border-top: 1px dashed #d8e2da; margin-top: 22px; display: flex; justify-content: space-between; }

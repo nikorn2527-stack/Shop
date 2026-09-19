@@ -20,6 +20,7 @@ import {
   memberTransactions,
   salesByCashier,
   salesByCategory,
+  salesByProduct,
   deleteAppSession,
   deleteMember,
   findAppUserByUsername,
@@ -28,6 +29,7 @@ import {
   listAppSessions,
   listAppUsers,
   listAuditLogs,
+  listDayClosures,
   listMembers,
   listProducts,
   listStockRows,
@@ -51,6 +53,8 @@ import {
   updateProduct,
   verifyPassword,
   walletTx,
+  businessPeriodStatus,
+  closeBusinessDay,
 } from "./sqliteStore";
 
 /** Maps business-rule StoreErrors (Thai messages) to tRPC BAD_REQUEST errors. */
@@ -107,6 +111,8 @@ const memberRegisterInput = z.object({
   citizenId: z.string().optional(),
   phone: z.string().optional(),
   type: z.string().optional(),
+  gender: z.enum(["ชาย", "หญิง", "ไม่ระบุ"]).optional(),
+  photoUrl: z.string().max(600_000).optional(),
   initialDeposit: z.number().positive("จำนวนเงินต้องมากกว่า 0").optional(),
   memberNumber: z.string().optional(),
   actor: z.string().optional(),
@@ -136,6 +142,8 @@ const memberUpdateInput = z.object({
   idCard: z.string().nullish(),
   phone: z.string().nullish(),
   type: z.string().optional(),
+  gender: z.enum(["ชาย", "หญิง", "ไม่ระบุ"]).nullish(),
+  photoUrl: z.string().max(600_000).nullish(),
   actor: z.string().optional(),
   actorRole: z.string().optional(),
 });
@@ -169,7 +177,7 @@ const stockCountLotsInput = z.object({
 const checkoutInput = z.object({
   items: z
     .array(z.union([
-      z.object({ productId: z.number().int().positive(), qty: z.number().int().positive() }),
+      z.object({ productId: z.number().int().positive(), qty: z.number().int().positive(), price: z.number().positive().optional(), unit: z.string().max(30).optional(), label: z.string().max(120).optional() }),
       z.object({ name: z.string().min(1, "กรุณาระบุชื่อรายการพิเศษ"), price: z.number().positive("ราคาต้องมากกว่า 0"), qty: z.number().int().positive(), unit: z.string().optional() }),
     ]))
     .min(1, "ยังไม่มีสินค้าในบิล"),
@@ -186,6 +194,10 @@ const productCreateInput = z.object({
   barcode: z.string().optional(),
   size: z.string().optional(),
   imageUrl: z.string().nullable().optional(),
+  // round 31-12: สินค้าลัดหน้าร้าน + สินค้าขายเป็นเงิน (เช่น น้ำแข็ง)
+  quickPick: z.number().int().min(0).max(1).nullish(),
+  sellMode: z.enum(["unit", "money"]).nullish(),
+  priceTiers: z.string().max(20_000).nullish(),
   unit: z.string().optional(),
   price: z.number().positive("ราคาขายต้องมากกว่า 0"),
   cost: z.number().min(0).optional(),
@@ -205,6 +217,10 @@ const productUpdateInput = z.object({
   barcode: z.string().nullable().optional(),
   size: z.string().nullable().optional(),
   imageUrl: z.string().nullable().optional(),
+  // round 31-12: สินค้าลัดหน้าร้าน + สินค้าขายเป็นเงิน (เช่น น้ำแข็ง)
+  quickPick: z.number().int().min(0).max(1).nullish(),
+  sellMode: z.enum(["unit", "money"]).nullish(),
+  priceTiers: z.string().max(20_000).nullish(),
   unit: z.string().optional(),
   price: z.number().optional(),
   cost: z.number().optional(),
@@ -298,6 +314,8 @@ const settingsPatchInput = z
     lowStockAlert: z.boolean().optional(),
     expiryAlert: z.boolean().optional(),
     expiryAlertDays: z.number().int().min(1).max(365).optional(),
+    dailyCutOffMode: z.enum(["auto", "manual"]).optional(),
+    dailyCutOffTime: z.string().regex(/^([01]?\d|2[0-3]):[0-5]\d$/, "รูปแบบเวลาต้องเป็น HH:MM").optional(),
   })
   .nullish();
 
@@ -658,12 +676,28 @@ export const appRouter = router({
     byCategory: publicProcedure
       .input(reportRangeInput)
       .query(({ input }) => withStoreErrors(() => salesByCategory(getWelfareDb(), input ?? {}))),
+    byProduct: publicProcedure
+      .input(reportRangeInput)
+      .query(({ input }) => withStoreErrors(() => salesByProduct(getWelfareDb(), input ?? {}))),
     byCashier: publicProcedure
       .input(reportRangeInput)
       .query(({ input }) => withStoreErrors(() => salesByCashier(getWelfareDb(), input ?? {}))),
     memberTransactions: publicProcedure
       .input(memberTransactionsInput)
       .query(({ input }) => withStoreErrors(() => memberTransactions(getWelfareDb(), input ?? {}))),
+    businessPeriod: publicProcedure
+      .input(z.unknown().optional())
+      .query(() => withStoreErrors(() => businessPeriodStatus(getWelfareDb()))),
+    closeDay: publicProcedure
+      .input(z.object({ note: z.string().max(300).optional(), actor: z.string().optional(), actorRole: z.string().optional() }).nullish())
+      .mutation(({ ctx, input }) => {
+        const { actor, actorRole } = resolveActor(ctx, input ?? {});
+        return withStoreErrors(() => closeBusinessDay(getWelfareDb(), { ...(input ?? {}), actor, actorRole }));
+      }),
+    /** ประวัติการตัดยอดรอบขาย (ล่าสุดขึ้นก่อน) */
+    closures: publicProcedure
+      .input(z.number().int().min(1).max(90).nullish())
+      .query(({ input }) => withStoreErrors(() => listDayClosures(getWelfareDb(), input ?? 30))),
   }),
 
   settings: router({

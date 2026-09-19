@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { TRPCClientError } from "@trpc/client";
 import {
-  ArrowDownToLine, ArrowUpFromLine, Check, CircleAlert, CircleHelp, CreditCard, FileImage, Minus, Pause, Plus, QrCode, RotateCcw, ScanLine, Search, ShieldCheck, SlidersHorizontal, Sparkles, ShoppingCart, Trash2, Upload, UserPlus, WalletCards, X,
+  ArrowDownToLine, ArrowUpFromLine, Check, CircleAlert, CircleHelp, CreditCard, FileImage, LayoutGrid, Minus, Pause, Plus, Printer, QrCode, RotateCcw, ScanLine, Search, ShieldCheck, SlidersHorizontal, Sparkles, Star, ShoppingCart, Trash2, Upload, WalletCards, X,
 } from "lucide-react";
 import type { CartItem, HeldBill, MemberLite, Product, Role } from "./pageData";
-import { HELD_BILLS_LIMIT, addScannedItem, calculateCartSubtotal, loadHeldBills, money, scanMatches } from "./pageData";
+import { HELD_BILLS_LIMIT, addScannedItem, addTierItem, calculateCartSubtotal, loadHeldBills, money, parsePriceTiers, scanMatches } from "./pageData";
+import type { PriceTier } from "./pageData";
 import { ConfirmDialog, SectionHeader } from "./PagePrimitives";
 import { ReceiptModal } from "@/components/ReceiptModal";
 import { MemberScanPicker } from "@/components/ScanPickers";
+import { MemberAvatar } from "@/components/MemberAvatar";
 import { trpc } from "@/lib/trpc";
 
 /** Product row straight from trpc.product.list (backend SqliteProduct). */
@@ -18,6 +20,9 @@ type StoreProduct = Product & {
   reorderPoint: number;
   size: string | null;
   imageUrl: string | null;
+  sellMode: string | null;
+  priceTiers: string | null;
+  quickPick: number;
 };
 
 type CheckoutReceipt = {
@@ -31,6 +36,7 @@ type CheckoutReceipt = {
   memberNumber: string | null;
   memberName: string | null;
   balanceAfter: number | null;
+  cashier: string | null;
 };
 
 type PaymentMethod = "เงินสด" | "QR / สแกน" | "หักบัญชีสมาชิก";
@@ -46,6 +52,19 @@ function holdTimeLabel(savedAt: number) {
   return new Date(savedAt).toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" });
 }
 
+function slipTimeLabel(date: Date) {
+  return `${date.toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" })} · ${date.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })} น.`;
+}
+
+/** Money-mode products count stock in grams — show 1,200 ก. / 1.2 กก. instead of raw numbers. */
+function formatBillQty(qty: number, unit: string) {
+  const normalized = (unit || "").trim();
+  if (normalized === "กรัม" || normalized === "ก." || normalized === "กรัม (g)") {
+    return qty >= 1000 ? `${(qty / 1000).toLocaleString("th-TH", { maximumFractionDigits: 2 })} กก.` : `${qty.toLocaleString("th-TH")} ก.`;
+  }
+  return qty.toLocaleString("th-TH");
+}
+
 export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: string; setShortcut: (value: string) => void; role: Role; userName: string }) {
   const utils = trpc.useUtils();
   const productsQuery = trpc.product.list.useQuery(undefined);
@@ -58,11 +77,6 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
   const [category, setCategory] = useState("ทั้งหมด");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [selectedMemberNumber, setSelectedMemberNumber] = useState<string | null>(null);
-  // Round 29 — member selection is a scan/key box (no more picking from a long
-  // list), plus an on-the-spot "สมาชิกใหม่" register modal right inside the POS.
-  const [newMemberOpen, setNewMemberOpen] = useState(false);
-  const [newMemberForm, setNewMemberForm] = useState({ firstName: "", lastName: "", phone: "", initialDeposit: "" });
-  const [newMemberError, setNewMemberError] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [slipPreview, setSlipPreview] = useState("");
@@ -73,7 +87,16 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
   const [walletAmount, setWalletAmount] = useState("");
   const [walletNote, setWalletNote] = useState("");
   const [walletMemberNumber, setWalletMemberNumber] = useState("");
+  // Round 31 — เติม/ถอนเป็น 2 ขั้น: กรอก → ยืนยันรายละเอียดก่อนเงินเข้าบัญชี →
+  // สลิปยอดผลลัพธ์พร้อมพิมพ์ (บันทึกลงรายการธุรกรรมเหมือนซื้อสินค้าทั่วไป)
+  const [walletStep, setWalletStep] = useState<"form" | "confirm" | "success">("form");
+  const [walletResult, setWalletResult] = useState<{ memberNumber: string; memberName: string; type: "deposit" | "withdrawal"; amount: number; balanceBefore: number; balanceAfter: number; detail: string } | null>(null);
+  const [walletDoneAt, setWalletDoneAt] = useState<Date | null>(null);
   const [cancelOpen, setCancelOpen] = useState(false);
+  // Round 31-12 — แผงลัดหน้าร้าน: เลือก/นำออกสินค้าที่หยิบบ่อยได้ที่ POS เลย
+  const [quickManageOpen, setQuickManageOpen] = useState(false);
+  const [quickManageSearch, setQuickManageSearch] = useState("");
+  const [quickManageNotice, setQuickManageNotice] = useState("");
   // พักบิล — parked bills live on this device so they survive reloads/view switches.
   const [heldBills, setHeldBills] = useState<HeldBill[]>(() => loadHeldBills());
   // รายการพิเศษ form state (F4 — ad-hoc priced line, no product/stock behind it).
@@ -111,17 +134,29 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
     reorderPoint: product.reorderPoint,
     size: product.size ?? null,
     imageUrl: product.imageUrl ?? null,
+    sellMode: product.sellMode ?? "unit",
+    priceTiers: product.priceTiers ?? null,
+    quickPick: product.quickPick ?? 0,
   })), [productsQuery.data]);
   const members = membersQuery.data ?? [];
   const selectedMember: MemberLite | null = members.find((member) => member.memberNumber === selectedMemberNumber) ?? null;
   const filtered = useMemo(() => products.filter((product) => (category === "ทั้งหมด" || product.category === category) && product.name.toLowerCase().includes(query.toLowerCase())), [category, products, query]);
+  // Round 31-12 — shortcuts: quickPick products take over the rail; typing a
+  // search still reaches EVERY product (fallback = all when none flagged).
+  const shortcuts = useMemo(() => products.filter((product) => product.quickPick === 1), [products]);
+  const panelList = useMemo(() => {
+    if (query.trim() !== "") return filtered;
+    if (shortcuts.length === 0) return filtered;
+    const inCategory = category === "ทั้งหมด" ? shortcuts : shortcuts.filter((product) => product.category === category);
+    return inCategory.length > 0 || category === "ทั้งหมด" ? inCategory : shortcuts;
+  }, [category, filtered, query, shortcuts]);
   const sampleCodes = useMemo(() => products.filter((product) => product.barcode).slice(0, 3), [products]);
   const subtotal = calculateCartSubtotal(cart);
   const discountValue = Math.max(0, Number(discount) || 0);
   const payable = Math.max(0, subtotal - discountValue);
   const cashier = userName || "ผู้ใช้ระบบ";
   const actorRole = role === "admin" ? "ผู้บริหาร" : "เจ้าหน้าที่";
-  const cartPieces = cart.reduce((sum, item) => sum + item.qty, 0);
+  const cartPieces = cart.reduce((sum, item) => sum + (item.variant ? 1 : item.qty), 0);
   const shortcutTitle = shortcut === SPECIAL_SHORTCUT ? "เพิ่มรายการพิเศษ" : shortcut;
   const checkoutMutation = trpc.pos.checkout.useMutation({
     onSuccess: (result) => {
@@ -135,34 +170,24 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
   });
   const walletMutation = trpc.member.wallet.useMutation({
     onSuccess: (result) => {
-      setShortcut("");
-      setWalletAmount("");
-      setWalletNote("");
-      setWalletMemberNumber("");
+      setWalletResult(result);
+      setWalletStep("success");
+      setWalletDoneAt(new Date());
       setError("");
-      setMessage(`${result.type === "deposit" ? "เติมเงิน" : "ถอนเงิน"} ${result.memberNumber} · ${result.memberName} สำเร็จ · ยอดคงเหลือ ${money(result.balanceAfter)}`);
       void utils.member.list.invalidate();
-      focusScan();
+      void utils.logs.list.invalidate();
+      void utils.dashboard.stats.invalidate();
     },
     onError: (mutationError) => setError(getErrorMessage(mutationError)),
-  });
-  const newMemberMutation = trpc.member.register.useMutation({
-    onSuccess: (result) => {
-      setNewMemberOpen(false);
-      setNewMemberForm({ firstName: "", lastName: "", phone: "", initialDeposit: "" });
-      setNewMemberError("");
-      setSelectedMemberNumber(result.member.memberNumber);
-      setError("");
-      setMessage(`ลงทะเบียนสมาชิก ${result.member.memberNumber} · สมาชิก${result.member.firstName} ${result.member.lastName} เรียบร้อย · เลือกในบิลนี้แล้ว`);
-      void utils.member.list.invalidate();
-      focusScan();
-    },
-    onError: (mutationError) => setNewMemberError(getErrorMessage(mutationError)),
   });
   const clearNotices = () => { setMessage(""); setError(""); };
   const addProduct = (product: Product) => {
     const store = products.find((item) => item.id === product.id);
-    const currentQty = cart.find((item) => item.id === product.id)?.qty ?? 0;
+    if (store?.sellMode === "money" && parsePriceTiers(store.priceTiers).length > 0) {
+      setError(`${product.name} ขายเป็นราคา — กดปุ่มราคา (฿1 / ฿5 / ฿10) บนการ์ดเพื่อเลือกขนาด`);
+      return;
+    }
+    const currentQty = cart.reduce((sum, item) => (item.id === product.id && !item.variant ? sum + item.qty : sum), 0);
     if (store && currentQty + 1 > store.stock) {
       setError(`สต็อกไม่พอ · ${product.name} เหลือ ${store.stock} ${store.unit}`);
       return;
@@ -172,22 +197,40 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
     setMessage(`เพิ่ม ${product.name} แล้ว · สแกนซ้ำเพื่อเพิ่มจำนวน`);
     focusScan();
   };
-  const updateQty = (id: number, delta: number) => {
+  const addTier = (product: StoreProduct, tier: PriceTier) => {
+    const inBill = cart.reduce((sum, item) => (item.id === product.id ? sum + item.qty : sum), 0);
+    if (inBill + tier.qty > product.stock) {
+      setError(`สต็อกไม่พอ · ${product.name} เหลือ ${formatBillQty(product.stock, product.unit)}`);
+      return;
+    }
+    clearNotices();
+    setCart((items) => addTierItem(items, product, tier));
+    setMessage(`เพิ่ม ${product.name} · ${tier.label} ${money(tier.price)} แล้ว`);
+    focusScan();
+  };
+  const updateQty = (id: number, delta: number, variant?: string, step = 1) => {
     if (delta > 0) {
       const store = products.find((item) => item.id === id);
-      const current = cart.find((item) => item.id === id);
-      if (store && current && current.qty + delta > store.stock) {
+      const inBill = cart.reduce((sum, item) => (item.id === id ? sum + item.qty : sum), 0);
+      if (store && inBill + delta * step > store.stock) {
         setError(`สต็อกไม่พอ · ${store.name} เหลือ ${store.stock} ${store.unit}`);
         return;
       }
     }
     clearNotices();
-    setCart((items) => items.flatMap((item) => item.id === id ? (item.qty + delta <= 0 ? [] : [{ ...item, qty: item.qty + delta }]) : [item]));
+    setCart((items) => items.flatMap((item) => (item.id === id && (item.variant ?? "") === (variant ?? "") ? (item.qty + delta * step <= 0 ? [] : [{ ...item, qty: item.qty + delta * step }]) : item)));
     focusScan();
   };
   // Quick picks (สินค้าไม่มีบาร์โค้ด) get their own stepper on the card itself —
   // the cashier can เพิ่ม/ลด directly on the grid without hunting the bill row.
-  const qtyInBill = (id: number) => cart.find((item) => item.id === id)?.qty ?? 0;
+  const qtyInBill = (id: number) => cart.reduce((sum, item) => (item.id === id ? sum + item.qty : sum), 0);
+  const quickPickMutation = trpc.product.update.useMutation({
+    onSuccess: (updated) => {
+      void utils.product.list.invalidate();
+      setQuickManageNotice(updated.quickPick === 1 ? `เพิ่ม ${updated.name} ขึ้นแผงลัดแล้ว` : `นำ ${updated.name} ออกจากแผงลัดแล้ว`);
+    },
+    onError: (mutationError) => setQuickManageNotice(getErrorMessage(mutationError)),
+  });
   const bumpPick = (product: StoreProduct, delta: number) => {
     if (qtyInBill(product.id) === 0 && delta > 0) {
       addProduct(product);
@@ -229,7 +272,9 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
     checkoutMutation.mutate({
       items: cart.map((item) => item.special
         ? { name: item.name, price: item.price, qty: item.qty, unit: item.unit }
-        : { productId: item.id, qty: item.qty }),
+        : item.variant
+          ? { productId: item.id, qty: item.qty, price: Math.round((item.price / (item.step || 1)) * 10000) / 10000, unit: item.unit, label: item.variant }
+          : { productId: item.id, qty: item.qty }),
       paymentMethod: method,
       memberNumber: selectedMember?.memberNumber ?? null,
       discount: discountValue,
@@ -243,31 +288,34 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
     const amount = Number(walletAmount);
     if (!(amount > 0)) { setError("กรุณาระบุจำนวนเงินมากกว่า 0"); return; }
     clearNotices();
+    setWalletStep("confirm");
+  };
+  const confirmWallet = () => {
+    const memberNumber = walletMemberNumber || selectedMemberNumber;
+    if (!memberNumber || !(Number(walletAmount) > 0)) { setWalletStep("form"); return; }
     walletMutation.mutate({
       memberNumber,
       type: shortcut === "ถอนเงิน" ? "withdrawal" : "deposit",
-      amount,
+      amount: Number(walletAmount),
       note: walletNote.trim() || undefined,
       actor: cashier,
       actorRole,
     });
   };
-  const submitNewMember = () => {
-    const firstName = newMemberForm.firstName.trim();
-    const lastName = newMemberForm.lastName.trim();
-    if (!firstName || !lastName) { setNewMemberError("กรุณาระบุชื่อและนามสกุลสมาชิก"); return; }
-    const initialDeposit = newMemberForm.initialDeposit.trim() === "" ? undefined : Number(newMemberForm.initialDeposit);
-    if (initialDeposit !== undefined && !(initialDeposit > 0)) { setNewMemberError("เงินเริ่มต้นต้องมากกว่า 0"); return; }
-    setNewMemberError("");
-    newMemberMutation.mutate({
-      firstName,
-      lastName,
-      phone: newMemberForm.phone.trim() || undefined,
-      initialDeposit,
-      actor: cashier,
-      actorRole,
-    });
+  const finishWallet = () => {
+    setShortcut("");
+    setWalletAmount("");
+    setWalletNote("");
+    setWalletMemberNumber("");
+    setWalletStep("form");
+    setWalletResult(null);
+    setWalletDoneAt(null);
+    setSlipName("");
+    setSlipPreview("");
+    focusScan();
   };
+  const walletTarget = members.find((member) => member.memberNumber === (walletMemberNumber || selectedMemberNumber)) ?? null;
+  const walletAfterPreview = walletTarget ? Math.round((walletTarget.balance + (shortcut === "เติมเงิน" ? 1 : -1) * (Number(walletAmount) || 0)) * 100) / 100 : 0;
   const submitSpecial = () => {
     const name = specialName.trim();
     const price = Number(specialPrice);
@@ -338,6 +386,8 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
     setWalletAmount("");
     setWalletNote("");
     setWalletMemberNumber("");
+    setWalletStep("form");
+    setWalletResult(null);
     clearNotices();
     setMessage("เริ่มรายการขายใหม่แล้ว");
     await Promise.allSettled([
@@ -376,11 +426,11 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
   useEffect(() => {
     if (!shortcut) return;
     const timer = window.setTimeout(() => {
-      const first = document.querySelector<HTMLDivElement>(".wallet-modal")?.querySelector<HTMLInputElement | HTMLSelectElement>("input, select");
+      const first = document.querySelector<HTMLDivElement>(".wallet-modal")?.querySelector<HTMLInputElement | HTMLSelectElement>(".wallet-form input, .special-form input");
       first?.focus();
     }, 40);
     return () => window.clearTimeout(timer);
-  }, [shortcut]);
+  }, [shortcut, walletStep]);
   // Real keyboard shortcuts for the quick actions (labels have advertised
   // F2/F3/F4 since round 14 — now they actually fire). Esc unwinds one step.
   useEffect(() => {
@@ -389,7 +439,10 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
       if (event.key === "F3") { event.preventDefault(); setShortcut(shortcut === "ถอนเงิน" ? "" : "ถอนเงิน"); return; }
       if (event.key === "F4") { event.preventDefault(); setShortcut(shortcut === SPECIAL_SHORTCUT ? "" : SPECIAL_SHORTCUT); return; }
       if (event.key === "Escape" && !receiptOpen) {
-        if (newMemberOpen) { setNewMemberOpen(false); return; }
+        if (shortcut === "เติมเงิน" || shortcut === "ถอนเงิน") {
+          if (walletStep === "success") { finishWallet(); return; }
+          if (walletStep === "confirm") { setWalletStep("form"); return; }
+        }
         if (shortcut) { setShortcut(""); return; }
         if (query) { setQuery(""); }
         focusScan();
@@ -419,22 +472,22 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
           {query ? <button type="button" className="scan-clear" onClick={() => { setQuery(""); focusScan(); }} aria-label="ล้างคำค้นหา"><X size={15} /></button> : <span className="scan-live"><span className="live-dot" /> พร้อมสแกน</span>}
           <kbd>Enter</kbd>
         </div>
-        <div className="member-select-wrap"><MemberScanPicker members={members} selectedNumber={selectedMemberNumber} onSelect={(member) => { setSelectedMemberNumber(member ? member.memberNumber : null); clearNotices(); focusScan(); }} onNewMember={() => { setNewMemberOpen(true); setNewMemberError(""); }} inputId="pos-member-input" /></div>
+        <div className="member-select-wrap"><MemberScanPicker members={members} selectedNumber={selectedMemberNumber} onSelect={(member) => { setSelectedMemberNumber(member ? member.memberNumber : null); clearNotices(); focusScan(); }} requireConfirm confirmContext="บิลนี้" inputId="pos-member-input" /></div>
         </div>
         <div className="cart-mid" ref={cartMidRef}>
         {heldBills.length > 0 && <div className="held-chips" aria-label="บิลที่ถูกพักไว้">{heldBills.map((bill) => <div className="held-chip" key={bill.id}><Pause size={13} /><b>{bill.items.reduce((sum, item) => sum + item.qty, 0)} ชิ้น</b><time>{holdTimeLabel(bill.savedAt)}</time><button type="button" className="chip-restore" onClick={() => restoreHeld(bill.id)} aria-label="เรียกคืนบิลที่พักไว้" title="เรียกคืนบิลนี้"><RotateCcw size={14} /></button><button type="button" className="chip-discard" onClick={() => discardHeld(bill.id)} aria-label="ยกเลิกบิลที่พักไว้" title="ยกเลิกบิลนี้"><X size={13} /></button></div>)}</div>}
         <div className="cart-heading"><div><h2>รายการขาย · บิลปัจจุบัน</h2><p>{cartPieces} ชิ้น · {cart.length} แถว</p></div><button className="icon-button" onClick={() => setCancelOpen(true)} title="ยกเลิกรายการขาย"><Trash2 size={17} /></button></div>
-        <div className="cart-items">{cart.length === 0 ? <div className="empty-cart"><ScanLine size={26} /><b>ยังไม่มีสินค้าในบิล</b><span>ยิงบาร์โค้ดที่ช่องด้านบน หรือกดสินค้าจากแผงด้านขวา</span></div> : <><div className="cart-items-head"><span>รายการ</span><span>จำนวน</span><span>ราคา/หน่วย</span><span>รวม</span></div>{cart.map((item) => <div className="cart-item" key={item.id}><b className="cart-item-name" title={item.name}>{item.special && <i className="special-tag">พิเศษ</i>}{item.name}</b><div className="qty-control"><button aria-label={`ลดจำนวน ${item.name}`} onClick={() => updateQty(item.id, -1)}><Minus size={12} /></button><span>{item.qty}</span><button aria-label={`เพิ่มจำนวน ${item.name}`} onClick={() => updateQty(item.id, 1)}><Plus size={12} /></button></div><span className="cart-item-unit" title={`${money(item.price)} / ${item.unit}`}>{money(item.price)}</span><strong className="cart-item-amount">{money(item.price * item.qty)}</strong></div>)}</>}</div></div>
+        <div className="cart-items">{cart.length === 0 ? <div className="empty-cart"><ScanLine size={26} /><b>ยังไม่มีสินค้าในบิล</b><span>ยิงบาร์โค้ดที่ช่องด้านบน หรือกดสินค้าจากแผงด้านขวา</span></div> : <><div className="cart-items-head"><span>รายการ</span><span>จำนวน</span><span>ราคา/หน่วย</span><span>รวม</span></div>{cart.map((item) => <div className="cart-item" key={item.variant ? `v-${item.id}-${item.variant}` : item.special ? `s-${item.id}` : `p-${item.id}`}><b className="cart-item-name" title={item.name}>{item.special && <i className="special-tag">พิเศษ</i>}{item.name}</b><div className="qty-control"><button aria-label={`ลดจำนวน ${item.name}`} onClick={() => updateQty(item.id, -1, item.variant, item.step ?? 1)}><Minus size={12} /></button><span title={item.variant ? `${item.qty} ${item.unit}` : undefined}>{item.variant ? formatBillQty(item.qty, item.unit) : item.qty}</span><button aria-label={`เพิ่มจำนวน ${item.name}`} onClick={() => updateQty(item.id, 1, item.variant, item.step ?? 1)}><Plus size={12} /></button></div><span className="cart-item-unit" title={`${money(item.price)} / ${item.unit}`}>{money(item.price)}</span><strong className="cart-item-amount">{money(item.variant ? item.price * (item.qty / (item.step || 1)) : item.price * item.qty)}</strong></div>)}</>}</div></div>
         <div className="cart-foot"><div className="cart-totals"><div><span>ยอดรวมสินค้า</span><strong>{money(subtotal)}</strong></div><div><span>ส่วนลดสมาชิก</span><strong className="discount discount-edit">- ฿<input type="number" min="0" step="0.01" value={discount} onChange={(event) => setDiscount(event.target.value)} aria-label="ส่วนลด (บาท)" /></strong></div><div className="total-line"><span>ยอดที่ต้องชำระ</span><strong>{money(payable)}</strong></div></div><div className="payment-actions"><button className="pay-button member-pay" disabled={payDisabled} onClick={() => selectedMember ? completePayment("หักบัญชีสมาชิก") : setError("กรุณาเลือกสมาชิกก่อนชำระแบบหักบัญชี")}><CreditCard size={18} /> หักบัญชีสมาชิก</button><div className="pay-split"><button disabled={payDisabled} onClick={() => completePayment("เงินสด")}><span className="pay-icon cash"><WalletCards size={16} /></span> เงินสด</button><button disabled={payDisabled} onClick={() => completePayment("QR / สแกน")}><span className="pay-icon qr"><QrCode size={16} /></span> QR / สแกน</button></div></div>{role === "admin" && <div className="admin-pos-note"><Sparkles size={14} /><span>ผู้บริหารสามารถแก้ไขราคา/ตรวจสอบรายการก่อนปิดบิล</span></div>}<div className={`cart-status-line${error ? " error" : message ? " ok" : ""}`} role="status" aria-live="polite">{error ? <><CircleAlert size={14} /> <span className="cart-status-text">{error}</span> <button onClick={() => setError("")} aria-label="ปิดข้อความแจ้งเหตุ"><X size={13} /></button></> : message ? <><Check size={14} /> <span className="cart-status-text">{message}</span></> : <><span className="live-dot" /> <span className="cart-status-text">{idleStatus}</span></>}</div></div>
       </section>
       <aside className="panel product-panel quick-pick-panel">
-        <div className="quick-pick-head"><div><h2>สินค้าไม่มีบาร์โค้ด</h2><p>กดการ์ดหรือปุ่ม + เพื่อเพิ่ม · ปรับลดจำนวนได้ที่ปุ่ม − + บนการ์ด</p></div><span className="quick-pick-count">{filtered.length} รายการ</span></div>
+        <div className="quick-pick-head"><div><h2>แผงลัดหน้าร้าน</h2><p>{query.trim() ? "กำลังค้นหาทุกสินค้า — ยิงบาร์โค้ดหรือพิมพ์ชื่อ/รหัสเพื่อเลือก" : shortcuts.length > 0 ? "สินค้าที่หยิบบ่อย (กดการ์ดเพิ่มเข้าบิล) — กด “จัดแผง” เพื่อเพิ่ม/นำออกเอง" : "กดการ์ดหรือปุ่ม + เพื่อเพิ่ม · กด “จัดแผง” เพื่อเลือกเฉพาะของที่หยิบบ่อยขึ้นมา"}</p></div><span className="quick-pick-count">{panelList.length} รายการ</span><button type="button" className="outline-button compact quick-manage-open-btn" onClick={() => { setQuickManageOpen(true); setQuickManageSearch(""); setQuickManageNotice(""); }} title="เพิ่ม/นำออก สินค้าที่ขึ้นแผงนี้"><Star size={14} /> จัดแผง</button></div>
         <div className="category-tabs">{["ทั้งหมด", "อาหาร", "เครื่องดื่ม", "ของใช้"].map((item) => <button className={category === item ? "active" : ""} key={item} onClick={() => setCategory(item)}>{item}</button>)}</div>
-        <div className="product-scroll">{productsQuery.isLoading ? <div className="product-grid" aria-busy="true">{Array.from({ length: 6 }, (_, index) => <div aria-hidden="true" className="product-card skeleton-card" key={`skeleton-${index}`}><div className="product-art"><span className="skeleton-avatar" /></div><div className="product-card-info"><span className="skeleton-cell-w" /><span className="skeleton-cell-n" /><span className="skeleton-price" /></div></div>)}</div> : productsQuery.isError ? <div className="inline-message error"><CircleAlert size={15} /> โหลดรายการสินค้าไม่สำเร็จ · {getErrorMessage(productsQuery.error)}</div> : filtered.length === 0 ? <div className="pos-loading"><Search size={26} /><b>ไม่พบสินค้าตามเงื่อนไข</b><span>ลองเปลี่ยนคำค้นหาหรือหมวดหมู่</span></div> : <div className="product-grid">{filtered.map((product) => <div className={`product-card${qtyInBill(product.id) > 0 ? " in-bill" : ""}`} key={product.id} role="button" tabIndex={0} aria-label={`เพิ่ม ${product.name} เข้าบิล`} onClick={() => addProduct(product)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); addProduct(product); } }}><div className={`product-art ${product.color}`}>{product.imageUrl ? <img className="product-art-img" src={product.imageUrl} alt="" /> : <span>{product.emoji}</span>}{product.stock <= 10 && <i>เหลือ {product.stock}</i>}{qtyInBill(product.id) > 0 && <b className="pick-qty-badge">{qtyInBill(product.id)}</b>}</div><div className="product-card-info"><b>{product.name}</b><small>{product.size ? `${product.size} · ` : ""}{product.unit} · คงเหลือ {product.stock}</small><strong>{money(product.price)}</strong></div><div className="pick-stepper" onClick={(event) => event.stopPropagation()}><button type="button" aria-label={`ลดจำนวน ${product.name} ในบิล`} disabled={qtyInBill(product.id) === 0} onClick={() => bumpPick(product, -1)}><Minus size={13} /></button><span className={qtyInBill(product.id) === 0 ? "pick-qty zero" : "pick-qty"} aria-label={`จำนวน ${product.name} ในบิล`}>{qtyInBill(product.id)}</span><button type="button" aria-label={`เพิ่มจำนวน ${product.name} ในบิล`} disabled={product.stock <= 0 || qtyInBill(product.id) >= product.stock} onClick={() => bumpPick(product, 1)}><Plus size={13} /></button></div></div>)}</div>}</div>
+        <div className="product-scroll">{productsQuery.isLoading ? <div className="product-grid" aria-busy="true">{Array.from({ length: 6 }, (_, index) => <div aria-hidden="true" className="product-card skeleton-card" key={`skeleton-${index}`}><div className="product-art"><span className="skeleton-avatar" /></div><div className="product-card-info"><span className="skeleton-cell-w" /><span className="skeleton-cell-n" /><span className="skeleton-price" /></div></div>)}</div> : productsQuery.isError ? <div className="inline-message error"><CircleAlert size={15} /> โหลดรายการสินค้าไม่สำเร็จ · {getErrorMessage(productsQuery.error)}</div> : panelList.length === 0 ? <div className="pos-loading"><Search size={26} /><b>ไม่พบสินค้าตามเงื่อนไข</b><span>ลองเปลี่ยนคำค้นหาหรือหมวดหมู่</span></div> : <div className="product-grid">{panelList.map((product) => { const tiers = product.sellMode === "money" ? parsePriceTiers(product.priceTiers) : []; if (tiers.length > 0) { return <div className={`product-card money-card${qtyInBill(product.id) > 0 ? " in-bill" : ""}`} key={product.id} aria-label={`${product.name} — สินค้าขายเป็นราคา เลือกขนาดที่ปุ่มราคา`} title={`${product.name} · ขายเป็นราคาตามขนาด`}><div className={`product-art ${product.color}`}>{product.imageUrl ? <img className="product-art-img" src={product.imageUrl} alt="" /> : <span>{product.emoji}</span>}{product.stock <= 10 && <i>เหลือ {formatBillQty(product.stock, product.unit)}</i>}{qtyInBill(product.id) > 0 && <b className="pick-qty-badge">{formatBillQty(qtyInBill(product.id), product.unit)}</b>}</div><div className="product-card-info"><b>{product.name}</b><small>{product.unit} · คงเหลือ {formatBillQty(product.stock, product.unit)}</small></div><div className="tier-stepper" onClick={(event) => event.stopPropagation()}>{tiers.map((tier) => <button type="button" className="tier-button" key={tier.label} disabled={product.stock < tier.qty} onClick={() => addTier(product, tier)} aria-label={`เพิ่ม ${product.name} ${tier.label} ${money(tier.price)}`}><b>฿{tier.price}</b><small>{tier.label}</small></button>)}</div></div>; } return <div className={`product-card${qtyInBill(product.id) > 0 ? " in-bill" : ""}`} key={product.id} role="button" tabIndex={0} aria-label={`เพิ่ม ${product.name} เข้าบิล`} onClick={() => addProduct(product)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); addProduct(product); } }}><div className={`product-art ${product.color}`}>{product.imageUrl ? <img className="product-art-img" src={product.imageUrl} alt="" /> : <span>{product.emoji}</span>}{product.stock <= 10 && <i>เหลือ {product.stock}</i>}{qtyInBill(product.id) > 0 && <b className="pick-qty-badge">{qtyInBill(product.id)}</b>}</div><div className="product-card-info"><b>{product.name}</b><small>{product.size ? `${product.size} · ` : ""}{product.unit} · คงเหลือ {product.stock}</small><strong>{money(product.price)}</strong></div><div className="pick-stepper" onClick={(event) => event.stopPropagation()}><button type="button" aria-label={`ลดจำนวน ${product.name} ในบิล`} disabled={qtyInBill(product.id) === 0} onClick={() => bumpPick(product, -1)}><Minus size={13} /></button><span className={qtyInBill(product.id) === 0 ? "pick-qty zero" : "pick-qty"} aria-label={`จำนวน ${product.name} ในบิล`}>{qtyInBill(product.id)}</span><button type="button" aria-label={`เพิ่มจำนวน ${product.name} ในบิล`} disabled={product.stock <= 0 || qtyInBill(product.id) >= product.stock} onClick={() => bumpPick(product, 1)}><Plus size={13} /></button></div></div>; })}</div>}</div>
         <div className="pos-help"><CircleHelp size={15} /><span>ตัวอย่างบาร์โค้ด {sampleCodes[0]?.barcode ?? "8850000000017"} · รหัส SKU เช่น DRK-001 · สแกนซ้ำเพื่อเพิ่มจำนวน</span></div>
       </aside>
     </div>
     <div className="shortcut-strip"><button onClick={() => runShortcut("เติมเงิน")}><ArrowDownToLine size={17} /><span>เติมเงิน</span><kbd>F2</kbd></button><button onClick={() => runShortcut("ถอนเงิน")}><ArrowUpFromLine size={17} /><span>ถอนเงิน</span><kbd>F3</kbd></button><button onClick={() => runShortcut(SPECIAL_SHORTCUT)}><SlidersHorizontal size={17} /><span>รายการพิเศษ</span><kbd>F4</kbd></button><button onClick={holdBill} className="strip-hold"><Pause size={17} /><span>พักบิล</span>{heldBills.length > 0 && <i className="dock-badge">{heldBills.length}</i>}</button></div>
     {cart.length > 0 && !receiptOpen && <div className="pos-mobile-bar"><span className="pos-mobile-count"><ShoppingCart size={15} /> {cartPieces} รายการ</span><strong>{money(payable)}</strong><button onClick={() => cartPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}><CreditCard size={16} /> ชำระเงิน</button></div>}
-    {receiptOpen && receipt && <ReceiptModal receipt={receipt} onClose={startNewSale} onNewSale={startNewSale} onPrinted={() => setMessage("ส่งใบเสร็จไปพิมพ์แล้ว")} autoPrint={settingsQuery.data?.autoPrintReceipt === true} />}<ConfirmDialog open={cancelOpen} title="ยืนยันการยกเลิกรายการขาย?" description="สินค้าที่อยู่ในบิลนี้จะถูกล้างออก และยังไม่บันทึกเป็นธุรกรรม (บิลที่พักไว้จะไม่ถูกกระทบ)" confirmLabel="ยืนยันยกเลิกบิล" onCancel={() => setCancelOpen(false)} onConfirm={() => { setCart([]); setCancelOpen(false); setMessage("ยกเลิกรายการขายแล้ว"); }} />{newMemberOpen && <div className="modal-backdrop" onClick={() => setNewMemberOpen(false)}><div className="form-modal" role="dialog" aria-modal="true" aria-label="ลงทะเบียนสมาชิกใหม่" onClick={(event) => event.stopPropagation()}><div className="modal-heading"><div><span className="eyebrow">NEW MEMBER · POS</span><h2>สมาชิกใหม่</h2><p>ลงทะเบียนที่เคาน์เตอร์ได้ทันที · หมายเลขสมาชิกรันอัตโนมัติตามการตั้งค่า · บันทึกเสร็จระบบเลือกสมาชิกไว้ในบิลนี้ให้ทันที</p></div><button className="icon-button" onClick={() => setNewMemberOpen(false)} aria-label="ปิดหน้าต่าง"><X size={17} /></button></div><div className="form-grid compact-form"><label>ชื่อ *<input autoFocus value={newMemberForm.firstName} onChange={(event) => setNewMemberForm({ ...newMemberForm, firstName: event.target.value })} placeholder="เช่น สมศรี" onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submitNewMember(); } }} /></label><label>นามสกุล *<input value={newMemberForm.lastName} onChange={(event) => setNewMemberForm({ ...newMemberForm, lastName: event.target.value })} placeholder="เช่น ใจดี" onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submitNewMember(); } }} /></label><label className="wide">เบอร์โทรศัพท์<input value={newMemberForm.phone} onChange={(event) => setNewMemberForm({ ...newMemberForm, phone: event.target.value })} placeholder="ไม่บังคับ · เช่น 08x-xxx-xxxx" inputMode="tel" onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submitNewMember(); } }} /></label><label>เงินเริ่มต้น (฿)<input type="number" min="0" step="0.01" value={newMemberForm.initialDeposit} onChange={(event) => setNewMemberForm({ ...newMemberForm, initialDeposit: event.target.value })} placeholder="ไม่บังคับ · 0.00" onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submitNewMember(); } }} /></label></div><div className="initial-balance-note"><ShieldCheck size={15} /> หมายเลขสมาชิกออกตามรูปแบบที่ผู้บริหารตั้งไว้ในเมนูตั้งค่า · การลงทะเบียนบันทึกลงระบบทันที</div>{newMemberError && <div className="notice-bar error"><CircleAlert size={16} /> {newMemberError}<button onClick={() => setNewMemberError("")}><X size={14} /></button></div>}<div className="modal-actions"><button className="outline-button" onClick={() => setNewMemberOpen(false)}>ยกเลิก</button><button className="primary-button" disabled={newMemberMutation.isPending} onClick={submitNewMember}><UserPlus size={16} /> {newMemberMutation.isPending ? "กำลังบันทึก…" : "บันทึกและใช้ในบิลนี้"}</button></div></div></div>}{shortcut && <div className="modal-backdrop" onClick={() => setShortcut("")}><div className="form-modal wallet-modal" role="dialog" aria-modal="true" aria-label={shortcutTitle} onClick={(event) => event.stopPropagation()}><div className="modal-heading"><div><span className="eyebrow">{shortcut === "เติมเงิน" ? "WALLET DEPOSIT" : shortcut === "ถอนเงิน" ? "WALLET WITHDRAWAL" : "SPECIAL LINE ITEM"}</span><h2>{shortcutTitle}</h2><p>{shortcut === "เติมเงิน" ? "เลือกสมาชิกและระบุจำนวนเงิน · รายการบันทึกลงบัญชีและตารางทันที" : shortcut === "ถอนเงิน" ? "ระบุจำนวนเงินและหมายเหตุ · แนบสลิปหลักฐานได้" : "รายการตามจริง · ไม่ตัดสต็อก เช่น ของชั่ง ค่าบริการ"}</p></div><button className="icon-button" onClick={() => setShortcut("")} aria-label="ปิดหน้าต่าง"><X size={17} /></button></div><div className="wallet-modal-body">{shortcut === SPECIAL_SHORTCUT && <div className="wallet-form special-form"><div className="wallet-heading"><span className="special-icon"><Sparkles size={16} /></span><div><b>เพิ่มรายการพิเศษเข้าบิล</b><small>สำหรับของชั่ง ค่าบริการ หรือรายการนอกแค็ตตาล็อก · ไม่ตัดสต็อก</small></div></div><label>ชื่อรายการ<input value={specialName} onChange={(event) => setSpecialName(event.target.value)} placeholder="เช่น ข้าวราดแกงนอกรายการ / ค่าฝากของ" onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submitSpecial(); } }} /></label><div className="special-grid"><label>ราคา/หน่วย (฿)<input type="number" min="0" step="0.01" value={specialPrice} onChange={(event) => setSpecialPrice(event.target.value)} placeholder="0.00" onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submitSpecial(); } }} /></label><label>จำนวน<input type="number" min="1" step="1" value={specialQty} onChange={(event) => setSpecialQty(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submitSpecial(); } }} /></label><label>หน่วย<input value={specialUnit} onChange={(event) => setSpecialUnit(event.target.value)} placeholder="รายการ" onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submitSpecial(); } }} /></label></div><button className="primary-button" disabled={!(specialName.trim() && Number(specialPrice) > 0)} onClick={submitSpecial}><Plus size={16} /> เพิ่มเข้าบิล</button></div>}{(shortcut === "เติมเงิน" || shortcut === "ถอนเงิน") && <div className="wallet-form"><div className="wallet-heading"><span>{shortcut === "เติมเงิน" ? <ArrowDownToLine size={16} /> : <ArrowUpFromLine size={16} />}</span><div><b>{shortcut === "เติมเงิน" ? "เติมเงินเข้าบัญชีสมาชิก" : "ถอนเงินจากบัญชีสมาชิก"}</b><small>บันทึกธุรกรรมลงบัญชีจริงทันที</small></div></div><div className="wallet-picker-row"><MemberScanPicker members={members} selectedNumber={walletMemberNumber || selectedMemberNumber} onSelect={(member) => setWalletMemberNumber(member ? member.memberNumber : "")} placeholder="คีย์เลขสมาชิก หรือยิงบาร์โค้ด / คิวอาร์โค้ด" /></div><label>จำนวนเงิน (฿)<input type="number" min="0" step="0.01" value={walletAmount} onChange={(event) => setWalletAmount(event.target.value)} placeholder="0.00" /></label><label>หมายเหตุ<input value={walletNote} onChange={(event) => setWalletNote(event.target.value)} placeholder={shortcut === "เติมเงิน" ? "เช่น เติมเงินสดที่เคาน์เตอร์" : "เช่น ถอนเพื่อใช้จ่ายส่วนตัว"} /></label><button className="primary-button" disabled={walletMutation.isPending || !(Number(walletAmount) > 0) || !(walletMemberNumber || selectedMemberNumber)} onClick={submitWallet}><Check size={16} /> {walletMutation.isPending ? "กำลังบันทึก…" : `บันทึก${shortcut}`}</button></div>}{(shortcut === "เติมเงิน" || shortcut === "ถอนเงิน") && <div className="slip-uploader"><div className="slip-heading"><span><FileImage size={16} /> หลักฐานการโอน / สลิป</span><small>ไม่บังคับ</small></div>{slipPreview ? <div className="slip-preview"><img src={slipPreview} alt="ตัวอย่างสลิป" /><div><b>{slipName}</b><small>พร้อมแนบกับรายการ {shortcut}</small></div><button onClick={() => { setSlipPreview(""); setSlipName(""); }}><X size={14} /></button></div> : <label className="upload-drop" htmlFor="slip-upload"><Upload size={17} /><span><b>คลิกเพื่ออัปโหลดรูปสลิป</b><small>รองรับ JPG, PNG ขนาดไม่เกิน 10 MB</small></span><input id="slip-upload" type="file" accept="image/png,image/jpeg" onChange={(event) => handleSlip(event.target.files?.[0])} /></label>}</div>}</div><div className="wallet-modal-foot"><small>Esc ปิดหน้าต่าง · F2/F3/F4 สลับโหมด</small><button type="button" className="outline-button" onClick={() => setShortcut("")}>ปิดหน้าต่าง</button></div></div></div>}</>;
+    {receiptOpen && receipt && <ReceiptModal receipt={receipt} onClose={startNewSale} onNewSale={startNewSale} onPrinted={() => setMessage("ส่งใบเสร็จไปพิมพ์แล้ว")} autoPrint={settingsQuery.data?.autoPrintReceipt === true} />}{quickManageOpen && <div className="modal-backdrop" onClick={() => setQuickManageOpen(false)}><div className="form-modal quick-manage-modal" role="dialog" aria-modal="true" aria-label="จัดแผงลัดหน้าร้าน" onClick={(event) => event.stopPropagation()}><div className="modal-heading"><div><span className="eyebrow">POS SHORTCUT RAIL</span><h2>จัดแผงลัดหน้าร้าน</h2><p>เลือกสินค้าที่หยิบขายบ่อยขึ้นแผงด้านขวา — ทั้งที่มีบาร์โค้ดและไม่มี · ค้นหาแล้วกดปุ่มดาวเพื่อขึ้นแผง/นำออก</p></div><button className="icon-button" onClick={() => setQuickManageOpen(false)} aria-label="ปิดหน้าต่าง"><X size={17} /></button></div><div className="quick-manage-tools"><div className="search-field"><Search size={16} /><input autoFocus value={quickManageSearch} onChange={(event) => setQuickManageSearch(event.target.value)} placeholder="ค้นหาชื่อสินค้า หรือรหัส SKU / บาร์โค้ด" /></div><span className="quick-manage-count">{shortcuts.length} รายการบนแผง</span></div><div className="quick-manage-list" role="list">{products.filter((product) => product.name.toLowerCase().includes(quickManageSearch.toLowerCase()) || product.sku.toLowerCase().includes(quickManageSearch.toLowerCase()) || (product.barcode ?? "").includes(quickManageSearch)).slice(0, 40).map((product) => { const active = product.quickPick === 1; return <div className={`quick-manage-row${active ? " active" : ""}`} key={product.id} role="listitem"><span className="quick-manage-thumb">{product.imageUrl ? <img src={product.imageUrl} alt="" /> : <span>{product.emoji}</span>}</span><div className="quick-manage-info"><b>{product.name}</b><small>{product.sku}{product.barcode ? ` · ${product.barcode}` : " · ไม่มีบาร์โค้ด"}{product.sellMode === "money" ? " · ขายเป็นราคา" : ""}</small></div><button type="button" className={active ? "primary-button compact" : "outline-button compact"} disabled={quickPickMutation.isPending} onClick={() => quickPickMutation.mutate({ productId: product.id, quickPick: active ? 0 : 1, actor: cashier, actorRole })} aria-pressed={active} title={active ? "นำออกจากแผงลัด" : "ขึ้นแผงลัดหน้าร้าน"}><Star size={14} /> {active ? "อยู่บนแผง" : "ขึ้นแผง"}</button></div>; })}</div>{quickManageNotice && <div className="notice-bar"><Check size={16} /> {quickManageNotice}<button onClick={() => setQuickManageNotice("")}><X size={14} /></button></div>}<div className="initial-balance-note"><LayoutGrid size={15} /><span>แผงลัดคือการ์ดสินค้าที่ขึ้นหน้า POS ทันที — เหมาะกับของที่ลูกค้าซื้อบ่อยและไม่ต้องยิงบาร์โค้ดทุกครั้ง · สินค้าขายเป็นราคา (เช่น น้ำแข็ง) ตั้งช่องราคาได้ที่หน้าสต็อก → เพิ่มไอเทมสินค้า</span></div><div className="modal-actions"><button className="primary-button" onClick={() => setQuickManageOpen(false)}><Check size={16} /> เสร็จสิ้น</button></div></div></div>}<ConfirmDialog open={cancelOpen} title="ยืนยันการยกเลิกรายการขาย?" description="สินค้าที่อยู่ในบิลนี้จะถูกล้างออก และยังไม่บันทึกเป็นธุรกรรม (บิลที่พักไว้จะไม่ถูกกระทบ)" confirmLabel="ยืนยันยกเลิกบิล" onCancel={() => setCancelOpen(false)} onConfirm={() => { setCart([]); setCancelOpen(false); setMessage("ยกเลิกรายการขายแล้ว"); }} />{shortcut && <div className="modal-backdrop" onClick={() => { if (walletStep !== "success") setShortcut(""); }}><div className="form-modal wallet-modal" role="dialog" aria-modal="true" aria-label={shortcutTitle} onClick={(event) => event.stopPropagation()}><div className="modal-heading"><div><span className="eyebrow">{shortcut === "เติมเงิน" ? (walletStep === "success" ? "WALLET SLIP · DEPOSIT" : walletStep === "confirm" ? "CONFIRM · DEPOSIT" : "WALLET DEPOSIT") : shortcut === "ถอนเงิน" ? (walletStep === "success" ? "WALLET SLIP · WITHDRAWAL" : walletStep === "confirm" ? "CONFIRM · WITHDRAWAL" : "WALLET WITHDRAWAL") : "SPECIAL LINE ITEM"}</span><h2>{(shortcut === "เติมเงิน" || shortcut === "ถอนเงิน") && walletStep === "success" ? (shortcut === "เติมเงิน" ? "สลิปเติมเงิน" : "สลิปถอนเงิน") : shortcutTitle}</h2><p>{shortcut === SPECIAL_SHORTCUT ? "รายการตามจริง · ไม่ตัดสต็อก เช่น ของชั่ง ค่าบริการ" : walletStep === "form" ? "เลือกสมาชิกและระบุจำนวนเงิน · ระบบจะให้ยืนยันรายละเอียดก่อนบันทึกทุกครั้ง" : walletStep === "confirm" ? "ตรวจสอบให้ถูกต้อง — ยอดเงินจะยังไม่เข้า/ออกจากบัญชีสมาชิกจนกว่าจะกดยืนยัน" : "รายการถูกบันทึกลงประวัติธุรกรรมของสมาชิกเรียบร้อยแล้ว"}</p></div><button className="icon-button" onClick={() => { if (walletStep !== "success") setShortcut(""); }} aria-label="ปิดหน้าต่าง"><X size={17} /></button></div><div className="wallet-modal-body">{shortcut === SPECIAL_SHORTCUT && <div className="wallet-form special-form"><div className="wallet-heading"><span className="special-icon"><Sparkles size={16} /></span><div><b>เพิ่มรายการพิเศษเข้าบิล</b><small>สำหรับของชั่ง ค่าบริการ หรือรายการนอกแค็ตตาล็อก · ไม่ตัดสต็อก</small></div></div><label>ชื่อรายการ<input value={specialName} onChange={(event) => setSpecialName(event.target.value)} placeholder="เช่น ข้าวราดแกงนอกรายการ / ค่าฝากของ" onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submitSpecial(); } }} /></label><div className="special-grid"><label>ราคา/หน่วย (฿)<input type="number" min="0" step="0.01" value={specialPrice} onChange={(event) => setSpecialPrice(event.target.value)} placeholder="0.00" onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submitSpecial(); } }} /></label><label>จำนวน<input type="number" min="1" step="1" value={specialQty} onChange={(event) => setSpecialQty(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submitSpecial(); } }} /></label><label>หน่วย<input value={specialUnit} onChange={(event) => setSpecialUnit(event.target.value)} placeholder="รายการ" onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submitSpecial(); } }} /></label></div><button className="primary-button" disabled={!(specialName.trim() && Number(specialPrice) > 0)} onClick={submitSpecial}><Plus size={16} /> เพิ่มเข้าบิล</button></div>}{(shortcut === "เติมเงิน" || shortcut === "ถอนเงิน") && walletStep === "form" && <div className="wallet-form"><div className="wallet-heading"><span>{shortcut === "เติมเงิน" ? <ArrowDownToLine size={16} /> : <ArrowUpFromLine size={16} />}</span><div><b>{shortcut === "เติมเงิน" ? "เติมเงินเข้าบัญชีสมาชิก" : "ถอนเงินจากบัญชีสมาชิก"}</b><small>ขั้นตอนที่ 1 จาก 2 · กรอกข้อมูล แล้วกด “ต่อไป” เพื่อตรวจสอบก่อนบันทึก</small></div></div><div className="wallet-picker-row"><MemberScanPicker members={members} selectedNumber={walletMemberNumber || selectedMemberNumber} onSelect={(member) => setWalletMemberNumber(member ? member.memberNumber : "")} placeholder="คีย์เลขสมาชิก หรือยิงบาร์โค้ด / คิวอาร์โค้ด" confirmContext="การเติม/ถอนเงินนี้" /></div><label>จำนวนเงิน (฿)<input type="number" min="0" step="0.01" value={walletAmount} onChange={(event) => setWalletAmount(event.target.value)} placeholder="0.00" /></label><label>หมายเหตุ<input value={walletNote} onChange={(event) => setWalletNote(event.target.value)} placeholder={shortcut === "เติมเงิน" ? "เช่น เติมเงินสดที่เคาน์เตอร์" : "เช่น ถอนเพื่อใช้จ่ายส่วนตัว"} /></label><button className="primary-button" disabled={!(Number(walletAmount) > 0) || !(walletMemberNumber || selectedMemberNumber)} onClick={submitWallet}><ShieldCheck size={16} /> ต่อไป: ตรวจสอบรายการ</button></div>}{(shortcut === "เติมเงิน" || shortcut === "ถอนเงิน") && walletStep === "confirm" && walletTarget && <div className="wallet-confirm"><div className="wallet-confirm-warning"><ShieldCheck size={16} /><span>ยอดเงินจะยังไม่ถูกบันทึกเข้าบัญชี จนกว่าจะกด “ยืนยันการทำรายการ”</span></div><div className="wallet-confirm-member"><MemberAvatar member={walletTarget} size={58} /><div><b>สมาชิก{walletTarget.firstName} {walletTarget.lastName}</b><small>เลขสมาชิก <i>{walletTarget.memberNumber}</i> · ประเภท {walletTarget.type}</small></div></div><div className="wallet-confirm-rows"><div><span>ประเภทรายการ</span><b className={shortcut === "เติมเงิน" ? "green-text" : "amber-text"}>{shortcut}</b></div><div><span>จำนวนเงิน</span><b>{money(Number(walletAmount))}</b></div><div><span>ยอดคงเหลือก่อนรายการ</span><b>{money(walletTarget.balance)}</b></div><div><span>ยอดคงเหลือหลังยืนยัน</span><b className={walletAfterPreview < 0 ? "red-text" : ""}>{money(walletAfterPreview)}</b></div><div><span>ผู้ทำรายการ</span><b>{cashier} · {actorRole}</b></div>{walletNote.trim() && <div><span>หมายเหตุ</span><b>{walletNote.trim()}</b></div>}{slipName && <div><span>หลักฐานแนบ</span><b><FileImage size={13} /> {slipName}</b></div>}</div>{walletAfterPreview < 0 && <div className="notice-bar error"><CircleAlert size={16} /> ยอดเงินคงเหลือไม่พอสำหรับถอนจำนวนนี้ — ลดจำนวนเงินหรือย้อนกลับแก้ไข<button onClick={() => setError("")}><X size={14} /></button></div>}<div className="wallet-confirm-actions"><button className="outline-button" onClick={() => setWalletStep("form")}><RotateCcw size={15} /> ย้อนกลับแก้ไข</button><button className="primary-button" disabled={walletMutation.isPending || walletAfterPreview < 0} onClick={confirmWallet}><Check size={16} /> {walletMutation.isPending ? "กำลังบันทึก…" : "ยืนยันการทำรายการ"}</button></div></div>}{(shortcut === "เติมเงิน" || shortcut === "ถอนเงิน") && walletStep === "success" && walletResult && <div className="wallet-success"><div className="receipt-paper wallet-slip" id="wallet-slip"><div className="receipt-success slip"><span>{shortcut === "เติมเงิน" ? <ArrowDownToLine size={22} /> : <ArrowUpFromLine size={22} />}</span><div><b>{shortcut === "เติมเงิน" ? "เติมเงินสำเร็จ" : "ถอนเงินสำเร็จ"}</b><small>บันทึกลงรายการธุรกรรมของสมาชิกแล้ว</small></div></div><div className="receipt-divider" /><div className="receipt-meta"><span>{shortcut === "เติมเงิน" ? "ใบยืนยันการเติมเงิน" : "ใบยืนยันการถอนเงิน"}</span><b>{walletDoneAt ? slipTimeLabel(walletDoneAt) : ""}</b></div><div className="receipt-customer"><span>สมาชิก</span><b>{walletResult.memberName} · {walletResult.memberNumber}</b></div><div className="receipt-line"><span>{shortcut === "เติมเงิน" ? "จำนวนเงินที่เติม" : "จำนวนเงินที่ถอน"}</span><b>{money(walletResult.amount)}</b></div><div className="receipt-line"><span>ยอดคงเหลือก่อนรายการ</span><b>{money(walletResult.balanceBefore)}</b></div><div className="receipt-total"><span>ยอดคงเหลือหลังรายการ</span><b>{money(walletResult.balanceAfter)}</b></div><div className="receipt-payment"><span>ผู้ทำรายการ</span><b>{cashier} · {actorRole}</b></div><div className="receipt-thanks">บันทึกเข้าระบบเรียบร้อย ตรวจสอบยอดได้ที่เมนูรายงาน · ประวัติธุรกรรม<br /><small>ข้อมูลถูกบันทึกในระบบ Log แล้ว</small></div></div><div className="wallet-success-actions"><button className="outline-button" onClick={() => window.print()}><Printer size={16} /> พิมพ์สลิป</button><button className="primary-button" onClick={finishWallet}><Check size={16} /> เสร็จสิ้น · เริ่มรายการใหม่</button></div></div>}{(shortcut === "เติมเงิน" || shortcut === "ถอนเงิน") && walletStep !== "success" && <div className="slip-uploader"><div className="slip-heading"><span><FileImage size={16} /> หลักฐานการโอน / สลิป</span><small>ไม่บังคับ</small></div>{slipPreview ? <div className="slip-preview"><img src={slipPreview} alt="ตัวอย่างสลิป" /><div><b>{slipName}</b><small>พร้อมแนบกับรายการ {shortcut}</small></div><button onClick={() => { setSlipPreview(""); setSlipName(""); }}><X size={14} /></button></div> : <label className="upload-drop" htmlFor="slip-upload"><Upload size={17} /><span><b>คลิกเพื่ออัปโหลดรูปสลิป</b><small>รองรับ JPG, PNG ขนาดไม่เกิน 10 MB</small></span><input id="slip-upload" type="file" accept="image/png,image/jpeg" onChange={(event) => handleSlip(event.target.files?.[0])} /></label>}</div>}</div><div className="wallet-modal-foot"><small>{(shortcut === "เติมเงิน" || shortcut === "ถอนเงิน") && walletStep !== "success" ? "Esc ย้อนหน้า · F2/F3/F4 สลับโหมด" : "Esc ปิดหน้าต่าง · F2/F3/F4 สลับโหมด"}</small><button type="button" className="outline-button" onClick={() => { if (walletStep === "success") finishWallet(); else setShortcut(""); }}>{(shortcut === "เติมเงิน" || shortcut === "ถอนเงิน") && walletStep === "success" ? "ปิดหน้าต่าง (ล้างรายการ)" : "ปิดหน้าต่าง"}</button></div></div></div>}</>;
 }

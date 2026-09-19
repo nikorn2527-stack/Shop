@@ -1,13 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { PackageSearch, Plus, ScanLine, UserCircle2, X } from "lucide-react";
+import { PackageSearch, ScanLine, ShieldAlert, UserCheck, UserPlus, X } from "lucide-react";
 import type { SqliteProduct } from "../../../server/sqliteStore";
 import type { MemberLite } from "@/pages/pageData";
 import { money, scanCandidates, scanMatches } from "@/pages/pageData";
+import { MemberAvatar } from "./MemberAvatar";
 
 /**
  * Scan-first member selector — the cashier keys the member number or fires a
  * barcode/QR gun into the box (scanners end with Enter, which commits).
  * Shows a short suggestion list while typing; exact code wins instantly.
+ *
+ * requireConfirm — after ANY pick (scan / key / click), a verification card
+ * with the member's photo, name, number and balance shows up first. The
+ * member only lands on the bill once the cashier presses ยืนยัน — protects
+ * against deducting the wrong account when two cards scan similar.
  */
 export function MemberScanPicker({
   members,
@@ -17,6 +23,8 @@ export function MemberScanPicker({
   inputId,
   placeholder = "คีย์เลขสมาชิก หรือยิงบาร์โค้ด / คิวอาร์โค้ด",
   emptyHint = "ยังไม่มีสมาชิกในระบบ · ลงทะเบียนก่อนใช้งาน",
+  requireConfirm = false,
+  confirmContext = "บิลนี้",
 }: {
   members: MemberLite[];
   selectedNumber: string | null;
@@ -25,9 +33,12 @@ export function MemberScanPicker({
   inputId?: string;
   placeholder?: string;
   emptyHint?: string;
+  requireConfirm?: boolean;
+  confirmContext?: string;
 }) {
   const [term, setTerm] = useState("");
   const [open, setOpen] = useState(false);
+  const [pending, setPending] = useState<MemberLite | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const selected = members.find((member) => member.memberNumber === selectedNumber) ?? null;
@@ -57,9 +68,22 @@ export function MemberScanPicker({
   }, []);
 
   const pick = (member: MemberLite | null) => {
+    if (member && requireConfirm) {
+      setPending(member);
+      setTerm("");
+      setOpen(false);
+      return;
+    }
     onSelect(member);
     setTerm("");
     setOpen(false);
+    inputRef.current?.focus();
+  };
+
+  const confirmPending = () => {
+    if (!pending) return;
+    onSelect(pending);
+    setPending(null);
     inputRef.current?.focus();
   };
 
@@ -77,10 +101,33 @@ export function MemberScanPicker({
 
   return (
     <div className="member-scan-wrap" ref={wrapRef}>
-      {selected ? (
+      {pending ? (
+        <div className="member-confirm-card" role="dialog" aria-label="ยืนยันตัวตนสมาชิกก่อนทำรายการ">
+          <div className="member-confirm-head">
+            <ShieldAlert size={16} />
+            <span>โปรดตรวจสอบข้อมูลสมาชิกก่อนใช้กับ{confirmContext}</span>
+          </div>
+          <div className="member-confirm-body">
+            <MemberAvatar member={pending} size={54} />
+            <div className="member-confirm-info">
+              <b>สมาชิก{pending.firstName} {pending.lastName}</b>
+              <small>เลขสมาชิก <i>{pending.memberNumber}</i> · ประเภท {pending.type}</small>
+              <small>ยอดคงเหลือ <strong className={pending.balance < 0 ? "red-text" : ""}>{money(pending.balance)}</strong>{pending.status === "suspended" ? <> · <em>ระงับการใช้จ่าย</em></> : null}</small>
+            </div>
+          </div>
+          <div className="member-confirm-actions">
+            <button type="button" className="outline-button" onClick={() => { setPending(null); inputRef.current?.focus(); }}>
+              <X size={15} /> ไม่ใช่สมาชิกนี้
+            </button>
+            <button type="button" className="primary-button" autoFocus onClick={confirmPending}>
+              <UserCheck size={15} /> ยืนยันใช้รายการนี้
+            </button>
+          </div>
+        </div>
+      ) : selected ? (
         <div className="member-scan-chip">
           <div className="member-avatar">
-            <UserCircle2 size={18} />
+            <MemberAvatar member={selected} size={30} rounded={false} />
           </div>
           <div className="member-scan-info">
             <b>
@@ -138,12 +185,12 @@ export function MemberScanPicker({
           </div>
           {onNewMember && (
             <button type="button" className="outline-button member-new-btn" onClick={onNewMember}>
-              <Plus size={15} /> สมาชิกใหม่
+              <UserPlus size={15} /> สมาชิกใหม่
             </button>
           )}
         </>
       )}
-      {open && !selected && (
+      {open && !selected && !pending && (
         <div className="member-scan-list" role="listbox" aria-label="รายการสมาชิกที่ตรงกับที่คีย์">
           <button type="button" className="member-option" onClick={() => pick(null)}>
             <div>
@@ -162,7 +209,7 @@ export function MemberScanPicker({
             <div className="member-option disabled">
               <div>
                 <b>ไม่พบเลขสมาชิกที่คีย์</b>
-                <small>ตรวจอีกครั้ง หรือกดปุ่ม “สมาชิกใหม่” เพื่อลงทะเบียน</small>
+                <small>ตรวจอีกครั้ง หรือลงทะเบียนผ่านเมนู “เพิ่มสมาชิกใหม่” ทางซ้าย</small>
               </div>
             </div>
           ) : (
@@ -174,6 +221,7 @@ export function MemberScanPicker({
                 disabled={member.status === "suspended"}
                 onClick={() => pick(member)}
               >
+                <MemberAvatar member={member} size={34} />
                 <div>
                   <b>
                     {member.memberNumber} · สมาชิก{member.firstName} {member.lastName}
