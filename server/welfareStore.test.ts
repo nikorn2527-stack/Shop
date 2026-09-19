@@ -971,6 +971,25 @@ describe("settings", () => {
     expect(getSettings(database).storeName).toBe("ร้านค้าทดสอบ");
     expect(listAuditLogs(database, 1)[0].action).toBe("บันทึกการตั้งค่า");
   });
+
+  // ROUND 38 (ข้อ 39) — สไตล์การแสดงผล + การตั้งค่าสำรองข้อมูลอัตโนมัติ: ค่าเริ่มต้น + round-trip
+  it("defaults to shop style with auto-backup on (24h, keep 14) and round-trips appStyle/backupKeepCount", () => {
+    const database = freshDb();
+    const defaults = getSettings(database);
+    expect(defaults.appStyle).toBe("shop");
+    expect(defaults.backupAutoEnabled).toBe(true);
+    expect(defaults.backupIntervalHours).toBe(24);
+    expect(defaults.backupKeepCount).toBe(14);
+
+    const updated = setSettings(database, { appStyle: "apple", backupKeepCount: 7 });
+    expect(updated.appStyle).toBe("apple");
+    expect(updated.backupKeepCount).toBe(7);
+    // ฟิลด์ที่ไม่ได้แตะต้องคงค่าเดิม (merge ไม่ทับ)
+    expect(updated.backupAutoEnabled).toBe(true);
+    expect(updated.backupIntervalHours).toBe(24);
+    expect(getSettings(database).appStyle).toBe("apple");
+    expect(getSettings(database).backupKeepCount).toBe(7);
+  });
 });
 
 describe("authentication", () => {

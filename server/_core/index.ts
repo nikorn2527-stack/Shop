@@ -8,6 +8,9 @@ import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { backupSqliteDatabase, listSqliteBackups, pruneSqliteBackupsByCount } from "../sqliteBackup";
+import { getBackupDir, getWelfareDb, getWelfareDbPath } from "../welfareStore";
+import { getSettings, logAction } from "../sqliteStore";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -26,6 +29,32 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
     }
   }
   throw new Error(`No available port found starting from ${startPort}`);
+}
+
+// ROUND 38 (ข้อ 39) — สำรองข้อมูลอัตโนมัติ: ตรวจทุก 10 นาทีว่าพ้นรอบเวลาที่ตั้ง
+// ไว้ใน settings หรือยัง (เทียบ createdAt ของไฟล์สำรองล่าสุด) — ผิดพลาดเท่าไหร่
+// ก็แค่ console.warn ไม่ทำให้เซิร์ฟเวอร์ล้ม
+function checkAutoBackup() {
+  try {
+    const db = getWelfareDb();
+    const settings = getSettings(db);
+    if (!settings.backupAutoEnabled) return;
+    const lastCreatedAt = listSqliteBackups(getBackupDir())[0]?.createdAt;
+    const lastMs = lastCreatedAt ? Date.parse(lastCreatedAt) : 0;
+    if (Date.now() - (Number.isNaN(lastMs) ? 0 : lastMs) < settings.backupIntervalHours * 3600_000) return;
+    const manifest = backupSqliteDatabase({ sourcePath: getWelfareDbPath(), backupDir: getBackupDir(), retentionDays: 3650 });
+    pruneSqliteBackupsByCount(getBackupDir(), settings.backupKeepCount);
+    logAction(db, "สำรองข้อมูล", "ระบบอัตโนมัติ", `สำรองข้อมูลอัตโนมัติตามรอบเวลา · ${manifest.file}`, "blue");
+  } catch (error) {
+    console.warn("[Backup] auto:", String(error));
+  }
+}
+
+/** ROUND 38 (ข้อ 39) — เริ่มตัวตรวจสำรองอัตโนมัติ (timer unref: ไม่ยื้อให้ process ค้าง) */
+function startBackupScheduler() {
+  const timer = setInterval(checkAutoBackup, 10 * 60_000);
+  timer.unref();
+  setTimeout(checkAutoBackup, 30_000).unref();
 }
 
 async function startServer() {
@@ -60,6 +89,8 @@ async function startServer() {
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
+    // ROUND 38 (ข้อ 39) — ตัวตรวจสำรองข้อมูลอัตโนมัติ (รอบแรกหลังบูต 30 วินาที)
+    startBackupScheduler();
   });
 }
 

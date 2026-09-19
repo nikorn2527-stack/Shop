@@ -3476,3 +3476,207 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .member-card-modal.confirm-mode .member-card-stage { background: repeating-linear-gradient(135deg, #f6faf7 0 14px, #f1f7f3 14px 28px); }
 .member-card-modal.confirm-mode .modal-heading p { color: #7c806f; }
 .member-card-identity .member-card-meta span.now { color: #3f8a6d; font-weight: 600; }
+
+/* ROUND 38 (ข้อ 37-39) — สไตล์การแสดงผล Apple / Microsoft / Android + โมดูลกล้อง + แท็บสำรองข้อมูล
+   สไตล์เปลี่ยนผ่าน data-style บน <html> (ดู client/src/theme.ts) — สีเน้นยังคุมด้วยกลุ่ม --teal ตามแบรนด์ */
+
+/* ——— APPLE: ขาวสะอาด ปุ่มทรงแคปซูล ฟอนต์ระบบ Apple เรียบแบบ iOS/macOS ——— */
+[data-style="apple"] {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Sarabun, "Leelawadee UI", Tahoma, system-ui, sans-serif;
+  color: #1d1d1f;
+  background: #f5f5f7;
+  --canvas: #f5f5f7;
+  --surface: #ffffff;
+  --line: #e8e8ed;
+  --ink: #1d1d1f;
+  --muted: #6e6e73;
+  --shadow: 0 0 0 .5px rgba(0, 0, 0, .04), 0 8px 28px rgba(0, 0, 0, .06);
+}
+[data-style="apple"] body { background: #f5f5f7; }
+[data-style="apple"] .sidebar { background: rgba(255, 255, 255, .78); border-right: 1px solid #e8e8ed; backdrop-filter: blur(20px) saturate(1.6); }
+[data-style="apple"] .topbar { background: rgba(255, 255, 255, .85); border-bottom: 1px solid #e8e8ed; backdrop-filter: blur(20px) saturate(1.8); }
+[data-style="apple"] .brand-mark { border-radius: 9px; }
+[data-style="apple"] .role-card { background: #f5f5f7; border-color: #e8e8ed; }
+[data-style="apple"] .primary-button, [data-style="apple"] .scan-button, [data-style="apple"] .member-pay { border-radius: 980px; font-weight: 600; border-color: var(--teal); box-shadow: 0 4px 14px var(--teal-glow); }
+[data-style="apple"] .outline-button { border-radius: 980px; border-color: #d2d2d7; background: #fff; color: #1d1d1f; }
+[data-style="apple"] .outline-button:hover { border-color: #a1a1a6; color: var(--teal); background: #fff; }
+[data-style="apple"] .metric-card, [data-style="apple"] .panel, [data-style="apple"] .stock-stat, [data-style="apple"] .report-card { border-radius: 18px; border-color: #e8e8ed; box-shadow: var(--shadow); }
+[data-style="apple"] .form-modal { border-radius: 22px; border-color: #e8e8ed; }
+[data-style="apple"] .form-grid input, [data-style="apple"] .compact-form input, [data-style="apple"] .compact-form select, [data-style="apple"] .search-field, [data-style="apple"] .threshold-input input { border-radius: 11px; border-color: #d2d2d7; background: #fff; }
+[data-style="apple"] .form-grid input:focus, [data-style="apple"] .compact-form input:focus, [data-style="apple"] .compact-form select:focus, [data-style="apple"] .search-field:focus-within { border-color: var(--teal); box-shadow: 0 0 0 4px var(--teal-glow); }
+[data-style="apple"] nav button { border-radius: 12px; }
+[data-style="apple"] nav button.active { box-shadow: none; background: var(--teal-soft); }
+[data-style="apple"] nav button:hover { background: #f5f5f7; }
+[data-style="apple"] .metric-icon.green, [data-style="apple"] .stat-icon.green { background: var(--teal-soft); color: var(--teal-dark); }
+[data-style="apple"] .toggle.on { background: #34c759; } /* สวิตช์เขียวแบบ iOS */
+[data-style="apple"] .member-balance-card { background: linear-gradient(115deg, var(--rail-a), var(--teal)); box-shadow: 0 10px 28px var(--teal-glow); }
+[data-style="apple"] .product-card { border-radius: 16px; }
+[data-style="apple"] .icon-button { border-radius: 50%; }
+[data-style="apple"] .settings-nav button.active { border-radius: 10px; }
+[data-style="apple"] .theme-swatch { border-radius: 14px; }
+[data-style="apple"] .number-mode-grid button { border-radius: 12px; }
+[data-style="apple"] .status-pill { border-radius: 20px; }
+
+/* ——— MICROSOFT: Fluent — ขอบคม เรียบตึง ฟอนต์ Segoe UI แบบ Windows 11 ——— */
+[data-style="microsoft"] {
+  font-family: "Segoe UI Variable Text", "Segoe UI", Sarabun, "Leelawadee UI", Tahoma, system-ui, sans-serif;
+  color: #242424;
+  background: #f3f2f1;
+  --canvas: #f3f2f1;
+  --surface: #ffffff;
+  --line: #e1dfdd;
+  --ink: #242424;
+  --muted: #605e5c;
+  --shadow: 0 1.6px 3.6px rgba(0, 0, 0, .07), 0 .3px .9px rgba(0, 0, 0, .05);
+}
+[data-style="microsoft"] body { background: #f3f2f1; }
+[data-style="microsoft"] .sidebar { background: #faf9f8; border-right: 1px solid #e1dfdd; }
+[data-style="microsoft"] .topbar { background: #fff; backdrop-filter: none; border-bottom: 1px solid #e1dfdd; }
+[data-style="microsoft"] .brand-mark { border-radius: 5px; }
+[data-style="microsoft"] .role-card { background: #f3f2f1; border-color: #e1dfdd; }
+[data-style="microsoft"] .primary-button, [data-style="microsoft"] .scan-button, [data-style="microsoft"] .member-pay { border-radius: 4px; font-weight: 600; box-shadow: none; }
+[data-style="microsoft"] .outline-button { border-radius: 4px; }
+[data-style="microsoft"] .metric-card, [data-style="microsoft"] .panel, [data-style="microsoft"] .stock-stat, [data-style="microsoft"] .report-card { border-radius: 4px; border-color: #e1dfdd; box-shadow: var(--shadow); }
+[data-style="microsoft"] .form-modal { border-radius: 6px; }
+[data-style="microsoft"] .topbar { box-shadow: 0 1.6px 3.6px rgba(0, 0, 0, .05); }
+[data-style="microsoft"] .form-grid input, [data-style="microsoft"] .compact-form input, [data-style="microsoft"] .compact-form select, [data-style="microsoft"] .search-field, [data-style="microsoft"] .threshold-input input { border-radius: 4px; border-color: #d2d0ce; background: #fff; }
+[data-style="microsoft"] .form-grid input:focus, [data-style="microsoft"] .compact-form input:focus, [data-style="microsoft"] .compact-form select:focus, [data-style="microsoft"] .search-field:focus-within { border-color: var(--teal); box-shadow: inset 0 0 0 1px var(--teal); }
+[data-style="microsoft"] nav button { border-radius: 4px; }
+[data-style="microsoft"] nav button.active { box-shadow: inset 2px 0 0 var(--teal); }
+[data-style="microsoft"] nav button:hover { background: #f3f2f1; }
+[data-style="microsoft"] .metric-icon.green, [data-style="microsoft"] .stat-icon.green { background: var(--teal-soft); color: var(--teal-dark); }
+[data-style="microsoft"] .toggle.on { background: var(--teal); }
+[data-style="microsoft"] .member-balance-card { background: linear-gradient(115deg, var(--rail-a), var(--teal)); box-shadow: 0 1.6px 3.6px rgba(0, 0, 0, .14); }
+[data-style="microsoft"] .product-card { border-radius: 3px; }
+[data-style="microsoft"] .backup-now-row, [data-style="microsoft"] .backup-row, [data-style="microsoft"] .ui-style-card { border-radius: 4px; }
+[data-style="microsoft"] .icon-button { border-radius: 4px; }
+[data-style="microsoft"] .settings-nav button.active { border-radius: 4px; }
+[data-style="microsoft"] .theme-swatch { border-radius: 6px; }
+[data-style="microsoft"] .number-mode-grid button { border-radius: 4px; }
+[data-style="microsoft"] .status-pill { border-radius: 3px; }
+
+/* ——— ANDROID: Material You — การ์ดมนมาก โทนม่วงพาสเทล แบบแอปบนมือถือ ——— */
+[data-style="android"] {
+  font-family: "Google Sans", Roboto, Sarabun, "Leelawadee UI", Tahoma, system-ui, sans-serif;
+  color: #1d1b20;
+  background: #fcf8fe;
+  --canvas: #fcf8fe;
+  --surface: #ffffff;
+  --line: #e7e0ec;
+  --ink: #1d1b20;
+  --muted: #49454f;
+  --shadow: 0 1px 3px rgba(0, 0, 0, .09), 0 6px 18px rgba(103, 80, 164, .09);
+}
+[data-style="android"] body { background: #fcf8fe; }
+[data-style="android"] .sidebar { background: #f7f1fc; border-right: 1px solid #e7e0ec; }
+[data-style="android"] .topbar { background: rgba(252, 248, 254, .92); backdrop-filter: blur(16px); border-bottom: 1px solid #e7e0ec; }
+[data-style="android"] .brand-mark { border-radius: 50%; }
+[data-style="android"] .role-card { background: #f3ecfa; border-color: #e7dcf3; }
+[data-style="android"] .primary-button, [data-style="android"] .scan-button, [data-style="android"] .member-pay { border-radius: 20px; font-weight: 600; letter-spacing: .2px; box-shadow: 0 3px 10px var(--teal-glow); }
+[data-style="android"] .outline-button { border-radius: 20px; border-color: #cac4d0; color: #1d1b20; }
+[data-style="android"] .outline-button:hover { border-color: var(--teal); color: var(--teal); background: #fff; }
+[data-style="android"] .metric-card, [data-style="android"] .panel, [data-style="android"] .stock-stat, [data-style="android"] .report-card { border-radius: 16px; border-color: #e7e0ec; }
+[data-style="android"] .form-modal { border-radius: 24px; }
+[data-style="android"] .form-grid input, [data-style="android"] .compact-form input, [data-style="android"] .compact-form select, [data-style="android"] .search-field, [data-style="android"] .threshold-input input { border-radius: 14px; border-color: #cac4d0; background: #fff; }
+[data-style="android"] .form-grid input:focus, [data-style="android"] .compact-form input:focus, [data-style="android"] .compact-form select:focus, [data-style="android"] .search-field:focus-within { border-color: var(--teal); box-shadow: 0 0 0 4px var(--teal-glow); }
+[data-style="android"] nav button { border-radius: 24px; }
+[data-style="android"] nav button.active { box-shadow: none; background: var(--teal-soft); border-radius: 24px; } /* ทรงโทนัลพิลล์แบบ M3 */
+[data-style="android"] nav button:hover { background: #f3ecfa; }
+[data-style="android"] nav button.active small { color: var(--teal-dark); }
+[data-style="android"] .metric-icon.green, [data-style="android"] .stat-icon.green { background: var(--teal-soft); color: var(--teal-dark); }
+[data-style="android"] .toggle { border-radius: 20px; }
+[data-style="android"] .toggle.on { background: var(--teal); }
+[data-style="android"] .member-balance-card { background: linear-gradient(115deg, var(--rail-a), var(--teal)); box-shadow: 0 6px 18px var(--teal-glow); }
+[data-style="android"] .product-card { border-radius: 14px; }
+[data-style="android"] .icon-button { border-radius: 50%; }
+[data-style="android"] .settings-nav button.active { border-radius: 20px; }
+[data-style="android"] .theme-swatch { border-radius: 16px; }
+[data-style="android"] .number-mode-grid button { border-radius: 18px; }
+[data-style="android"] .status-pill { border-radius: 8px; }
+
+/* องค์ประกอบสีเขียวตายตัว → ตามสีเน้นของสไตล์ที่เลือก (ทั้ง 3 สไตล์) */
+[data-style="apple"] .bar.teal, [data-style="microsoft"] .bar.teal, [data-style="android"] .bar.teal { background: var(--teal); }
+[data-style="apple"] .dot.teal, [data-style="microsoft"] .dot.teal, [data-style="android"] .dot.teal { background: var(--teal); }
+[data-style="apple"] .progress i, [data-style="microsoft"] .progress i, [data-style="android"] .progress i { background: var(--teal); }
+[data-style="apple"] .member-avatar, [data-style="microsoft"] .member-avatar, [data-style="android"] .member-avatar { background: var(--teal-soft); color: var(--teal-dark); }
+[data-style="apple"] .add-product, [data-style="microsoft"] .add-product, [data-style="android"] .add-product { background: var(--teal-soft); }
+[data-style="apple"] .settings-nav button.active, [data-style="microsoft"] .settings-nav button.active, [data-style="android"] .settings-nav button.active { background: var(--teal-mist); }
+
+/* ——— การ์ดเลือกสไตล์ (ตั้งค่า → แบรนด์และธีม) — พร้อมมินิพรีวิวจำลองหน้าจอ ——— */
+.ui-style-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding-top: 15px; }
+.ui-style-card { border: 1.5px solid var(--line); background: #fff; border-radius: 14px; padding: 11px; display: flex; flex-direction: column; gap: 8px; text-align: left; transition: all .16s ease; }
+.ui-style-card:hover { border-color: #b9d8cc; transform: translateY(-1px); }
+.ui-style-card.active { border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-glow); background: var(--teal-mist); }
+.ui-style-card > b { font-size: 11.5px; color: #52584a; }
+.ui-style-card.active > b { color: var(--teal-dark); }
+.ui-style-card > small { font-size: 10px; color: #7d8172; line-height: 1.4; }
+.ui-style-preview { height: 74px; border-radius: 9px; display: flex; overflow: hidden; border: 1px solid var(--line); background: #fff; }
+.ui-style-preview .pv-side { width: 26%; background: #fbfdfc; border-right: 1px solid var(--line); position: relative; }
+.ui-style-preview .pv-side::after { content: ""; position: absolute; left: 4px; top: 8px; width: 55%; height: 6px; border-radius: 4px; background: var(--pv-accent, #007a55); }
+.ui-style-preview .pv-body { flex: 1; padding: 7px 8px; display: flex; flex-direction: column; gap: 5px; background: var(--pv-canvas, #fcfbf7); }
+.ui-style-preview .pv-title { width: 46%; height: 7px; border-radius: 3px; background: #d9dcd4; }
+.ui-style-preview .pv-chip { width: 64%; height: 9px; border-radius: var(--pv-chip-radius, 4px); background: #eef1ee; }
+.ui-style-preview .pv-btn { width: 52%; height: 13px; margin-top: auto; border-radius: var(--pv-btn-radius, 6px); background: var(--pv-accent, #007a55); }
+/* มินิพรีวิวตามสไตล์ */
+.ui-style-preview[data-preview="shop"] { --pv-accent: #007a55; --pv-canvas: #fcfbf7; --pv-btn-radius: 6px; --pv-chip-radius: 4px; }
+.ui-style-preview[data-preview="apple"] { --pv-accent: #0071e3; --pv-canvas: #f5f5f7; --pv-btn-radius: 999px; --pv-chip-radius: 999px; }
+.ui-style-preview[data-preview="apple"] .pv-side { background: rgba(255, 255, 255, .8); }
+.ui-style-preview[data-preview="microsoft"] { --pv-accent: #0f6cbd; --pv-canvas: #f3f2f1; --pv-btn-radius: 2px; --pv-chip-radius: 1px; }
+.ui-style-preview[data-preview="microsoft"] .pv-side { background: #faf9f8; }
+.ui-style-preview[data-preview="android"] { --pv-accent: #6750a4; --pv-canvas: #fcf8fe; --pv-btn-radius: 999px; --pv-chip-radius: 6px; }
+.ui-style-preview[data-preview="android"] .pv-side { background: #f7f1fc; }
+.style-note-row { margin-top: 12px; }
+@media (max-width: 760px) { .ui-style-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* ——— โมดูลถ่ายรูปจากกล้อง (ข้อ 37) ——— */
+.camera-modal { width: min(480px, 100%); }
+.camera-stage-wrap { margin-top: 15px; }
+.camera-stage { position: relative; border-radius: 14px; overflow: hidden; background: #101613; aspect-ratio: 4 / 3; display: grid; place-items: center; }
+.camera-stage video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); } /* มิเรอร์แบบเซลฟี่ */
+.camera-stage.starting video { opacity: 0; }
+.camera-starting { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; color: #9fd8c3; background: #101613; }
+.camera-starting b { color: #cdeedf; font-size: 12px; }
+.camera-starting span { color: #7ba893; font-size: 10.5px; }
+.camera-guide { position: absolute; inset: 14%; border: 1.5px dashed rgba(255, 255, 255, .4); border-radius: 12px; pointer-events: none; }
+.camera-preview { position: relative; border-radius: 14px; overflow: hidden; background: #f4f7f5; aspect-ratio: 4 / 3; display: grid; place-items: center; }
+.camera-preview img { width: 100%; height: 100%; object-fit: contain; background: #fff; }
+.camera-ready-flag { position: absolute; left: 10px; bottom: 10px; display: inline-flex; align-items: center; gap: 5px; background: rgba(20, 56, 40, .85); color: #d7f5e8; font-size: 10.5px; padding: 5px 9px; border-radius: 20px; }
+.camera-error { aspect-ratio: 4 / 3; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 18px; border: 1.5px dashed #e3c9c6; border-radius: 14px; background: #fdf7f6; color: #a1564f; }
+.camera-error b { font-size: 12.5px; color: #8d443e; }
+.camera-error span { font-size: 10.5px; color: #9c6a63; line-height: 1.5; max-width: 300px; }
+.camera-actions { justify-content: space-between; }
+.camera-shutter { min-width: 130px; }
+.camera-hint-inline { display: flex; align-items: center; gap: 7px; margin-top: 11px; color: #7d8172; font-size: 10.5px; }
+.photo-action-row { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 9px; }
+
+/* ——— แท็บสำรองข้อมูล (ข้อ 39) ——— */
+.backup-now-row { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 14px 15px; margin-top: 4px; background: var(--teal-mist); border: 1px solid var(--teal-soft); border-radius: 12px; }
+.backup-now-row > div { min-width: 0; }
+.backup-now-row b { display: block; color: #2f5247; font-size: 12px; }
+.backup-now-row small { display: block; color: #6b7f76; font-size: 10.5px; margin-top: 3px; line-height: 1.45; }
+.backup-now-row .primary-button { flex: 0 0 auto; height: 40px; padding: 0 16px; }
+.backup-interval-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.backup-interval-grid label { display: block; color: #7f8373; font-size: 11px; }
+.backup-interval-grid select { width: 100%; height: 36px; margin-top: 6px; border: 1px solid #e2eae7; border-radius: 8px; padding: 0 9px; background: #fff; color: #6b715a; font-size: 11.5px; outline: none; }
+.backup-interval-grid select:focus { border-color: #8fc5b0; box-shadow: 0 0 0 3px #eaf6f1; }
+.backup-list { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; max-height: 388px; overflow-y: auto; }
+.backup-row { display: flex; align-items: center; gap: 12px; border: 1px solid #e7eeeb; background: #fff; border-radius: 11px; padding: 11px 13px; }
+.backup-row .backup-icon { width: 34px; height: 34px; flex: 0 0 34px; display: grid; place-items: center; border-radius: 9px; background: #eef6f2; color: var(--teal); }
+.backup-row > div { flex: 1; min-width: 0; }
+.backup-row b { display: block; color: #575c4e; font-size: 11px; font-family: "IBM Plex Mono", monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.backup-row small { display: block; color: #828776; font-size: 10px; margin-top: 3px; }
+.backup-row .backup-actions { display: flex; gap: 6px; flex: 0 0 auto; }
+.backup-empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 34px 16px; color: #828776; }
+.backup-empty b { font-size: 12px; color: #6b705d; }
+.backup-empty small { font-size: 10.5px; }
+.backup-restore-note { margin-top: 12px; }
+@media (max-width: 620px) {
+  .backup-now-row { flex-direction: column; align-items: stretch; text-align: left; }
+  .backup-now-row .primary-button { width: 100%; }
+  .backup-row { flex-wrap: wrap; }
+  .backup-row .backup-actions { width: 100%; justify-content: flex-end; }
+}
+
+/* ROUND 38 — เติมเล็กน้อย: บรรทัดฟอนต์บนการ์ดสไตล์ + แถวปุ่มถ่ายรูป */
+.ui-style-card .style-font-hint { color: #99a094; font-family: "IBM Plex Mono", monospace; font-size: 9px; letter-spacing: .2px; }
+.ui-style-card.active .style-font-hint { color: var(--teal); }

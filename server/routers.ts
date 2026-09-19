@@ -1,11 +1,14 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
+import { existsSync, readFileSync, rmSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { readAppSessionCookie, type TrpcContext } from "./_core/context";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { getWelfareDb } from "./welfareStore";
+import { backupSqliteDatabase, listSqliteBackups, pruneSqliteBackupsByCount, restoreSqliteBackup, verifySqliteBackup } from "./sqliteBackup";
+import { closeWelfareDb, getBackupDir, getWelfareDb, getWelfareDbPath } from "./welfareStore";
 import {
   LOGIN_MAX_FAILURES,
   StoreError,
@@ -366,8 +369,18 @@ const settingsPatchInput = z
     dailyCutOffTime: z.string().regex(/^([01]?\d|2[0-3]):[0-5]\d$/, "รูปแบบเวลาต้องเป็น HH:MM").optional(),
     // ROUND 36 (ข้อ 31) — ประตูบัญชีผู้พัฒนา (dev): ปิดไว้เป็นค่าเริ่มต้น เปิดเฉพาะเมื่อจำเป็น
     devAccess: z.boolean().optional(),
+    // ROUND 38 (ข้อ 39) — สไตล์การแสดงผลของแอป + การตั้งค่าสำรองข้อมูลอัตโนมัติ
+    appStyle: z.string().max(32).optional(),
+    backupAutoEnabled: z.boolean().optional(),
+    backupIntervalHours: z.number().int().min(1).max(168).optional(),
+    backupKeepCount: z.number().int().min(3).max(60).optional(),
   })
   .nullish();
+
+// ROUND 38 (ข้อ 39) — ชื่อไฟล์สำรองที่รับได้: welfare-store-YYYYMMDDTHHMMSSZ.sqlite เท่านั้น
+const backupFileInput = z.object({
+  file: z.string().regex(/^welfare-store-\d{8}T\d{6}Z\.sqlite$/, "ชื่อไฟล์สำรองไม่ถูกต้อง"),
+});
 
 const authLoginInput = z.object({
   username: z.string().min(1, "กรุณาระบุชื่อผู้ใช้"),
@@ -886,6 +899,107 @@ export const appRouter = router({
             throw new TRPCError({ code: "FORBIDDEN", message: "การตั้งค่าระบบต้องใช้สิทธิ์ผู้บริหาร" });
           }
           return setSettings(getWelfareDb(), input ?? {}, actor ?? "ผู้บริหาร", actorRole);
+        });
+      }),
+  }),
+
+  // ROUND 38 (ข้อ 39) — ระบบสำรองข้อมูล: สำรองเดี๋ยวนี้ / รายการไฟล์ / ดาวน์โหลด / กู้คืน (ผู้บริหารเท่านั้น)
+  backup: router({
+    create: publicProcedure.mutation(({ ctx }) => {
+      const { actor, actorRole } = resolveActor(ctx, {});
+      return withStoreErrors(() => {
+        if (!isAdminCtx(ctx, {})) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "การสำรองข้อมูลต้องใช้สิทธิ์ผู้บริหาร" });
+        }
+        const db = getWelfareDb();
+        const keepCount = getSettings(db).backupKeepCount;
+        const manifest = backupSqliteDatabase({ sourcePath: getWelfareDbPath(), backupDir: getBackupDir(), retentionDays: 3650 });
+        pruneSqliteBackupsByCount(getBackupDir(), keepCount);
+        logAction(db, "สำรองข้อมูล", actor ?? "ผู้บริหาร", `สำรองข้อมูลด้วยตนเอง · ${manifest.file}`, "blue", actorRole ?? null);
+        return { ...manifest, keepCount };
+      });
+    }),
+    list: publicProcedure
+      .input(z.unknown().optional())
+      .query(({ ctx }) =>
+        withStoreErrors(() => {
+          if (!isAdminCtx(ctx, {})) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "การดูรายการสำรองข้อมูลต้องใช้สิทธิ์ผู้บริหาร" });
+          }
+          const settings = getSettings(getWelfareDb());
+          return {
+            backups: listSqliteBackups(getBackupDir()),
+            keepCount: settings.backupKeepCount,
+            autoEnabled: settings.backupAutoEnabled,
+            intervalHours: settings.backupIntervalHours,
+          };
+        }),
+      ),
+    download: publicProcedure
+      .input(backupFileInput)
+      .mutation(({ ctx, input }) =>
+        withStoreErrors(() => {
+          if (!isAdminCtx(ctx, {})) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "การดาวน์โหลดไฟล์สำรองต้องใช้สิทธิ์ผู้บริหาร" });
+          }
+          const backupPath = join(getBackupDir(), input.file);
+          if (!existsSync(backupPath)) {
+            throw new TRPCError({ code: "NOT_FOUND", message: `ไม่พบไฟล์สำรอง ${input.file}` });
+          }
+          try {
+            verifySqliteBackup(backupPath);
+          } catch {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "ไฟล์สำรองไม่ถูกต้องหรือตรวจสอบความถูกต้องไม่ผ่าน" });
+          }
+          return { file: input.file, sizeBytes: statSync(backupPath).size, base64: readFileSync(backupPath).toString("base64") };
+        }),
+      ),
+    restore: publicProcedure
+      .input(backupFileInput)
+      .mutation(({ ctx, input }) => {
+        const { actor, actorRole } = resolveActor(ctx, {});
+        return withStoreErrors(() => {
+          if (!isAdminCtx(ctx, {})) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "การกู้คืนข้อมูลต้องใช้สิทธิ์ผู้บริหาร" });
+          }
+          const backupPath = join(getBackupDir(), input.file);
+          if (!existsSync(backupPath)) {
+            throw new TRPCError({ code: "NOT_FOUND", message: `ไม่พบไฟล์สำรอง ${input.file}` });
+          }
+          try {
+            verifySqliteBackup(backupPath);
+          } catch {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "ไฟล์สำรองไม่ถูกต้องหรือตรวจสอบความถูกต้องไม่ผ่าน" });
+          }
+          const dbPath = getWelfareDbPath();
+          // 1) สำรองไฟล์ป้องกันไว้ก่อนเสมอ — ถ้ากู้คืนพลาด ยังมีไฟล์กลับรออยู่
+          let safetyBackupFile: string;
+          try {
+            safetyBackupFile = backupSqliteDatabase({ sourcePath: dbPath, backupDir: getBackupDir(), retentionDays: 3650 }).file;
+          } catch (error) {
+            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `สำรองไฟล์ป้องกันก่อนกู้คืนไม่สำเร็จ: ${String(error)}` });
+          }
+          try {
+            // 2) ปิด handle เดิม แล้วลบตัวจริง + WAL/SHM คู่กัน (DatabaseSync จะเปิดใหม่แบบ lazy)
+            closeWelfareDb();
+            for (const suffix of ["", "-wal", "-shm"]) {
+              rmSync(`${dbPath}${suffix}`, { force: true });
+            }
+            // 3) คัดลอกไฟล์สำรองทับตำแหน่งเดิม พร้อมตรวจ integrity หลังเขียนเสร็จ
+            restoreSqliteBackup({ backupPath, targetPath: dbPath, overwrite: true });
+          } catch (error) {
+            throw new StoreError(`กู้คืนฐานข้อมูลไม่สำเร็จ: ${error instanceof Error ? error.message : String(error)} · ไฟล์ป้องกันที่พึ่งสำรองไว้: ${safetyBackupFile}`);
+          }
+          // 4) เปิดฐานข้อมูลใหม่ (lazy) แล้วบันทึก audit สีแดง — กู้คืนเป็นเหตุการณ์สำคัญ
+          logAction(
+            getWelfareDb(),
+            "กู้คืนข้อมูล",
+            actor ?? "ผู้บริหาร",
+            `กู้คืนฐานข้อมูลจากไฟล์สำรอง ${input.file} · สำรองไฟล์ป้องกันไว้ก่อนกู้คืน`,
+            "red",
+            actorRole ?? null,
+          );
+          return { ok: true as const, safetyBackupFile };
         });
       }),
   }),

@@ -4,9 +4,15 @@
  * ตอน runtime ตามที่ผู้บริหารเลือกใน ตั้งค่า → แบรนด์และธีม
  * (preset สำเร็จรูป หรือสี custom) พร้อมแคชชื่อ/โลโก้/สีไว้ใน localStorage
  * เพื่อให้หน้า login ก็ได้ธีมเดียวกันทันทีในการเข้าใช้ครั้งถัดไป
+ *
+ * ROUND 38 (ข้อ 38) — สไตล์การแสดงผล (UI Style): นอกจากสีแบรนด์ ยังเลือก
+ * “บุคลิก” ทั้งระบบได้ — ร้านค้า (มาตรฐาน) / Apple / Microsoft / Android
+ * เขียน data-style ลง <html> แล้ว CSS ใน index.css ปรับฟอนต์-ความมน-พื้นหลัง
+ * ตามสไตล์นั้น ๆ · เลือกสไตล์ = ได้สีเน้นประจำแพลตฟอร์มมาด้วย
+ * (เปลี่ยนสีเน้นแยกทีหลังได้ตามปกติผ่านพาเลตต์สี)
  */
 
-export type BrandSettings = { appName: string; appLogo: string; appTheme: string };
+export type BrandSettings = { appName: string; appLogo: string; appTheme: string; appStyle?: string };
 
 /** Preset สีหลัก — คุมโทนทั้งแอป (ปุ่ม / แถบเมนู / จุดเน้น) */
 export const THEME_PRESETS: { id: string; label: string; base: string }[] = [
@@ -22,6 +28,33 @@ export const THEME_PRESETS: { id: string; label: string; base: string }[] = [
 
 export const DEFAULT_THEME = "emerald";
 const BRAND_CACHE_KEY = "png-brand-v1";
+
+/** ROUND 38 (ข้อ 38) — สไตล์การแสดงผลทั้งระบบ (บุคลิกการออกแบบ)
+ *  id ใช้เป็น data-style บน <html> · accent = สีเน้นประจำแพลตฟอร์มที่จะใช้ตอนเลือกสไตล์ */
+export type UiStyleId = "shop" | "apple" | "microsoft" | "android";
+export const UI_STYLE_PRESETS: { id: UiStyleId; label: string; detail: string; accent: string; fontFamily: string }[] = [
+  { id: "shop", label: "ร้านค้า (มาตรฐาน)", detail: "โทนอบอุ่น เขียวร้านค้า ปุ่มมนพอดีมือ — ธีมเดิมของระบบ", accent: "#007a55", fontFamily: "Sarabun" },
+  { id: "apple", label: "Apple", detail: "ขาวสะอาด ปุ่มทรงแคปซูล ฟอนต์ระบบ Apple — เรียบแบบ iOS/macOS", accent: "#0071e3", fontFamily: "SF / Helvetica" },
+  { id: "microsoft", label: "Microsoft", detail: "แบบ Fluent — ขอบคม เรียบตึง ฟอนต์ Segoe UI แบบ Windows 11", accent: "#0f6cbd", fontFamily: "Segoe UI" },
+  { id: "android", label: "Android", detail: "แบบ Material You — การ์ดมนมาก โทนม่วงพาสเทล แบบแอปบนมือถือ", accent: "#6750a4", fontFamily: "Roboto / Google Sans" },
+];
+
+export const DEFAULT_UI_STYLE: UiStyleId = "shop";
+
+/** สไตล์ id ที่รับรอง (กันค่าเพี้ยนจาก settings) */
+export function resolveUiStyle(style: string | undefined | null): UiStyleId {
+  if (style === "apple" || style === "microsoft" || style === "android") return style;
+  return DEFAULT_UI_STYLE;
+}
+
+/** เขียน data-style ลง <html> — CSS ใน index.css จะปรับรูปลักษณ์ตามค่านี้ */
+export function applyUiStyle(style: string | undefined | null): UiStyleId {
+  const resolved = resolveUiStyle(style);
+  const root = document.documentElement;
+  if (resolved === DEFAULT_UI_STYLE) delete root.dataset.style;
+  else root.dataset.style = resolved;
+  return resolved;
+}
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
@@ -110,20 +143,23 @@ export function applyThemeColor(theme: string | undefined | null): string {
   return base;
 }
 
-/** ใช้แบรนด์ (ชื่อ+สี) — ตั้ง title และจำลง cache ให้ครั้งถัดไปโหลดไว */
+/** ใช้แบรนด์ (ชื่อ+สี+สไตล์) — ตั้ง title และจำลง cache ให้ครั้งถัดไปโหลดไว */
 export function applyBrand(brand: Partial<BrandSettings> | null | undefined): BrandSettings | null {
   if (!brand) return null;
   const appName = (brand.appName ?? "").trim();
   const appLogo = brand.appLogo ?? "";
   const appTheme = brand.appTheme ?? DEFAULT_THEME;
-  if (!appName && !appLogo && !brand.appTheme) return null;
+  const appStyle = brand.appStyle ?? DEFAULT_UI_STYLE;
+  if (!appName && !appLogo && !brand.appTheme && !brand.appStyle) return null;
   applyThemeColor(appTheme);
+  applyUiStyle(appStyle); // ROUND 38 — สไตล์บุคลิก (ฟอนต์/ความมน/พื้นหลัง) ตามไปกับแบรนด์ด้วย
   if (appName) document.title = appName;
   const cached = readBrandCache();
   const next: BrandSettings = {
     appName: appName || cached?.appName || "ร้านค้าสวัสดิการ",
     appLogo,
     appTheme,
+    appStyle: resolveUiStyle(appStyle),
   };
   try {
     localStorage.setItem(BRAND_CACHE_KEY, JSON.stringify(next));
@@ -138,11 +174,12 @@ export function readBrandCache(): BrandSettings | null {
     const raw = localStorage.getItem(BRAND_CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<BrandSettings>;
-    if (!parsed.appName && !parsed.appLogo && !parsed.appTheme) return null;
+    if (!parsed.appName && !parsed.appLogo && !parsed.appTheme && !parsed.appStyle) return null;
     return {
       appName: parsed.appName || "ร้านค้าสวัสดิการ",
       appLogo: parsed.appLogo || "",
       appTheme: parsed.appTheme || DEFAULT_THEME,
+      appStyle: resolveUiStyle(parsed.appStyle),
     };
   } catch {
     return null;

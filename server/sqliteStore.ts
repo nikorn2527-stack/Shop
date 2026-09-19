@@ -202,6 +202,14 @@ export type StoreSettings = {
   dailyCutOffTime: string;
   /** ROUND 36 (ข้อ 31) — ประตูบัญชีผู้พัฒนา (dev): ปิดอยู่ (false) = บัญชี dev เข้าสู่ระบบไม่ได้ทั้งหมด */
   devAccess: boolean;
+  /** ROUND 38 (ข้อ 39) — สไตล์การแสดงผลของแอป: "shop" (ค่าเริ่มต้น) | "apple" | "microsoft" | "android" */
+  appStyle: string;
+  /** ROUND 38 (ข้อ 39) — สำรองข้อมูลอัตโนมัติ: เปิด/ปิดตัวตรวจตามรอบเวลาของเซิร์ฟเวอร์ */
+  backupAutoEnabled: boolean;
+  /** ROUND 38 (ข้อ 39) — รอบสำรองข้อมูลอัตโนมัติเป็นชั่วโมง (1-168) */
+  backupIntervalHours: number;
+  /** ROUND 38 (ข้อ 39) — จำนวนไฟล์สำรองที่เก็บสูงสุด (3-60) — เกินจากนี้ลบไฟล์เก่าสุด */
+  backupKeepCount: number;
 };
 
 /**
@@ -2065,6 +2073,11 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   dailyCutOffMode: "auto",
   dailyCutOffTime: "00:00",
   devAccess: false,
+  // ROUND 38 (ข้อ 39) — สไตล์การแสดงผล + ระบบสำรองข้อมูล (ค่าเริ่มต้น: สำรองทุก 24 ชม. เก็บ 14 ไฟล์)
+  appStyle: "shop",
+  backupAutoEnabled: true,
+  backupIntervalHours: 24,
+  backupKeepCount: 14,
 };
 
 const SETTINGS_KEY = "app_settings";
