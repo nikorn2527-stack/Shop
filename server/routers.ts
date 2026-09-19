@@ -17,6 +17,9 @@ import {
   dailySalesRows,
   deleteProduct,
   dashboardStats,
+  memberTransactions,
+  salesByCashier,
+  salesByCategory,
   deleteAppSession,
   deleteMember,
   findAppUserByUsername,
@@ -250,8 +253,29 @@ const dashboardStatsInput = z
   .object({ rangeDays: z.number().int().min(1).max(365).optional() })
   .nullish();
 
+const reportRangeInput = z
+  .object({
+    from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
+    to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
+  })
+  .nullish();
+
 const reportsDailyInput = z
-  .object({ days: z.number().int().min(1).max(365).optional() })
+  .object({
+    days: z.number().int().min(1).max(365).optional(),
+    from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
+    to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
+  })
+  .nullish();
+
+const memberTransactionsInput = z
+  .object({
+    memberNumber: z.string().optional(),
+    type: z.enum(["purchase", "deposit", "withdrawal"]).optional(),
+    from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
+    to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
+    limit: z.number().int().min(1).max(1000).optional(),
+  })
   .nullish();
 
 const logsListInput = z
@@ -630,7 +654,16 @@ export const appRouter = router({
   reports: router({
     daily: publicProcedure
       .input(reportsDailyInput)
-      .query(({ input }) => withStoreErrors(() => dailySalesRows(getWelfareDb(), input?.days ?? 30))),
+      .query(({ input }) => withStoreErrors(() => dailySalesRows(getWelfareDb(), input ?? {}))),
+    byCategory: publicProcedure
+      .input(reportRangeInput)
+      .query(({ input }) => withStoreErrors(() => salesByCategory(getWelfareDb(), input ?? {}))),
+    byCashier: publicProcedure
+      .input(reportRangeInput)
+      .query(({ input }) => withStoreErrors(() => salesByCashier(getWelfareDb(), input ?? {}))),
+    memberTransactions: publicProcedure
+      .input(memberTransactionsInput)
+      .query(({ input }) => withStoreErrors(() => memberTransactions(getWelfareDb(), input ?? {}))),
   }),
 
   settings: router({

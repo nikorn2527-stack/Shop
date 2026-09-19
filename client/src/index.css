@@ -2753,3 +2753,50 @@ th { font-weight: 600; }
 @media (max-width: 900px) {
   .export-row { grid-template-columns: 1fr; }
 }
+
+/* ============================================================
+   ROUND 30 — รายงาน: ① สรุปยอดขายแยกชนิดสินค้า/พนักงานขาย
+   + ช่วงเวลาส่งถึงเซิร์ฟเวอร์ ② ประวัติบิลแยกรายสมาชิก
+   ③ ประวัติธุรกรรมสมาชิก + เจ้าหน้าที่ผู้ทำรายการ
+   ============================================================ */
+
+/* (1) มุมมองรายงาน — แถบสลับ ภาพรวม / ชนิดสินค้า / พนักงานขาย */
+.report-view-pills { margin: 13px 0 0; }
+.report-view-pills button { border: 1px solid #e3ebe8; border-radius: 20px; padding: 6px 13px; background: #fff; }
+.report-view-pills button.active { background: var(--teal); border-color: var(--teal); color: #fff; }
+.report-view-pills button.active::after { display: none; }
+.report-view-pills + .report-period-pills { margin-top: 9px; }
+.report-breakdown .sales-bar { margin-top: 4px; height: 4px; }
+.range-picker .mini-button { margin-left: 4px; white-space: nowrap; }
+
+/* (2) ประวัติบิล — แถบกรองตามสมาชิก (คีย์/ยิงบาร์โค้ด) */
+.bill-member-filter { margin-top: 12px; }
+.bill-member-filter .member-scan-field { height: 42px; border-radius: 10px; }
+.bill-cashier-cell { display: block; color: #6d7364; font-size: 10.5px; white-space: nowrap; }
+
+/* (3) ประวัติธุรกรรม — แถบตัวกรอง + การ์ดสรุป + ตาราง */
+.tx-filter-bar { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-top: 12px; }
+.tx-filter-bar .member-scan-wrap { flex: 1 1 260px; max-width: 420px; }
+.tx-filter-bar .member-scan-field { height: 40px; border-radius: 10px; }
+.tx-type-pills { display: flex; gap: 5px; flex-wrap: wrap; }
+.tx-type-pills button { border: 1px solid #e3ebe8; border-radius: 20px; padding: 7px 13px; background: #fff; color: #7c806f; font-size: 11.5px; font-weight: 500; }
+.tx-type-pills button:hover { border-color: #b3d7c8; color: var(--teal-dark); }
+.tx-type-pills button.active { background: var(--teal); border-color: var(--teal); color: #fff; font-weight: 600; }
+.tx-date-range { display: flex; align-items: center; gap: 6px; color: #848876; font-size: 11px; }
+.tx-date-range input { height: 34px; border: 1px solid #e2eae7; border-radius: 8px; padding: 0 8px; color: #5f6352; font-size: 11px; background: #fff; }
+.tx-summary-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 12px 0 4px; }
+.tx-summary-cards > div { background: #fbfdfc; border: 1px solid #eaf1ee; border-radius: 11px; padding: 11px 14px; }
+.tx-summary-cards small { display: block; color: #7a7e6e; font-size: 10.5px; }
+.tx-summary-cards strong { display: block; font-size: 17px; margin-top: 4px; letter-spacing: -.3px; }
+.tx-summary-cards span { display: block; color: #9aa093; font-size: 10px; margin-top: 3px; }
+.tx-table .tx-detail { display: block; max-width: 380px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #6b7163; font-size: 11.5px; }
+.tx-table tr.tx-deposit td { background: #f7fcf9; }
+.tx-table tr.tx-withdrawal td { background: #fdfaf4; }
+.amber-text { color: #b8863d; }
+
+/* คอลัมน์รองของตารางบิล/ธุรกรรม — จอแคบซ่อนก่อน */
+@media (max-width: 860px) {
+  .bill-history-table .hide-sm, .tx-table .hide-sm { display: none; }
+  .tx-summary-cards { grid-template-columns: 1fr; }
+  .tx-filter-bar .member-scan-wrap { max-width: none; }
+}

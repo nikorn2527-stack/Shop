@@ -297,6 +297,24 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
   ensureColumn(db, "app_users", "failed_attempts", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn(db, "products", "size", "TEXT");
   ensureColumn(db, "products", "image_url", "TEXT");
+  ensureColumn(db, "member_transactions", "actor", "TEXT");
+  // Backfill the new actor column from audit_logs (round 30): every wallet /
+  // purchase transaction was logged with the same timestamp as its
+  // member_transactions row, so an exact created_at match recovers the staff
+  // member who did it. Idempotent — only rows still missing actor are touched.
+  db.prepare(`UPDATE member_transactions SET actor = (
+    SELECT a.actor FROM audit_logs a
+    WHERE a.action = 'ขายสินค้า' AND a.created_at = member_transactions.created_at
+      AND a.detail LIKE 'บิล #' || substr(member_transactions.detail, 6, instr(member_transactions.detail || ' ·', ' ·') - 6) || ' ·%'
+    ORDER BY a.id DESC LIMIT 1
+  ) WHERE actor IS NULL AND type = 'purchase' AND detail LIKE 'บิล #%'`).run();
+  db.prepare(`UPDATE member_transactions SET actor = (
+    SELECT a.actor FROM audit_logs a
+    WHERE a.action IN ('เติมเงินสมาชิก', 'ถอนเงินสมาชิก')
+      AND a.created_at = member_transactions.created_at
+      AND a.detail LIKE member_transactions.member_number || ' ·%'
+    ORDER BY a.id DESC LIMIT 1
+  ) WHERE actor IS NULL AND type IN ('deposit', 'withdrawal')`).run();
   ensureColumn(db, "app_users", "locked_until", "TEXT");
   // Backfill units for sale_items rows written before the column existed (idempotent).
   db.prepare("UPDATE sale_items SET unit = (SELECT p.unit FROM products p WHERE p.id = sale_items.product_id) WHERE unit IS NULL").run();
@@ -972,12 +990,13 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
     if (isWallet && member) {
       balanceAfter = round2(member.balance - total);
       db.prepare(`UPDATE members SET balance = ? WHERE member_number = ?`).run(balanceAfter, member.memberNumber);
-      db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, created_at) VALUES (?, 'purchase', ?, ?, ?, ?, ?)`).run(
+      db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, actor, created_at) VALUES (?, 'purchase', ?, ?, ?, ?, ?, ?)`).run(
         member.memberNumber,
         `บิล #${orderNumber} · ${summarizeItems(items)}`,
         -total,
         input.paymentMethod,
         balanceAfter,
+        cashier,
         createdAt,
       );
     }
@@ -1209,12 +1228,13 @@ export function walletTx(db: SqliteDb, input: WalletTxInput) {
   const createdAt = formatDateTime();
   runInTransaction(db, () => {
     db.prepare(`UPDATE members SET balance = ? WHERE member_number = ?`).run(balanceAfter, member.memberNumber);
-    db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, created_at) VALUES (?, ?, ?, ?, 'เงินสด', ?, ?)`).run(
+    db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, actor, created_at) VALUES (?, ?, ?, ?, 'เงินสด', ?, ?, ?)`).run(
       member.memberNumber,
       input.type,
       detail,
       signedAmount,
       balanceAfter,
+      actor,
       createdAt,
     );
     logAction(
@@ -1324,28 +1344,128 @@ export function deleteMember(db: SqliteDb, input: DeleteMemberInput): { memberNu
 
 // --- reports ----------------------------------------------------------------
 
-export function dailySalesRows(db: SqliteDb, days = 30): DailySalesRow[] {
-  const range = Math.max(1, Math.min(365, Math.floor(days)));
+const ISO_DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+export type DailyRangeInput = { days?: number; from?: string; to?: string };
+
+function resolveRangeDates(input: DailyRangeInput): { fromDate: Date; toDate: Date } {
   const today = startOfToday();
-  const since = `${formatDate(addDays(today, -(range - 1)))} 00:00:00`;
+  let fromDate: Date;
+  let toDate: Date;
+  if (input.from && ISO_DATE_ONLY.test(input.from)) fromDate = new Date(`${input.from}T00:00:00`);
+  else {
+    const range = Math.max(1, Math.min(365, Math.floor(input.days ?? 30)));
+    fromDate = addDays(today, -(range - 1));
+  }
+  if (input.to && ISO_DATE_ONLY.test(input.to)) toDate = new Date(`${input.to}T00:00:00`);
+  else toDate = today;
+  if (fromDate > toDate) [fromDate, toDate] = [toDate, fromDate];
+  // Cap at 366 rows so a bad range can never generate an unbounded loop.
+  if ((toDate.getTime() - fromDate.getTime()) / 86_400_000 > 365) toDate = addDays(fromDate, 365);
+  return { fromDate, toDate };
+}
+
+export function dailySalesRows(db: SqliteDb, input: number | DailyRangeInput = 30): DailySalesRow[] {
+  const options: DailyRangeInput = typeof input === "number" ? { days: input } : (input ?? {});
+  const { fromDate, toDate } = resolveRangeDates(options);
+  const since = `${formatDate(fromDate)} 00:00:00`;
+  const until = `${formatDate(toDate)} 23:59:59`;
   const salesByDay = new Map<string, { orders: number; revenue: number }>();
-  for (const row of db.prepare(`SELECT substr(created_at, 1, 10) AS date, COUNT(*) AS orders, ROUND(SUM(total), 2) AS revenue FROM sales WHERE created_at >= ? GROUP BY date`).all(since) as unknown as { date: string; orders: number; revenue: number }[]) {
+  for (const row of db.prepare(`SELECT substr(created_at, 1, 10) AS date, COUNT(*) AS orders, ROUND(SUM(total), 2) AS revenue FROM sales WHERE created_at >= ? AND created_at <= ? GROUP BY date`).all(since, until) as unknown as { date: string; orders: number; revenue: number }[]) {
     salesByDay.set(row.date, { orders: row.orders, revenue: round2(row.revenue) });
   }
   const itemsByDay = new Map<string, { items: number; cogs: number }>();
-  for (const row of db.prepare(`SELECT substr(s.created_at, 1, 10) AS date, COALESCE(SUM(si.qty), 0) AS items, ROUND(COALESCE(SUM(si.qty * si.cost), 0), 2) AS cogs FROM sales s JOIN sale_items si ON si.sale_id = s.id WHERE s.created_at >= ? GROUP BY date`).all(since) as unknown as { date: string; items: number; cogs: number }[]) {
+  for (const row of db.prepare(`SELECT substr(s.created_at, 1, 10) AS date, COALESCE(SUM(si.qty), 0) AS items, ROUND(COALESCE(SUM(si.qty * si.cost), 0), 2) AS cogs FROM sales s JOIN sale_items si ON si.sale_id = s.id WHERE s.created_at >= ? AND s.created_at <= ? GROUP BY date`).all(since, until) as unknown as { date: string; items: number; cogs: number }[]) {
     itemsByDay.set(row.date, { items: row.items, cogs: round2(row.cogs) });
   }
   const rows: DailySalesRow[] = [];
-  for (let offset = range - 1; offset >= 0; offset -= 1) {
-    const date = formatDate(addDays(today, -offset));
-    const sales = salesByDay.get(date);
-    const items = itemsByDay.get(date);
+  for (let date = new Date(fromDate); date <= toDate; date = addDays(date, 1)) {
+    const key = formatDate(date);
+    const sales = salesByDay.get(key);
+    const items = itemsByDay.get(key);
     const revenue = sales?.revenue ?? 0;
     const cogs = items?.cogs ?? 0;
-    rows.push({ date, orders: sales?.orders ?? 0, items: items?.items ?? 0, revenue, cogs, profit: round2(revenue - cogs) });
+    rows.push({ date: key, orders: sales?.orders ?? 0, items: items?.items ?? 0, revenue, cogs, profit: round2(revenue - cogs) });
   }
   return rows;
+}
+
+// --- report breakdowns (round 30): by product category & by cashier ---------
+
+export type SalesByCategoryRow = { category: string; orders: number; qty: number; revenue: number; cogs: number; profit: number };
+
+/** Sales grouped by product category — special (no-product) lines land in "รายการพิเศษ". */
+export function salesByCategory(db: SqliteDb, input: DailyRangeInput = {}): SalesByCategoryRow[] {
+  const { fromDate, toDate } = resolveRangeDates(input);
+  const since = `${formatDate(fromDate)} 00:00:00`;
+  const until = `${formatDate(toDate)} 23:59:59`;
+  const rows = db.prepare(`SELECT COALESCE(NULLIF(TRIM(p.category), ''), 'ไม่ระบุหมวด') AS category, COUNT(DISTINCT si.sale_id) AS orders, COALESCE(SUM(si.qty), 0) AS qty, ROUND(COALESCE(SUM(si.qty * si.price), 0), 2) AS revenue, ROUND(COALESCE(SUM(si.qty * si.cost), 0), 2) AS cogs FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id WHERE s.created_at >= ? AND s.created_at <= ? GROUP BY category ORDER BY revenue DESC`).all(since, until) as unknown as { category: string; orders: number; qty: number; revenue: number; cogs: number }[];
+  return rows.map((row) => ({ ...row, qty: Number(row.qty), profit: round2(row.revenue - row.cogs) }));
+}
+
+export type SalesByCashierRow = { cashier: string; orders: number; items: number; memberBills: number; discount: number; total: number };
+
+/** Sales grouped by the staff member (cashier) who closed each bill. */
+export function salesByCashier(db: SqliteDb, input: DailyRangeInput = {}): SalesByCashierRow[] {
+  const { fromDate, toDate } = resolveRangeDates(input);
+  const since = `${formatDate(fromDate)} 00:00:00`;
+  const until = `${formatDate(toDate)} 23:59:59`;
+  const base = db.prepare(`SELECT COALESCE(NULLIF(TRIM(s.cashier), ''), 'ไม่ระบุพนักงาน') AS cashier, COUNT(*) AS orders, ROUND(COALESCE(SUM(s.discount), 0), 2) AS discount, ROUND(COALESCE(SUM(s.total), 0), 2) AS total, SUM(CASE WHEN s.member_number IS NOT NULL AND s.member_number != '' THEN 1 ELSE 0 END) AS memberBills FROM sales s WHERE s.created_at >= ? AND s.created_at <= ? GROUP BY cashier ORDER BY total DESC`).all(since, until) as unknown as { cashier: string; orders: number; discount: number; total: number; memberBills: number }[];
+  const itemsByCashier = new Map<string, number>();
+  for (const row of db.prepare(`SELECT COALESCE(NULLIF(TRIM(s.cashier), ''), 'ไม่ระบุพนักงาน') AS cashier, COALESCE(SUM(si.qty), 0) AS items FROM sales s JOIN sale_items si ON si.sale_id = s.id WHERE s.created_at >= ? AND s.created_at <= ? GROUP BY cashier`).all(since, until) as unknown as { cashier: string; items: number }[]) {
+    itemsByCashier.set(row.cashier, Number(row.items));
+  }
+  return base.map((row) => ({ cashier: row.cashier, orders: row.orders, items: itemsByCashier.get(row.cashier) ?? 0, memberBills: Number(row.memberBills), discount: round2(row.discount), total: round2(row.total) }));
+}
+
+// --- member transaction history (round 30): what members spent / deposited /
+// withdrew + which staff member performed each entry ---------------------------
+
+export type MemberTransactionRow = {
+  id: number;
+  memberNumber: string;
+  memberName: string | null;
+  type: "purchase" | "deposit" | "withdrawal";
+  detail: string;
+  amount: number;
+  paymentMethod: string | null;
+  balanceAfter: number | null;
+  actor: string | null;
+  createdAt: string;
+};
+
+export type MemberTransactionsInput = {
+  memberNumber?: string;
+  type?: "purchase" | "deposit" | "withdrawal";
+  from?: string;
+  to?: string;
+  limit?: number;
+};
+
+/** Member wallet ledger with the staff member (actor) who performed each entry. */
+export function memberTransactions(db: SqliteDb, input: MemberTransactionsInput = {}): MemberTransactionRow[] {
+  const conditions: string[] = [];
+  const params: (string | number)[] = [];
+  const memberNumber = input.memberNumber?.trim();
+  if (memberNumber) {
+    conditions.push("t.member_number LIKE ?");
+    params.push(`%${memberNumber}%`);
+  }
+  if (input.type) {
+    conditions.push("t.type = ?");
+    params.push(input.type);
+  }
+  if (input.from && ISO_DATE_ONLY.test(input.from)) {
+    conditions.push("t.created_at >= ?");
+    params.push(`${input.from} 00:00:00`);
+  }
+  if (input.to && ISO_DATE_ONLY.test(input.to)) {
+    conditions.push("t.created_at <= ?");
+    params.push(`${input.to} 23:59:59`);
+  }
+  const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
+  const limit = Math.max(1, Math.min(1000, Math.floor(input.limit ?? 300)));
+  return db.prepare(`SELECT t.id, t.member_number AS memberNumber, NULLIF(TRIM(m.first_name || ' ' || m.last_name), '') AS memberName, t.type, t.detail, t.amount, t.payment_method AS paymentMethod, t.balance_after AS balanceAfter, t.actor, t.created_at AS createdAt FROM member_transactions t LEFT JOIN members m ON m.member_number = t.member_number${where} ORDER BY t.created_at DESC, t.id DESC LIMIT ?`).all(...params, limit) as unknown as MemberTransactionRow[];
 }
 
 export function dashboardStats(db: SqliteDb, rangeDays = 30): DashboardStats {
@@ -1882,13 +2002,13 @@ const SEED_MEMBERS: { memberNumber: string; firstName: string; lastName: string;
   { memberNumber: "M-000119", firstName: "จุฑามาศ", lastName: "ก.", type: "เจ้าหน้าที่", balance: 2180, status: "active" },
 ];
 
-const SEED_MEMBER_TRANSACTIONS: { memberNumber: string; type: "purchase" | "deposit" | "withdrawal"; detail: string; amount: number; paymentMethod: string | null; balanceAfter: number; createdAt: string }[] = [
-  { memberNumber: "M-000218", type: "purchase", detail: "บิล #INV-260917-038 · น้ำดื่ม 2 ขวด, ข้าวกล่อง 1 กล่อง", amount: -59, paymentMethod: "member_balance", balanceAfter: 1240, createdAt: "2026-09-17 14:38:00" },
-  { memberNumber: "M-000218", type: "deposit", detail: "เงินสด · ผู้ฝาก: น.ส.กัญญาณัฐ พ.", amount: 500, paymentMethod: "cash", balanceAfter: 1299, createdAt: "2026-09-17 14:32:00" },
-  { memberNumber: "M-000218", type: "withdrawal", detail: "ถอนเพื่อถอนฟัน · เงินสด", amount: -200, paymentMethod: "cash", balanceAfter: 799, createdAt: "2026-09-12 10:16:00" },
-  { memberNumber: "M-000218", type: "purchase", detail: "บิล #INV-260901-006 · สินค้า 4 รายการ", amount: -132, paymentMethod: "member_balance", balanceAfter: 999, createdAt: "2026-09-01 09:05:00" },
-  { memberNumber: "M-000092", type: "withdrawal", detail: "ถอนเพื่อถอนฟัน · แนบหลักฐานแล้ว", amount: -200, paymentMethod: "cash", balanceAfter: 0, createdAt: "2026-09-16 09:12:00" },
-  { memberNumber: "M-000092", type: "purchase", detail: "บิล #INV-260912-091 · สินค้า 2 รายการ", amount: -80, paymentMethod: "member_balance", balanceAfter: 200, createdAt: "2026-09-12 11:40:00" },
+const SEED_MEMBER_TRANSACTIONS: { memberNumber: string; type: "purchase" | "deposit" | "withdrawal"; detail: string; amount: number; paymentMethod: string | null; balanceAfter: number; createdAt: string; actor: string | null }[] = [
+  { memberNumber: "M-000218", type: "purchase", detail: "บิล #INV-260917-038 · น้ำดื่ม 2 ขวด, ข้าวกล่อง 1 กล่อง", amount: -59, paymentMethod: "member_balance", balanceAfter: 1240, createdAt: "2026-09-17 14:38:00", actor: "น.ส.กัญญาณัฐ พ." },
+  { memberNumber: "M-000218", type: "deposit", detail: "เงินสด · ผู้ฝาก: น.ส.กัญญาณัฐ พ.", amount: 500, paymentMethod: "cash", balanceAfter: 1299, createdAt: "2026-09-17 14:32:00", actor: "น.ส.กัญญาณัฐ พ." },
+  { memberNumber: "M-000218", type: "withdrawal", detail: "ถอนเพื่อถอนฟัน · เงินสด", amount: -200, paymentMethod: "cash", balanceAfter: 799, createdAt: "2026-09-12 10:16:00", actor: "นายวรพจน์ ด." },
+  { memberNumber: "M-000218", type: "purchase", detail: "บิล #INV-260901-006 · สินค้า 4 รายการ", amount: -132, paymentMethod: "member_balance", balanceAfter: 999, createdAt: "2026-09-01 09:05:00", actor: "น.ส.กัญญาณัฐ พ." },
+  { memberNumber: "M-000092", type: "withdrawal", detail: "ถอนเพื่อถอนฟัน · แนบหลักฐานแล้ว", amount: -200, paymentMethod: "cash", balanceAfter: 0, createdAt: "2026-09-16 09:12:00", actor: "นายวรพจน์ ด." },
+  { memberNumber: "M-000092", type: "purchase", detail: "บิล #INV-260912-091 · สินค้า 2 รายการ", amount: -80, paymentMethod: "member_balance", balanceAfter: 200, createdAt: "2026-09-12 11:40:00", actor: "น.ส.กัญญาณัฐ พ." },
 ];
 
 const SEED_AUDIT_LOGS: { action: string; actor: string; actorRole: string; detail: string; tone: string; createdAt: string }[] = [
@@ -1991,9 +2111,9 @@ export function seedWelfareStoreData(db: SqliteDb) {
     insertMember.run(member.memberNumber, member.firstName, member.lastName, null, member.balance, member.status, member.type);
   }
   if (countRows(db, "member_transactions") === 0) {
-    const insertTransaction = db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+    const insertTransaction = db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, actor, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
     for (const transaction of SEED_MEMBER_TRANSACTIONS) {
-      insertTransaction.run(transaction.memberNumber, transaction.type, transaction.detail, transaction.amount, transaction.paymentMethod, transaction.balanceAfter, transaction.createdAt);
+      insertTransaction.run(transaction.memberNumber, transaction.type, transaction.detail, transaction.amount, transaction.paymentMethod, transaction.balanceAfter, transaction.actor, transaction.createdAt);
     }
   }
   if (countRows(db, "products") === 0) {
