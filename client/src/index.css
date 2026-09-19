@@ -3711,3 +3711,103 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
   .app-footer .footer-powered { order: 3; font-size: 9.5px; }
   .sidebar-powered { text-align: center; }
 }
+
+/* ============================================================
+   ROUND 40 — แท็บนำเข้าข้อมูลจาก Excel/CSV (ตั้งค่า → นำเข้าข้อมูล)
+   ============================================================ */
+/* การ์ดเลือกชนิดข้อมูล (สมาชิก / สินค้า) */
+.import-kind-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; margin-top: 14px; }
+.import-kind-card { display: flex; align-items: flex-start; gap: 11px; padding: 14px 15px; border: 1.5px solid #e3ebe7; border-radius: 12px; background: #fcfefd; text-align: left; cursor: pointer; transition: border-color .15s ease, background .15s ease; }
+.import-kind-card:hover { border-color: #9fc9b6; }
+.import-kind-card.selected { border-color: var(--teal); background: #eef8f3; box-shadow: 0 0 0 3px #e2f3ec; }
+.import-kind-card .import-kind-icon { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 10px; display: grid; place-items: center; background: #e7f3ee; color: var(--teal); }
+.import-kind-card.selected .import-kind-icon { background: #fff; }
+.import-kind-card b { display: block; color: #43554c; font-size: 12.5px; }
+.import-kind-card small { display: block; color: #7d8679; font-size: 10px; line-height: 1.5; margin-top: 4px; }
+/* แถวดาวน์โหลดเทมเพลต */
+.import-template-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 13px; padding: 13px 15px; background: #fbf7ec; border: 1px solid #eee0bf; border-radius: 12px; }
+.import-template-row > div { min-width: 0; }
+.import-template-row b { display: block; color: #6c5c34; font-size: 12px; }
+.import-template-row small { display: block; color: #8f8264; font-size: 10.5px; margin-top: 3px; line-height: 1.45; }
+.import-template-row .outline-button { flex: 0 0 auto; }
+/* dropzone อัปโหลด */
+.import-dropzone { display: flex; flex-direction: column; align-items: center; gap: 7px; padding: 34px 20px; margin-top: 13px; border: 2px dashed #bfd6cb; border-radius: 14px; background: #fbfdfc; color: var(--teal); text-align: center; cursor: pointer; transition: border-color .15s ease, background .15s ease; }
+.import-dropzone:hover, .import-dropzone:focus-visible { border-color: var(--teal); background: #f2faf6; outline: none; }
+.import-dropzone b { color: #3f5a4f; font-size: 13px; }
+.import-dropzone small { color: #7d8679; font-size: 10.5px; }
+.import-drop-hint { display: inline-block; margin-top: 5px; padding: 3px 10px; border-radius: 20px; background: #e9f4ef; color: #4e7d6c; font-size: 10px; }
+/* ข้อมูลไฟล์ที่อ่านแล้ว */
+.import-file-info { display: flex; align-items: center; gap: 12px; margin-top: 13px; padding: 12px 14px; border: 1px solid #dcebe3; border-radius: 12px; background: #f4faf7; }
+.import-file-info .import-file-icon { width: 38px; height: 38px; flex: 0 0 38px; border-radius: 10px; display: grid; place-items: center; background: #fff; color: #3d7a5f; border: 1px solid #d8e9e0; }
+.import-file-info > div:not(.import-file-icon):first-of-type { flex: 1; min-width: 0; }
+.import-file-info b { display: block; color: #3f5a4f; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.import-file-info small { display: block; color: #7d8679; font-size: 10px; margin-top: 3px; }
+.import-file-actions { display: flex; gap: 6px; flex: 0 0 auto; }
+.import-reading-row { display: flex; align-items: center; gap: 9px; margin-top: 10px; color: #6b7f76; font-size: 11px; }
+.mini-spinner { width: 14px; height: 14px; border-radius: 50%; border: 2px solid #cfe4da; border-top-color: var(--teal); animation: import-spin .7s linear infinite; }
+@keyframes import-spin { to { transform: rotate(360deg); } }
+/* แถวควบคุมพรีวิว (ชีต + แถวหัวตาราง + จำนวนแถว) */
+.import-preview-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 13px; }
+.import-preview-controls label { color: #7f8373; font-size: 11px; display: flex; align-items: center; gap: 7px; }
+.import-preview-controls select { height: 32px; border: 1px solid #dfe9e4; border-radius: 8px; background: #fff; color: #575c4e; font-size: 11px; padding: 0 8px; outline: none; }
+.import-preview-controls select:focus { border-color: #8fc5b0; box-shadow: 0 0 0 3px #eaf6f1; }
+.import-row-count { margin-left: auto; color: #7d8679; font-size: 11px; }
+.import-row-count b { color: #3f7a5f; font-size: 13px; }
+/* grid จับคู่คอลัมน์ */
+.import-mapping-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 13px; }
+.import-field { display: block; padding: 10px 12px; border: 1px solid #e3ebe7; border-radius: 11px; background: #fcfefd; }
+.import-field > span:first-child { display: block; color: #6d735e; font-size: 11px; font-weight: 600; }
+.import-field select { width: 100%; height: 32px; margin-top: 6px; border: 1px solid #dfe9e4; border-radius: 8px; background: #fff; color: #575c4e; font-size: 11px; padding: 0 7px; outline: none; }
+.import-field select:focus { border-color: #8fc5b0; box-shadow: 0 0 0 3px #eaf6f1; }
+.import-field small { display: block; color: #8d948a; font-size: 9.5px; margin-top: 5px; line-height: 1.45; }
+.import-field.missing { border-color: #e8c9b0; background: #fdf8f1; }
+.import-field.missing > span:first-child { color: #b4712d; }
+/* ตารางตัวอย่างข้อมูล */
+.import-sample-block { margin-top: 14px; }
+.import-sample-head { display: flex; align-items: center; gap: 7px; color: #5f6a60; font-size: 11.5px; font-weight: 600; }
+.import-sample-head span { color: #8d948a; font-weight: 400; font-size: 10px; }
+.import-sample-table { margin-top: 8px; border: 1px solid #e3ebe7; border-radius: 11px; overflow: auto; max-height: 240px; background: #fff; }
+.import-sample-table table { width: 100%; border-collapse: collapse; font-size: 10.5px; min-width: 480px; margin: 0; }
+.import-sample-table th { position: sticky; top: 0; background: #f4f9f6; color: #6d735e; font-size: 9.5px; font-weight: 600; text-align: left; padding: 7px 9px; border-bottom: 1px solid #e3ebe7; white-space: nowrap; }
+.import-sample-table th span { display: block; margin-top: 2px; color: #8d948a; font-weight: 400; }
+.import-sample-table th.mapped { background: #e9f5ef; color: #2f7a5c; }
+.import-sample-table td { padding: 6px 9px; border-bottom: 1px solid #f0f4f2; color: #6f7566; white-space: nowrap; max-width: 190px; overflow: hidden; text-overflow: ellipsis; }
+.import-blank { color: #b6bcae; font-style: normal; font-size: 9px; }
+/* แถวเลือกวิธีจัดการรายการซ้ำ */
+.import-duplicate-row { display: flex; flex-direction: column; gap: 9px; margin-top: 14px; padding: 13px 15px; background: #f7f8f4; border: 1px solid #e5e8de; border-radius: 12px; }
+.import-duplicate-row > div:first-child b { display: block; color: #4a524a; font-size: 11.5px; }
+.import-duplicate-row > div:first-child small { display: block; color: #828a7e; font-size: 10px; margin-top: 3px; }
+.import-duplicate-options { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+.import-duplicate-options button { display: flex; align-items: flex-start; gap: 9px; padding: 10px 12px; border: 1.5px solid #e0e5dc; border-radius: 10px; background: #fff; text-align: left; cursor: pointer; }
+.import-duplicate-options button.selected { border-color: var(--teal); background: #eef8f3; }
+.import-duplicate-options b { display: block; color: #45544b; font-size: 11px; }
+.import-duplicate-options small { display: block; color: #828a7e; font-size: 9.5px; margin-top: 3px; line-height: 1.4; }
+/* แถวปุ่มนำเข้า */
+.import-run-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 14px; padding: 14px 15px; background: var(--teal-mist); border: 1px solid var(--teal-soft); border-radius: 12px; }
+.import-run-row > div { min-width: 0; }
+.import-run-row b { display: block; color: #2f5247; font-size: 12.5px; }
+.import-run-row small { display: block; color: #6b7f76; font-size: 10.5px; margin-top: 3px; line-height: 1.45; }
+.import-run-row .primary-button { flex: 0 0 auto; height: 42px; padding: 0 18px; }
+/* การ์ดผลลัพธ์ */
+.import-result-card { border-color: #cfe6d8; }
+.import-result-stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; margin-top: 13px; }
+.import-result-stats > div { padding: 13px 10px; border: 1px solid #e3ebe7; border-radius: 11px; background: #fcfdfd; text-align: center; }
+.import-result-stats small { display: block; color: #828a7e; font-size: 10px; }
+.import-result-stats strong { display: block; color: #575c4e; font-size: 21px; margin-top: 4px; }
+.import-result-stats .ok strong { color: #2f8a64; }
+.import-result-stats .bad strong { color: #c16b6e; }
+.import-error-list { margin-top: 11px; border: 1px solid #eed6cd; border-radius: 11px; overflow: hidden; }
+.import-error-head { padding: 9px 13px; background: #fdf4ee; color: #a05c33; font-size: 10.5px; font-weight: 600; border-bottom: 1px solid #f0e2d8; }
+.import-error-row { display: flex; align-items: baseline; gap: 9px; padding: 7px 13px; border-bottom: 1px solid #f5efe9; background: #fff; font-size: 10.5px; }
+.import-error-row:last-child { border-bottom: 0; }
+.import-error-row b { color: #a05c33; flex: 0 0 auto; font-family: "IBM Plex Mono", monospace; font-size: 9.5px; }
+.import-error-row span { color: #7d756b; }
+.import-error-row.more { color: #828a7e; font-style: italic; }
+.import-result-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 13px; }
+@media (max-width: 680px) {
+  .import-kind-grid, .import-duplicate-options, .import-mapping-grid, .import-result-stats { grid-template-columns: 1fr; }
+  .import-template-row, .import-run-row, .import-file-info { flex-direction: column; align-items: stretch; }
+  .import-template-row .outline-button, .import-run-row .primary-button, .import-file-actions { width: 100%; }
+  .import-file-actions { justify-content: stretch; }
+  .import-row-count { margin-left: 0; }
+}

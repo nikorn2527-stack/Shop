@@ -447,11 +447,12 @@ const WALLET_PAYMENT = "หักบัญชีสมาชิก";
 
 const pad2 = (value: number) => String(value).padStart(2, "0");
 
-function round2(value: number) {
+// ROUND 40 (ข้อ 32) — export ให้ importTool.ts ใช้ร่วมกัน (ตัวเล็ก ไร้ผลข้างเนียง)
+export function round2(value: number) {
   return Math.round((value + Number.EPSILON) * 100) / 100;
 }
 
-function formatDateTime(date = new Date()) {
+export function formatDateTime(date = new Date()) {
   return `${formatDate(date)} ${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
 }
 
@@ -476,7 +477,7 @@ export function money(value: number) {
   return `฿${value.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-function runInTransaction<T>(db: SqliteDb, fn: () => T): T {
+export function runInTransaction<T>(db: SqliteDb, fn: () => T): T {
   db.exec("BEGIN");
   try {
     const result = fn();

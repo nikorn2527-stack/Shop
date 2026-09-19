@@ -8,6 +8,7 @@ import { readAppSessionCookie, type TrpcContext } from "./_core/context";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { backupSqliteDatabase, listSqliteBackups, pruneSqliteBackupsByCount, restoreSqliteBackup, verifySqliteBackup } from "./sqliteBackup";
+import { buildTemplateBase64, importMembers, importProducts, parseSpreadsheetBase64, readSheetRows, type MemberFieldMapping, type ProductFieldMapping } from "./importTool";
 import { closeWelfareDb, getBackupDir, getWelfareDb, getWelfareDbPath } from "./welfareStore";
 import {
   LOGIN_MAX_FAILURES,
@@ -108,6 +109,15 @@ function resolveActor(ctx: TrpcContext, input: { actor?: string; actorRole?: str
 /** Admin gate: session role wins; only anonymous requests fall back to input. */
 function isAdminCtx(ctx: TrpcContext, input: { actorRole?: string }) {
   return ctx.user ? ctx.user.role === "admin" : (input.actorRole ?? "").trim() === "ผู้บริหาร";
+}
+
+/** ROUND 40 (ข้อ 32) — แปลง mapping ที่ client ส่ง (อาจมี -1 = ไม่นำเข้า) ให้เป็น undefined ตาม contract ของ importTool */
+function sanitizeMapping<T extends Record<string, number | undefined>>(mapping: T): T {
+  const cleaned: Record<string, number | undefined> = {};
+  for (const [key, value] of Object.entries(mapping)) {
+    if (value !== undefined && value >= 0) cleaned[key] = value;
+  }
+  return cleaned as T;
 }
 
 const paymentMethodSchema = z.enum(["เงินสด", "QR / สแกน", "หักบัญชีสมาชิก"]);
@@ -1002,6 +1012,111 @@ export const appRouter = router({
           return { ok: true as const, safetyBackupFile };
         });
       }),
+  }),
+
+  // ROUND 40 (ข้อ 32) — นำเข้าข้อมูลจริงจาก Excel/CSV: พรีวิว → map คอลัมน์ → นำเข้า (ผู้บริหารเท่านั้น)
+  importData: router({
+    /** อ่านไฟล์ (base64) → หัวตารางทุกชีต + ตัวอย่างแถว + mapping ที่ระบบเดาให้ — ยังไม่แตะฐานข้อมูล */
+    preview: publicProcedure
+      .input(
+        z.object({
+          kind: z.enum(["members", "products"]),
+          fileName: z.string().min(1).max(200),
+          base64: z.string().min(16).max(7_000_000), // ~5MB ไฟล์จริง
+          headerRowOverride: z.number().int().min(0).max(9).optional(),
+        }),
+      )
+      .mutation(({ ctx, input }) =>
+        withStoreErrors(() => {
+          if (!isAdminCtx(ctx, {})) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "การนำเข้าข้อมูลต้องใช้สิทธิ์ผู้บริหาร" });
+          }
+          return parseSpreadsheetBase64(input.base64, input.kind, input.headerRowOverride);
+        }),
+      ),
+    /** นำเข้าจริง — สำรองข้อมูลเป็นไฟล์ป้องกันก่อนเสมอ */
+    execute: publicProcedure
+      .input(
+        z.object({
+          kind: z.enum(["members", "products"]),
+          fileName: z.string().min(1).max(200),
+          base64: z.string().min(16).max(7_000_000),
+          sheetName: z.string().min(1).max(200),
+          headerRowIndex: z.number().int().min(0).max(9),
+          duplicateMode: z.enum(["skip", "replace"]),
+          memberMapping: z
+            .object({
+              firstName: z.number().int().min(-1).max(99),
+              memberNumber: z.number().int().min(-1).max(99).optional(),
+              lastName: z.number().int().min(-1).max(99).optional(),
+              balance: z.number().int().min(-1).max(99).optional(),
+              creditLimit: z.number().int().min(-1).max(99).optional(),
+              status: z.number().int().min(-1).max(99).optional(),
+              phone: z.number().int().min(-1).max(99).optional(),
+              idCard: z.number().int().min(-1).max(99).optional(),
+              type: z.number().int().min(-1).max(99).optional(),
+              gender: z.number().int().min(-1).max(99).optional(),
+            })
+            .optional(),
+          productMapping: z
+            .object({
+              name: z.number().int().min(-1).max(99),
+              barcode: z.number().int().min(-1).max(99).optional(),
+              sku: z.number().int().min(-1).max(99).optional(),
+              category: z.number().int().min(-1).max(99).optional(),
+              unit: z.number().int().min(-1).max(99).optional(),
+              price: z.number().int().min(-1).max(99).optional(),
+              cost: z.number().int().min(-1).max(99).optional(),
+              stock: z.number().int().min(-1).max(99).optional(),
+              reorderPoint: z.number().int().min(-1).max(99).optional(),
+              size: z.number().int().min(-1).max(99).optional(),
+            })
+            .optional(),
+        }),
+      )
+      .mutation(({ ctx, input }) => {
+        const { actor, actorRole } = resolveActor(ctx, {});
+        return withStoreErrors(() => {
+          if (!isAdminCtx(ctx, {})) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "การนำเข้าข้อมูลต้องใช้สิทธิ์ผู้บริหาร" });
+          }
+          if (input.kind === "members" && (!input.memberMapping || input.memberMapping.firstName < 0)) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "กรุณาเลือกคอลัมน์ “ชื่อ” ของสมาชิกก่อนนำเข้า" });
+          }
+          if (input.kind === "products" && (!input.productMapping || input.productMapping.name < 0)) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "กรุณาเลือกคอลัมน์ “ชื่อสินค้า” ก่อนนำเข้า" });
+          }
+          const { rows } = readSheetRows(input.base64, input.sheetName, input.headerRowIndex);
+          if (rows.length === 0) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "ชีตที่เลือกไม่มีแถวข้อมูลให้นำเข้า" });
+          }
+          // 1) สำรองไฟล์ป้องกันก่อนนำเข้าเสมอ — ถ้าผลไม่ตามที่คิด กู้คืนกลับได้ทันที
+          let safetyBackupFile = "";
+          try {
+            safetyBackupFile = backupSqliteDatabase({ sourcePath: getWelfareDbPath(), backupDir: getBackupDir(), retentionDays: 3650 }).file;
+          } catch (error) {
+            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `สำรองไฟล์ป้องกันก่อนนำเข้าไม่สำเร็จ: ${String(error)}` });
+          }
+          // 2) นำเข้าตาม kind + mapping ที่ผู้บริหารยืนยัน
+          const db = getWelfareDb();
+          const summary =
+            input.kind === "members"
+              ? importMembers(db, { rows, mapping: sanitizeMapping(input.memberMapping!) as MemberFieldMapping, duplicateMode: input.duplicateMode, actor, actorRole })
+              : importProducts(db, { rows, mapping: sanitizeMapping(input.productMapping!) as ProductFieldMapping, duplicateMode: input.duplicateMode, actor, actorRole });
+          return { ...summary, safetyBackupFile, fileName: input.fileName };
+        });
+      }),
+    /** ดาวน์โหลดไฟล์เทมเพลต .xlsx ให้กรอกตามรูปแบบที่ระบบนำเข้าได้ทันที */
+    template: publicProcedure
+      .input(z.object({ kind: z.enum(["members", "products"]) }))
+      .mutation(({ ctx, input }) =>
+        withStoreErrors(() => {
+          if (!isAdminCtx(ctx, {})) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "การดาวน์โหลดเทมเพลตนำเข้าต้องใช้สิทธิ์ผู้บริหาร" });
+          }
+          return buildTemplateBase64(input.kind);
+        }),
+      ),
   }),
 
   logs: router({
