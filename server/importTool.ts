@@ -382,7 +382,7 @@ export function importMembers(db: SqliteDb, options: ImportMembersOptions): Impo
 // import สินค้า
 // ---------------------------------------------------------------------------
 
-const IMPORT_SKU_PREFIXES: Record<string, string> = { "เครื่องดื่ม": "DRK", "อาหาร": "FD", "ของใช้": "HYG" };
+const IMPORT_SKU_PREFIXES: Record<string, string> = { "เครื่องดื่ม": "DRK", "อาหาร": "FD", "ของใช้": "HYG", "ขนม": "SNK" };
 
 function nextImportSku(db: SqliteDb, category: string): string {
   const prefix = IMPORT_SKU_PREFIXES[category] ?? "GEN";

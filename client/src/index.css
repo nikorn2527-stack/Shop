@@ -4229,6 +4229,58 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 /* ซ่อนโมดัลพรีวิวทุกครั้งที่พิมพ์จริง — ให้ @media print ของเอกสารต้นฉบับทำงานล้วน ๆ */
 @media print { .print-preview-scope { display: none !important; } }
 
+/* ============================================================
+   ROUND 53 (user) — ใบนับสต็อก A4 สำหรับพิมพ์ออกไปนับมือ
+   ซ่อนบนจอ · แสดงในพรีวิว (PrintPreviewModal) · พิมพ์แบบ
+   กระดาษ A4 ต่อเนื่องหลายหน้า มีช่องให้เขียนด้วยมือ
+   ============================================================ */
+.stock-count-sheet { display: none; }
+.print-preview-paper .stock-count-sheet { display: block; width: 100%; background: #fff; color: #26251f; font-family: "Sarabun", "TH Sarabun New", "Leelawadee UI", Tahoma, sans-serif; }
+.scs-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; border-bottom: 2px solid #0d7a55; padding-bottom: 8px; }
+.scs-brand { display: flex; align-items: center; gap: 8px; }
+.scs-mark { width: 36px; height: 36px; border-radius: 9px; background: #0d7a55; color: #fff; display: grid; place-items: center; font-size: 18px; font-weight: 700; flex: 0 0 auto; }
+.scs-brand b { display: block; font-size: 13.5px; }
+.scs-brand small { display: block; color: #6f7466; font-size: 9.5px; }
+.scs-title { text-align: right; }
+.scs-title b { display: block; font-size: 15px; }
+.scs-title small { display: block; color: #5c6156; font-size: 10px; margin-top: 2px; }
+.scs-fill-row { display: grid; grid-template-columns: 1.6fr 1fr 1fr 1fr; gap: 8px; margin: 10px 0; }
+.scs-fill-row > div { border: 1px solid #c9d3cc; border-radius: 6px; padding: 5px 8px 6px; background: #fbfdfc; }
+.scs-fill-row span { display: block; font-size: 9px; color: #79806f; }
+.scs-fill-row i { display: block; border-bottom: 1px dotted #9aa79d; height: 15px; }
+.scs-table { width: 100%; border-collapse: collapse; font-size: 10px; }
+.scs-table th { background: #0d7a55; color: #fff; padding: 5px 6px; text-align: left; font-weight: 600; }
+.scs-table td { border-bottom: 1px solid #e2e7de; padding: 6.5px 6px; vertical-align: middle; }
+.scs-table thead { display: table-header-group; }
+.scs-table tr { page-break-inside: avoid; }
+.scs-cat td { background: #ecf5ef; color: #14563b; font-weight: 700; font-size: 10.5px; border-bottom: 1px solid #d3e6da; }
+.scs-no { width: 34px; text-align: center; color: #6d7466; }
+.scs-name { min-width: 150px; }
+.scs-name b { font-weight: 600; color: #26251f; }
+.scs-name small { color: #79806f; font-size: 9px; }
+.scs-sku { font-family: "IBM Plex Mono", monospace; }
+.scs-unit { width: 44px; color: #5c6156; }
+.scs-num { width: 52px; text-align: center; font-variant-numeric: tabular-nums; }
+.scs-blank { border-bottom: 1px dotted #9aa79d !important; min-height: 14px; }
+.scs-note { width: 110px; border-bottom: 1px dotted #9aa79d !important; }
+.scs-foot { display: flex; justify-content: space-around; gap: 26px; margin-top: 22px; }
+.scs-sign { text-align: center; flex: 1; max-width: 220px; }
+.scs-sign i { display: block; border-bottom: 1px dotted #6d7466; height: 30px; }
+.scs-sign small { display: block; color: #5c6156; font-size: 9.5px; margin-top: 4px; }
+.scs-note-line { margin-top: 14px; border-top: 1px solid #dfe4da; padding-top: 6px; font-size: 9px; color: #6f7466; line-height: 1.6; }
+@media print {
+  /* ใช้ @page margin 8mm กฎเดิมของระบบ (กฎ @page ไม่สามารถ constrain ตาม DOM ได้ —
+     ห้ามตั้ง size/margin เพิ่มเพราะจะทับการพิมพ์สลิปใบเสร็จ) */
+  body:has(#stock-count-sheet) .sidebar, body:has(#stock-count-sheet) .topbar, body:has(#stock-count-sheet) .app-footer,
+  body:has(#stock-count-sheet) .page-content > * { display: none !important; }
+  body:has(#stock-count-sheet) .page-content > .stock-count-sheet { display: block !important; }
+  body:has(#stock-count-sheet) .app-shell { display: block; min-height: 0; }
+  body:has(#stock-count-sheet) .main-shell { min-width: 0; }
+  body:has(#stock-count-sheet) .page-content { max-width: none; margin: 0; padding: 0; animation: none; }
+  body:has(#stock-count-sheet) { min-height: 0 !important; height: auto !important; }
+  body:has(#stock-count-sheet) .stock-count-sheet { display: block; }
+}
+
 /* (2) ตัวกรองพนักงานขาย — ดรอปดาวน์เดียว ใช้ได้กับทุกมุมมองรายงาน */
 .report-staff-filter { display: inline-flex; align-items: center; gap: 7px; }
 .report-staff-filter > span { color: #7d8172; font-size: 11px; font-weight: 600; white-space: nowrap; }
