@@ -1825,7 +1825,22 @@ export function countPendingLimitRequests(db: SqliteDb): number {
 
 const ISO_DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
-export type DailyRangeInput = { days?: number; from?: string; to?: string };
+/** ROUND 51 — ชื่อพนักงานพิเศษ: แทนบิลที่ไม่ได้ระบุชื่อผู้ขาย (เก่า ๆ / นำเข้า) */
+export const UNASSIGNED_CASHIER = "ไม่ระบุพนักงาน";
+
+export type DailyRangeInput = { days?: number; from?: string; to?: string; cashier?: string };
+
+/**
+ * ROUND 51 (user) — ตัวกรองพนักงานขายใช้ร่วมกับทุกรายงานยอดขาย
+ * "" = ทุกคน · UNASSIGNED_CASHIER = เฉพาะบิลที่ไม่มีชื่อผู้ขาย · ชื่ออื่น = เจาะจงคนนั้น
+ * (เทียบแบบ TRIM เพื่อให้ตรงกับการจัดกลุ่มของ salesByCashier เสมอ)
+ */
+function cashierWhere(alias: string, cashier?: string): { sql: string; params: string[] } {
+  const name = cashier?.trim();
+  if (!name) return { sql: "", params: [] };
+  if (name === UNASSIGNED_CASHIER) return { sql: ` AND TRIM(COALESCE(${alias}.cashier, '')) = ''`, params: [] };
+  return { sql: ` AND TRIM(COALESCE(${alias}.cashier, '')) = ?`, params: [name] };
+}
 
 function resolveRangeDates(input: DailyRangeInput): { fromDate: Date; toDate: Date } {
   const today = startOfToday();
@@ -1849,12 +1864,13 @@ export function dailySalesRows(db: SqliteDb, input: number | DailyRangeInput = 3
   const { fromDate, toDate } = resolveRangeDates(options);
   const since = `${formatDate(fromDate)} 00:00:00`;
   const until = `${formatDate(toDate)} 23:59:59`;
+  const filter = cashierWhere("s", options.cashier);
   const salesByDay = new Map<string, { orders: number; revenue: number }>();
-  for (const row of db.prepare(`SELECT substr(created_at, 1, 10) AS date, COUNT(*) AS orders, ROUND(SUM(total), 2) AS revenue FROM sales WHERE created_at >= ? AND created_at <= ? GROUP BY date`).all(since, until) as unknown as { date: string; orders: number; revenue: number }[]) {
+  for (const row of db.prepare(`SELECT substr(s.created_at, 1, 10) AS date, COUNT(*) AS orders, ROUND(SUM(s.total), 2) AS revenue FROM sales s WHERE s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY date`).all(since, until, ...filter.params) as unknown as { date: string; orders: number; revenue: number }[]) {
     salesByDay.set(row.date, { orders: row.orders, revenue: round2(row.revenue) });
   }
   const itemsByDay = new Map<string, { items: number; cogs: number }>();
-  for (const row of db.prepare(`SELECT substr(s.created_at, 1, 10) AS date, COALESCE(SUM(si.qty), 0) AS items, ROUND(COALESCE(SUM(si.qty * si.cost), 0), 2) AS cogs FROM sales s JOIN sale_items si ON si.sale_id = s.id WHERE s.created_at >= ? AND s.created_at <= ? GROUP BY date`).all(since, until) as unknown as { date: string; items: number; cogs: number }[]) {
+  for (const row of db.prepare(`SELECT substr(s.created_at, 1, 10) AS date, COALESCE(SUM(si.qty), 0) AS items, ROUND(COALESCE(SUM(si.qty * si.cost), 0), 2) AS cogs FROM sales s JOIN sale_items si ON si.sale_id = s.id WHERE s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY date`).all(since, until, ...filter.params) as unknown as { date: string; items: number; cogs: number }[]) {
     itemsByDay.set(row.date, { items: row.items, cogs: round2(row.cogs) });
   }
   const rows: DailySalesRow[] = [];
@@ -1878,7 +1894,8 @@ export function salesByCategory(db: SqliteDb, input: DailyRangeInput = {}): Sale
   const { fromDate, toDate } = resolveRangeDates(input);
   const since = `${formatDate(fromDate)} 00:00:00`;
   const until = `${formatDate(toDate)} 23:59:59`;
-  const rows = db.prepare(`SELECT COALESCE(NULLIF(TRIM(p.category), ''), 'ไม่ระบุหมวด') AS category, COUNT(DISTINCT si.sale_id) AS orders, COALESCE(SUM(si.qty), 0) AS qty, ROUND(COALESCE(SUM(si.qty * si.price), 0), 2) AS revenue, ROUND(COALESCE(SUM(si.qty * si.cost), 0), 2) AS cogs FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id WHERE s.created_at >= ? AND s.created_at <= ? GROUP BY category ORDER BY revenue DESC`).all(since, until) as unknown as { category: string; orders: number; qty: number; revenue: number; cogs: number }[];
+  const filter = cashierWhere("s", input.cashier);
+  const rows = db.prepare(`SELECT COALESCE(NULLIF(TRIM(p.category), ''), 'ไม่ระบุหมวด') AS category, COUNT(DISTINCT si.sale_id) AS orders, COALESCE(SUM(si.qty), 0) AS qty, ROUND(COALESCE(SUM(si.qty * si.price), 0), 2) AS revenue, ROUND(COALESCE(SUM(si.qty * si.cost), 0), 2) AS cogs FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id WHERE s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY category ORDER BY revenue DESC`).all(since, until, ...filter.params) as unknown as { category: string; orders: number; qty: number; revenue: number; cogs: number }[];
   return rows.map((row) => ({ ...row, qty: Number(row.qty), profit: round2(row.revenue - row.cogs) }));
 }
 
@@ -1905,7 +1922,8 @@ export function salesByProduct(db: SqliteDb, input: DailyRangeInput = {}): Sales
   const { fromDate, toDate } = resolveRangeDates(input);
   const since = `${formatDate(fromDate)} 00:00:00`;
   const until = `${formatDate(toDate)} 23:59:59`;
-  const rows = db.prepare(`SELECT si.product_id AS productId, CASE WHEN si.product_id IS NULL THEN 'รายการพิเศษ' ELSE COALESCE(p.name, si.name) END AS name, p.sku AS sku, p.barcode AS barcode, NULLIF(TRIM(p.category), '') AS category, COUNT(DISTINCT si.sale_id) AS bills, COALESCE(SUM(si.qty), 0) AS qty, ROUND(COALESCE(SUM(si.qty * si.price), 0), 2) AS revenue, ROUND(COALESCE(SUM(si.qty * si.cost), 0), 2) AS cogs FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id WHERE s.created_at >= ? AND s.created_at <= ? GROUP BY si.product_id ORDER BY revenue DESC`).all(since, until) as unknown as { productId: number | null; name: string; sku: string | null; barcode: string | null; category: string | null; bills: number; qty: number; revenue: number; cogs: number }[];
+  const filter = cashierWhere("s", input.cashier);
+  const rows = db.prepare(`SELECT si.product_id AS productId, CASE WHEN si.product_id IS NULL THEN 'รายการพิเศษ' ELSE COALESCE(p.name, si.name) END AS name, p.sku AS sku, p.barcode AS barcode, NULLIF(TRIM(p.category), '') AS category, COUNT(DISTINCT si.sale_id) AS bills, COALESCE(SUM(si.qty), 0) AS qty, ROUND(COALESCE(SUM(si.qty * si.price), 0), 2) AS revenue, ROUND(COALESCE(SUM(si.qty * si.cost), 0), 2) AS cogs FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id WHERE s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY si.product_id ORDER BY revenue DESC`).all(since, until, ...filter.params) as unknown as { productId: number | null; name: string; sku: string | null; barcode: string | null; category: string | null; bills: number; qty: number; revenue: number; cogs: number }[];
   return rows.map((row) => ({ ...row, bills: Number(row.bills), qty: Number(row.qty), profit: round2(row.revenue - row.cogs) }));
 }
 
@@ -1933,7 +1951,8 @@ export function salesLineItems(db: SqliteDb, input: DailyRangeInput = {}): Sales
   const { fromDate, toDate } = resolveRangeDates(input);
   const since = `${formatDate(fromDate)} 00:00:00`;
   const until = `${formatDate(toDate)} 23:59:59`;
-  return db.prepare(`SELECT s.order_number AS orderNumber, s.created_at AS createdAt, si.name AS productName, COALESCE(si.unit, p.unit, 'ชิ้น') AS unit, si.qty, si.price, ROUND(si.qty * si.price, 2) AS amount, s.payment_method AS paymentMethod, COALESCE(NULLIF(TRIM(s.cashier), ''), 'ไม่ระบุพนักงาน') AS cashier, s.member_number AS memberNumber, CASE WHEN m.member_number IS NULL THEN NULL WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id LEFT JOIN members m ON m.member_number = s.member_number WHERE s.created_at >= ? AND s.created_at <= ? ORDER BY s.created_at DESC, s.id DESC, si.id ASC LIMIT 1000`).all(since, until) as unknown as SalesLineItemRow[];
+  const filter = cashierWhere("s", input.cashier);
+  return db.prepare(`SELECT s.order_number AS orderNumber, s.created_at AS createdAt, si.name AS productName, COALESCE(si.unit, p.unit, 'ชิ้น') AS unit, si.qty, si.price, ROUND(si.qty * si.price, 2) AS amount, s.payment_method AS paymentMethod, COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, s.member_number AS memberNumber, CASE WHEN m.member_number IS NULL THEN NULL WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id LEFT JOIN members m ON m.member_number = s.member_number WHERE s.created_at >= ? AND s.created_at <= ?${filter.sql} ORDER BY s.created_at DESC, s.id DESC, si.id ASC LIMIT 1000`).all(since, until, ...filter.params) as unknown as SalesLineItemRow[];
 }
 
 export type SalesByCashierRow = { cashier: string; orders: number; items: number; memberBills: number; discount: number; total: number };
@@ -1943,12 +1962,20 @@ export function salesByCashier(db: SqliteDb, input: DailyRangeInput = {}): Sales
   const { fromDate, toDate } = resolveRangeDates(input);
   const since = `${formatDate(fromDate)} 00:00:00`;
   const until = `${formatDate(toDate)} 23:59:59`;
-  const base = db.prepare(`SELECT COALESCE(NULLIF(TRIM(s.cashier), ''), 'ไม่ระบุพนักงาน') AS cashier, COUNT(*) AS orders, ROUND(COALESCE(SUM(s.discount), 0), 2) AS discount, ROUND(COALESCE(SUM(s.total), 0), 2) AS total, SUM(CASE WHEN s.member_number IS NOT NULL AND s.member_number != '' THEN 1 ELSE 0 END) AS memberBills FROM sales s WHERE s.created_at >= ? AND s.created_at <= ? GROUP BY cashier ORDER BY total DESC`).all(since, until) as unknown as { cashier: string; orders: number; discount: number; total: number; memberBills: number }[];
+  const filter = cashierWhere("s", input.cashier);
+  const base = db.prepare(`SELECT COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, COUNT(*) AS orders, ROUND(COALESCE(SUM(s.discount), 0), 2) AS discount, ROUND(COALESCE(SUM(s.total), 0), 2) AS total, SUM(CASE WHEN s.member_number IS NOT NULL AND s.member_number != '' THEN 1 ELSE 0 END) AS memberBills FROM sales s WHERE s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY cashier ORDER BY total DESC`).all(since, until, ...filter.params) as unknown as { cashier: string; orders: number; discount: number; total: number; memberBills: number }[];
   const itemsByCashier = new Map<string, number>();
-  for (const row of db.prepare(`SELECT COALESCE(NULLIF(TRIM(s.cashier), ''), 'ไม่ระบุพนักงาน') AS cashier, COALESCE(SUM(si.qty), 0) AS items FROM sales s JOIN sale_items si ON si.sale_id = s.id WHERE s.created_at >= ? AND s.created_at <= ? GROUP BY cashier`).all(since, until) as unknown as { cashier: string; items: number }[]) {
+  for (const row of db.prepare(`SELECT COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, COALESCE(SUM(si.qty), 0) AS items FROM sales s JOIN sale_items si ON si.sale_id = s.id WHERE s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY cashier`).all(since, until, ...filter.params) as unknown as { cashier: string; items: number }[]) {
     itemsByCashier.set(row.cashier, Number(row.items));
   }
   return base.map((row) => ({ cashier: row.cashier, orders: row.orders, items: itemsByCashier.get(row.cashier) ?? 0, memberBills: Number(row.memberBills), discount: round2(row.discount), total: round2(row.total) }));
+}
+
+/** ROUND 51 (user) — รายชื่อพนักงานขายจากบิลจริงทั้งหมด (สำหรับตัวกรองเจาะจงในรายงาน) */
+export type CashierOptionRow = { cashier: string; bills: number; lastSale: string };
+
+export function salesCashierOptions(db: SqliteDb): CashierOptionRow[] {
+  return db.prepare(`SELECT COALESCE(NULLIF(TRIM(cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, COUNT(*) AS bills, MAX(created_at) AS lastSale FROM sales GROUP BY COALESCE(NULLIF(TRIM(cashier), ''), '${UNASSIGNED_CASHIER}') ORDER BY bills DESC`).all() as unknown as CashierOptionRow[];
 }
 
 // --- member transaction history (round 30): what members spent / deposited /

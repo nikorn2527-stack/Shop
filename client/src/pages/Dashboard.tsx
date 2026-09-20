@@ -6,6 +6,7 @@ import type { BusinessPeriodStatus, DayClosureRow } from "../../../server/sqlite
 import type { Role, View } from "./pageData";
 import { isAdminRole, money, roleThaiLabel } from "./pageData";
 import { ConfirmDialog, SectionHeader } from "./PagePrimitives";
+import { PrintPreviewModal } from "@/components/PrintPreviewModal";
 import { trpc } from "@/lib/trpc";
 import { formatAxisLabel, formatThaiDate, formatTimeShort, parseBahtFromDetail } from "./viewFormat";
 
@@ -106,6 +107,8 @@ function CutoffWidget({ role, userName }: { role: Role; userName: string }) {
   const periodQuery = trpc.reports.businessPeriod.useQuery(undefined, { refetchInterval: 60_000 });
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [closed, setClosed] = useState<DayClosureRow | null>(null);
+  // ROUND 51 — พิมพ์สรุปรอบผ่านพรีวิวก่อน (เหมือนจุดพิมพ์อื่นทั้งระบบ)
+  const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
   const closeMutation = trpc.reports.closeDay.useMutation({
     onSuccess: (closure) => {
       setClosed(closure);
@@ -145,7 +148,7 @@ function CutoffWidget({ role, userName }: { role: Role; userName: string }) {
     <div className="cutoff-widget-actions">
       {closed ? <>
         <div className="cutoff-done-note"><Check size={14} /> ตัดยอดเรียบร้อย {formatTimeShort(closed.closedAt)} · โดย {closed.closedBy ?? "—"}</div>
-        <button type="button" className="outline-button" onClick={() => window.print()}><Printer size={15} /> พิมพ์สรุปรอบ</button>
+        <button type="button" className="outline-button" onClick={() => setPrintPreviewOpen(true)}><Printer size={15} /> พิมพ์สรุปรอบ</button>
         <button type="button" className="primary-button" onClick={() => setClosed(null)}><CalendarClock size={15} /> เริ่มรอบใหม่</button>
       </> : <>
         <button type="button" className="primary-button cutoff-trigger" onClick={() => setConfirmOpen(true)} disabled={closeMutation.isPending}><CalendarClock size={15} /> ตัดยอดรอบนี้</button>
@@ -172,6 +175,7 @@ function CutoffWidget({ role, userName }: { role: Role; userName: string }) {
       <div className="receipt-thanks">ตัดยอดโดย {closed.closedBy ?? "—"} · {actorRole} {userName ? `(${userName})` : ""}<br /><small>สรุปรอบนี้บันทึกลงระบบ Log แล้ว · รอบใหม่เริ่มทันทีหลังตัดยอด</small></div>
     </div>}
     <ConfirmDialog open={confirmOpen} title="ยืนยันตัดยอดรอบนี้?" description={`สรุปยอดตั้งแต่ ${period ? `${formatThaiDate(period.periodStart)} ${formatTimeShort(period.periodStart)}` : "ต้นรอบ"} จนถึงตอนนี้ แล้วเริ่มรอบใหม่ทันที · ยอดขายรอบนี้ ${period ? money(period.totals.revenue) : "—"} (${period?.totals.bills ?? 0} บิล) · ระบบจะสร้างสรุปรอบให้พิมพ์เก็บไว้ และบันทึกลง Log`} confirmLabel="ตัดยอดรอบนี้" onCancel={() => setConfirmOpen(false)} onConfirm={() => closeMutation.mutate({ actor: userName || "เจ้าหน้าที่ร้านค้า", actorRole: role })} />
+    {printPreviewOpen && closed && <PrintPreviewModal targetId="cutoff-report" title="พรีวิวก่อนพิมพ์สรุปรอบตัดยอด" subtitle={`ตัดยอดเมื่อ ${formatThaiDate(closed.closedAt)} · ${formatTimeShort(closed.closedAt)} · โดย ${closed.closedBy ?? "—"}`} paper="thermal" chips={[`${closed.bills.toLocaleString("th-TH")} บิล`, `ยอดขาย ${money(closed.revenue)}`, `เงินสด ${money(closed.cashTotal)} · QR ${money(closed.qrTotal)}`]} onClose={() => setPrintPreviewOpen(false)} />}
     {closeMutation.isError && <div className="notice-bar error" role="alert"><CircleAlert size={16} /> {closeMutation.error.message}<button onClick={() => closeMutation.reset()}><X size={14} /></button></div>}
   </section>;
 }

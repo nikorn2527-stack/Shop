@@ -4170,3 +4170,49 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 @media print {
   .report-range-row, .report-range-status, .report-custom-picker { display: none; }
 }
+
+/* ============================================================
+   ROUND 51 — (1) พรีวิวก่อนพิมพ์ทุกจุด (2) ตัวกรองพนักงานขายเจาะจง
+   (1) .print-preview-scope = โมดัลพรีวิวก่อนพิมพ์ — โคลนเอกสารต้นฉบับ
+   มาแสดงในกรอบขนาดจริง แล้วค่อยกดพิมพ์ · ซ่อนเสมอตอนพิมพ์จริง
+   (2) .report-staff-filter = ดรอปดาวน์เลือกพนักงานขาย ใช้ร่วมกับทุกมุมมอง
+   ============================================================ */
+.print-preview-modal { width: min(620px, calc(100vw - 28px)); }
+.print-preview-stage { margin-top: 4px; border-radius: 12px; padding: 18px 14px; max-height: min(58vh, 560px); overflow: auto; display: grid; place-items: start center; background: repeating-linear-gradient(-45deg, #f4f8f6 0 14px, #eff4f1 14px 28px); border: 1px solid #e2ebe7; }
+.print-preview-stage .print-preview-paper { min-height: 40px; }
+.print-preview-stage.paper-thermal .print-preview-paper { width: 300px; max-width: 100%; }
+.print-preview-stage.paper-a4 .print-preview-paper { width: min(470px, 100%); }
+.print-preview-stage.paper-card .print-preview-paper { width: 323px; }
+/* เอกสารที่ปกติซ่อนบนหน้าจอ (โผล่เฉพาะตอนพิมพ์) ต้องแสดงในพรีวิว */
+.print-preview-paper .cutoff-report, .print-preview-paper .printer-test-slip { display: block !important; width: 300px; max-width: 100%; margin: 0 auto; }
+.print-preview-paper .statement-paper { width: 100%; max-width: none; box-shadow: none; }
+.print-preview-paper .receipt-paper, .print-preview-paper .wallet-slip { box-shadow: 0 6px 18px rgba(35, 62, 52, .12); }
+.print-preview-paper .member-card { box-shadow: 0 8px 20px rgba(40, 70, 58, .16); }
+.print-preview-empty { color: #7d8172; font-size: 11.5px; padding: 30px 10px; }
+.print-preview-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.print-preview-note { color: #7d8172; font-size: 10.5px; line-height: 1.5; flex: 1 1 240px; }
+.print-preview-buttons { display: flex; gap: 7px; flex-shrink: 0; }
+@media (max-width: 560px) {
+  .print-preview-stage { padding: 10px 7px; max-height: 52vh; }
+  .print-preview-stage.paper-thermal .print-preview-paper, .print-preview-stage.paper-card .print-preview-paper { width: 100%; }
+  .print-preview-actions { flex-direction: column; align-items: stretch; }
+  .print-preview-buttons { justify-content: stretch; }
+  .print-preview-buttons button { flex: 1; }
+}
+/* ซ่อนโมดัลพรีวิวทุกครั้งที่พิมพ์จริง — ให้ @media print ของเอกสารต้นฉบับทำงานล้วน ๆ */
+@media print { .print-preview-scope { display: none !important; } }
+
+/* (2) ตัวกรองพนักงานขาย — ดรอปดาวน์เดียว ใช้ได้กับทุกมุมมองรายงาน */
+.report-staff-filter { display: inline-flex; align-items: center; gap: 7px; }
+.report-staff-filter > span { color: #7d8172; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.report-staff-filter > select { appearance: none; -webkit-appearance: none; border: 1px solid #e3ebe8; background: #fff url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%237d8172' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 9px center; border-radius: 16px; padding: 5px 28px 5px 12px; font-size: 11.5px; font-weight: 500; color: #41504a; max-width: 220px; cursor: pointer; transition: .15s ease; }
+.report-staff-filter > select:hover { border-color: #b9d8cb; background-color: #f4faf7; }
+.report-staff-filter > select:focus-visible { outline: none; border-color: #9bcdba; box-shadow: 0 0 0 3px #eaf6f1; }
+.report-staff-filter.active > select { border-color: #9bcdba; background-color: #eef7f2; color: #1f6d4d; font-weight: 600; }
+.report-staff-hint { color: #8b8f80; font-size: 10.5px; margin-top: 6px; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.report-staff-hint svg { flex: 0 0 auto; }
+@media (max-width: 560px) {
+  .report-staff-filter > span { display: none; }
+  .report-staff-filter > select { max-width: 100%; flex: 1; }
+}
+@media print { .report-staff-filter, .report-staff-hint { display: none; } }

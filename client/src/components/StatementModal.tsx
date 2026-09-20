@@ -6,6 +6,7 @@ import { money } from "../pages/pageData";
 import { WALLET_TX_META } from "../pages/viewFormat";
 import { trpc } from "@/lib/trpc";
 import { brandInitial } from "@/theme";
+import { PrintPreviewModal } from "./PrintPreviewModal";
 
 /** A wallet transaction row as returned by member.detail (DESC order, ≤50). */
 export type StatementTx = {
@@ -113,9 +114,10 @@ export function StatementModal({ member, transactions, onClose }: { member: Stat
     } finally { setBusy(false); }
   };
 
-  // Print uses the @media print rules keyed on body:has(#member-statement) —
-  // same isolation approach as the wallet card and thermal receipts.
-  const printStatement = () => window.print();
+  // ROUND 51 — พิมพ์ผ่านพรีวิวก่อน (เหมือนจุดพิมพ์อื่นทั้งระบบ) — เห็นหน้ากระดาษ A4
+  // พร้อมจำนวนแถวก่อนสั่งพิมพ์จริง
+  const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
+  const printStatement = () => setPrintPreviewOpen(true);
 
   return <div className="modal-backdrop" onClick={onClose}><div className="statement-modal" onClick={(event) => event.stopPropagation()}>
     <div className="modal-heading">
@@ -182,5 +184,6 @@ export function StatementModal({ member, transactions, onClose }: { member: Stat
       <button className="outline-button" disabled={busy} onClick={downloadPdf}><Download size={16} /> {busy ? "กำลังสร้าง PDF..." : "ดาวน์โหลด PDF"}</button>
       <button className="primary-button" onClick={printStatement}><Printer size={16} /> พิมพ์รายงาน</button>
     </div>
+    {printPreviewOpen && <PrintPreviewModal targetId="member-statement" title="พรีวิวก่อนพิมพ์รายงานสมาชิก" subtitle={`${displayName} · ${member.memberNumber} · ยอดคงเหลือ ${money(member.balance)}`} paper="a4" chips={[`${totals.count} รายการ`, totals.truncated ? `แสดง ${TX_LIMIT} รายการล่าสุด` : "ครบทุกรายการ"]} onClose={() => setPrintPreviewOpen(false)} />}
   </div></div>;
 }

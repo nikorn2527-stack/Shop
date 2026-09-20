@@ -22,6 +22,7 @@ import {
   createAppUser,
   createProduct,
   dailySalesRows,
+  salesCashierOptions,
   deleteProduct,
   dashboardStats,
   memberTransactions,
@@ -337,6 +338,8 @@ const reportRangeInput = z
   .object({
     from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
     to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
+    /** ROUND 51 — กรองเฉพาะพนักงานขายคนนี้ ("" = ทุกคน · "ไม่ระบุพนักงาน" = บิลที่ไม่มีชื่อ) */
+    cashier: z.string().trim().max(120).optional(),
   })
   .nullish();
 
@@ -345,6 +348,8 @@ const reportsDailyInput = z
     days: z.number().int().min(1).max(365).optional(),
     from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
     to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
+    /** ROUND 51 — กรองเฉพาะพนักงานขายคนนี้ ("" = ทุกคน · "ไม่ระบุพนักงาน" = บิลที่ไม่มีชื่อ) */
+    cashier: z.string().trim().max(120).optional(),
   })
   .nullish();
 
@@ -878,6 +883,10 @@ export const appRouter = router({
     byCashier: publicProcedure
       .input(reportRangeInput)
       .query(({ input }) => withStoreErrors(() => salesByCashier(getWelfareDb(), input ?? {}))),
+    /** ROUND 51 — รายชื่อพนักงานขายทั้งหมดจากบิลจริง (ตัวเลือกตัวกรองเจาะจงในรายงาน) */
+    cashiers: publicProcedure
+      .input(z.unknown().optional())
+      .query(() => withStoreErrors(() => salesCashierOptions(getWelfareDb()))),
     memberTransactions: publicProcedure
       .input(memberTransactionsInput)
       .query(({ input }) => withStoreErrors(() => memberTransactions(getWelfareDb(), input ?? {}))),

@@ -7,6 +7,7 @@ import { code128DataUrl } from "../barcode";
 import { MemberAvatar } from "./MemberAvatar";
 import { trpc } from "@/lib/trpc";
 import { brandInitial } from "@/theme";
+import { PrintPreviewModal } from "./PrintPreviewModal";
 
 /** Fields the wallet card actually renders (subset of the member record). */
 export type MemberCardData = {
@@ -98,9 +99,9 @@ export function MemberCardModal({
       link.click();
     } finally { setBusy(false); }
   };
-  // Print while the modal stays mounted — the @media print rules keyed on
-  // body:has(#member-card) isolate the card onto a clean cut-ready page.
-  const printCard = () => window.print();
+  // ROUND 51 — พิมพ์บัตรผ่านพรีวิวก่อน (เหมือนจุดพิมพ์อื่น) ตรวจบัตรให้ถูกคนก่อนสั่งพิมพ์จริง
+  const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
+  const printCard = () => setPrintPreviewOpen(true);
   return <div className="modal-backdrop" onClick={onClose}><div className={`member-card-modal${confirmForBill ? " confirm-mode" : ""}`} onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label={confirmForBill ? "ยืนยันข้อมูลสมาชิกก่อนทำรายการ" : "บัตรสมาชิก"}>
     <div className="modal-heading">
       <div>
@@ -165,5 +166,6 @@ export function MemberCardModal({
         <button className="primary-button" onClick={printCard}><Printer size={16} /> พิมพ์บัตรสมาชิก</button>
       </>}
     </div>
+    {printPreviewOpen && <PrintPreviewModal targetId="member-card" title="พรีวิวก่อนพิมพ์บัตรสมาชิก" subtitle={`${displayName} · ${member.memberNumber}`} paper="card" chips={[`ยอดคงเหลือ ${money(member.balance)}`, member.status === "active" ? "สถานะใช้จ่ายได้" : "ระงับการใช้จ่าย"]} onClose={() => setPrintPreviewOpen(false)} />}
   </div></div>;
 }
