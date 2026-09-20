@@ -59,6 +59,8 @@ import {
   revokeAppSession,
   revokeOtherAppSessions,
   salesList,
+  getSaleSlip,
+  getTransactionSlip,
   setMemberStatus,
   setProductActive,
   setSettings,
@@ -177,6 +179,8 @@ const memberWalletInput = z.object({
   note: z.string().optional(),
   actor: z.string().optional(),
   actorRole: z.string().optional(),
+  // ROUND 63 (user) — รูปหลักฐานการโอน/สลิป แนบไปกับรายการเติม/ถอน
+  slipImage: z.string().max(600_000).nullish(),
 });
 
 const memberUpdateInput = z.object({
@@ -266,6 +270,8 @@ const checkoutInput = z.object({
   discount: z.number().min(0).optional(),
   cashier: z.string().optional(),
   actorRole: z.string().optional(),
+  // ROUND 63 (user) — รูปหลักฐานการชำระ (สลิป QR / สแกน) แนบไปกับบิล
+  slipImage: z.string().max(600_000).nullish(),
 });
 
 const productCreateInput = z.object({
@@ -411,6 +417,8 @@ const settingsPatchInput = z
     receiptPaperWidth: z.enum(["58", "72", "80"]).optional(),
     // ROUND 56 (user) — เช็คลิสต์วันขึ้นระบบ (โซนเครื่องมือติดตั้ง): JSON รหัสรายการที่ติ๊กแล้ว
     goliveChecks: z.string().max(4000).optional(),
+    // ROUND 63 (user) — บัญชีพร้อมเพย์ร้าน: เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก
+    promptpayId: z.string().max(20).optional(),
   })
   .nullish();
 
@@ -769,6 +777,10 @@ export const appRouter = router({
     list: publicProcedure
       .input(salesListInput)
       .query(({ input }) => withStoreErrors(() => salesList(getWelfareDb(), input ?? {}))),
+    // ROUND 63 (user) — ดึงรูปหลักฐานการชำระของบิล (สลิป QR / สแกน) แยกจากลิสต์กัน payload หนัก
+    slip: publicProcedure
+      .input(z.object({ id: z.number().int().min(1) }))
+      .query(({ input }) => withStoreErrors(() => getSaleSlip(getWelfareDb(), input.id))),
   }),
 
   stock: router({
@@ -889,6 +901,10 @@ export const appRouter = router({
         const { actor, actorRole } = resolveActor(ctx, input);
         return withStoreErrors(() => walletTx(getWelfareDb(), { ...input, actor, actorRole }));
       }),
+    // ROUND 63 (user) — ดึงรูปหลักฐานของรายการเติม/ถอนเงินสมาชิก (แนบตอนทำรายการที่ POS)
+    transactionSlip: publicProcedure
+      .input(z.object({ id: z.number().int().min(1) }))
+      .query(({ input }) => withStoreErrors(() => getTransactionSlip(getWelfareDb(), input.id))),
     update: publicProcedure
       .input(memberUpdateInput)
       .mutation(({ ctx, input }) => {

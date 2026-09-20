@@ -12,7 +12,7 @@ import type { ReportDocConfig } from "@/reportDoc";
 export type ExportFormat = "csv" | "xlsx" | "pdf" | "print";
 
 export type ExportPreviewState = {
-  kind: "sales" | "bills" | "transactions";
+  kind: "sales" | "bills" | "transactions" | "stock" | "orders";
   /** ชื่อรายงานที่โชว์บนโมดัล */
   title: string;
   periodLabel?: string;

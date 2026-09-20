@@ -7,12 +7,17 @@ import { useEffect, useRef, useState } from "react";
  * ยืนยันรูปก่อนใช้ · ภาพที่ได้เป็น data-URL JPEG 480px (สอดคล้องขนาดรูปสมาชิก
  * ที่ระบบย่อให้เหมือนการเลือกจากไฟล์) จึงต่อเข้าฟอร์มเดิมได้ทันที
  * ไม่มีกล้อง/ไม่ได้รับอนุญาต → ข้อความไทยชี้ทางแก้ + ใช้เลือกไฟล์แทนได้เสมอ
+ *
+ * ROUND 63 (user) — facing="environment" = ใช้กล้องหลัง (ถ่ายสลิป/สินค้าจากมือถือ)
+ * · "user" (ค่าเริ่มต้น) = กล้องหน้า สำหรับถ่ายรูปคน
  */
 
 export type CameraCaptureModalProps = {
   open: boolean;
   title: string;
   hint?: string;
+  /** กล้องที่ใช้: "user" = กล้องหน้า (ถ่ายคน) · "environment" = กล้องหลัง (ถ่ายสลิป/เอกสาร) */
+  facing?: "user" | "environment";
   onClose: () => void;
   onCapture: (dataUrl: string) => void;
 };
@@ -20,7 +25,7 @@ export type CameraCaptureModalProps = {
 const MAX_OUTPUT_DIM = 480;
 const JPEG_QUALITY = 0.82;
 
-export function CameraCaptureModal({ open, title, hint, onClose, onCapture }: CameraCaptureModalProps) {
+export function CameraCaptureModal({ open, title, hint, facing = "user", onClose, onCapture }: CameraCaptureModalProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [phase, setPhase] = useState<"starting" | "live" | "error">("starting");
@@ -48,7 +53,7 @@ export function CameraCaptureModal({ open, title, hint, onClose, onCapture }: Ca
           return;
         }
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
+          video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: facing === "environment" ? { ideal: "environment" } : "user" },
           audio: false,
         });
         if (cancelled) {
@@ -82,7 +87,7 @@ export function CameraCaptureModal({ open, title, hint, onClose, onCapture }: Ca
       cancelled = true;
       stopStream();
     };
-  }, [open, attempt]);
+  }, [open, attempt, facing]);
 
   // ปิดกล้องทันทีเมื่อปิดโมดูล/ถอด component ค้างไว้
   useEffect(() => () => stopStream(), []);

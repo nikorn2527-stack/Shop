@@ -4624,3 +4624,86 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
   .edition-key-row { flex-direction: column; }
   .edition-trial-card { flex-direction: column; align-items: stretch; }
 }
+
+/* ================================================================
+   ROUND 63 (user) — ความอ่านง่ายของข้อความในโมดัลทั้งระบบ
+   ผู้ใช้สะท้อน: ตัวหนังสือในหน้าต่างที่เด้งขึ้นมา "บางเกินจนมองไม่ชัด"
+   แนวทาง: override เฉพาะภายใน .modal-backdrop (ทุกโมดัลของระบบอยู่ใน
+   คอนเทนเนอร์นี้) — หน้าจอหลัก/ตารางคงขนาดเดิม ไม่กระทบเลย์เอาต์เดิม
+   · เพิ่มน้ำหนักฟอนต์ (Sarabun 400 บน Windows ดูบาง) + สีเข้มขึ้น + ขยาย 1–1.5px
+   ================================================================ */
+.modal-backdrop .modal-heading h2 { font-size: 18px; font-weight: 700; letter-spacing: -.2px; }
+.modal-backdrop .modal-heading p { font-size: 12.5px; font-weight: 500; color: #5f6455; line-height: 1.5; }
+.modal-backdrop .eyebrow { font-size: 10.5px; font-weight: 500; color: #565b4c; }
+.modal-backdrop .compact-form label, .modal-backdrop .form-grid label, .modal-backdrop .wallet-form label { font-size: 12px; font-weight: 600; color: #4f5444; }
+.modal-backdrop .compact-form input, .modal-backdrop .compact-form select, .modal-backdrop .form-grid input, .modal-backdrop .wallet-form input, .modal-backdrop .wallet-form select { font-size: 12.5px; font-weight: 500; color: #3d4235; height: 38px; }
+.modal-backdrop .wallet-form label { margin-top: 11px; }
+.modal-backdrop .compact-form input::placeholder, .modal-backdrop .form-grid input::placeholder, .modal-backdrop .wallet-form input::placeholder { color: #8a8f7d; }
+.modal-backdrop .notice-bar { font-size: 12px; font-weight: 500; }
+.modal-backdrop .initial-balance-note { font-size: 11.5px; font-weight: 500; color: #565b4c; }
+.modal-backdrop .member-number-preview, .modal-backdrop .number-preview { font-size: 11.5px; color: #666b5a; }
+.modal-backdrop .member-number-preview b, .modal-backdrop .number-preview b { font-size: 12.5px; }
+.modal-backdrop .wallet-confirm-rows > div { font-size: 12.5px; }
+.modal-backdrop .wallet-confirm-rows span { color: #63685a; font-weight: 500; }
+.modal-backdrop .wallet-confirm-warning { font-size: 12px; }
+.modal-backdrop .wallet-heading b { font-size: 12.5px; }
+.modal-backdrop .wallet-heading small { font-size: 10.5px; }
+.modal-backdrop .wallet-modal-foot small { font-size: 10.5px; }
+.modal-backdrop .confirm-modal h2 { font-weight: 700; }
+.modal-backdrop .confirm-modal p { font-size: 12.5px; font-weight: 500; color: #5f6455; max-width: 360px; line-height: 1.55; }
+.modal-backdrop .outline-button, .modal-backdrop .primary-button, .modal-backdrop .danger-button, .modal-backdrop .danger-outline-button { font-size: 12px; font-weight: 600; }
+.modal-backdrop .quick-manage-info b { font-size: 12px; }
+.modal-backdrop .quick-manage-info small { font-size: 10.5px; }
+.modal-backdrop .pay-confirm-items > .pay-confirm-item { font-size: 12px; }
+.modal-backdrop .pay-confirm-items-head { font-size: 10.5px; }
+.modal-backdrop .slip-heading { font-size: 12px; color: #5f6455; font-weight: 600; }
+.modal-backdrop .slip-heading small { font-size: 10px; }
+.modal-backdrop .upload-drop b { font-size: 12px; color: #4f5444; }
+.modal-backdrop .upload-drop small { font-size: 10.5px; }
+.modal-backdrop .slip-preview b { font-size: 12px; }
+.modal-backdrop .slip-preview small { font-size: 10.5px; }
+/* ใบเสร็จ/สลิปบนจอและงานพิมพ์ — ขยับขนาดขึ้นเล็กน้อยให้อ่านง่าย (กระดาษ 58–80 มม. รับได้) */
+.receipt-line { font-size: 11px; }
+.receipt-line small { font-size: 10px; }
+.receipt-line b { font-size: 11px; }
+.receipt-meta, .receipt-customer, .receipt-payment, .receipt-balance { font-size: 10px; }
+.receipt-total { font-size: 12px; }
+.receipt-thanks { font-size: 11.5px; }
+.receipt-thanks small { font-size: 10px; }
+
+/* ================================================================
+   ROUND 63 (user) — QR พร้อมเพย์ที่หน้ายืนยันการชำระเงิน + แนบหลักฐานสลิป
+   ================================================================ */
+.pay-qr-block { margin-top: 12px; display: grid; gap: 10px; }
+.pay-qr-figure { display: flex; align-items: center; gap: 14px; border: 1px solid #dbece5; background: #f6fbf8; border-radius: 10px; padding: 12px; }
+.pay-qr-figure img { width: 150px; height: 150px; border-radius: 8px; border: 1px solid #d8e8e0; background: #fff; flex: 0 0 150px; }
+.pay-qr-caption b { display: flex; align-items: center; gap: 6px; color: #2d5c4a; font-size: 14px; }
+.pay-qr-caption small { display: block; color: #6a705f; font-size: 11.5px; font-weight: 500; line-height: 1.5; margin-top: 6px; }
+.pay-qr-missing { display: flex; gap: 8px; align-items: flex-start; color: #8a6a2f; background: #fff8e8; border: 1px solid #f0dcae; border-radius: 8px; padding: 10px 11px; font-size: 11.5px; font-weight: 500; line-height: 1.55; }
+.pay-slip-block { border: 1px dashed #cfe4db; border-radius: 9px; padding: 10px; background: #fcfefd; }
+.pay-slip-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.pay-slip-file { cursor: pointer; }
+.pay-qr-block .slip-preview { background: #fff; }
+.slip-uploader-row { display: flex; gap: 8px; align-items: stretch; }
+.slip-uploader-row .upload-drop { flex: 1; min-width: 0; }
+.slip-camera-btn { flex: 0 0 auto; }
+@media (max-width: 560px) {
+  .pay-qr-figure { flex-direction: column; text-align: center; }
+  .pay-qr-figure img { flex-basis: auto; }
+  .pay-qr-caption b { justify-content: center; }
+  .slip-uploader-row { flex-direction: column; }
+  .pay-slip-actions > button, .pay-slip-actions > .pay-slip-file { flex: 1; }
+}
+
+/* ROUND 63 — ปุ่มดูหลักฐานในตารางบิล + ประวัติธุรกรรมสมาชิก */
+.row-slip-btn { display: inline-flex; align-items: center; gap: 4px; border: 1px solid #d5e6de; background: #f4faf7; color: #3f8467; font-size: 11px; font-weight: 500; font-family: inherit; cursor: pointer; padding: 3px 8px; border-radius: 7px; transition: .14s ease; white-space: nowrap; }
+.row-slip-btn:hover { background: #e6f4ed; border-color: #9ecdb8; color: #2c6b52; }
+.row-actions-cell { display: inline-flex; align-items: center; gap: 5px; justify-content: flex-end; }
+
+/* ROUND 63 — โมดัลดูรูปหลักฐานการชำระ (SlipViewModal) */
+.slip-view-modal { width: min(560px, 100%); }
+.slip-view-stage { margin-top: 12px; border: 1px solid #e2ece7; border-radius: 10px; background: #f7faf8; display: grid; place-items: center; min-height: 260px; max-height: min(60vh, 520px); overflow: auto; padding: 12px; }
+.slip-view-stage img { max-width: 100%; max-height: min(58vh, 500px); object-fit: contain; border-radius: 6px; border: 1px solid #dfe9e4; background: #fff; }
+.slip-view-loading { display: grid; place-items: center; gap: 5px; color: #7c816e; padding: 26px 12px; text-align: center; }
+.slip-view-loading b { color: #5b6151; font-size: 13px; }
+.slip-view-loading span { font-size: 11.5px; font-weight: 500; }

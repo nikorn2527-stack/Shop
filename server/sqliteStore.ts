@@ -44,6 +44,8 @@ export type SqliteTransaction = {
   paymentMethod: string | null;
   balanceAfter: number | null;
   createdAt: string;
+  /** ROUND 63 — รายการนี้มีรูปหลักฐานแนบไหม (ตัวรูปดึงแยกที่ member.transactionSlip) */
+  hasSlip?: number;
 };
 
 export type SqliteMemberSummary = {
@@ -155,7 +157,12 @@ export type CheckoutReceipt = {
 };
 
 /** A past receipt rebuilt from the sales/sale_items tables — balanceAfter is replayed from the member ledger when that bill was a wallet purchase. */
-export type SaleHistoryEntry = CheckoutReceipt;
+export type SaleHistoryEntry = CheckoutReceipt & {
+  /** รหัสแถวในตาราง sales — ใช้ดึงหลักฐานแนบ (sales.slip) รอบหลัง */
+  id: number;
+  /** ROUND 63 — บิลนี้มีรูปหลักฐานการชำระแนบอยู่ไหม (ตัวรูปดึงแยกที่ sales.slip เพื่อไม่ให้ลิสต์หนัก) */
+  hasSlip: boolean;
+};
 
 export type DailySalesRow = {
   date: string;
@@ -226,6 +233,9 @@ export type StoreSettings = {
   licenseName: string;
   /** วันเริ่มทดลองใช้โปรพลัส 30 วัน "YYYY-MM-DD" · "" = ยังไม่เคยทดลอง · ตั้งผ่าน edition.startTrial เท่านั้น */
   trialStart: string;
+  /** ROUND 63 (user) — บัญชีพร้อมเพย์ของร้าน (เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก)
+   *  ใช้สร้าง QR ให้ลูกค้าสแกนจ่ายที่หน้ายืนยันการชำระเงิน · "" = ยังไม่ตั้ง (ไม่แสดง QR) */
+  promptpayId: string;
 };
 
 /**
@@ -408,6 +418,10 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
     ORDER BY a.id DESC LIMIT 1
   ) WHERE actor IS NULL AND type IN ('deposit', 'withdrawal')`).run();
   ensureColumn(db, "app_users", "locked_until", "TEXT");
+  // ROUND 63 (user) — หลักฐานการชำระเงิน: รูปสลิปที่แนบมากับบิลขาย (QR/สแกน) และ
+  // รายการเติม/ถอนเงินสมาชิก เก็บเป็น data-URL JPEG (ย่อ ~800px ฝั่ง client ก่อนส่ง)
+  ensureColumn(db, "sales", "slip_url", "TEXT");
+  ensureColumn(db, "member_transactions", "slip_url", "TEXT");
   // Backfill units for sale_items rows written before the column existed (idempotent).
   db.prepare("UPDATE sale_items SET unit = (SELECT p.unit FROM products p WHERE p.id = sale_items.product_id) WHERE unit IS NULL").run();
   return db;
@@ -437,8 +451,15 @@ export function seedSqliteDemoData(db: SqliteDb) {
 export function getMemberDetail(db: SqliteDb, memberNumber: string, transactionLimit = 50) {
   const member = db.prepare(`SELECT id, member_number as memberNumber, prename, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, credit_limit as creditLimit FROM members WHERE member_number = ?`).get(memberNumber) as SqliteMember | undefined;
   if (!member) return undefined;
-  const transactions = db.prepare(`SELECT id, member_number as memberNumber, type, detail, amount, payment_method as paymentMethod, balance_after as balanceAfter, created_at as createdAt FROM member_transactions WHERE member_number = ? ORDER BY created_at DESC, id DESC LIMIT ?`).all(memberNumber, transactionLimit) as unknown as SqliteTransaction[];
+  const transactions = db.prepare(`SELECT id, member_number as memberNumber, type, detail, amount, payment_method as paymentMethod, balance_after as balanceAfter, created_at as createdAt, slip_url IS NOT NULL AS hasSlip FROM member_transactions WHERE member_number = ? ORDER BY created_at DESC, id DESC LIMIT ?`).all(memberNumber, transactionLimit) as unknown as SqliteTransaction[];
   return { member, transactions };
+}
+
+/** ROUND 63 (user) — ดึงรูปหลักฐานของรายการเติม/ถอนเงินสมาชิก ตามรหัสแถว member_transactions */
+export function getTransactionSlip(db: SqliteDb, id: number): { slipUrl: string | null } {
+  const row = db.prepare(`SELECT slip_url AS slipUrl FROM member_transactions WHERE id = ?`).get(id) as { slipUrl: string | null } | undefined;
+  if (!row) throw new StoreError("ไม่พบรายการธุรกรรมนี้ในระบบ");
+  return { slipUrl: row.slipUrl };
 }
 
 export function setMemberNumberMode(db: SqliteDb, mode: "running" | "year" | "manual") {
@@ -1175,6 +1196,8 @@ export type CheckoutInput = {
   discount?: number;
   cashier?: string;
   actorRole?: string;
+  /** ROUND 63 (user) — รูปหลักฐานการชำระ (สลิปโอน/สแกนจ่าย) data-URL · ไม่แนบ = ไม่ส่ง */
+  slipImage?: string | null;
 };
 
 export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
@@ -1258,9 +1281,11 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
   const createdAt = formatDateTime(now);
   const orderNumber = nextOrderNumber(db, now);
   const cashier = input.cashier?.trim() || "เจ้าหน้าที่ร้านค้า";
+  // ROUND 63 — แนบหลักฐานการชำระไปกับบิล (ส่วนใหญ่คือสลิป QR / สแกน) · จำกัดความยาวกัน URL ผิดปกติ
+  const slipImage = typeof input.slipImage === "string" && input.slipImage.startsWith("data:image/") ? input.slipImage.slice(0, 600_000) : null;
 
   return runInTransaction(db, () => {
-    const saleResult = db.prepare(`INSERT INTO sales (order_number, payment_method, member_number, subtotal, discount, total, cashier, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    const saleResult = db.prepare(`INSERT INTO sales (order_number, payment_method, member_number, subtotal, discount, total, cashier, created_at, slip_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
       orderNumber,
       input.paymentMethod,
       member?.memberNumber ?? (input.memberNumber?.trim() || null),
@@ -1269,6 +1294,7 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
       total,
       cashier,
       createdAt,
+      slipImage,
     );
     const saleId = Number(saleResult.lastInsertRowid);
     const insertItem = db.prepare(`INSERT INTO sale_items (sale_id, product_id, name, qty, price, cost, unit) VALUES (?, ?, ?, ?, ?, ?, ?)`);
@@ -1303,7 +1329,7 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
     const lotNote = lotShortfalls.length
       ? ` · ตัดยอด Lot ไม่ครบ: ${lotShortfalls.map((row) => `${row.name} ${row.qty} ${row.unit}`).join(", ")} (แนะนำนับสต็อกแยกล็อต)`
       : "";
-    logAction(db, "ขายสินค้า", cashier, `บิล #${orderNumber} · ${money(total)}${member ? ` · หักบัญชี ${member.memberNumber}` : ""}${lotNote}`, "blue", input.actorRole ?? null, createdAt);
+    logAction(db, "ขายสินค้า", cashier, `บิล #${orderNumber} · ${money(total)}${member ? ` · หักบัญชี ${member.memberNumber}` : ""}${slipImage ? " · แนบหลักฐานการชำระแล้ว" : ""}${lotNote}`, "blue", input.actorRole ?? null, createdAt);
 
     return {
       orderNumber,
@@ -1339,7 +1365,7 @@ export function salesList(db: SqliteDb, input: SalesListInput = {}): SaleHistory
     params.push(`%${search}%`, `%${search}%`);
   }
   const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
-  const sales = db.prepare(`SELECT s.id, s.order_number AS orderNumber, s.payment_method AS paymentMethod, s.member_number AS memberNumber, s.subtotal, s.discount, s.total, s.cashier, s.created_at AS createdAt, CASE WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sales s LEFT JOIN members m ON m.member_number = s.member_number${where} ORDER BY s.created_at DESC, s.id DESC LIMIT ?`).all(...params, limit) as unknown as {
+  const sales = db.prepare(`SELECT s.id, s.order_number AS orderNumber, s.payment_method AS paymentMethod, s.member_number AS memberNumber, s.subtotal, s.discount, s.total, s.cashier, s.created_at AS createdAt, s.slip_url IS NOT NULL AS hasSlip, CASE WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sales s LEFT JOIN members m ON m.member_number = s.member_number${where} ORDER BY s.created_at DESC, s.id DESC LIMIT ?`).all(...params, limit) as unknown as {
     id: number;
     orderNumber: string;
     paymentMethod: string;
@@ -1349,6 +1375,7 @@ export function salesList(db: SqliteDb, input: SalesListInput = {}): SaleHistory
     total: number;
     cashier: string | null;
     createdAt: string;
+    hasSlip: number;
     memberName: string | null;
   }[];
   if (sales.length === 0) return [];
@@ -1369,6 +1396,7 @@ export function salesList(db: SqliteDb, input: SalesListInput = {}): SaleHistory
   const balanceLookup = db.prepare(`SELECT balance_after AS balanceAfter FROM member_transactions WHERE member_number = ? AND detail LIKE ? ORDER BY id DESC LIMIT 1`);
 
   return sales.map((sale) => ({
+    id: sale.id,
     orderNumber: sale.orderNumber,
     createdAt: sale.createdAt,
     items: itemsBySale.get(sale.id) ?? [],
@@ -1382,7 +1410,15 @@ export function salesList(db: SqliteDb, input: SalesListInput = {}): SaleHistory
       ? ((balanceLookup.get(sale.memberNumber, `บิล #${sale.orderNumber} ·%`) as { balanceAfter: number | null } | undefined)?.balanceAfter ?? null)
       : null,
     cashier: sale.cashier,
+    hasSlip: sale.hasSlip === 1,
   }));
+}
+
+/** ROUND 63 (user) — ดึงรูปหลักฐานการชำระของบิล (สลิป QR / สแกน) ตามรหัสแถว sales */
+export function getSaleSlip(db: SqliteDb, id: number): { slipUrl: string | null } {
+  const row = db.prepare(`SELECT slip_url AS slipUrl FROM sales WHERE id = ?`).get(id) as { slipUrl: string | null } | undefined;
+  if (!row) throw new StoreError("ไม่พบบิลนี้ในระบบ");
+  return { slipUrl: row.slipUrl };
 }
 
 // --- members & wallet -------------------------------------------------------
@@ -1515,6 +1551,8 @@ export type WalletTxInput = {
   note?: string;
   actor?: string;
   actorRole?: string;
+  /** ROUND 63 (user) — รูปหลักฐาน (สลิปโอน/ถอน) data-URL · ไม่แนบ = ไม่ส่ง */
+  slipImage?: string | null;
 };
 
 export function walletTx(db: SqliteDb, input: WalletTxInput) {
@@ -1532,9 +1570,11 @@ export function walletTx(db: SqliteDb, input: WalletTxInput) {
   const detail = note || (input.type === "deposit" ? "เติมเงินเข้าบัญชีสมาชิก · เงินสด" : "ถอนเงินจากบัญชีสมาชิก · เงินสด");
   const actor = input.actor?.trim() || "เจ้าหน้าที่ร้านค้า";
   const createdAt = formatDateTime();
+  // ROUND 63 — รูปหลักฐานที่แนบมากับการเติม/ถอน (เช่น สลิปโอนเข้า) เก็บไปกับรายการ
+  const slipImage = typeof input.slipImage === "string" && input.slipImage.startsWith("data:image/") ? input.slipImage.slice(0, 600_000) : null;
   runInTransaction(db, () => {
     db.prepare(`UPDATE members SET balance = ? WHERE member_number = ?`).run(balanceAfter, member.memberNumber);
-    db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, actor, created_at) VALUES (?, ?, ?, ?, 'เงินสด', ?, ?, ?)`).run(
+    db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, actor, created_at, slip_url) VALUES (?, ?, ?, ?, 'เงินสด', ?, ?, ?, ?)`).run(
       member.memberNumber,
       input.type,
       detail,
@@ -1542,12 +1582,13 @@ export function walletTx(db: SqliteDb, input: WalletTxInput) {
       balanceAfter,
       actor,
       createdAt,
+      slipImage,
     );
     logAction(
       db,
       input.type === "deposit" ? "เติมเงินสมาชิก" : "ถอนเงินสมาชิก",
       actor,
-      `${member.memberNumber} · ${money(amount)} · ${note || "เงินสด"}`,
+      `${member.memberNumber} · ${money(amount)} · ${note || "เงินสด"}${slipImage ? " · แนบหลักฐานแล้ว" : ""}`,
       input.type === "deposit" ? "green" : "purple",
       input.actorRole ?? null,
       createdAt,
@@ -2199,6 +2240,8 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   licenseKey: "",
   licenseName: "",
   trialStart: "",
+  // ROUND 63 — บัญชีพร้อมเพย์ร้าน ยังไม่ตั้ง → หน้า POS จะแนะนำให้ไปตั้งที่หน้าตั้งค่า การชำระเงิน
+  promptpayId: "",
 };
 
 const SETTINGS_KEY = "app_settings";
