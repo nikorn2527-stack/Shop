@@ -4138,3 +4138,35 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
   .preview-format-btn small { display: none; }
   .export-preview-table td, .export-preview-table th { max-width: 160px; }
 }
+
+/* ============================================================
+   ROUND 49 — เครื่องมือเลือกช่วงเวลารายงานฉบับเรียบง่าย
+   ปุ่มลัด 5 อัน (วันนี้/เมื่อวาน/7 วัน/เดือนนี้/กำหนดเอง) ใช้กับทุกมุมมอง
+   + แยกตาม (รายวัน/สัปดาห์/เดือน) เฉพาะมุมมองภาพรวม
+   + บรรทัดบอกช่วงข้อมูลจริงที่กำลังแสดง (โปร่งใส ไม่มีที่ซ่อน)
+   ============================================================ */
+.report-range-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.report-range-row .report-period-pills { margin: 0; flex-wrap: wrap; gap: 6px; border-bottom: 0; }
+.report-range-row .report-period-pills button { border: 1px solid #e3ebe8; border-radius: 18px; padding: 6px 13px; background: #fff; font-size: 11.5px; }
+.report-range-row .report-period-pills button:hover { border-color: #b9d8cb; background: #f4faf7; }
+.report-range-row .report-period-pills button.active { background: var(--teal); border-color: var(--teal); color: #fff; font-weight: 600; }
+.report-range-row .report-period-pills button.active::after { display: none; }
+.report-groupby { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.report-groupby > span { color: #7d8172; font-size: 11px; font-weight: 600; white-space: nowrap; }
+.report-groupby button { border: 1px solid #e3ebe8; background: #fff; color: #5c6b60; border-radius: 16px; padding: 4px 11px; font-size: 11px; font-weight: 500; transition: .15s ease; }
+.report-groupby button:hover { border-color: #b9d8cb; background: #f4faf7; }
+.report-groupby button.active { background: #eef7f2; border-color: #9bcdba; color: #1f6d4d; font-weight: 600; }
+.report-custom-picker { margin-top: 9px; }
+.report-custom-picker .thai-date-field { min-width: 138px; }
+.report-range-status { display: inline-flex; align-items: center; gap: 7px; margin-top: 9px; padding: 6px 13px; background: #f6faf8; border: 1px solid #e3ebe8; border-radius: 999px; color: #5c6b60; font-size: 11.5px; width: fit-content; max-width: 100%; flex-wrap: wrap; }
+.report-range-status svg { color: #57b391; flex: 0 0 auto; }
+.report-range-status b { color: #1f6d4d; font-weight: 700; }
+.report-range-status .range-pending-note { color: #8b8f80; font-style: italic; }
+@media (max-width: 560px) {
+  .report-groupby > span { display: none; }
+  .report-range-row { gap: 8px; }
+  .report-range-status { font-size: 11px; padding: 5px 11px; }
+}
+@media print {
+  .report-range-row, .report-range-status, .report-custom-picker { display: none; }
+}
