@@ -741,8 +741,8 @@ describe("product editing", () => {
   it("rejects invalid values with Thai errors and keeps the row intact", () => {
     const database = freshDb();
     const rice = productBySku(database, "FD-014");
-    expect(() => updateProduct(database, { productId: rice.id, price: 0 })).toThrowError(/ราคาขายต้องมากกว่า 0/);
-    expect(() => updateProduct(database, { productId: rice.id, price: -5 })).toThrowError(/ราคาขายต้องมากกว่า 0/);
+    // ROUND 54 (user): ฿0 = "ยังไม่ได้ตั้งราคา" อนุญาต — ติดลบเท่านั้นที่ผิด
+    expect(() => updateProduct(database, { productId: rice.id, price: -5 })).toThrowError(/ราคาขายต้องเป็นตัวเลข 0 ขึ้นไป/);
     expect(() => updateProduct(database, { productId: rice.id, cost: -1 })).toThrowError(/ต้นทุนต้องเป็น 0 ขึ้นไป/);
     expect(() => updateProduct(database, { productId: rice.id, reorderPoint: -1 })).toThrowError(/จุดสั่งซื้อต้องเป็นจำนวนเต็ม 0 ขึ้นไป/);
     expect(() => updateProduct(database, { productId: rice.id, reorderPoint: 2.5 })).toThrowError(/จุดสั่งซื้อต้องเป็นจำนวนเต็ม 0 ขึ้นไป/);
@@ -755,6 +755,7 @@ describe("product editing", () => {
     expect(persisted?.reorderPoint).toBe(rice.reorderPoint);
     expect(persisted?.unit).toBe(rice.unit);
     // boundary values are valid
+    expect(updateProduct(database, { productId: rice.id, price: 0 }).price).toBe(0);
     expect(updateProduct(database, { productId: rice.id, cost: 0 }).cost).toBe(0);
     expect(updateProduct(database, { productId: rice.id, reorderPoint: 0 }).reorderPoint).toBe(0);
   });

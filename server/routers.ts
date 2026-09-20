@@ -264,7 +264,7 @@ const productCreateInput = z.object({
   sellMode: z.enum(["unit", "money"]).nullish(),
   priceTiers: z.string().max(20_000).nullish(),
   unit: z.string().optional(),
-  price: z.number().positive("ราคาขายต้องมากกว่า 0"),
+  price: z.number().min(0, "ราคาขายต้องเป็นตัวเลข 0 ขึ้นไป"),
   cost: z.number().min(0).optional(),
   stock: z.number().int().min(0).optional(),
   reorderPoint: z.number().int().min(0).optional(),

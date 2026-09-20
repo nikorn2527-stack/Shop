@@ -612,7 +612,9 @@ function assertValidPriceTiers(raw: string | null): void {
 export function createProduct(db: SqliteDb, input: CreateProductInput): SqliteProduct {
   const name = input.name?.trim();
   if (!name) throw new StoreError("กรุณาระบุชื่อสินค้า");
-  if (!(input.price > 0)) throw new StoreError("ราคาขายต้องมากกว่า 0");
+  // ROUND 54 (user) — อนุญาตราคา ฿0 = "ยังไม่ได้ตั้งราคา" (สินค้านำเข้า 120 รายการยังไม่มีราคา
+  // ต้องแก้ชื่อ/ขนาด/หน่วยได้ก่อน โดยยังไม่ต้องใส่ราคา) — ห้ามติดลบเท่านั้น
+  if (!(input.price >= 0)) throw new StoreError("ราคาขายต้องเป็นตัวเลข 0 ขึ้นไป");
   if (input.stock !== undefined && (!Number.isInteger(input.stock) || input.stock < 0)) throw new StoreError("จำนวนสต็อกเริ่มต้นไม่ถูกต้อง");
   const sellMode = input.sellMode ?? "unit";
   const quickPick = toQuickPickFlag(input.quickPick);
@@ -955,7 +957,7 @@ export function updateProduct(db: SqliteDb, input: UpdateProductInput): SqlitePr
   if (!product) throw new StoreError(`ไม่พบสินค้ารหัส ${input.productId} ในระบบ`);
   if (input.name !== undefined && !input.name.trim()) throw new StoreError("กรุณาระบุชื่อสินค้า");
   if (input.unit !== undefined && !input.unit.trim()) throw new StoreError("กรุณาระบุหน่วยสินค้า");
-  if (input.price !== undefined && !(input.price > 0)) throw new StoreError("ราคาขายต้องมากกว่า 0");
+  if (input.price !== undefined && !(input.price >= 0)) throw new StoreError("ราคาขายต้องเป็นตัวเลข 0 ขึ้นไป");
   if (input.cost !== undefined && input.cost < 0) throw new StoreError("ต้นทุนต้องเป็น 0 ขึ้นไป");
   if (input.reorderPoint !== undefined && (!Number.isInteger(input.reorderPoint) || input.reorderPoint < 0)) throw new StoreError("จุดสั่งซื้อต้องเป็นจำนวนเต็ม 0 ขึ้นไป");
 
