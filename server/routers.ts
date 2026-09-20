@@ -3,6 +3,8 @@ import { TRPCError } from "@trpc/server";
 import { existsSync, readFileSync, rmSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { COOKIE_NAME } from "@shared/const";
+import { EDITIONS, EDITION_TRIAL_DAYS, STANDARD_MAX_USERS, type Edition, type EditionFeatureKey } from "@shared/editions";
+import { ensureEditionFeature, generateLicenseKey, parseLicenseKey, resolveEditionStatus, todayString } from "./license";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { readAppSessionCookie, type TrpcContext } from "./_core/context";
 import { systemRouter } from "./_core/systemRouter";
@@ -25,6 +27,7 @@ import {
   salesCashierOptions,
   deleteProduct,
   dashboardStats,
+  setEditionSettings,
   memberTransactions,
   salesByCashier,
   salesByCategory,
@@ -127,6 +130,11 @@ function sanitizeMapping<T extends Record<string, number | undefined>>(mapping: 
     if (value !== undefined && value >= 0) cleaned[key] = value;
   }
   return cleaned as T;
+}
+
+/** ROUND 61 (user) — ประตูเวอร์ชันฝั่งเซิร์ฟเวอร์: โยน StoreError ไทย (ผ่าน withStoreErrors) เมื่อเวอร์ชันยังไม่รวมฟีเจอร์นี้ */
+function requireEdition(feature: EditionFeatureKey): void {
+  ensureEditionFeature(getSettings(getWelfareDb()), feature);
 }
 
 const paymentMethodSchema = z.enum(["เงินสด", "QR / สแกน", "หักบัญชีสมาชิก"]);
@@ -417,11 +425,14 @@ const authLoginInput = z.object({
 });
 
 // ROUND 36 (ข้อ 31) — ลงทะเบียนครั้งแรก: ใช้ได้เฉพาะระบบที่ยังไม่มีบัญชีผู้ใช้เลย
+// ROUND 61 — เพิ่มการเลือกเวอร์ชันตอนลงทะเบียน: ทดลองใช้ 30 วัน / ใส่รหัสลิขสิทธิ์ / เริ่มที่ทั่วไป
 const authSetupInput = z.object({
   username: z.string().min(1).max(30).regex(/^[^\s]+$/, "ชื่อผู้ใช้ห้ามมีช่องว่าง"),
   displayName: z.string().min(1),
   password: z.string().min(1),
   storeName: z.string().max(80).optional(),
+  editionChoice: z.enum(["trial", "license", "standard"]).optional(),
+  licenseKey: z.string().max(40).optional(),
 });
 
 const authChangePasswordInput = z.object({
@@ -457,7 +468,8 @@ export const appRouter = router({
           if (!isDevCtx(ctx)) {
             throw new TRPCError({ code: "FORBIDDEN", message: "เครื่องมือติดตั้งระบบใช้ได้เฉพาะบัญชีผู้พัฒนา" });
           }
-          return installOverview(getWelfareDb(), getWelfareDbPath());
+          // ROUND 61 — พ่วงสถานะเวอร์ชัน/ลิขสิทธิ์ให้ช่างเห็นตอนติดตั้ง (ลูกค้ายังไม่ได้ใส่รหัส = ทั่วไป)
+          return { ...installOverview(getWelfareDb(), getWelfareDbPath()), edition: resolveEditionStatus(getSettings(getWelfareDb())) };
         }),
       ),
   }),
@@ -465,13 +477,27 @@ export const appRouter = router({
     me: publicProcedure.query(opts => opts.ctx.user),
     /** ROUND 36 (ข้อ 31) — สถานะลงทะเบียนครั้งแรก: needsSetup = ยังไม่มีบัญชีผู้ใช้เลย */
     setupStatus: publicProcedure.query(() => withStoreErrors(() => ({ needsSetup: countAppUsers(getWelfareDb()) === 0 }))),
-    /** ROUND 36 (ข้อ 31) — ลงทะเบียนผู้บริหารหลัก (ระบบใหม่เท่านั้น) แล้วเข้าสู่ระบบทันที */
+    /** ROUND 36 (ข้อ 31) — ลงทะเบียนผู้บริหารหลัก (ระบบใหม่เท่านั้น) แล้วเข้าสู่ระบบทันที
+     *  ROUND 61 — บันทึกการเลือกเวอร์ชันไปพร้อมกัน: ทดลอง 30 วัน / ใช้รหัสลิขสิทธิ์ / ทั่วไป */
     setup: publicProcedure
       .input(authSetupInput)
       .mutation(({ ctx, input }) =>
         withStoreErrors(() => {
           const db = getWelfareDb();
           const user = setupInitialAdmin(db, input);
+          // ROUND 61 — เวอร์ชันที่เลือกไว้ตอนลงทะเบียน (ค่าเริ่มต้น = ทดลองใช้ 30 วัน)
+          const choice = input.editionChoice ?? "trial";
+          const storeName = (input.storeName ?? "").trim();
+          if (choice === "trial") {
+            setEditionSettings(db, { trialStart: todayString() });
+          } else if (choice === "license") {
+            const key = (input.licenseKey ?? "").trim();
+            const parsed = key ? parseLicenseKey(key) : null;
+            if (!parsed) {
+              throw new TRPCError({ code: "BAD_REQUEST", message: "รหัสลิขสิทธิ์ไม่ถูกต้อง — ตรวจอักขระให้ครบทุกกลุ่ม หรือเลือก “เริ่มทดลองใช้” ก่อนแล้วค่อยใส่รหัสภายหลังได้" });
+            }
+            setEditionSettings(db, { licenseKey: key, licenseName: storeName || user.displayName });
+          }
           const roleThai = "ผู้บริหาร";
           const session = createAppSession(db, user.id);
           ctx.res.cookie(COOKIE_NAME, session.sessionId, {
@@ -603,6 +629,14 @@ export const appRouter = router({
         return withStoreErrors(() => {
           if (!isAdminCtx(ctx, {})) {
             throw new TRPCError({ code: "FORBIDDEN", message: "การจัดการผู้ใช้ระบบต้องใช้สิทธิ์ผู้บริหาร" });
+          }
+          // ROUND 61 — เวอร์ชันทั่วไปจำกัดบัญชีที่ใช้งานได้ 3 บัญชี (โปร/โปรพลัสไม่จำกัด)
+          const editionStatus = resolveEditionStatus(getSettings(getWelfareDb()));
+          if (!editionStatus.features.includes("usersUnlimited")) {
+            const activeUsers = listAppUsers(getWelfareDb()).filter((user) => user.active === 1).length;
+            if (activeUsers >= STANDARD_MAX_USERS) {
+              throw new TRPCError({ code: "FORBIDDEN", message: `เวอร์ชันทั่วไปใช้บัญชีได้สูงสุด ${STANDARD_MAX_USERS} บัญชี (ใช้อยู่ ${activeUsers} บัญชี) — อัปเกรดเป็นเวอร์ชันโปรเพื่อเพิ่มผู้ใช้ไม่จำกัด` });
+            }
           }
           return createAppUser(getWelfareDb(), { ...input, actor, actorRole });
         });
@@ -762,13 +796,19 @@ export const appRouter = router({
       .input(stockCountInput)
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input);
-        return withStoreErrors(() => stockCount(getWelfareDb(), { ...input, actor, actorRole }));
+        return withStoreErrors(() => {
+          requireEdition("stockCount"); // ROUND 61 — งานนับสต๊อกเป็นฟีเจอร์เวอร์ชันโปรพลัส
+          return stockCount(getWelfareDb(), { ...input, actor, actorRole });
+        });
       }),
     countLots: publicProcedure
       .input(stockCountLotsInput)
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input);
-        return withStoreErrors(() => stockCountLots(getWelfareDb(), { ...input, actor, actorRole }));
+        return withStoreErrors(() => {
+          requireEdition("stockCount"); // ROUND 61 — นับแยกล็อตรวมอยู่ในงานนับสต๊อก (โปรพลัส)
+          return stockCountLots(getWelfareDb(), { ...input, actor, actorRole });
+        });
       }),
     // Round 32-15 — รายการสั่งซื้อ: สะสมรายการที่จะสั่งเข้า เพื่อกันตกหล่นก่อนสั่งจริง
     orderList: publicProcedure
@@ -805,7 +845,11 @@ export const appRouter = router({
       .input(checkoutInput)
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input);
-        return withStoreErrors(() => checkout(getWelfareDb(), { ...input, cashier: input.cashier ?? actor, actorRole }));
+        return withStoreErrors(() => {
+          // ROUND 61 — รายการพิเศษ/ของสั่ง (บรรทัดไม่มี productId) เป็นฟีเจอร์เวอร์ชันโปรพลัส
+          if (input.items.some((item) => !("productId" in item))) requireEdition("specialOrders");
+          return checkout(getWelfareDb(), { ...input, cashier: input.cashier ?? actor, actorRole });
+        });
       }),
   }),
 
@@ -898,21 +942,33 @@ export const appRouter = router({
       .query(({ input }) => withStoreErrors(() => salesByCategory(getWelfareDb(), input ?? {}))),
     byProduct: publicProcedure
       .input(reportRangeInput)
-      .query(({ input }) => withStoreErrors(() => salesByProduct(getWelfareDb(), input ?? {}))),
+      .query(({ input }) => withStoreErrors(() => {
+        requireEdition("reportsAdvanced"); // ROUND 61 — มุมมองตามสินค้า = เวอร์ชันโปรขึ้นไป
+        return salesByProduct(getWelfareDb(), input ?? {});
+      })),
     /** ROUND 48 — รายการสินค้าทุกบรรทัดจากทุกบิลในช่วงเวลา (แยกตามรายการในบิล) */
     lineItems: publicProcedure
       .input(reportRangeInput)
-      .query(({ input }) => withStoreErrors(() => salesLineItems(getWelfareDb(), input ?? {}))),
+      .query(({ input }) => withStoreErrors(() => {
+        requireEdition("reportsAdvanced"); // ROUND 61 — รายการในบิล = เวอร์ชันโปรขึ้นไป
+        return salesLineItems(getWelfareDb(), input ?? {});
+      })),
     byCashier: publicProcedure
       .input(reportRangeInput)
-      .query(({ input }) => withStoreErrors(() => salesByCashier(getWelfareDb(), input ?? {}))),
+      .query(({ input }) => withStoreErrors(() => {
+        requireEdition("reportsAdvanced"); // ROUND 61 — มุมมองตามพนักงานขาย = เวอร์ชันโปรขึ้นไป
+        return salesByCashier(getWelfareDb(), input ?? {});
+      })),
     /** ROUND 51 — รายชื่อพนักงานขายทั้งหมดจากบิลจริง (ตัวเลือกตัวกรองเจาะจงในรายงาน) */
     cashiers: publicProcedure
       .input(z.unknown().optional())
       .query(() => withStoreErrors(() => salesCashierOptions(getWelfareDb()))),
     memberTransactions: publicProcedure
       .input(memberTransactionsInput)
-      .query(({ input }) => withStoreErrors(() => memberTransactions(getWelfareDb(), input ?? {}))),
+      .query(({ input }) => withStoreErrors(() => {
+        requireEdition("reportsAdvanced"); // ROUND 61 — ธุรกรรมสมาชิกทั้งระบบ = เวอร์ชันโปรขึ้นไป (สเตตเมนต์รายคนยังใช้ได้ทุกเวอร์ชัน)
+        return memberTransactions(getWelfareDb(), input ?? {});
+      })),
     // Req 23.2 — คำขอลดวงเงินทั้งหมด (รอพิจารณาขึ้นก่อน) + จำนวนค้างพิจารณาสำหรับ badge
     limitRequests: publicProcedure
       .input(z.object({ status: z.enum(["pending", "approved", "rejected"]).optional(), limit: z.number().int().min(1).max(200).optional() }).optional())
@@ -954,7 +1010,88 @@ export const appRouter = router({
       }),
   }),
 
+  // ROUND 61 (user) — ระบบเวอร์ชัน 3 แบบ (ทั่วไป/โปร/โปรพลัส):
+  // ดูสถานะเวอร์ชันปัจจุบัน · ใช้รหัสลิขสิทธิ์ · เริ่มทดลองใช้ · (เจ้าของระบบ) ออกรหัสให้ลูกค้า
+  edition: router({
+    /** สถานะเวอร์ชันที่ใช้งานจริง — ใช้ทั้งตกแต่ง UI และตรวจสิทธิ์ฝั่งหน้าจอ */
+    status: publicProcedure
+      .input(z.unknown().optional())
+      .query(() => withStoreErrors(() => resolveEditionStatus(getSettings(getWelfareDb())))),
+    /** ใช้รหัสลิขสิทธิ์ (ผู้บริหาร): ตรวจรหัส → บันทึก + audit · รหัสหมดอายุ/ไม่ถูกต้อง = BAD_REQUEST ไทย */
+    applyLicense: publicProcedure
+      .input(z.object({ key: z.string().min(8).max(40), licensedTo: z.string().max(120).optional() }))
+      .mutation(({ ctx, input }) => {
+        const { actor, actorRole } = resolveActor(ctx, {});
+        return withStoreErrors(() => {
+          if (!isAdminCtx(ctx, {})) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "การใช้รหัสลิขสิทธิ์ต้องใช้สิทธิ์ผู้บริหาร" });
+          }
+          const db = getWelfareDb();
+          const key = input.key.trim().toUpperCase();
+          const parsed = parseLicenseKey(key);
+          if (!parsed) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "รหัสลิขสิทธิ์ไม่ถูกต้อง — ตรวจว่าพิมพ์ครบทุกกลุ่ม ไม่มีอักขระเกิน/ขาด" });
+          }
+          if (parsed.expiresAt !== null && parsed.expiresAt < todayString()) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: `รหัสลิขสิทธิ์นี้หมดอายุแล้ว ( ${parsed.expiresAt} ) — ติดต่อผู้ขายเพื่อรับรหัสใหม่` });
+          }
+          const licensedTo = input.licensedTo?.trim() || getSettings(db).storeName || actor || "ผู้ถือลิขสิทธิ์";
+          setEditionSettings(db, { licenseKey: key, licenseName: licensedTo });
+          logAction(
+            db,
+            "ใช้รหัสลิขสิทธิ์",
+            actor ?? "ผู้บริหาร",
+            `เปิดใช้${EDITIONS[parsed.edition].label}${parsed.expiresAt ? ` ถึง ${parsed.expiresAt}` : " ถาวร"} · ผู้ถือ: ${licensedTo}`,
+            "green",
+            actorRole ?? null,
+          );
+          return resolveEditionStatus(getSettings(db));
+        });
+      }),
+    /** เริ่มทดลองใช้โปรพลัส (ผู้บริหาร): ทำได้ครั้งเดียวต่อระบบ — ถ้าเคยทดลองแล้วจะปฏิเสธ */
+    startTrial: publicProcedure
+      .input(z.unknown().optional())
+      .mutation(({ ctx }) => {
+        const { actor, actorRole } = resolveActor(ctx, {});
+        return withStoreErrors(() => {
+          if (!isAdminCtx(ctx, {})) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "การเริ่มทดลองใช้ต้องใช้สิทธิ์ผู้บริหาร" });
+          }
+          const db = getWelfareDb();
+          const settings = getSettings(db);
+          if ((settings.trialStart ?? "").trim()) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: `ระบบนี้เริ่มทดลองใช้ไปแล้วเมื่อ ${settings.trialStart} (ทดลองได้ครั้งเดียว) — ใส่รหัสลิขสิทธิ์เพื่อใช้ต่อ` });
+          }
+          setEditionSettings(db, { trialStart: todayString() });
+          logAction(db, "เริ่มทดลองใช้", actor ?? "ผู้บริหาร", `ทดลองใช้โปรพลัส ${EDITION_TRIAL_DAYS} วัน`, "blue", actorRole ?? null);
+          return resolveEditionStatus(getSettings(db));
+        });
+      }),
+    /** ออกรหัสลิขสิทธิ์ให้ลูกค้า — เจ้าของระบบเท่านั้น (บัญชีผู้พัฒนา ผ่านโซนเครื่องมือติดตั้ง) */
+    generateKey: publicProcedure
+      .input(z.object({ edition: z.enum(["standard", "pro", "proplus"]), months: z.number().int().min(1).max(48).nullable() }))
+      .mutation(({ ctx, input }) =>
+        withStoreErrors(() => {
+          if (!isDevCtx(ctx)) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "การออกรหัสลิขสิทธิ์ใช้ได้เฉพาะบัญชีผู้พัฒนา (เจ้าของระบบ)" });
+          }
+          const key = generateLicenseKey(input.edition, input.months);
+          const db = getWelfareDb();
+          logAction(
+            db,
+            "ออกรหัสลิขสิทธิ์",
+            ctx.user?.name ?? "ผู้พัฒนา",
+            `${EDITIONS[input.edition].label} ${input.months ? `${input.months} เดือน` : "ถาวร"} · ${key}`,
+            "purple",
+            "ผู้พัฒนา",
+          );
+          return { key, edition: input.edition, months: input.months };
+        }),
+      ),
+  }),
+
   // ROUND 38 (ข้อ 39) — ระบบสำรองข้อมูล: สำรองเดี๋ยวนี้ / รายการไฟล์ / ดาวน์โหลด / กู้คืน (ผู้บริหารเท่านั้น)
+  // ROUND 61 — สำรอง–กู้คืนอัตโนมัติเป็นฟีเจอร์เวอร์ชันโปรขึ้นไป (เวอร์ชันทั่วไปสำรองมือ — ก๊อปไฟล์ data\welfare-store.sqlite)
   backup: router({
     create: publicProcedure.mutation(({ ctx }) => {
       const { actor, actorRole } = resolveActor(ctx, {});
@@ -962,6 +1099,7 @@ export const appRouter = router({
         if (!isAdminCtx(ctx, {})) {
           throw new TRPCError({ code: "FORBIDDEN", message: "การสำรองข้อมูลต้องใช้สิทธิ์ผู้บริหาร" });
         }
+        requireEdition("backupRestore");
         const db = getWelfareDb();
         const keepCount = getSettings(db).backupKeepCount;
         const manifest = backupSqliteDatabase({ sourcePath: getWelfareDbPath(), backupDir: getBackupDir(), retentionDays: 3650 });
@@ -977,6 +1115,7 @@ export const appRouter = router({
           if (!isAdminCtx(ctx, {})) {
             throw new TRPCError({ code: "FORBIDDEN", message: "การดูรายการสำรองข้อมูลต้องใช้สิทธิ์ผู้บริหาร" });
           }
+          requireEdition("backupRestore");
           const settings = getSettings(getWelfareDb());
           return {
             backups: listSqliteBackups(getBackupDir()),
@@ -993,6 +1132,7 @@ export const appRouter = router({
           if (!isAdminCtx(ctx, {})) {
             throw new TRPCError({ code: "FORBIDDEN", message: "การดาวน์โหลดไฟล์สำรองต้องใช้สิทธิ์ผู้บริหาร" });
           }
+          requireEdition("backupRestore");
           const backupPath = join(getBackupDir(), input.file);
           if (!existsSync(backupPath)) {
             throw new TRPCError({ code: "NOT_FOUND", message: `ไม่พบไฟล์สำรอง ${input.file}` });
@@ -1013,6 +1153,7 @@ export const appRouter = router({
           if (!isAdminCtx(ctx, {})) {
             throw new TRPCError({ code: "FORBIDDEN", message: "การกู้คืนข้อมูลต้องใช้สิทธิ์ผู้บริหาร" });
           }
+          requireEdition("backupRestore");
           const backupPath = join(getBackupDir(), input.file);
           if (!existsSync(backupPath)) {
             throw new TRPCError({ code: "NOT_FOUND", message: `ไม่พบไฟล์สำรอง ${input.file}` });
@@ -1056,6 +1197,7 @@ export const appRouter = router({
   }),
 
   // ROUND 40 (ข้อ 32) — นำเข้าข้อมูลจริงจาก Excel/CSV: พรีวิว → map คอลัมน์ → นำเข้า (ผู้บริหารเท่านั้น)
+  // ROUND 61 — การนำเข้า–ส่งออกเป็นฟีเจอร์เวอร์ชันโปรขึ้นไป (เทมเพลตสำหรับขึ้นระบบอยู่ในแท็บนำเข้าข้อมูล)
   importData: router({
     /** อ่านไฟล์ (base64) → หัวตารางทุกชีต + ตัวอย่างแถว + mapping ที่ระบบเดาให้ — ยังไม่แตะฐานข้อมูล */
     preview: publicProcedure
@@ -1072,6 +1214,7 @@ export const appRouter = router({
           if (!isAdminCtx(ctx, {})) {
             throw new TRPCError({ code: "FORBIDDEN", message: "การนำเข้าข้อมูลต้องใช้สิทธิ์ผู้บริหาร" });
           }
+          requireEdition("importExport");
           return parseSpreadsheetBase64(input.base64, input.kind, input.headerRowOverride);
         }),
       ),
@@ -1121,6 +1264,7 @@ export const appRouter = router({
           if (!isAdminCtx(ctx, {})) {
             throw new TRPCError({ code: "FORBIDDEN", message: "การนำเข้าข้อมูลต้องใช้สิทธิ์ผู้บริหาร" });
           }
+          requireEdition("importExport");
           if (input.kind === "members" && (!input.memberMapping || input.memberMapping.firstName < 0)) {
             throw new TRPCError({ code: "BAD_REQUEST", message: "กรุณาเลือกคอลัมน์ “ชื่อ” ของสมาชิกก่อนนำเข้า" });
           }
@@ -1155,6 +1299,7 @@ export const appRouter = router({
           if (!isAdminCtx(ctx, {})) {
             throw new TRPCError({ code: "FORBIDDEN", message: "การดาวน์โหลดเทมเพลตนำเข้าต้องใช้สิทธิ์ผู้บริหาร" });
           }
+          requireEdition("importExport");
           return buildTemplateBase64(input.kind);
         }),
       ),

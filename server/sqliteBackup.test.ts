@@ -179,6 +179,8 @@ describe("backup router (admin, end-to-end on temp files)", () => {
     process.env.SQLITE_BACKUP_DIR = backupDir;
     try {
       const caller = appRouter.createCaller(createAdminContext());
+      // ROUND 61 — สำรอง–กู้คืนเป็นฟีเจอร์เวอร์ชันโปรขึ้นไป: เริ่มทดลองใช้ผ่าน router จริงก่อนทดสอบ
+      await caller.edition.startTrial();
 
       // สำรองด้วยตนเอง — เปิด db เปล่า (seed) สำรอง แล้วได้ manifest + keepCount กลับมา
       const created = await caller.backup.create();
@@ -243,6 +245,8 @@ describe("backup router (admin, end-to-end on temp files)", () => {
       await expect(anonymous.backup.create()).rejects.toThrow("การสำรองข้อมูลต้องใช้สิทธิ์ผู้บริหาร");
 
       const caller = appRouter.createCaller(createAdminContext());
+      // ROUND 61 — เปิดสิทธิ์สำรองข้อมูลด้วยการเริ่มทดลองใช้ (ผ่าน router จริง)
+      await caller.edition.startTrial();
       // ชื่อไฟล์นอกรูปแบบ welfare-store-YYYYMMDDTHHMMSSZ.sqlite โดน zod ปฏิเสธ (กัน path traversal)
       await expect(caller.backup.download({ file: "../welfare-store.sqlite" })).rejects.toThrow();
       await expect(caller.backup.download({ file: "welfare-store-19990101T000000Z.sqlite" })).rejects.toThrow("ไม่พบไฟล์สำรอง");

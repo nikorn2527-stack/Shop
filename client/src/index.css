@@ -4507,3 +4507,118 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
   .printer-flow-steps.lan-steps .printer-step small { font-size: 10.5px; }
 }
 
+
+/* ============================================================
+   ROUND 61 — ระบบเวอร์ชัน 3 แบบ (ทั่วไป / โปร / โปรพลัส)
+   ป้ายเวอร์ชัน · ปุ่มล็อกฟีเจอร์ · โมดัลอัปเกรด + ตารางเทียบ ·
+   ตัวเลือกเวอร์ชันตอนลงทะเบียน · เครื่องมือออกรหัส (โซน dev)
+   ============================================================ */
+
+/* --- ป้ายเวอร์ชันเล็ก ๆ ที่ sidebar --- */
+.edition-pill { display: inline-flex; align-items: center; gap: 6px; margin: 0 6px 10px; padding: 5px 10px; border-radius: 999px; font-size: 10.5px; font-weight: 600; line-height: 1; cursor: pointer; border: 1px solid transparent; width: fit-content; transition: transform .15s ease, box-shadow .15s ease; }
+.edition-pill:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(31, 42, 34, .12); }
+.edition-pill em { font-style: normal; font-weight: 500; opacity: .75; }
+.edition-pill.tone-slate { background: #f1f0ec; color: #5b6068; border-color: #e2e0d7; }
+.edition-pill.tone-blue { background: #e9f3f4; color: #2c6d7e; border-color: #d0e3e6; }
+.edition-pill.tone-amber { background: #fbf3e3; color: #9a7434; border-color: #ecd9b4; }
+
+/* --- ปุ่มล็อกฟีเจอร์ (แทนปุ่ม/ตัวเลือกที่เวอร์ชันยังไม่รวม) --- */
+.feature-lock { display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; border-radius: 9px; background: #faf8f2; border: 1px dashed #d8d2bd; color: #8d8873; font-size: 11.5px; font-weight: 600; cursor: pointer; transition: background .15s ease, border-color .15s ease; }
+.feature-lock:hover { background: #f6f2e6; border-color: #c9c0a0; }
+.feature-lock em { font-style: normal; background: #efe9d6; color: #9a7434; border-radius: 999px; padding: 2px 7px; font-size: 9.5px; }
+.feature-lock.compact { padding: 6px 8px; }
+
+/* --- โมดัลเวอร์ชันและลิขสิทธิ์ --- */
+.edition-modal { width: min(680px, calc(100vw - 32px)); max-height: min(88vh, 780px); overflow-y: auto; background: #fdfcf9; border-radius: 18px; border: 1px solid #e7e2d3; box-shadow: 0 24px 70px rgba(30, 38, 32, .28); padding: 18px 20px 20px; }
+.edition-modal-title { display: flex; align-items: center; gap: 10px; color: #9a7434; }
+.edition-modal-title svg { color: #c2964c; }
+.edition-modal-title h2 { font-size: 17px; }
+.edition-modal-title p { font-size: 12px; color: #7d7862; }
+
+/* แถบบอกฟีเจอร์ที่เป็นเหตุผลเปิดโมดัล */
+.edition-focus-feature { display: flex; gap: 9px; align-items: flex-start; margin: 4px 0 12px; padding: 10px 12px; border-radius: 10px; background: #fdf8ec; border: 1px solid #ecd9b4; color: #8a6d3b; font-size: 12px; line-height: 1.55; }
+.edition-focus-feature svg { flex: none; margin-top: 2px; color: #c2964c; }
+
+/* --- ตารางเทียบ 3 เวอร์ชัน --- */
+.edition-compare { border: 1px solid #e7e2d3; border-radius: 12px; overflow: hidden; font-size: 11.5px; }
+.edition-compare-head, .edition-compare-row { display: grid; grid-template-columns: 1fr 64px 64px 72px; align-items: stretch; }
+.edition-compare-head { background: #f4f1e8; font-weight: 700; color: #6b6650; }
+.edition-compare-head > span { padding: 9px 8px; text-align: center; }
+.edition-compare-head > span:first-child { text-align: left; }
+.edition-compare-head .col-edition { border-left: 1px solid #e7e2d3; }
+.edition-compare-head .col-edition.current { background: #fff; box-shadow: inset 0 -2px 0 #2f8c6d; }
+.edition-compare-head .col-edition em { display: block; font-style: normal; font-size: 9px; font-weight: 600; color: #2f8c6d; margin-top: 2px; }
+.edition-compare-head .col-edition.tone-slate { color: #5b6068; }
+.edition-compare-head .col-edition.tone-blue { color: #2c6d7e; }
+.edition-compare-head .col-edition.tone-amber { color: #9a7434; }
+.edition-compare-body { max-height: 264px; overflow-y: auto; }
+.edition-compare-row { border-top: 1px solid #eeeadd; }
+.edition-compare-row:hover { background: #fbfaf4; }
+.edition-feature-cell { padding: 8px 10px; display: flex; flex-direction: column; gap: 1px; }
+.edition-feature-cell b { font-size: 11.5px; color: #44412f; }
+.edition-feature-cell small { font-size: 10px; color: #97927a; line-height: 1.4; }
+.edition-compare-row > span:not(.edition-feature-cell) { display: grid; place-items: center; border-left: 1px solid #f0ecdf; }
+.edition-compare-row > span.yes { color: #2f8c6d; background: #f2f9f5; }
+.edition-compare-row > span.no { color: #cfc9b2; }
+
+/* --- ใส่รหัสลิขสิทธิ์ --- */
+.edition-apply { margin-top: 14px; padding: 13px 14px; border-radius: 12px; background: #fff; border: 1px solid #e7e2d3; }
+.edition-apply-title { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; color: #44412f; margin-bottom: 9px; }
+.edition-apply-title svg { color: #c2964c; }
+.edition-key-row { display: flex; gap: 8px; }
+.edition-key-row input { flex: 1; min-width: 0; font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; letter-spacing: .4px; }
+.edition-apply > input:not(:only-of-type):not(:first-of-type) { margin-top: 8px; font-size: 12px; }
+.edition-apply-error { margin-top: 8px; font-size: 11px; color: #b3552f; background: #fdf3ec; border: 1px solid #f0d7c6; border-radius: 8px; padding: 7px 10px; }
+
+/* --- การ์ดชวนเริ่มทดลองใช้ --- */
+.edition-trial-card { margin-top: 12px; display: flex; align-items: center; gap: 12px; padding: 13px 14px; border-radius: 12px; background: linear-gradient(135deg, #f3faf6, #fbf3e3); border: 1px solid #d9e9de; }
+.edition-trial-card > div:first-child { display: flex; align-items: flex-start; gap: 9px; flex: 1; }
+.edition-trial-card svg { flex: none; margin-top: 2px; color: #2f8c6d; }
+.edition-trial-card b { font-size: 12.5px; color: #2f6a52; }
+.edition-trial-card p { font-size: 11px; color: #7d7862; margin-top: 2px; line-height: 1.5; }
+.edition-trial-note { margin-top: 12px; display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 10px; background: #e9f3f4; border: 1px solid #d0e3e6; color: #2c6d7e; font-size: 11.5px; }
+
+/* --- แท็บเวอร์ชันในหน้าตั้งค่า: การ์ดสถานะ --- */
+.edition-status-card { display: flex; align-items: center; gap: 14px; padding: 16px; border-radius: 14px; background: linear-gradient(135deg, #fdfcf9, #f6f3ea); border: 1px solid #e7e2d3; }
+.edition-status-icon { width: 46px; height: 46px; border-radius: 13px; display: grid; place-items: center; color: #fff; flex: none; }
+.edition-status-icon.tone-slate { background: #7b8393; }
+.edition-status-icon.tone-blue { background: #3d8899; }
+.edition-status-icon.tone-amber { background: #c2964c; }
+.edition-status-body { flex: 1; min-width: 0; }
+.edition-status-body b { display: block; font-size: 14.5px; color: #3c392b; }
+.edition-status-body p { font-size: 11.5px; color: #7d7862; margin-top: 3px; line-height: 1.55; }
+.edition-status-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+.edition-status-chips span { font-size: 9.5px; font-weight: 600; padding: 3px 8px; border-radius: 999px; background: #fff; border: 1px solid #e7e2d3; color: #6b6650; }
+.edition-status-chips span.trial { color: #2c6d7e; border-color: #d0e3e6; background: #f0f8f9; }
+
+/* --- ตัวเลือกเวอร์ชันตอนลงทะเบียนครั้งแรก (SetupView) --- */
+.setup-edition-picker { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 2px; }
+.setup-edition-option { display: flex; gap: 10px; align-items: flex-start; text-align: left; padding: 11px 12px; border-radius: 12px; border: 1.5px solid #e7e2d3; background: #fff; cursor: pointer; transition: border-color .15s ease, background .15s ease; }
+.setup-edition-option:hover { border-color: #cfc7ac; }
+.setup-edition-option.active { border-color: #2f8c6d; background: #f2f9f5; box-shadow: 0 0 0 3px rgba(47, 140, 109, .12); }
+.setup-edition-radio { width: 16px; height: 16px; border-radius: 50%; border: 2px solid #cfcaB5; margin-top: 1px; flex: none; position: relative; }
+.setup-edition-option.active .setup-edition-radio { border-color: #2f8c6d; }
+.setup-edition-option.active .setup-edition-radio::after { content: ""; position: absolute; inset: 2.5px; border-radius: 50%; background: #2f8c6d; }
+.setup-edition-text { flex: 1; min-width: 0; }
+.setup-edition-text b { display: block; font-size: 12px; color: #3c392b; }
+.setup-edition-text small { display: block; font-size: 10.5px; color: #8d8873; margin-top: 2px; line-height: 1.5; }
+.setup-edition-key-input { margin: 2px 0 2px 26px; }
+
+/* --- เครื่องมือออกรหัสลิขสิทธิ์ (โซนผู้พัฒนา) --- */
+.dev-keygen { border: 1px solid #e7e2d3; border-radius: 12px; padding: 14px; background: #fff; }
+.dev-keygen-head { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 700; color: #44412f; margin-bottom: 4px; }
+.dev-keygen-head svg { color: #8d6fd2; }
+.dev-keygen-sub { font-size: 11px; color: #8d8873; line-height: 1.55; margin-bottom: 10px; }
+.dev-keygen-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+.dev-keygen-form label { display: flex; flex-direction: column; gap: 4px; font-size: 10.5px; font-weight: 600; color: #6b6650; }
+.dev-keygen-result { margin-top: 10px; display: flex; gap: 8px; align-items: center; }
+.dev-keygen-result code { flex: 1; min-width: 0; font-family: ui-monospace, "SFMono-Regular", Menlo, monospace; font-size: 13px; letter-spacing: .5px; color: #5b4a1e; background: #fbf3e3; border: 1px dashed #e0c98f; border-radius: 9px; padding: 9px 12px; white-space: nowrap; overflow-x: auto; }
+
+/* มือถือ: ตารางเทียบ + โมดัลกะทัดรัด */
+@media (max-width: 560px) {
+  .edition-modal { padding: 14px; border-radius: 14px; }
+  .edition-compare-head, .edition-compare-row { grid-template-columns: 1.4fr 44px 44px 52px; }
+  .edition-feature-cell small { display: none; }
+  .edition-key-row { flex-direction: column; }
+  .edition-trial-card { flex-direction: column; align-items: stretch; }
+}

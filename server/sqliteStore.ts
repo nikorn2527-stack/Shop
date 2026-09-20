@@ -219,6 +219,13 @@ export type StoreSettings = {
   /** ROUND 56 (user) — เช็คลิสต์วันขึ้นระบบ (โซนเครื่องมือติดตั้ง): JSON array ของ id ที่ติ๊กแล้ว
    *  เก็บฝั่งเซิร์ฟเวอร์ให้ทุกเครื่องเห็นตรงกัน · "" = ยังไม่ได้ติ๊กอะไร */
   goliveChecks: string;
+  /** ROUND 61 (user) — ระบบเวอร์ชัน 3 แบบ (ทั่วไป/โปร/โปรพลัส): รหัสลิขสิทธิ์ที่ใส่แล้ว ("" = ยังไม่มี) ·
+   *  เปลี่ยนผ่าน edition.applyLicense เท่านั้น (settings.set กลั่น fields เหล่านี้ทิ้งเสมอ) */
+  licenseKey: string;
+  /** ชื่อผู้ถือลิขสิทธิ์ที่พิมพ์ตอนใช้รหัส — แสดงบนหน้าเวอร์ชันและโซนช่าง */
+  licenseName: string;
+  /** วันเริ่มทดลองใช้โปรพลัส 30 วัน "YYYY-MM-DD" · "" = ยังไม่เคยทดลอง · ตั้งผ่าน edition.startTrial เท่านั้น */
+  trialStart: string;
 };
 
 /**
@@ -2187,6 +2194,11 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   receiptPaperWidth: "72",
   // ROUND 56 — เช็คลิสต์วันขึ้นระบบ (โซนเครื่องมือติดตั้ง): ยังไม่ได้ติ๊กอะไร
   goliveChecks: "",
+  // ROUND 61 — ระบบเวอร์ชัน: ยังไม่มีรหัส ยังไม่เคยทดลอง → เริ่มที่เวอร์ชันทั่วไป
+  // (ระบบใหม่จะชวนเลือก "ทดลองใช้ 30 วัน" ตอนลงทะเบียนครั้งแรก)
+  licenseKey: "",
+  licenseName: "",
+  trialStart: "",
 };
 
 const SETTINGS_KEY = "app_settings";
@@ -2345,7 +2357,9 @@ export function setSettings(db: SqliteDb, patch: Partial<StoreSettings>, actor =
   if (patch.memberNumberMode !== undefined) {
     setMemberNumberMode(db, patch.memberNumberMode);
   }
-  const { memberNumberMode: _mode, ...rest } = patch;
+  // ROUND 61 — ฟิลด์เวอร์ชัน/ลิขสิทธิ์เปลี่ยนได้ผ่าน edition.* เท่านั้น
+  // (ออกรหัส–ใช้รหัส–เริ่มทดลอง มี audit + validation เฉพาะทาง) — settings.set กลั่นทิ้งเสมอ
+  const { memberNumberMode: _mode, licenseKey: _licenseKey, licenseName: _licenseName, trialStart: _trialStart, ...rest } = patch;
   if (Object.keys(rest).length > 0) {
     const next = { ...getSettings(db), ...rest };
     db.prepare(`INSERT INTO store_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(SETTINGS_KEY, JSON.stringify(next));
@@ -2354,6 +2368,16 @@ export function setSettings(db: SqliteDb, patch: Partial<StoreSettings>, actor =
     .map(([key, value]) => `${key}: ${typeof value === "boolean" ? (value ? "เปิด" : "ปิด") : String(value)}`)
     .join(" · ");
   logAction(db, "บันทึกการตั้งค่า", actor, changedKeys || "ไม่มีการเปลี่ยนแปลง", "amber", actorRole ?? null);
+  return getSettings(db);
+}
+
+/**
+ * ROUND 61 — เขียนฟิลด์เวอร์ชัน/ลิขสิทธิ์โดยตรง (ไม่ผ่าน setSettings ที่กลั่นทิ้ง)
+ * เรียกเฉพาะจาก edition.* ใน routers ที่มีการตรวจสิทธิ์ + audit log ของตัวเองแล้ว
+ */
+export function setEditionSettings(db: SqliteDb, patch: Partial<Pick<StoreSettings, "licenseKey" | "licenseName" | "trialStart">>): StoreSettings {
+  const next = { ...getSettings(db), ...patch };
+  db.prepare(`INSERT INTO store_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(SETTINGS_KEY, JSON.stringify(next));
   return getSettings(db);
 }
 
@@ -3162,10 +3186,18 @@ export function openWelfareStore(filename = process.env.SQLITE_DB_PATH ?? "data/
     mkdirSync(dirname(resolve(filename)), { recursive: true });
   }
   const db = createSqliteStore(filename);
-  seedWelfareStoreData(db);
-  // ROUND 48 — dev bypass: ฐานข้อมูลใหม่บน `pnpm dev` ข้าม SetupView ไปหน้าล็อกอินเลย
-  if (process.env.NODE_ENV === "development" && countAppUsers(db) === 0) {
-    seedDevAppUsers(db);
+  // ROUND 61 (user) — "ลงใหม่ต้องไม่มีข้อมูล": หยุด seed ข้อมูลตัวอย่างโดยดีฟอลต์
+  // ระบบเกิดใหม่เริ่มว่างเปล่า 100% — ข้อมูลจริงขึ้นด้วย 2 ทางเท่านั้น:
+  //   1) เทมเพลต .xlsx (ตั้งค่า → นำเข้าข้อมูล) ที่เตรียมให้กรอกตามรูปแบบ
+  //   2) กรอกเองผ่านหน้า POS / สต็อก / ลงทะเบียนสมาชิก
+  // นักพัฒนาที่ต้องการข้อมูลตัวอย่าง (ทดสอบระบบ): ตั้ง SEED_DEMO_DATA=1 ใน .env
+  //   — จะได้สมาชิก/สินค้า/บิลตัวอย่าง + บัญชีทดสอบ kanyanat/woraphot (dev เท่านั้น)
+  if (process.env.SEED_DEMO_DATA === "1") {
+    seedWelfareStoreData(db);
+    // ROUND 48 — dev bypass: ฐานข้อมูลใหม่บน `pnpm dev` ข้าม SetupView ไปหน้าล็อกอินเลย
+    if (process.env.NODE_ENV === "development" && countAppUsers(db) === 0) {
+      seedDevAppUsers(db);
+    }
   }
   return db;
 }

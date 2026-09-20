@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { Eye, EyeOff, LogIn, ShieldCheck, Store } from "lucide-react";
+import { Crown, Eye, EyeOff, Gift, KeyRound, LogIn, ShieldCheck, Store } from "lucide-react";
+import { EDITIONS, EDITION_TRIAL_DAYS } from "@shared/editions";
 import { trpc } from "@/lib/trpc";
 import { getErrorMessage } from "@/pages/viewFormat";
 import { brandInitial, type BrandSettings } from "@/theme";
@@ -22,6 +23,9 @@ export function SetupView({ brand, onAuthed }: { brand?: BrandSettings | null | 
   const [confirm, setConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  // ROUND 61 — เลือกเวอร์ชันตอนลงทะเบียนครั้งแรก: ทดลองใช้ 30 วัน (แนะนำ) / มีรหัสลิขสิทธิ์ / เริ่มที่ทั่วไป
+  const [editionChoice, setEditionChoice] = useState<"trial" | "license" | "standard">("trial");
+  const [licenseKey, setLicenseKey] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
   const setupMutation = trpc.auth.setup.useMutation({
     onSuccess: () => {
@@ -48,12 +52,16 @@ export function SetupView({ brand, onAuthed }: { brand?: BrandSettings | null | 
     const issues = passwordIssues(password, { min: 8 });
     if (issues.length > 0) { setError(issues.join(" · ")); return; }
     if (password !== confirm) { setError("รหัสผ่านทั้งสองช่องไม่ตรงกัน"); return; }
+    // ROUND 61 — เลือกใช้รหัสลิขสิทธิ์ต้องกรอกรหัสก่อน (ระบบตรวจความถูกต้องตอนสร้างบัญชี)
+    if (editionChoice === "license" && licenseKey.trim().length < 8) { setError("กรุณาพิมพ์รหัสลิขสิทธิ์ให้ครบทุกกลุ่ม หรือเลือก “เริ่มทดลองใช้” ก่อน"); return; }
     setError("");
     setupMutation.mutate({
       username: trimmedUsername,
       displayName: trimmedName,
       password,
       storeName: storeName.trim() || undefined,
+      editionChoice,
+      licenseKey: editionChoice === "license" ? licenseKey.trim().toUpperCase() : undefined,
     });
   };
 
@@ -135,6 +143,41 @@ export function SetupView({ brand, onAuthed }: { brand?: BrandSettings | null | 
             />
           </label>
           <PasswordMeter password={password} min={8} />
+          <div className="setup-edition-picker" role="radiogroup" aria-label="เลือกเวอร์ชันเริ่มใช้งาน">
+            <button type="button" className={`setup-edition-option${editionChoice === "trial" ? " active" : ""}`} role="radio" aria-checked={editionChoice === "trial"} onClick={() => setEditionChoice("trial")}>
+              <span className="setup-edition-radio" aria-hidden="true" />
+              <span className="setup-edition-text">
+                <b><Gift size={13} style={{ display: "inline", verticalAlign: "-2px", marginRight: 4 }} />เริ่มทดลองใช้{EDITIONS.proplus.label} {EDITION_TRIAL_DAYS} วัน (แนะนำ)</b>
+                <small>เปิดทุกฟีเจอร์ทันที — นับสต็อก กล้องสแกน นำเข้า Excel สำรองข้อมูล · ครบกำหนดกลับเป็นเวอร์ชันทั่วไป (ข้อมูลครบทุกอย่าง)</small>
+              </span>
+            </button>
+            <button type="button" className={`setup-edition-option${editionChoice === "license" ? " active" : ""}`} role="radio" aria-checked={editionChoice === "license"} onClick={() => setEditionChoice("license")}>
+              <span className="setup-edition-radio" aria-hidden="true" />
+              <span className="setup-edition-text">
+                <b><KeyRound size={13} style={{ display: "inline", verticalAlign: "-2px", marginRight: 4 }} />ฉันมีรหัสลิขสิทธิ์แล้ว</b>
+                <small>ซื้อมาจากผู้พัฒนา — วางรหัสด้านล่างนี้ ระบบจะเปิดเวอร์ชันตามรหัสทันทีที่ลงทะเบียน</small>
+              </span>
+            </button>
+            {editionChoice === "license" && (
+              <span className="setup-edition-key-input">
+                <input
+                  value={licenseKey}
+                  onChange={(event) => setLicenseKey(event.target.value.toUpperCase())}
+                  placeholder="WSH-X-XXXX-XXXX-XXXX-XXXX"
+                  aria-label="รหัสลิขสิทธิ์"
+                  maxLength={40}
+                  spellCheck={false}
+                />
+              </span>
+            )}
+            <button type="button" className={`setup-edition-option${editionChoice === "standard" ? " active" : ""}`} role="radio" aria-checked={editionChoice === "standard"} onClick={() => setEditionChoice("standard")}>
+              <span className="setup-edition-radio" aria-hidden="true" />
+              <span className="setup-edition-text">
+                <b><Crown size={13} style={{ display: "inline", verticalAlign: "-2px", marginRight: 4 }} />เริ่มที่{EDITIONS.standard.label}เลย</b>
+                <small>POS ขายหน้าร้าน · สมาชิกและกระเป๋าเงิน · สต็อกพื้นฐาน · รายงานยอดขาย — ใช้ฟรีไม่มีกำหนด</small>
+              </span>
+            </button>
+          </div>
           {error && (
             <div className="login-error" role="alert">
               <ShieldCheck size={15} /> {error}

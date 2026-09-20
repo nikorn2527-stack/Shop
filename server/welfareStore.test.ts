@@ -899,6 +899,10 @@ describe("sales history", () => {
   it("backfills sale_items.unit when opening a pre-migration database file", () => {
     const dir = mkdtempSync(join(tmpdir(), "welfare-backfill-"));
     const filename = join(dir, "store.sqlite");
+    // ROUND 61 — openWelfareStore เลิก seed ตัวอย่างโดยดีฟอลต์ (ระบบใหม่ต้องว่าง):
+    // เปิด SEED_DEMO_DATA ชั่วคราวเพื่อจำลอง "ฐานข้อมูลเดิมที่มีบิลอยู่แล้ว" ตามเจตนาของเทสนี้
+    const prevSeed = process.env.SEED_DEMO_DATA;
+    process.env.SEED_DEMO_DATA = "1";
     try {
       const seeded = openWelfareStore(filename);
       seeded.close();
@@ -917,6 +921,8 @@ describe("sales history", () => {
       expect(sample.unit.length).toBeGreaterThan(0);
       migrated.close();
     } finally {
+      if (prevSeed === undefined) delete process.env.SEED_DEMO_DATA;
+      else process.env.SEED_DEMO_DATA = prevSeed;
       rmSync(dir, { recursive: true, force: true });
     }
   });
