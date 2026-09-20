@@ -1,5 +1,5 @@
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 
@@ -216,6 +216,9 @@ export type StoreSettings = {
   backupKeepCount: number;
   /** ROUND 42 (ข้อ 32 ตอนที่ 3 — ข้อ 4) — ความกว้างกระดาษสลิปเครื่องพิมพ์: "58" (สลิปเล็ก) | "72" (มาตรฐานเดิม) | "80" (สลิปใหญ่) */
   receiptPaperWidth: "58" | "72" | "80";
+  /** ROUND 56 (user) — เช็คลิสต์วันขึ้นระบบ (โซนเครื่องมือติดตั้ง): JSON array ของ id ที่ติ๊กแล้ว
+   *  เก็บฝั่งเซิร์ฟเวอร์ให้ทุกเครื่องเห็นตรงกัน · "" = ยังไม่ได้ติ๊กอะไร */
+  goliveChecks: string;
 };
 
 /**
@@ -2128,6 +2131,35 @@ export function dashboardStats(db: SqliteDb, rangeDays = 30): DashboardStats {
 
 // --- settings ---------------------------------------------------------------
 
+/** ROUND 56 (user) — ภาพรวมสำหรับ "เครื่องมือติดตั้งระบบ" (โซนผู้พัฒนา): ตัวเลขที่ช่าง
+ *  ต้องเห็นในวันขึ้นระบบ — จำนวนบัญชี/สมาชิก/สินค้า/บิลวันนี้/สินค้ายังไม่ตั้งราคา
+ *  ขนาดฐานข้อมูล — ไว้ตรวจรับข้อมูลก่อนส่งมอบระบบให้ลูกค้า */
+export type InstallOverview = {
+  users: { total: number; active: number; devAccounts: number };
+  members: { total: number; active: number; walletTotal: number };
+  products: { total: number; active: number; zeroPrice: number; lowStock: number };
+  sales: { todayBills: number; todayRevenue: number; totalBills: number };
+  dbSizeBytes: number;
+};
+
+export function installOverview(db: SqliteDb, dbPath: string): InstallOverview {
+  const users = listAppUsers(db);
+  const memberRow = db.prepare(`SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN status = 'active' THEN 1 ELSE 0 END), 0) AS active, ROUND(COALESCE(SUM(balance), 0), 2) AS walletTotal FROM members`).get() as { total: number; active: number; walletTotal: number };
+  const productRow = db.prepare(`SELECT COUNT(*) AS total, COALESCE(SUM(CASE WHEN active = 1 THEN 1 ELSE 0 END), 0) AS active, COALESCE(SUM(CASE WHEN active = 1 AND price = 0 THEN 1 ELSE 0 END), 0) AS zeroPrice, COALESCE(SUM(CASE WHEN active = 1 AND stock <= reorder_point THEN 1 ELSE 0 END), 0) AS lowStock FROM products`).get() as { total: number; active: number; zeroPrice: number; lowStock: number };
+  const today = formatDate(startOfToday());
+  const todayRow = db.prepare(`SELECT COUNT(*) AS bills, ROUND(COALESCE(SUM(total), 0), 2) AS revenue FROM sales WHERE created_at >= ?`).get(`${today} 00:00:00`) as { bills: number; revenue: number };
+  const totalRow = db.prepare(`SELECT COUNT(*) AS total FROM sales`).get() as { total: number };
+  let dbSizeBytes = 0;
+  try { dbSizeBytes = statSync(dbPath).size; } catch { /* ไฟล์หายชั่วคราว = 0 */ }
+  return {
+    users: { total: users.length, active: users.filter((user) => user.active === 1).length, devAccounts: users.filter((user) => user.role === "dev" && user.active === 1).length },
+    members: memberRow,
+    products: productRow,
+    sales: { todayBills: todayRow.bills, todayRevenue: todayRow.revenue, totalBills: totalRow.total },
+    dbSizeBytes,
+  };
+}
+
 export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   memberNumberMode: "running",
   storeName: "ร้านค้าสวัสดิการ",
@@ -2153,6 +2185,8 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   backupKeepCount: 14,
   // ROUND 42 — เครื่องพิมพ์สลิป: ค่าเริ่มต้น 72mm ตรงกับขนาดที่ระบบใช้อยู่แล้ว
   receiptPaperWidth: "72",
+  // ROUND 56 — เช็คลิสต์วันขึ้นระบบ (โซนเครื่องมือติดตั้ง): ยังไม่ได้ติ๊กอะไร
+  goliveChecks: "",
 };
 
 const SETTINGS_KEY = "app_settings";

@@ -35,6 +35,7 @@ import {
   findAppUserByUsername,
   getMemberDetail,
   getSettings,
+  installOverview,
   listAppSessions,
   listAppUsers,
   listAuditLogs,
@@ -111,6 +112,12 @@ function resolveActor(ctx: TrpcContext, input: { actor?: string; actorRole?: str
 /** Admin gate: session role wins; only anonymous requests fall back to input. */
 function isAdminCtx(ctx: TrpcContext, input: { actorRole?: string }) {
   return ctx.user ? ctx.user.role === "admin" : (input.actorRole ?? "").trim() === "ผู้บริหาร";
+}
+
+/** ROUND 56 (user) — ประตูโซนผู้พัฒนา (เครื่องมือติดตั้งระบบ): บัญชีที่เป็น dev เท่านั้น
+ *  ใช้บทบาทจากเซสชันฝั่งเซิร์ฟเวอร์ (appRole จากฐานข้อมูล) ไม่เชื่อค่าที่ client ส่งมา */
+function isDevCtx(ctx: TrpcContext) {
+  return Boolean(ctx.user && ctx.user.role === "admin" && ctx.user.appRole === "dev");
 }
 
 /** ROUND 40 (ข้อ 32) — แปลง mapping ที่ client ส่ง (อาจมี -1 = ไม่นำเข้า) ให้เป็น undefined ตาม contract ของ importTool */
@@ -394,6 +401,8 @@ const settingsPatchInput = z
     backupKeepCount: z.number().int().min(3).max(60).optional(),
     // ROUND 42 (ข้อ 32 ตอนที่ 3 — ข้อ 4) — ความกว้างกระดาษสลิปเครื่องพิมพ์ 58/72/80 มม.
     receiptPaperWidth: z.enum(["58", "72", "80"]).optional(),
+    // ROUND 56 (user) — เช็คลิสต์วันขึ้นระบบ (โซนเครื่องมือติดตั้ง): JSON รหัสรายการที่ติ๊กแล้ว
+    goliveChecks: z.string().max(4000).optional(),
   })
   .nullish();
 
@@ -438,6 +447,20 @@ const userUpdateInput = z.object({
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
+  // ROUND 56 (user) — โซนเครื่องมือติดตั้งระบบ (บัญชีผู้พัฒนาเท่านั้น): ตัวเลขตรวจรับข้อมูล
+  // วันขึ้นระบบ — จำนวนบัญชี/สมาชิก/สินค้า (รวมสินค้ายังไม่ตั้งราคา)/บิลวันนี้/ขนาดฐานข้อมูล
+  install: router({
+    overview: publicProcedure
+      .input(z.unknown().optional())
+      .query(({ ctx }) =>
+        withStoreErrors(() => {
+          if (!isDevCtx(ctx)) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "เครื่องมือติดตั้งระบบใช้ได้เฉพาะบัญชีผู้พัฒนา" });
+          }
+          return installOverview(getWelfareDb(), getWelfareDbPath());
+        }),
+      ),
+  }),
   auth: router({
     me: publicProcedure.query(opts => opts.ctx.user),
     /** ROUND 36 (ข้อ 31) — สถานะลงทะเบียนครั้งแรก: needsSetup = ยังไม่มีบัญชีผู้ใช้เลย */

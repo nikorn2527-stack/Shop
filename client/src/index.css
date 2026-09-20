@@ -4378,3 +4378,116 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
   .barcode-stage-foot { flex-wrap: wrap; }
   .barcode-live-hint { flex-basis: 100%; }
 }
+
+/* ============================================================
+   ROUND 56 — โซนผู้พัฒนา + เครื่องมือติดตั้งระบบ (Settings)
+   แยกสิทธิ์: 4 แท็บระบบ (เครื่องมือติดตั้ง/นำเข้า/สำรอง/เชื่อมต่อ)
+   มองเห็นเฉพาะบัญชี dev · ผู้บริหารเห็นป้ายล็อกแทน
+   ============================================================ */
+.settings-nav-group-label { margin: 7px 4px 4px; padding: 0 10px; font-size: 9.5px; font-weight: 600; letter-spacing: .06em; color: #9aa08c; text-transform: none; user-select: none; }
+.settings-nav-group-label.dev { color: #b3855e; margin-top: 12px; padding-top: 10px; border-top: 1px dashed #e8e4d8; }
+.settings-nav-locked { display: flex; align-items: flex-start; gap: 6px; margin: 2px 4px; padding: 9px 10px; border-radius: 8px; background: #f8f6ef; border: 1px dashed #e3dfd2; color: #8b8f7d; font-size: 10px; line-height: 1.5; }
+.settings-nav-locked svg { flex: none; margin-top: 1px; color: #b0a98f; }
+
+.install-hero .install-chip-row { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 15px; }
+.install-chip { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 11px; border-radius: 15px; background: #f2f7f4; border: 1px solid #e0ebe6; color: #557b6d; font-size: 10.5px; white-space: nowrap; }
+.install-chip.dev { background: #fdf6ec; border-color: #eedfc6; color: #a4763c; font-weight: 600; }
+
+.install-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 15px; }
+.install-info-rows { padding-top: 13px; display: flex; flex-direction: column; gap: 0; }
+.install-info-rows > div { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8.5px 0; border-bottom: 1px solid #f2f3f0; }
+.install-info-rows > div:last-child { border-bottom: 0; }
+.install-info-rows span { color: #82866f; font-size: 10.5px; }
+.install-info-rows b { color: #5d6758; font-size: 11.5px; font-family: "IBM Plex Mono", monospace; }
+
+.install-lan-urls { margin-top: 13px; display: flex; flex-direction: column; gap: 7px; }
+.install-url-row { display: flex; align-items: center; gap: 9px; width: 100%; height: 40px; padding: 0 12px; border-radius: 8px; border: 1px solid #dbe8e2; background: #f6fbf8; color: #3f7263; font-size: 11.5px; cursor: pointer; transition: .16s ease; }
+.install-url-row:hover { border-color: #9bcdba; background: #eef7f2; }
+.install-url-row b { flex: 1; text-align: left; font-family: "IBM Plex Mono", monospace; font-weight: 500; }
+.install-url-row svg:last-child { opacity: .55; }
+.install-url-empty { display: flex; align-items: center; gap: 8px; padding: 11px 12px; border-radius: 8px; background: #faf9f3; border: 1px dashed #e3dfd2; color: #8b8f7d; font-size: 10.5px; }
+
+.install-stat-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; padding-top: 13px; }
+.install-stat-grid > div { background: #fbfdfc; border: 1px solid #edf1ee; border-radius: 9px; padding: 11px 12px; min-width: 0; }
+.install-stat-grid span { display: block; color: #82866f; font-size: 10px; }
+.install-stat-grid b { display: block; color: #4b665c; font-size: 15px; margin-top: 4px; }
+.install-stat-grid small { display: block; color: #93978a; font-size: 9.5px; margin-top: 3px; }
+.install-warn { margin-top: 11px; }
+.install-action-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 13px; }
+.install-last-backup { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 12px; padding: 9px 11px; border-radius: 8px; background: #f0f8f3; border: 1px solid #d8ecdf; color: #4f8a6f; font-size: 10.5px; }
+.install-last-backup b { font-family: "IBM Plex Mono", monospace; font-weight: 500; word-break: break-all; }
+.install-last-backup.none { background: #fdf6ec; border-color: #f0dfc0; color: #a4763c; }
+
+.golive-progress { display: flex; align-items: center; gap: 12px; padding-top: 15px; }
+.golive-progress-bar { flex: 1; height: 8px; border-radius: 10px; background: #eef2ef; overflow: hidden; }
+.golive-progress-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #64af93, #007a55); transition: width .3s ease; }
+.golive-progress > b { color: #4b665c; font-size: 12px; white-space: nowrap; }
+.golive-list { display: flex; flex-direction: column; gap: 7px; padding-top: 14px; }
+.golive-item { display: flex; align-items: flex-start; gap: 11px; padding: 11px 13px; border-radius: 10px; border: 1px solid #e7ece9; background: #fdfefd; cursor: pointer; transition: .16s ease; }
+.golive-item:hover { border-color: #c4dfd3; }
+.golive-item.checked { border-color: #bcdcc9; background: #f3faf6; }
+.golive-item input[type="checkbox"] { appearance: none; -webkit-appearance: none; flex: none; width: 19px; height: 19px; margin: 1px 0 0; border: 1.6px solid #c8d4cd; border-radius: 6px; background: #fff; cursor: pointer; transition: .15s ease; }
+.golive-item input[type="checkbox"]:checked { border-color: #007a55; background: #007a55; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: center; }
+.golive-item-body { flex: 1; min-width: 0; }
+.golive-item-body b { display: block; color: #57614f; font-size: 11.5px; font-weight: 600; }
+.golive-item.checked .golive-item-body b { color: #2f7a5e; text-decoration: line-through; text-decoration-color: rgba(47, 122, 94, .45); text-decoration-thickness: 1px; }
+.golive-item-body small { display: block; color: #93978a; font-size: 9.5px; margin-top: 3px; line-height: 1.55; }
+.golive-auto { flex: none; display: inline-flex; align-items: center; gap: 4px; margin-top: 1px; height: 22px; padding: 0 8px; border-radius: 11px; font-size: 9px; font-weight: 600; white-space: nowrap; }
+.golive-auto.pass { background: #e7f6ee; color: #35846a; }
+.golive-auto.warn { background: #fdf3e3; color: #b3855e; }
+
+.install-handover-steps { display: flex; flex-direction: column; gap: 11px; padding-top: 13px; }
+.install-handover-step { display: flex; gap: 12px; align-items: flex-start; }
+.install-handover-step > b { flex: none; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; background: #0c4b34; color: #cfe9dc; font-size: 11px; }
+.install-handover-step > div { min-width: 0; }
+.install-handover-step > div b { display: block; color: #4f5a4a; font-size: 11.5px; }
+.install-handover-step > div small { display: block; color: #93978a; font-size: 9.5px; margin-top: 3px; line-height: 1.55; }
+
+@media (max-width: 1080px) {
+  .install-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 820px) {
+  .settings-nav-group-label { display: none; }
+  .settings-nav-locked { max-width: 210px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; display: inline-flex; align-items: center; flex: none; }
+}
+@media (max-width: 560px) {
+  .install-grid { grid-template-columns: 1fr; }
+  .install-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .install-action-row { flex-direction: column; align-items: stretch; }
+  .install-action-row .install-chip { justify-content: center; }
+  .install-action-row .outline-button, .install-action-row .primary-button, .install-action-row .danger-outline-button { width: 100%; }
+  .golive-auto { margin-left: 30px; align-self: flex-start; }
+  .install-url-row { height: 46px; }
+}
+
+/* ============================================================
+   ROUND 56 — มือถือ: ปุ่มควบคุมจำนวนในบิล / ปุ่มแถบลัด POS กดง่ายขึ้น
+   (จากการทดสอบจริงบนมือถือ 390px: ปุ่ม +/- เล็กเกินไปสำหรับนิ้ว)
+   + ตารางสต็อก/รายงานบนมือถือ มีแถบบอกว่าเลื่อนนอนได้
+   ============================================================ */
+@media (max-width: 820px) {
+  .pos-rail { display: none; }
+  .table-wrap { -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+}
+@media (max-width: 560px) {
+  /* ปุ่ม +/- ปรับจำนวนในบิล POS: ใหญ่ขึ้นเป็น 34px (กดนิ้วถูก) แตะซ้ำได้เร็ว */
+  .cart-item .qty-control button { width: 34px; height: 34px; border-radius: 8px; flex: none; }
+  .cart-item .qty-control { gap: 8px; flex-wrap: wrap; }
+  .cart-item .qty-control input { width: 52px; height: 34px; flex: none; }
+  .cart-item .qty-control span { min-width: 26px; font-size: 13px; }
+  .pick-stepper button { height: 38px; }
+  /* ปุ่มลบรายการ (ถังขยะ) ในบิล */
+  .remove-item { width: 34px; height: 34px; display: grid; place-items: center; }
+  /* แถบชำระเงินมือถือ */
+  .pos-mobile-bar button { min-height: 44px; padding: 0 16px; }
+  /* แถวสินค้าในบิล: ชื่อกดยาวขึ้น */
+  .cart-item { padding: 12px 0; }
+  /* ตารางที่ต้องเลื่อนนอน: บอกผู้ใช้ด้วยเงาด้านขวา */
+  .table-wrap { position: relative; background: linear-gradient(to right, #fff 30%, rgba(255,255,255,0)), linear-gradient(to right, rgba(232,238,235,.55), rgba(232,238,235,0) 82%); background-repeat: no-repeat; background-size: 26px 100%, 26px 100%; background-position: left center, right center; }
+  .table-wrap table { min-width: 640px; }
+}
+@media (max-width: 560px) {
+  /* ปุ่มเครื่องมือในแถวตาราง (แก้ไข/รับเข้า) กดง่ายขึ้น */
+  .row-action button, .row-action .outline-button, .row-action .mini-button { min-height: 34px; min-width: 34px; }
+  td .icon-button { width: 34px; height: 34px; }
+}
