@@ -76,7 +76,7 @@ import { GlobalSearch } from "@/components/GlobalSearch";
 import { ThaiDatePicker } from "@/components/ThaiDatePicker";
 import { downloadReportPdf, printReportDoc, type ReportDocConfig } from "@/reportDoc";
 import { ExportPreviewModal, type ExportFormat, type ExportPreviewState } from "@/components/ExportPreviewModal";
-import { downloadCsvFile, downloadXlsxFile } from "@/exportUtils";
+import { downloadCsvFile, downloadXlsxFile, exportCount, exportNumber } from "@/exportUtils";
 import { MemberScanPicker } from "@/components/ScanPickers";
 import { LoginView } from "@/components/LoginView";
 import { SetupView } from "@/components/SetupView";
@@ -631,8 +631,8 @@ function Reports({ focusBill, onFocusBillConsumed, role, userName }: { focusBill
   };
   const dailySalesRows = [
     ["วันที่ / ช่วงเวลา", "จำนวนบิล", "รายการที่ขาย", "ยอดขาย", "ต้นทุน", "กำไร"],
-    ...reportRows.map((row) => [row.label, String(row.orders), String(row.items), row.revenue.toFixed(2), row.cogs.toFixed(2), row.profit.toFixed(2)]),
-    ["รวม", String(totals.orders), String(totals.items), totals.revenue.toFixed(2), totals.cogs.toFixed(2), totals.profit.toFixed(2)],
+    ...reportRows.map((row) => [row.label, exportCount(row.orders), exportCount(row.items), exportNumber(row.revenue), exportNumber(row.cogs), exportNumber(row.profit)]),
+    ["รวม", exportCount(totals.orders), exportCount(totals.items), exportNumber(totals.revenue), exportNumber(totals.cogs), exportNumber(totals.profit)],
   ];
   // ROUND 45 — ชุดข้อมูลส่งออกตามมุมมองที่เลือก (timeline / สินค้า / ชนิดสินค้า / พนักงานขาย)
   // CSV กับ Excel ใช้แถวชุดเดียวกับ PDF (dailySalesDocConfig) เพื่อให้ตัวเลขตรงกันทุกไฟล์
@@ -642,8 +642,8 @@ function Reports({ focusBill, onFocusBillConsumed, role, userName }: { focusBill
         fileName: "sales-by-product", sheetName: "ยอดขายตามสินค้า", label: "แยกตามสินค้า",
         rows: [
           ["สินค้า (รหัส)", "บิล", "ชิ้น", "ยอดขาย (บาท)", "ต้นทุน (บาท)", "กำไร (บาท)"],
-          ...productRows.map((row) => [`${row.name}${row.sku ? ` (${row.sku})` : ""}`, String(row.bills), String(row.qty), row.revenue.toFixed(2), row.cogs.toFixed(2), row.profit.toFixed(2)]),
-          ["รวมทุกสินค้า", String(productTotal.bills), String(productTotal.qty), productTotal.revenue.toFixed(2), productTotal.cogs.toFixed(2), productTotal.profit.toFixed(2)],
+          ...productRows.map((row) => [`${row.name}${row.sku ? ` (${row.sku})` : ""}`, exportCount(row.bills), exportCount(row.qty), exportNumber(row.revenue), exportNumber(row.cogs), exportNumber(row.profit)]),
+          ["รวมทุกสินค้า", exportCount(productTotal.bills), exportCount(productTotal.qty), exportNumber(productTotal.revenue), exportNumber(productTotal.cogs), exportNumber(productTotal.profit)],
         ],
       };
     }
@@ -652,8 +652,8 @@ function Reports({ focusBill, onFocusBillConsumed, role, userName }: { focusBill
         fileName: "sales-by-category", sheetName: "ยอดขายตามชนิดสินค้า", label: "แยกตามชนิดสินค้า",
         rows: [
           ["ชนิดสินค้า", "บิล", "ชิ้น", "ยอดขาย (บาท)", "ต้นทุน (บาท)", "กำไร (บาท)"],
-          ...categoryRows.map((row) => [row.category, String(row.orders), String(row.qty), row.revenue.toFixed(2), row.cogs.toFixed(2), row.profit.toFixed(2)]),
-          ["รวมทุกชนิดสินค้า", String(categoryTotal.orders), String(categoryTotal.qty), categoryTotal.revenue.toFixed(2), categoryTotal.cogs.toFixed(2), categoryTotal.profit.toFixed(2)],
+          ...categoryRows.map((row) => [row.category, exportCount(row.orders), exportCount(row.qty), exportNumber(row.revenue), exportNumber(row.cogs), exportNumber(row.profit)]),
+          ["รวมทุกชนิดสินค้า", exportCount(categoryTotal.orders), exportCount(categoryTotal.qty), exportNumber(categoryTotal.revenue), exportNumber(categoryTotal.cogs), exportNumber(categoryTotal.profit)],
         ],
       };
     }
@@ -662,8 +662,8 @@ function Reports({ focusBill, onFocusBillConsumed, role, userName }: { focusBill
         fileName: "sales-by-cashier", sheetName: "ยอดขายตามพนักงานขาย", label: "แยกตามพนักงานขาย",
         rows: [
           ["พนักงานขาย (ผู้ทำรายการ)", "บิล", "ชิ้น", "บิลสมาชิก", "ส่วนลดรวม (บาท)", "ยอดขายรวม (บาท)"],
-          ...cashierRows.map((row) => [row.cashier, String(row.orders), String(row.items), String(row.memberBills), row.discount.toFixed(2), row.total.toFixed(2)]),
-          ["รวมทุกพนักงาน", String(cashierTotal.orders), String(cashierTotal.items), String(cashierTotal.memberBills), cashierTotal.discount.toFixed(2), cashierTotal.total.toFixed(2)],
+          ...cashierRows.map((row) => [row.cashier, exportCount(row.orders), exportCount(row.items), exportCount(row.memberBills), exportNumber(row.discount), exportNumber(row.total)]),
+          ["รวมทุกพนักงาน", exportCount(cashierTotal.orders), exportCount(cashierTotal.items), exportCount(cashierTotal.memberBills), exportNumber(cashierTotal.discount), exportNumber(cashierTotal.total)],
         ],
       };
     }
@@ -672,8 +672,8 @@ function Reports({ focusBill, onFocusBillConsumed, role, userName }: { focusBill
         fileName: "sales-line-items", sheetName: "รายการขายรายบิล", label: "แยกตามรายการในบิล",
         rows: [
           ["วันที่ · เวลา", "เลขที่บิล", "รายการสินค้า", "ชิ้น", "ราคา/ชิ้น (บาท)", "ยอดรวม (บาท)", "ชำระโดย", "พนักงานขาย"],
-          ...lineItemRows.map((row) => [formatLogDateTime(row.createdAt), row.orderNumber, row.productName, String(row.qty), row.price.toFixed(2), row.amount.toFixed(2), row.paymentMethod, row.cashier]),
-          ["รวม", `${lineItemTotals.bills} บิล`, `${lineItemTotals.lines} รายการ`, String(lineItemTotals.qty), "—", lineItemTotals.revenue.toFixed(2), "—", "—"],
+          ...lineItemRows.map((row) => [formatLogDateTime(row.createdAt), row.orderNumber, row.productName, exportCount(row.qty), exportNumber(row.price), exportNumber(row.amount), row.paymentMethod, row.cashier]),
+          ["รวม", `${exportCount(lineItemTotals.bills)} บิล`, `${exportCount(lineItemTotals.lines)} รายการ`, exportCount(lineItemTotals.qty), "—", exportNumber(lineItemTotals.revenue), "—", "—"],
         ],
       };
     }
@@ -687,18 +687,18 @@ function Reports({ focusBill, onFocusBillConsumed, role, userName }: { focusBill
         fileName: "daily-sales-summary.pdf", title: "รายงานสรุปยอดขายตามช่วงเวลา", periodLabel: `ช่วงข้อมูล ${rangeLabel}${staffSuffix}${salesView === "timeline" ? ` · จัดกลุ่มราย${groupBy === "day" ? "วัน" : groupBy === "week" ? "สัปดาห์" : "เดือน"}` : ""}`,
         meta: [["จำนวนบิล", `${totals.orders.toLocaleString("th-TH")} บิล`], ["ยอดขายรวม", money(totals.revenue)], ["กำไรขั้นต้น", `${money(totals.profit)} (${marginPercent}%)`]],
         columns: ["วันที่ / ช่วงเวลา", "บิล", "รายการที่ขาย", "ยอดขาย (บาท)", "ต้นทุน (บาท)", "กำไร (บาท)"], numericCols: [1, 2, 3, 4, 5],
-        rows: reportRows.map((row) => [row.label, String(row.orders), String(row.items), row.revenue.toFixed(2), row.cogs.toFixed(2), row.profit.toFixed(2)]),
-        totalsRow: ["รวมทั้งช่วง", String(totals.orders), String(totals.items), totals.revenue.toFixed(2), totals.cogs.toFixed(2), totals.profit.toFixed(2)],
+        rows: reportRows.map((row) => [row.label, exportCount(row.orders), exportCount(row.items), exportNumber(row.revenue), exportNumber(row.cogs), exportNumber(row.profit)]),
+        totalsRow: ["รวมทั้งช่วง", exportCount(totals.orders), exportCount(totals.items), exportNumber(totals.revenue), exportNumber(totals.cogs), exportNumber(totals.profit)],
         brandName: "ร้านค้าสวัสดิการ", footnote: "ตัวเลขจากระบบขายหน้าร้าน · รายงานสร้างตามช่วงเวลาที่เลือกไว้",
       };
     }
     if (salesView === "product" || salesView === "category") {
       const rows = salesView === "product"
-        ? productRows.map((row) => [`${row.name}${row.sku ? ` (${row.sku})` : ""}`, String(row.bills), String(row.qty), row.revenue.toFixed(2), row.cogs.toFixed(2), row.profit.toFixed(2)])
-        : categoryRows.map((row) => [row.category, String(row.orders), String(row.qty), row.revenue.toFixed(2), row.cogs.toFixed(2), row.profit.toFixed(2)]);
+        ? productRows.map((row) => [`${row.name}${row.sku ? ` (${row.sku})` : ""}`, exportCount(row.bills), exportCount(row.qty), exportNumber(row.revenue), exportNumber(row.cogs), exportNumber(row.profit)])
+        : categoryRows.map((row) => [row.category, exportCount(row.orders), exportCount(row.qty), exportNumber(row.revenue), exportNumber(row.cogs), exportNumber(row.profit)]);
       const totalsRow = salesView === "product"
-        ? ["รวมทุกสินค้า", String(productTotal.bills), String(productTotal.qty), productTotal.revenue.toFixed(2), productTotal.cogs.toFixed(2), productTotal.profit.toFixed(2)]
-        : ["รวมทุกชนิดสินค้า", String(categoryTotal.orders), String(categoryTotal.qty), categoryTotal.revenue.toFixed(2), categoryTotal.cogs.toFixed(2), categoryTotal.profit.toFixed(2)];
+        ? ["รวมทุกสินค้า", exportCount(productTotal.bills), exportCount(productTotal.qty), exportNumber(productTotal.revenue), exportNumber(productTotal.cogs), exportNumber(productTotal.profit)]
+        : ["รวมทุกชนิดสินค้า", exportCount(categoryTotal.orders), exportCount(categoryTotal.qty), exportNumber(categoryTotal.revenue), exportNumber(categoryTotal.cogs), exportNumber(categoryTotal.profit)];
       return {
         fileName: "daily-sales-summary.pdf", title: salesView === "product" ? "รายงานสรุปยอดขายแยกตามสินค้า" : "รายงานสรุปยอดขายแยกตามชนิดสินค้า", periodLabel: `ช่วงข้อมูล ${rangeLabel}${staffSuffix}`,
         columns: [salesView === "product" ? "สินค้า (รหัส)" : "ชนิดสินค้า", "บิล", "ชิ้น", "ยอดขาย (บาท)", "ต้นทุน (บาท)", "กำไร (บาท)"], numericCols: [1, 2, 3, 4, 5],
@@ -710,16 +710,16 @@ function Reports({ focusBill, onFocusBillConsumed, role, userName }: { focusBill
         fileName: "sales-line-items.pdf", title: "รายงานรายการสินค้าที่ขาย (รายบิล)", periodLabel: `ช่วงข้อมูล ${rangeLabel}${staffSuffix}`,
         meta: [["จำนวนบิล", `${lineItemTotals.bills.toLocaleString("th-TH")} บิล`], ["จำนวนรายการ", `${lineItemTotals.lines.toLocaleString("th-TH")} รายการ`], ["ยอดขายรวม", money(lineItemTotals.revenue)]],
         columns: ["วันที่ · เวลา", "เลขที่บิล", "รายการสินค้า", "ชิ้น", "ราคา/ชิ้น (บาท)", "ยอดรวม (บาท)", "ชำระโดย", "พนักงานขาย"], numericCols: [3, 4, 5],
-        rows: lineItemRows.map((row) => [formatLogDateTime(row.createdAt), row.orderNumber, row.productName, String(row.qty), row.price.toFixed(2), row.amount.toFixed(2), row.paymentMethod, row.cashier]),
-        totalsRow: ["รวม", `${lineItemTotals.bills} บิล`, `${lineItemTotals.lines} รายการ`, String(lineItemTotals.qty), "—", lineItemTotals.revenue.toFixed(2), "—", "—"],
+        rows: lineItemRows.map((row) => [formatLogDateTime(row.createdAt), row.orderNumber, row.productName, exportCount(row.qty), exportNumber(row.price), exportNumber(row.amount), row.paymentMethod, row.cashier]),
+        totalsRow: ["รวม", `${exportCount(lineItemTotals.bills)} บิล`, `${exportCount(lineItemTotals.lines)} รายการ`, exportCount(lineItemTotals.qty), "—", exportNumber(lineItemTotals.revenue), "—", "—"],
         brandName: "ร้านค้าสวัสดิการ", footnote: "ทุกบรรทัดสินค้าจากทุกบิลในช่วงเวลาที่เลือก · เรียงจากล่าสุดขึ้นก่อน · แสดงสูงสุด 1,000 รายการ",
       };
     }
     return {
       fileName: "daily-sales-summary.pdf", title: "รายงานสรุปยอดขายแยกตามพนักงานขาย", periodLabel: `ช่วงข้อมูล ${rangeLabel}${staffSuffix}`,
       columns: ["พนักงานขาย (ผู้ทำรายการ)", "บิล", "ชิ้น", "บิลสมาชิก", "ส่วนลดรวม (บาท)", "ยอดขายรวม (บาท)"], numericCols: [1, 2, 3, 4, 5],
-      rows: cashierRows.map((row) => [row.cashier, String(row.orders), String(row.items), String(row.memberBills), row.discount.toFixed(2), row.total.toFixed(2)]),
-      totalsRow: ["รวมทุกพนักงาน", String(cashierTotal.orders), String(cashierTotal.items), String(cashierTotal.memberBills), cashierTotal.discount.toFixed(2), cashierTotal.total.toFixed(2)],
+      rows: cashierRows.map((row) => [row.cashier, exportCount(row.orders), exportCount(row.items), exportCount(row.memberBills), exportNumber(row.discount), exportNumber(row.total)]),
+      totalsRow: ["รวมทุกพนักงาน", exportCount(cashierTotal.orders), exportCount(cashierTotal.items), exportCount(cashierTotal.memberBills), exportNumber(cashierTotal.discount), exportNumber(cashierTotal.total)],
       brandName: "ร้านค้าสวัสดิการ", footnote: "สรุปจากบิลขายจริง · แยกตามผู้ทำรายการที่หน้าร้าน",
     };
   };
@@ -746,7 +746,7 @@ function Reports({ focusBill, onFocusBillConsumed, role, userName }: { focusBill
   };
   const billsExportRows = () => [
     ["เลขที่บิล", "วันที่ · เวลา", "ลูกค้า", "เลขสมาชิก", "จำนวนรายการ", "ชำระโดย", "ยอดรวม (บาท)"],
-    ...salesHistory.map((entry) => [entry.orderNumber, formatLogDateTime(entry.createdAt), entry.memberName ? `สมาชิก ${entry.memberName}` : "บุคคลทั่วไป", entry.memberNumber ?? "—", String(entry.items.length), entry.paymentMethod, entry.total.toFixed(2)]),
+    ...salesHistory.map((entry) => [entry.orderNumber, formatLogDateTime(entry.createdAt), entry.memberName ? `สมาชิก ${entry.memberName}` : "บุคคลทั่วไป", entry.memberNumber ?? "—", exportCount(entry.items.length), entry.paymentMethod, exportNumber(entry.total)]),
   ];
   const billExportBase = billMember ? `bills-${billMember.memberNumber}` : "bills-history";
   const billsDocConfig = (): ReportDocConfig => {
@@ -756,8 +756,8 @@ function Reports({ focusBill, onFocusBillConsumed, role, userName }: { focusBill
       periodLabel: billMember ? `แยกรายสมาชิก ${billMember.memberNumber} · สมาชิก${billMember.firstName} ${billMember.lastName}` : `บิลล่าสุดที่โหลดไว้ ${salesHistory.length} บิล`,
       meta: [["จำนวนบิล", `${salesHistory.length} บิล`], ["ยอดรวมทั้งหมด", money(total)]],
       columns: ["เลขที่บิล", "วันที่ · เวลา", "ลูกค้า", "เลขสมาชิก", "รายการ", "ชำระโดย", "ยอดรวม (บาท)"], numericCols: [4, 6],
-      rows: salesHistory.map((entry) => [entry.orderNumber, formatLogDateTime(entry.createdAt), entry.memberName ? `สมาชิก ${entry.memberName}` : "บุคคลทั่วไป", entry.memberNumber ?? "—", String(entry.items.length), entry.paymentMethod, entry.total.toFixed(2)]),
-      totalsRow: ["รวม", "—", "—", "—", String(salesHistory.reduce((sum, entry) => sum + entry.items.length, 0)), "—", total.toFixed(2)],
+      rows: salesHistory.map((entry) => [entry.orderNumber, formatLogDateTime(entry.createdAt), entry.memberName ? `สมาชิก ${entry.memberName}` : "บุคคลทั่วไป", entry.memberNumber ?? "—", exportCount(entry.items.length), entry.paymentMethod, exportNumber(entry.total)]),
+      totalsRow: ["รวม", "—", "—", "—", exportCount(salesHistory.reduce((sum, entry) => sum + entry.items.length, 0)), "—", exportNumber(total)],
       brandName: "ร้านค้าสวัสดิการ", footnote: "กดแถวบนหน้าจอเพื่อเปิดใบเสร็จฉบับเต็มได้ · รายงานนี้สร้างจากบิลที่โหลดไว้ตามตัวกรอง",
     };
   };
@@ -774,7 +774,7 @@ function Reports({ focusBill, onFocusBillConsumed, role, userName }: { focusBill
   };
   const txExportRows = () => [
     ["วันที่ · เวลา", "เลขสมาชิก", "ชื่อสมาชิก", "ประเภท", "รายละเอียด", "ยอด (บาท)", "คงเหลือหลังรายการ (บาท)", "เจ้าหน้าที่ผู้ทำรายการ"],
-    ...txRows.map((row) => [formatLogDateTime(row.createdAt), row.memberNumber, row.memberName ?? "—", TX_TYPE_LABEL[row.type], row.detail, row.amount.toFixed(2), row.balanceAfter !== null ? row.balanceAfter.toFixed(2) : "—", row.actor ?? "ไม่ระบุ"]),
+    ...txRows.map((row) => [formatLogDateTime(row.createdAt), row.memberNumber, row.memberName ?? "—", TX_TYPE_LABEL[row.type], row.detail, exportNumber(row.amount), row.balanceAfter !== null ? exportNumber(row.balanceAfter) : "—", row.actor ?? "ไม่ระบุ"]),
   ];
   const txExportBase = txMember ? `member-transactions-${txMember.memberNumber}` : "member-transactions";
   const txDocConfig = (): ReportDocConfig => ({
@@ -782,7 +782,7 @@ function Reports({ focusBill, onFocusBillConsumed, role, userName }: { focusBill
     periodLabel: txMember ? `สมาชิก ${txMember.memberNumber} · สมาชิก${txMember.firstName} ${txMember.lastName}` : "ทุกสมาชิก · แสดง 300 รายการล่าสุด",
     meta: [["ชนิดธุรกรรม", txType === "all" ? "ทั้งหมด" : TX_TYPE_LABEL[txType]], ["ช่วงวันที่", txFrom || txTo ? `${txFrom || "ต้นช่วง"} → ${txTo || "ปัจจุบัน"}` : "ทั้งหมด"], ["จำนวนรายการ", `${txRows.length} รายการ`]],
     columns: ["วันที่ · เวลา", "เลขสมาชิก", "ชื่อสมาชิก", "ประเภท", "รายละเอียด", "ยอด (บาท)", "คงเหลือหลังรายการ (บาท)", "เจ้าหน้าที่ผู้ทำรายการ"], numericCols: [5, 6],
-    rows: txRows.map((row) => [formatLogDateTime(row.createdAt), row.memberNumber, row.memberName ?? "—", TX_TYPE_LABEL[row.type], row.detail, row.amount.toFixed(2), row.balanceAfter !== null ? row.balanceAfter.toFixed(2) : "—", row.actor ?? "ไม่ระบุ"]),
+    rows: txRows.map((row) => [formatLogDateTime(row.createdAt), row.memberNumber, row.memberName ?? "—", TX_TYPE_LABEL[row.type], row.detail, exportNumber(row.amount), row.balanceAfter !== null ? exportNumber(row.balanceAfter) : "—", row.actor ?? "ไม่ระบุ"]),
     brandName: "ร้านค้าสวัสดิการ", footnote: "ข้อมูลจากบัญชีสมาชิกโดยตรง · ใช้จ่าย / เติมเงิน / ถอนเงิน พร้อมผู้ทำรายการทุกครั้ง",
   });
   const openTxExportPreview = (preferred: ExportFormat) => {

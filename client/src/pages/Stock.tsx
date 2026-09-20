@@ -14,7 +14,7 @@ import { ThaiDatePicker } from "@/components/ThaiDatePicker";
 import { PrintPreviewModal } from "@/components/PrintPreviewModal";
 import { StockCountSheet } from "@/components/StockCountSheet";
 import { printReportDoc } from "@/reportDoc";
-import * as XLSX from "xlsx";
+import { downloadXlsxFile, exportCount, exportNumber } from "@/exportUtils";
 import type { SqliteProduct } from "../../../server/sqliteStore";
 import { trpc } from "@/lib/trpc";
 
@@ -474,13 +474,13 @@ export function Stock({ role, userName }: { role: Role; userName: string }) {
     const openingValue = products.reduce((sum, product) => sum + product.stock * product.cost, 0);
     const rows: string[][] = [
       ["สินค้า", "รหัส SKU", "บาร์โค้ด", "หน่วยขาย", "คงเหลือ", "ต้นทุน/หน่วย", "มูลค่ารวม (ต้นทุน)", "ล็อต", "หมดอายุถัดไป", "สถานะ"],
-      ["ยอดยกมา — มูลค่าคงคลังทั้งหมด", "", "", "", String(totalQty), "", openingValue.toFixed(2), "", "", `สินค้า ${productCards.length} รายการ`],
+      ["ยอดยกมา — มูลค่าคงคลังทั้งหมด", "", "", "", exportCount(totalQty), "", exportNumber(openingValue), "", "", `สินค้า ${productCards.length} รายการ`],
       ...filteredCards.map((card) => [
-        card.product.name, card.product.sku, card.product.barcode ?? "—", card.product.unit, String(card.product.stock),
-        card.product.cost.toFixed(2), (card.product.stock * card.product.cost).toFixed(2),
-        String(card.lots.length), formatExpiry(card.nextExpiry), card.status,
+        card.product.name, card.product.sku, card.product.barcode ?? "—", card.product.unit, exportCount(card.product.stock),
+        exportNumber(card.product.cost), exportNumber(card.product.stock * card.product.cost),
+        exportCount(card.lots.length), formatExpiry(card.nextExpiry), card.status,
       ]),
-      ["รวมทั้งคลัง", "", "", "", String(totalQty), "", openingValue.toFixed(2), String(stockRows.length), "", ""],
+      ["รวมทั้งคลัง", "", "", "", exportCount(totalQty), "", exportNumber(openingValue), exportCount(stockRows.length), "", ""],
     ];
     return rows;
   };
@@ -498,11 +498,9 @@ export function Stock({ role, userName }: { role: Role; userName: string }) {
   };
   const downloadStockXlsx = () => {
     if (stockRows.length === 0) { setNotice("ยังไม่มีรายการคงคลังให้ส่งออก"); return; }
-    const sheet = XLSX.utils.aoa_to_sheet(stockExportRows().map((row) => row.map((cell) => (/^-?[0-9,]+(\.[0-9]+)?$/.test(cell) ? Number(cell) : cell))));
-    sheet["!cols"] = [{ wch: 30 }, { wch: 12 }, { wch: 15 }, { wch: 9 }, { wch: 9 }, { wch: 11 }, { wch: 16 }, { wch: 7 }, { wch: 13 }, { wch: 11 }];
-    const book = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(book, sheet, "รายการคงคลัง");
-    XLSX.writeFile(book, "stock-report.xlsx");
+    // ROUND 59 — ใช้ตัวส่งออกกลางของระบบ: ตัวเลขมีลูกน้ำ · แปลงเฉพาะคอลัมน์ตัวเลขที่ระบุ
+    // (บาร์โค้ดคงเป็นข้อความ ไม่กลายเป็นเลขวิทยาศาสตร์) · คอลัมน์กว้างพอดีเนื้อหาอัตโนมัติ
+    downloadXlsxFile("stock-report", "รายการคงคลัง", stockExportRows(), [4, 5, 6, 7]);
     setNotice(`ส่งออกรายการคงคลัง Excel แล้ว · ${filteredCards.length} รายการ · รวมแถวยอดยกมา`);
   };
   const printStockReport = () => {
@@ -515,18 +513,18 @@ export function Stock({ role, userName }: { role: Role; userName: string }) {
       meta: [["ยอดยกมา", `สินค้า ${filteredCards.length} รายการ · ${totalQty.toLocaleString("th-TH")} หน่วย`], ["มูลค่าคงคลังรวม (ต้นทุน)", money(openingValue)], ["ล็อตทั้งหมด", `${stockRows.length} ล็อต`]],
       columns: ["สินค้า", "รหัส/บาร์โค้ด", "หน่วย", "คงเหลือ", "ต้นทุน/หน่วย", "มูลค่ารวม", "สถานะ"], numericCols: [3, 4, 5],
       rows: [
-        ["ยอดยกมา — มูลค่าคงคลังทั้งหมด", `${productCards.length} รายการ`, "", String(totalQty), "", openingValue.toFixed(2), ""],
-        ...filteredCards.map((card) => [card.product.name, card.product.barcode ?? card.product.sku, card.product.unit, String(card.product.stock), card.product.cost.toFixed(2), (card.product.stock * card.product.cost).toFixed(2), card.status]),
+        ["ยอดยกมา — มูลค่าคงคลังทั้งหมด", `${productCards.length} รายการ`, "", exportCount(totalQty), "", exportNumber(openingValue), ""],
+        ...filteredCards.map((card) => [card.product.name, card.product.barcode ?? card.product.sku, card.product.unit, exportCount(card.product.stock), exportNumber(card.product.cost), exportNumber(card.product.stock * card.product.cost), card.status]),
       ],
-      totalsRow: ["รวมทั้งคลัง", `${filteredCards.length} รายการ`, "", String(totalQty), "", openingValue.toFixed(2), ""],
+      totalsRow: ["รวมทั้งคลัง", `${filteredCards.length} รายการ`, "", exportCount(totalQty), "", exportNumber(openingValue), ""],
       brandName: "ร้านค้าสวัสดิการ", footnote: "แถวแรกคือยอดยกมา (มูลค่าคงคลัง ณ วันที่พิมพ์) · รายละเอียดล็อตและวันหมดอายุดูได้จากหน้าจอรายการคงคลัง",
     });
     setNotice("สั่งพิมพ์รายงานคงคลังแล้ว — เอกสาร A4 พร้อมแถวยอดยกมา");
   };
   const orderExportRows = () => [
     ["สินค้า", "รหัส SKU", "คงเหลือ", "จำนวนที่จะสั่ง", "หน่วย", "ต้นทุน/หน่วย", "มูลค่ารวมโดยประมาณ", "หมายเหตุ"],
-    ...orderItems.map((item) => [item.name, item.sku, String(item.stock), String(item.qty), item.unit, item.cost.toFixed(2), (item.qty * item.cost).toFixed(2), item.note ?? ""]),
-    ["รวม", "", "", String(orderItems.reduce((sum, item) => sum + item.qty, 0)), "", "", orderTotalValue.toFixed(2), `${orderItems.length} รายการ`],
+    ...orderItems.map((item) => [item.name, item.sku, exportCount(item.stock), exportCount(item.qty), item.unit, exportNumber(item.cost), exportNumber(item.qty * item.cost), item.note ?? ""]),
+    ["รวม", "", "", exportCount(orderItems.reduce((sum, item) => sum + item.qty, 0)), "", "", exportNumber(orderTotalValue), `${orderItems.length} รายการ`],
   ];
   const downloadOrderCsv = () => {
     if (orderItems.length === 0) { setNotice("ยังไม่มีรายการที่จะสั่งซื้อ"); return; }
@@ -545,8 +543,8 @@ export function Stock({ role, userName }: { role: Role; userName: string }) {
       periodLabel: `สะสมไว้ ${orderItems.length} รายการ · พิมพ์เมื่อ ${new Date().toLocaleDateString("th-TH", { day: "numeric", month: "long", year: "numeric" })}`,
       meta: [["จำนวนรายการ", `${orderItems.length} รายการ`], ["มูลค่ารวมโดยประมาณ", money(orderTotalValue)]],
       columns: ["สินค้า", "รหัส SKU", "คงเหลือ", "จะสั่ง", "หน่วย", "ต้นทุน/หน่วย", "มูลค่ารวม", "หมายเหตุ"], numericCols: [2, 3, 5, 6],
-      rows: orderItems.map((item) => [item.name, item.sku, String(item.stock), String(item.qty), item.unit, item.cost.toFixed(2), (item.qty * item.cost).toFixed(2), item.note ?? "—"]),
-      totalsRow: ["รวม", "—", "—", String(orderItems.reduce((sum, item) => sum + item.qty, 0)), "—", "—", orderTotalValue.toFixed(2), `${orderItems.length} รายการ`],
+      rows: orderItems.map((item) => [item.name, item.sku, exportCount(item.stock), exportCount(item.qty), item.unit, exportNumber(item.cost), exportNumber(item.qty * item.cost), item.note ?? "—"]),
+      totalsRow: ["รวม", "—", "—", exportCount(orderItems.reduce((sum, item) => sum + item.qty, 0)), "—", "—", exportNumber(orderTotalValue), `${orderItems.length} รายการ`],
       brandName: "ร้านค้าสวัสดิการ", footnote: "ใช้ตรวจทานก่อนสั่งซื้อจริง เพื่อไม่ให้ตกหล่น · ลบรายการที่รับเข้าแล้วออกจากลิสต์ได้ที่หน้าจอ",
     });
     setNotice("สั่งพิมพ์รายการสั่งซื้อแล้ว");

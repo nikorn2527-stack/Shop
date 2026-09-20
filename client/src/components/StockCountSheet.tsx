@@ -75,7 +75,7 @@ export function StockCountSheet({ products }: { products: SqliteProduct[] }) {
                     <small className="scs-sku"> {product.sku}</small>
                   </td>
                   <td className="scs-unit">{product.unit}</td>
-                  <td className="scs-num">{product.stock}</td>
+                  <td className="scs-num">{product.stock.toLocaleString("th-TH")}</td>
                   <td className="scs-num scs-blank" />
                   <td className="scs-num scs-blank" />
                   <td className="scs-note" />

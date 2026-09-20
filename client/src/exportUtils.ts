@@ -12,6 +12,24 @@ import * as XLSX from "xlsx";
  * ตัวเลขให้ทศนิยม 2 ตำแหน่งเหมือนที่เห็นบนหน้าจอ หัวกับข้อมูลจึงเรียงตรงแนวกัน
  */
 
+/**
+ * ROUND 59 (user) — ตัวเลขในเอกสารส่งออกต้องมีลูกน้ำทุกจุด เหมือนที่เห็นบนหน้าจอ
+ * ก่อนหน้านี้ทุกไฟล์ส่งออก (CSV / Excel / PDF / พิมพ์ A4) ใช้ .toFixed(2) เปล่า ๆ
+ * เลขยอดใหญ่จึงออกมาเป็น "12345.50" อ่านลำบาก — ปัจจุบันใช้ตัวช่วยคู่นี้ทุกจุด
+ */
+
+/** ตัวเลขเงิน/ปริมาณ (ค่าเริ่มต้น 2 ตำแหน่ง): 1234.5 → "1,234.50" */
+export function exportNumber(value: number, decimals = 2): string {
+  if (!Number.isFinite(value)) return "—";
+  return value.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+}
+
+/** จำนวนเต็ม (บิล / ชิ้น / หน่วย / ล็อต): 3391 → "3,391" */
+export function exportCount(value: number): string {
+  if (!Number.isFinite(value)) return "—";
+  return Math.round(value).toLocaleString("en-US");
+}
+
 const NUMBER_LIKE = /^-?[0-9,]+(\.[0-9]+)?$/;
 
 /** ความกว้างแสดงผลโดยประมาณของข้อความ (สระบน/ล่าง/วรรณยุกต์ไทยไม่นับ — ไม่กินความกว้าง) */
@@ -53,20 +71,26 @@ export function downloadCsvFile(fileName: string, rows: string[][]): void {
 
 /**
  * Excel ที่คอลัมน์กว้างพอดีเนื้อหา + เซลล์ตัวเลขเป็นตัวเลขจริงพร้อมทศนิยม 2 ตำแหน่ง
- * (numericCols = ดัชนีคอลัมน์ตัวเลข เช่น [1, 2, 3] — เซลล์อื่นที่ดูเหมือนตัวเลขก็แปลงให้)
+ * (numericCols = ดัชนีคอลัมน์ตัวเลข เช่น [1, 2, 3])
+ *
+ * ROUND 59 — แปลงเป็นตัวเลขจริง "เฉพาะคอลัมน์ที่ระบุใน numericCols" เท่านั้น
+ * (เดิมแปลงทุกเซลล์ที่หน้าตาเป็นตัวเลข ทำให้บาร์โค้ด/รหัสยาว ๆ กลายเป็น
+ * เลขวิทยาศาสตร์ 8.85E+12 ใน Excel) + รองรับตัวเลขที่มีลูกน้ำแล้วจาก exportNumber
+ * จำนวนเต็มใช้รูปแบบ #,##0 (ไม่ต่อทศนิยม .00 ต่อท้ายจำนวนบิล/ชิ้น)
  */
 export function downloadXlsxFile(fileName: string, sheetName: string, rows: string[][], numericCols: number[] = []): void {
   const numeric = new Set(numericCols);
   const sheet = XLSX.utils.aoa_to_sheet(
-    rows.map((row) => row.map((cell, index) => (NUMBER_LIKE.test(cell ?? "") ? Number(cell) : cell))),
+    rows.map((row) => row.map((cell, index) => (numeric.has(index) && NUMBER_LIKE.test(cell ?? "") ? Number(cell.replaceAll(",", "")) : cell))),
   );
   sheet["!cols"] = autoColumnWidths(rows);
-  // รูปแบบตัวเลข: ทศนิยม 2 ตำแหน่ง (ตรงกับที่หน้าจอโชว์) — จำนวนเต็มก็แสดงพร้อมจุดทศนิยม
+  // รูปแบบตัวเลข: ตามที่พรีวิว/CSV/PDF แสดง — ตัวเลขที่มีทศนิยม (เงิน) เป็น #,##0.00
+  // ตัวเลขไม่มีทศนิยม (จำนวนบิล/ชิ้น/หน่วย) เป็น #,##0 ไม่ต่อ .00 ให้ดูเวอร์
   for (const col of numericCols) {
     for (let row = 1; row < rows.length; row += 1) {
       const address = XLSX.utils.encode_cell({ r: row, c: col });
       const cell = sheet[address];
-      if (cell && cell.t === "n") cell.z = "#,##0.00";
+      if (cell && cell.t === "n") cell.z = /\.\d+$/.test(rows[row]?.[col] ?? "") ? "#,##0.00" : "#,##0";
     }
   }
   const book = XLSX.utils.book_new();
