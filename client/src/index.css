@@ -4192,12 +4192,39 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .print-preview-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
 .print-preview-note { color: #7d8172; font-size: 10.5px; line-height: 1.5; flex: 1 1 240px; }
 .print-preview-buttons { display: flex; gap: 7px; flex-shrink: 0; }
+
+/* ROUND 52 (user) — ปุ่มปิดหน้าต่างพรีวิว: เดิมคลาสนี้ไม่เคยมีนิยาม CSS จนปุ่มดูเหมือนข้อความเปล่า
+   ให้มีกรอบชัด + สี + สัญลักษณ์ ✕ และ hover โทนอุ่นแดงเข้ากับ icon-button มุมขวาบน */
+.ghost-button {
+  height: 36px;
+  padding: 0 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid #d8d0bd;
+  border-radius: 999px;
+  background: #fff;
+  color: #7d7666;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  box-shadow: 0 1px 3px rgba(64, 51, 24, .06);
+  transition: border-color .18s ease, background .18s ease, color .18s ease, transform 80ms ease;
+}
+.ghost-button svg { opacity: .8; flex-shrink: 0; }
+.ghost-button:hover { border-color: #d9b3ac; background: #fdf6f4; color: #b25c5c; }
+.ghost-button:hover svg { opacity: 1; }
+.ghost-button:active { transform: scale(.98); }
+.ghost-button:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+
 @media (max-width: 560px) {
   .print-preview-stage { padding: 10px 7px; max-height: 52vh; }
   .print-preview-stage.paper-thermal .print-preview-paper, .print-preview-stage.paper-card .print-preview-paper { width: 100%; }
   .print-preview-actions { flex-direction: column; align-items: stretch; }
   .print-preview-buttons { justify-content: stretch; }
   .print-preview-buttons button { flex: 1; }
+  .ghost-button { height: 40px; }
 }
 /* ซ่อนโมดัลพรีวิวทุกครั้งที่พิมพ์จริง — ให้ @media print ของเอกสารต้นฉบับทำงานล้วน ๆ */
 @media print { .print-preview-scope { display: none !important; } }

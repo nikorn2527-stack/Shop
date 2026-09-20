@@ -100,7 +100,7 @@ export function PrintPreviewModal({
         <div className="print-preview-actions">
           <span className="print-preview-note">ตรวจข้อมูลด้านบนให้ถูกต้องก่อนกดพิมพ์ — เอกสารที่พิมพ์ออกมาเหมือนตัวอย่างนี้ทุกบรรทัด</span>
           <div className="print-preview-buttons">
-            <button type="button" className="ghost-button" onClick={onClose}>ปิดหน้าต่างนี้</button>
+            <button type="button" className="ghost-button" onClick={onClose}><X size={15} /> ปิด</button>
             <button type="button" className="primary-button" onClick={doPrint}><Printer size={16} /> พิมพ์เลย</button>
           </div>
         </div>

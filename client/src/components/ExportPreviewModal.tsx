@@ -158,7 +158,7 @@ export function ExportPreviewModal({
             ))}
           </div>
           <button type="button" className="ghost-button" onClick={onClose}>
-            ปิดหน้าต่างนี้
+            <X size={15} /> ปิด
           </button>
         </div>
       </div>
