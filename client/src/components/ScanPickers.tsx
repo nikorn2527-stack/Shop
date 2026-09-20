@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { PackageSearch, ScanLine, X } from "lucide-react";
+import { Camera, PackageSearch, ScanLine, X } from "lucide-react";
 import { toast } from "sonner";
 import type { SqliteProduct } from "../../../server/sqliteStore";
 import type { MemberLite } from "@/pages/pageData";
 import { money, memberFullName, scanMatches, smartMatchScore } from "@/pages/pageData";
 import { MemberAvatar } from "./MemberAvatar";
 import { MemberCardModal } from "./MemberCardModal";
+import { BarcodeCameraModal } from "./BarcodeCameraModal";
 
 /**
  * Round 37 (req 36) — ปิดประวัติการคีย์/ยิงของช่องกรอกข้อมูลทุกช่อง:
@@ -52,6 +53,8 @@ export function MemberScanPicker({
   const [term, setTerm] = useState("");
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState<MemberLite | null>(null);
+  // ROUND 55 (user) — สแกนด้วยกล้องมือถือ (ไม่มีปืนสแกนก็ยิงได้)
+  const [cameraOpen, setCameraOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const inputName = useNoHistoryName("pos-member-scan");
@@ -112,16 +115,18 @@ export function MemberScanPicker({
     inputRef.current?.focus();
   };
 
-  const commit = () => {
-    if (term.trim() === "") {
+  // codeArg = รหัสที่มาจากกล้อง (ROUND 55) — commit ให้เลยไม่ต้องรอ Enter
+  const commit = (codeArg?: string) => {
+    const value = (codeArg ?? term).trim();
+    if (value === "") {
       setOpen(false);
       return;
     }
     const exact =
-      members.find((member) => scanMatches(member.memberNumber, term)) ??
-      (suggestions.length === 1 && suggestions[0].status === "active" ? suggestions[0] : null);
+      members.find((member) => scanMatches(member.memberNumber, value)) ??
+      (codeArg === undefined && suggestions.length === 1 && suggestions[0].status === "active" ? suggestions[0] : null);
     if (exact) pick(exact);
-    else setOpen(true);
+    else { setTerm(value); setOpen(true); }
   };
 
   return (
@@ -178,6 +183,15 @@ export function MemberScanPicker({
               placeholder={placeholder}
               aria-label="เลขสมาชิกสำหรับบิลนี้ (คีย์หรือสแกน)"
             />
+            <button
+              type="button"
+              className="scan-camera-btn"
+              onClick={() => setCameraOpen(true)}
+              aria-label="สแกนบัตรสมาชิกด้วยกล้อง"
+              title="สแกนด้วยกล้องโทรศัพท์/เว็บแคม — สำหรับเครื่องที่ไม่มีปืนสแกน อ่านบาร์โค้ด/QR บนบัตรได้เลย"
+            >
+              <Camera size={16} />
+            </button>
             {term ? (
               <button
                 type="button"
@@ -253,6 +267,18 @@ export function MemberScanPicker({
           onConfirm={confirmPending}
         />
       )}
+      {cameraOpen && (
+        <BarcodeCameraModal
+          open
+          title="สแกนบัตรสมาชิกด้วยกล้อง"
+          hint="เล็งบาร์โค้ดหรือคิวอาร์โค้ดบนบัตรสมาชิก — อ่านได้แล้วระบบหาสมาชิกให้ทันที"
+          onClose={() => setCameraOpen(false)}
+          onDetect={(code) => {
+            setCameraOpen(false);
+            commit(code);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -278,6 +304,8 @@ export function ProductScanPicker({
   const [term, setTerm] = useState("");
   const [open, setOpen] = useState(false);
   const [missed, setMissed] = useState("");
+  // ROUND 55 (user) — สแกนด้วยกล้องมือถือ: นับสต็อก/รับเข้าโดยไม่ต้องมีปืนสแกน
+  const [cameraOpen, setCameraOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const inputName = useNoHistoryName("pos-product-scan");
@@ -325,18 +353,21 @@ export function ProductScanPicker({
     setOpen(false);
   };
 
-  const commit = () => {
-    if (term.trim() === "") {
+  // codeArg = รหัสที่มาจากกล้อง (ROUND 55) — บาร์โค้ดที่ยิงตรงเข้าเลือกสินค้าทันที
+  const commit = (codeArg?: string) => {
+    const value = (codeArg ?? term).trim();
+    if (value === "") {
       setOpen(false);
       return;
     }
     const exact =
       products.find(
-        (product) => scanMatches(product.barcode, term) || scanMatches(product.sku, term),
-      ) ?? (suggestions.length === 1 ? suggestions[0] : null);
+        (product) => scanMatches(product.barcode, value) || scanMatches(product.sku, value),
+      ) ?? (codeArg === undefined && suggestions.length === 1 ? suggestions[0] : null);
     if (exact) pick(exact);
     else {
-      setMissed(term.trim());
+      setTerm(value);
+      setMissed(value);
       setOpen(true);
     }
   };
@@ -393,6 +424,15 @@ export function ProductScanPicker({
             placeholder={placeholder}
             aria-label="ค้นหาสินค้าด้วยบาร์โค้ด รหัส SKU หรือชื่อ"
           />
+          <button
+            type="button"
+            className="scan-camera-btn"
+            onClick={() => setCameraOpen(true)}
+            aria-label="สแกนสินค้าด้วยกล้อง"
+            title="สแกนด้วยกล้องโทรศัพท์/เว็บแคม — เหมาะกับงานนับสต็อกเดินนับรอบร้าน ไม่ต้องมีปืนสแกน"
+          >
+            <Camera size={16} />
+          </button>
           {term ? (
             <button
               type="button"
@@ -454,6 +494,18 @@ export function ProductScanPicker({
             ))
           )}
         </div>
+      )}
+      {cameraOpen && (
+        <BarcodeCameraModal
+          open
+          title="สแกนสินค้าด้วยกล้อง"
+          hint="เล็งบาร์โค้ดที่ตัวสินค้า — อ่านได้แล้วสินค้าเข้าฟอร์มให้ทันที ใช้นับสต็อกเดินรอบร้านได้เลย"
+          onClose={() => setCameraOpen(false)}
+          onDetect={(code) => {
+            setCameraOpen(false);
+            commit(code);
+          }}
+        />
       )}
     </div>
   );

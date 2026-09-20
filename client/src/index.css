@@ -4334,3 +4334,47 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 /* ROUND 54 (user) — hint ราคา ฿0 (ยังไม่ได้ตั้งราคา) ใน dialog เพิ่ม/แก้ไขสินค้า */
 .price-zero-hint { display: inline-flex; align-items: center; gap: 4px; margin-top: 5px; color: #9a6b1f; font-size: 10px; line-height: 1.4; }
 .price-zero-hint svg { flex: 0 0 auto; color: #c78d2e; }
+
+/* ROUND 55 (user) — สแกนบาร์โค้ดด้วยกล้อง (มือถือ/เว็บแคม) แทนปืนสแกน
+   ปุ่มกล้องจะอยู่ข้างทุกช่องสแกน/ค้นหาสำคัญ: POS หลัก · เลือกสมาชิก ·
+   รับเข้า/นับสต็อก/สั่งซื้อ · ค้นหารายการคงคลัง */
+.scan-camera-btn { flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border: 1px solid #cfe6da; border-radius: 8px; background: #f0f9f4; color: #2f7d5b; cursor: pointer; transition: .15s ease; }
+.scan-camera-btn:hover { background: #e2f3ea; border-color: #93c9b1; color: #1f6d4d; }
+.scan-camera-btn:active { transform: scale(.93); }
+.scan-camera-btn:focus-visible { outline: none; border-color: #7ec4a6; box-shadow: 0 0 0 3px #e6f4ed; }
+.scan-camera-btn svg { flex: 0 0 auto; }
+.member-scan-field .scan-camera-btn { width: 25px; height: 25px; border-radius: 7px; }
+.scan-camera-hero { width: 38px; height: 38px; border-radius: 10px; }
+
+/* โมดัลกล้องอ่านบาร์โค้ด */
+.barcode-camera-modal { width: min(430px, 100%); }
+/* สำคัญ: โมดัลถ่ายรูปใช้มิเรอร์เซลฟี่ (scaleX(-1)) — โมดัลนี้ห้ามมิเรอร์
+   เพราะบาร์โค้ดกลับด้านจะอ่านไม่ออก */
+.barcode-stage video { transform: none; }
+.barcode-frame { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(80%, 320px); aspect-ratio: 1.85; pointer-events: none; }
+.barcode-frame i { position: absolute; width: 30px; height: 30px; border: 3px solid rgba(255, 255, 255, .95); filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .45)); }
+.barcode-frame i:nth-child(1) { left: 0; top: 0; border-right: 0; border-bottom: 0; border-top-left-radius: 9px; }
+.barcode-frame i:nth-child(2) { right: 0; top: 0; border-left: 0; border-bottom: 0; border-top-right-radius: 9px; }
+.barcode-frame i:nth-child(3) { left: 0; bottom: 0; border-right: 0; border-top: 0; border-bottom-left-radius: 9px; }
+.barcode-frame i:nth-child(4) { right: 0; bottom: 0; border-left: 0; border-top: 0; border-bottom-right-radius: 9px; }
+.barcode-scanline { position: absolute; left: 7%; right: 7%; top: 50%; height: 2px; border-radius: 999px; background: linear-gradient(90deg, transparent, #8df2c4 18%, #8df2c4 82%, transparent); box-shadow: 0 0 10px 2px rgba(141, 242, 196, .55); animation: barcode-sweep 1.9s ease-in-out infinite; }
+@keyframes barcode-sweep { 0% { transform: translateY(-44px); } 50% { transform: translateY(44px); } 100% { transform: translateY(-44px); } }
+.camera-stage .camera-overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 18px; text-align: center; color: #f2f7f4; background: rgba(13, 22, 17, .6); }
+.camera-stage .camera-overlay b { font-size: 12.5px; }
+.camera-stage .camera-overlay small { font-size: 10px; line-height: 1.55; color: #c4d4cb; max-width: 320px; }
+.camera-stage .camera-overlay.error small { color: #f3c9c9; }
+.camera-stage .camera-overlay .outline-button { margin-top: 4px; border-color: rgba(255, 255, 255, .4); background: rgba(255, 255, 255, .08); color: #fff; }
+.barcode-stage-foot { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.barcode-live-hint { flex: 1; display: inline-flex; align-items: center; gap: 6px; color: #7d8473; font-size: 10.5px; line-height: 1.45; }
+.barcode-live-hint svg { flex: 0 0 auto; color: #4f9c78; }
+.torch-btn.on { background: #f7ecc9; border-color: #dcc17c; color: #8a6a1f; }
+.barcode-last-code { display: flex; align-items: center; gap: 6px; margin-top: 10px; padding: 8px 11px; border: 1px solid #dfe9e4; border-radius: 9px; background: #f4faf7; color: #6b7a6f; font-size: 11px; }
+.barcode-last-code svg { flex: 0 0 auto; color: #4f9c78; }
+.barcode-last-code b { font-family: "IBM Plex Mono", monospace; color: #2f7d5b; word-break: break-all; }
+@media (max-width: 560px) {
+  .barcode-camera-modal { width: 100%; }
+  .barcode-frame { width: 84%; }
+  .scan-camera-hero { width: 34px; height: 34px; }
+  .barcode-stage-foot { flex-wrap: wrap; }
+  .barcode-live-hint { flex-basis: 100%; }
+}
