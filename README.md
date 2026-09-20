@@ -24,6 +24,13 @@ pnpm --version
 git --version
 ```
 
+### ดึงโปรเจกต์จาก GitHub
+
+```bash
+git clone https://github.com/nikorn2527-stack/Shop.git
+cd Shop
+```
+
 ### ติดตั้งและเปิดเว็บ
 
 ```bash
@@ -32,6 +39,11 @@ pnpm dev
 ```
 
 เปิด `http://localhost:3000` ในเบราว์เซอร์ คำสั่ง `dev` ใช้ `cross-env` จึงรองรับ Windows PowerShell, macOS และ Linux
+
+ฐานข้อมูลใหม่บนโหมด dev จะสร้างบัญชีทดสอบให้อัตโนมัติ (`kanyanat` / `woraphot` · รหัส `1234`) และข้ามหน้าลงทะเบียนครั้งแรก
+
+> ดึงข้อมูลร้านจริงมาใช้บนเครื่องตัวเอง (โฟลเดอร์ `data/` ไม่อยู่ใน git)
+> และวิธีใช้งานจริงในร้าน ดูคู่มือฉบับเต็ม: **[docs/LOCAL-SETUP.md](docs/LOCAL-SETUP.md)**
 
 ### ตรวจสอบก่อนส่งงาน
 
