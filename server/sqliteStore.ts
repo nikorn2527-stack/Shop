@@ -1084,6 +1084,92 @@ export function updateProduct(db: SqliteDb, input: UpdateProductInput): SqlitePr
   return getProductById(db, input.productId)!;
 }
 
+export type BulkPriceItemInput = {
+  productId: number;
+  price?: number;
+  cost?: number;
+};
+
+export type BulkUpdatePricesInput = {
+  items: BulkPriceItemInput[];
+  actor?: string;
+  actorRole?: string;
+};
+
+export type BulkUpdatePricesResult = {
+  updated: number;
+  priceChanges: number;
+  costChanges: number;
+  skipped: number;
+  /** ตัวอย่างชื่อสินค้าที่แก้ (ใช้ทำ toast สรุป) */
+  sampleNames: string[];
+};
+
+/**
+ * Round 64 — ปรับราคาขาย/ต้นทุนหลายรายการพร้อมกันใน transaction เดียว
+ * (use case จริง: ร้านใหม่มีสินค้า 100+ รายการที่ยังไม่มีราคา)
+ * - validate ทุกรายการก่อนแตะ DB (fail fast — ไม่มีการแก้ครึ่งชุด)
+ * - รายการที่ค่าเท่าเดิมถูกนับเป็น skipped (ไม่เขียน DB ไม่ลง log ต่อชิ้น)
+ * - ลง log สรุปก้อนเดียว กันปนคอมไพล์ log หลายร้อยแถว
+ */
+export function bulkUpdateProductPrices(db: SqliteDb, input: BulkUpdatePricesInput): BulkUpdatePricesResult {
+  if (input.items.length === 0) throw new StoreError("กรุณาเลือกรายการที่ต้องการปรับราคาอย่างน้อย 1 รายการ");
+  if (input.items.length > 500) throw new StoreError("ปรับราคาได้ครั้งละไม่เกิน 500 รายการ");
+
+  // 1) ตรวจทุกรายการก่อน — ผิดสักชิ้นเดียวโยนทิ้งทั้งชุด (ไม่มี partial write)
+  const seen = new Set<number>();
+  const prepared: Array<{ product: SqliteProduct; price: number | null; cost: number | null }> = [];
+  for (const item of input.items) {
+    if (seen.has(item.productId)) continue; // ซ้ำ (เช่น client ส่งมาสองแถว) — เอาแถวแรก
+    seen.add(item.productId);
+    const product = getProductById(db, item.productId);
+    if (!product) throw new StoreError(`ไม่พบสินค้ารหัส ${item.productId} ในระบบ`);
+    if (item.price !== undefined && !(item.price >= 0)) throw new StoreError(`ราคาขายของ "${product.name}" ต้องเป็นตัวเลข 0 ขึ้นไป`);
+    if (item.cost !== undefined && item.cost < 0) throw new StoreError(`ต้นทุนของ "${product.name}" ต้องเป็นตัวเลข 0 ขึ้นไป`);
+    const nextPrice = item.price !== undefined ? round2(item.price) : null;
+    const nextCost = item.cost !== undefined ? round2(item.cost) : null;
+    if (nextPrice !== null && nextPrice === product.price && nextCost !== null && nextCost === product.cost) continue;
+    prepared.push({ product, price: nextPrice, cost: nextCost });
+  }
+  const willChange = (row: { product: SqliteProduct; price: number | null; cost: number | null }) =>
+    (row.price !== null && row.price !== row.product.price) || (row.cost !== null && row.cost !== row.product.cost);
+  const changing = prepared.filter(willChange);
+  if (changing.length === 0) {
+    return { updated: 0, priceChanges: 0, costChanges: 0, skipped: input.items.length, sampleNames: [] };
+  }
+
+  // 2) เขียนทั้งชุดใน transaction เดียว
+  let priceChanges = 0;
+  let costChanges = 0;
+  const sampleNames: string[] = [];
+  runInTransaction(db, () => {
+    for (const row of changing) {
+      const assignments: string[] = [];
+      const values: (string | number | null)[] = [];
+      if (row.price !== null && row.price !== row.product.price) {
+        assignments.push("price = ?");
+        values.push(row.price);
+        priceChanges += 1;
+        if (sampleNames.length < 3) sampleNames.push(row.product.name);
+      }
+      if (row.cost !== null && row.cost !== row.product.cost) {
+        assignments.push("cost = ?");
+        values.push(row.cost);
+        costChanges += 1;
+        if (sampleNames.length < 3 && !sampleNames.includes(row.product.name)) sampleNames.push(row.product.name);
+      }
+      if (assignments.length > 0) {
+        db.prepare(`UPDATE products SET ${assignments.join(", ")} WHERE id = ?`).run(...values, row.product.id);
+      }
+    }
+    const actor = input.actor?.trim() || "เจ้าหน้าที่ร้านค้า";
+    const detail = `${changing.length} รายการ · แก้ราคาขาย ${priceChanges} · แก้ต้นทุน ${costChanges}${sampleNames.length > 0 ? ` · เช่น ${sampleNames.join(", ")}${changing.length > sampleNames.length ? " และอื่นๆ" : ""}` : ""}`;
+    logAction(db, "ปรับราคาหลายรายการ", actor, detail, "blue", input.actorRole ?? null, formatDateTime());
+  });
+
+  return { updated: changing.length, priceChanges, costChanges, skipped: input.items.length - changing.length, sampleNames };
+}
+
 export type DeleteProductInput = {
   productId: number;
   actor?: string;

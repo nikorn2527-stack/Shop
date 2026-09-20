@@ -76,6 +76,7 @@ import {
   updateAppUser,
   updateMember,
   updateProduct,
+  bulkUpdateProductPrices,
   verifyPassword,
   walletTx,
   businessPeriodStatus,
@@ -326,6 +327,22 @@ const productSetActiveInput = z.object({
 
 const productDeleteInput = z.object({
   productId: z.number().int(),
+  actor: z.string().optional(),
+  actorRole: z.string().optional(),
+});
+
+// Round 64 — ปรับราคาขาย/ต้นทุนหลายรายการพร้อมกัน (ใช้ transaction เดียว + log สรุปก้อนเดียว)
+const productBulkUpdatePricesInput = z.object({
+  items: z
+    .array(
+      z.object({
+        productId: z.number().int(),
+        price: z.number().optional(),
+        cost: z.number().optional(),
+      }),
+    )
+    .min(1, "กรุณาเลือกรายการอย่างน้อย 1 รายการ")
+    .max(500, "ปรับราคาได้ครั้งละไม่เกิน 500 รายการ"),
   actor: z.string().optional(),
   actorRole: z.string().optional(),
 });
@@ -748,6 +765,17 @@ export const appRouter = router({
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input);
         return withStoreErrors(() => updateProduct(getWelfareDb(), { ...input, actor, actorRole }));
+      }),
+    bulkUpdatePrices: publicProcedure
+      .input(productBulkUpdatePricesInput)
+      .mutation(({ ctx, input }) => {
+        const { actor, actorRole } = resolveActor(ctx, input);
+        return withStoreErrors(() => {
+          if (!isAdminCtx(ctx, input)) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "การปรับราคาหลายรายการพร้อมกันต้องใช้สิทธิ์ผู้บริหาร" });
+          }
+          return bulkUpdateProductPrices(getWelfareDb(), { ...input, actor, actorRole });
+        });
       }),
     setActive: publicProcedure
       .input(productSetActiveInput)

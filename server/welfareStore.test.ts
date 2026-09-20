@@ -49,6 +49,7 @@ import {
   updateAppUser,
   updateMember,
   updateProduct,
+  bulkUpdateProductPrices,
   validatePasswordStrength,
   verifyPassword,
   walletTx,
@@ -758,6 +759,89 @@ describe("product editing", () => {
     expect(updateProduct(database, { productId: rice.id, price: 0 }).price).toBe(0);
     expect(updateProduct(database, { productId: rice.id, cost: 0 }).cost).toBe(0);
     expect(updateProduct(database, { productId: rice.id, reorderPoint: 0 }).reorderPoint).toBe(0);
+  });
+});
+
+describe("bulk price editing", () => {
+  it("updates prices and costs for many products in one call and logs a single summary entry", () => {
+    const database = freshDb();
+    const rice = productBySku(database, "FD-014");
+    const masks = productBySku(database, "HYG-033");
+    const third = listProducts(database).find((item) => item.id !== rice.id && item.id !== masks.id)!;
+
+    const result = bulkUpdateProductPrices(database, {
+      items: [
+        { productId: rice.id, price: 55, cost: 40 },
+        { productId: masks.id, price: 79 },
+        { productId: third.id, cost: 12.5 },
+      ],
+      actor: "นายวรพจน์ ด.",
+      actorRole: "ผู้บริหาร",
+    });
+
+    expect(result.updated).toBe(3);
+    expect(result.priceChanges).toBe(2);
+    expect(result.costChanges).toBe(2);
+    expect(result.skipped).toBe(0);
+
+    const persistedRice = listProducts(database).find((item) => item.id === rice.id);
+    expect(persistedRice?.price).toBe(55);
+    expect(persistedRice?.cost).toBe(40);
+    const persistedMasks = listProducts(database).find((item) => item.id === masks.id);
+    expect(persistedMasks?.price).toBe(79);
+    expect(persistedMasks?.cost).toBe(masks.cost);
+    const persistedThird = listProducts(database).find((item) => item.id === third.id);
+    expect(persistedThird?.cost).toBe(12.5);
+    expect(persistedThird?.price).toBe(third.price);
+
+    const latest = listAuditLogs(database, 1)[0];
+    expect(latest.action).toBe("ปรับราคาหลายรายการ");
+    expect(latest.actor).toBe("นายวรพจน์ ด.");
+    expect(latest.actorRole).toBe("ผู้บริหาร");
+    expect(latest.tone).toBe("blue");
+    expect(latest.detail).toContain("3 รายการ");
+    expect(latest.detail).toContain("แก้ราคาขาย 2");
+    expect(latest.detail).toContain("แก้ต้นทุน 2");
+  });
+
+  it("counts unchanged rows as skipped and writes nothing for them", () => {
+    const database = freshDb();
+    const rice = productBySku(database, "FD-014");
+
+    const result = bulkUpdateProductPrices(database, {
+      items: [
+        { productId: rice.id, price: rice.price, cost: rice.cost },
+        { productId: rice.id, price: 99 }, // ซ้ำ id — แถวแรกชนะ (ค่าเท่าเดิม)
+      ],
+    });
+
+    expect(result.updated).toBe(0);
+    expect(result.skipped).toBe(2);
+    const persisted = listProducts(database).find((item) => item.id === rice.id);
+    expect(persisted?.price).toBe(rice.price);
+  });
+
+  it("validates the whole batch before touching the database (no partial writes)", () => {
+    const database = freshDb();
+    const rice = productBySku(database, "FD-014");
+    const masks = productBySku(database, "HYG-033");
+
+    expect(() =>
+      bulkUpdateProductPrices(database, {
+        items: [
+          { productId: rice.id, price: 42 },
+          { productId: 999, price: 10 },
+        ],
+      }),
+    ).toThrowError(/ไม่พบสินค้ารหัส 999 ในระบบ/);
+    // รายการแรกต้องไม่ถูกแก้ (fail fast ทั้งชุด)
+    const persisted = listProducts(database).find((item) => item.id === rice.id);
+    expect(persisted?.price).toBe(rice.price);
+
+    expect(() => bulkUpdateProductPrices(database, { items: [{ productId: masks.id, price: -3 }] })).toThrowError(
+      /ราคาขายของ .* ต้องเป็นตัวเลข 0 ขึ้นไป/,
+    );
+    expect(() => bulkUpdateProductPrices(database, { items: [] })).toThrowError(/อย่างน้อย 1 รายการ/);
   });
 });
 
