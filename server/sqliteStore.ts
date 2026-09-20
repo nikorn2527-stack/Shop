@@ -1909,6 +1909,33 @@ export function salesByProduct(db: SqliteDb, input: DailyRangeInput = {}): Sales
   return rows.map((row) => ({ ...row, bills: Number(row.bills), qty: Number(row.qty), profit: round2(row.revenue - row.cogs) }));
 }
 
+/**
+ * ROUND 48 (user) — รายงาน "แยกตามรายการในบิล": ทุกบรรทัดสินค้าจากทุกบิลในช่วงเวลา
+ * ผู้ใช้อยากรู้ว่าแต่ละช่วง "มีรายการอะไร" บ้าง ไม่ใช่แค่จำนวนบิล — รายงานนี้คือ
+ * สมุดขายรายบรรทัด: บิลไหน วันไหน เวลาไหน ขายอะไร กี่ชิ้น ราคาเท่าไหร่ ใครขาย
+ * จำกัดที่ 1000 บรรทัดล่าสุดกันช่วงยาว ๆ ลากเบราว์เซอร์ (พอสำหรับรายงานหน้าร้าน)
+ */
+export type SalesLineItemRow = {
+  orderNumber: string;
+  createdAt: string;
+  productName: string;
+  unit: string;
+  qty: number;
+  price: number;
+  amount: number;
+  paymentMethod: string;
+  cashier: string;
+  memberNumber: string | null;
+  memberName: string | null;
+};
+
+export function salesLineItems(db: SqliteDb, input: DailyRangeInput = {}): SalesLineItemRow[] {
+  const { fromDate, toDate } = resolveRangeDates(input);
+  const since = `${formatDate(fromDate)} 00:00:00`;
+  const until = `${formatDate(toDate)} 23:59:59`;
+  return db.prepare(`SELECT s.order_number AS orderNumber, s.created_at AS createdAt, si.name AS productName, COALESCE(si.unit, p.unit, 'ชิ้น') AS unit, si.qty, si.price, ROUND(si.qty * si.price, 2) AS amount, s.payment_method AS paymentMethod, COALESCE(NULLIF(TRIM(s.cashier), ''), 'ไม่ระบุพนักงาน') AS cashier, s.member_number AS memberNumber, CASE WHEN m.member_number IS NULL THEN NULL WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id LEFT JOIN members m ON m.member_number = s.member_number WHERE s.created_at >= ? AND s.created_at <= ? ORDER BY s.created_at DESC, s.id DESC, si.id ASC LIMIT 1000`).all(since, until) as unknown as SalesLineItemRow[];
+}
+
 export type SalesByCashierRow = { cashier: string; orders: number; items: number; memberBills: number; discount: number; total: number };
 
 /** Sales grouped by the staff member (cashier) who closed each bill. */
@@ -3052,11 +3079,30 @@ export function seedWelfareStoreData(db: SqliteDb) {
  * Opens (and creates if needed) the welfare store database, runs migrations
  * and seeds demo data. Uses SQLITE_DB_PATH when no filename is provided.
  */
+/**
+ * ROUND 48 (user) — โหมดพัฒนา (pnpm dev) กับฐานข้อมูลใหม่: สร้างบัญชีทดสอบ
+ * ให้อัตโนมัติ ไม่ต้องผ่านหน้าลงทะเบียนครั้งแรก (SetupView) — ตรงกับชิปบัญชี
+ * ทดลองที่หน้าล็อกอินโชว์ไว้แล้ว (kanyanat / woraphot · รหัส 1234)
+ * ทำงานเฉพาะ NODE_ENV=development เท่านั้น: production (pnpm start) ยัง
+ * บังคับลงทะเบียนผู้บริหารจริงตามดีไซน์ Round 36 เสมอ
+ */
+function seedDevAppUsers(db: SqliteDb): void {
+  const createdAt = formatDateTime();
+  const insert = db.prepare(`INSERT INTO app_users (username, password_hash, display_name, role, active, created_at, must_change_password) VALUES (?, ?, ?, ?, 1, ?, 0)`);
+  insert.run("kanyanat", hashPassword("1234"), "น.ส.กัญญาณัฐ พ.", "staff", createdAt);
+  insert.run("woraphot", hashPassword("1234"), "นายวรพจน์ ด.", "admin", createdAt);
+  logAction(db, "โหมดพัฒนา", "ระบบ", "สร้างบัญชีทดสอบอัตโนมัติ kanyanat (เจ้าหน้าที่) + woraphot (ผู้บริหาร) · รหัสผ่าน 1234 · ข้ามหน้าลงทะเบียนครั้งแรกให้โหมดพัฒนา", "green", null, createdAt);
+}
+
 export function openWelfareStore(filename = process.env.SQLITE_DB_PATH ?? "data/welfare-store.sqlite"): SqliteDb {
   if (filename !== ":memory:") {
     mkdirSync(dirname(resolve(filename)), { recursive: true });
   }
   const db = createSqliteStore(filename);
   seedWelfareStoreData(db);
+  // ROUND 48 — dev bypass: ฐานข้อมูลใหม่บน `pnpm dev` ข้าม SetupView ไปหน้าล็อกอินเลย
+  if (process.env.NODE_ENV === "development" && countAppUsers(db) === 0) {
+    seedDevAppUsers(db);
+  }
   return db;
 }

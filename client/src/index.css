@@ -4018,3 +4018,123 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 /* โทเคนยาวไม่มีช่องว่างในทุกแท็บตั้งค่า (เช่น รหัสสี / ชื่อไฟล์ backup) ตัดได้ */
 .settings-card b, .settings-card small { max-width: 100%; }
 .backup-row b, .backup-row code, .backup-row small { overflow-wrap: anywhere; min-width: 0; }
+
+/* ============================================================
+   ROUND 48 — ผู้ใช้ขอ 4 เรื่อง
+   ① ราง POS สีเดียวกับแอป: พื้นสว่างโทน sidebar เดิมของแอป
+      (สี Sidebar มันเด่นจนเกินไป ไม่กลมกลืน — ให้แค่ปุ่ม
+      เท่านั้นที่แยกสีตามหน้าที่ และเปลี่ยนตามธีมได้)
+   ② ตารางมุมมอง "แยกตามรายการในบิล" + กดแถว timeline ขยาย
+      ดูรายการสินค้าที่ขายในช่วงนั้น
+   ③ โมดัลพรีวิวก่อนส่งออก (CSV / Excel / PDF / พิมพ์)
+   ④ เข้ากับ UI style ทุกตัว (ร้านค้า / Apple / Microsoft / Android)
+   ============================================================ */
+
+/* ① ราง POS — พื้นสีเดียวกับ sidebar ของแอป ขอบเส้นเดียวกัน */
+.pos-rail { background: #fbfdfc; border-right: 1px solid var(--line); }
+.pos-rail .rail-caption { color: #757869; }
+.rail-btn { background: #ffffff; border-color: var(--line); color: #4c4a3f; }
+.rail-btn b { color: #33322a; }
+.rail-btn:hover { border-color: #9ec7ae; color: var(--teal-dark); background: var(--teal-mist); }
+.rail-btn kbd { background: #f2f1ea; color: #8a8676; border-color: #e3e0d5; }
+/* ปุ่มแยกสีตามหน้าที่ — โทนพาสเทลบนพื้นสว่าง อ่านง่าย คงเอกลักษณ์เดิม */
+.pos-rail .rail-btn.rail-scan { background: #ffffff; border-color: #b9cfc5; color: #0c5c40; }
+.pos-rail .rail-btn.rail-scan b { color: #0c5c40; }
+.pos-rail .rail-btn.rail-scan:hover { border-color: var(--teal); background: var(--teal-soft); color: #005c3e; }
+.pos-rail .rail-btn.rail-scan:hover b { color: #005c3e; }
+.pos-rail .rail-btn.rail-customer { background: #e8faf5; border-color: #7fd6c0; color: #0f766e; }
+.pos-rail .rail-btn.rail-customer b { color: #0b5f58; }
+.pos-rail .rail-btn.rail-deposit { background: #e7f8ef; border-color: #86dfb0; color: #067647; }
+.pos-rail .rail-btn.rail-deposit b { color: #066245; }
+.pos-rail .rail-btn.rail-deposit:hover, .pos-rail .rail-btn.rail-deposit.active { background: #0f9f6e; border-color: #0f9f6e; color: #fff; }
+.pos-rail .rail-btn.rail-deposit.active b, .pos-rail .rail-btn.rail-deposit:hover b { color: #fff; }
+.pos-rail .rail-btn.rail-withdraw { background: #fdf3df; border-color: #e8c98a; color: #92610a; }
+.pos-rail .rail-btn.rail-withdraw b { color: #7a5007; }
+.pos-rail .rail-btn.rail-withdraw:hover, .pos-rail .rail-btn.rail-withdraw.active { background: #c78416; border-color: #c78416; color: #fff; }
+.pos-rail .rail-btn.rail-withdraw.active b, .pos-rail .rail-btn.rail-withdraw:hover b { color: #fff; }
+.pos-rail .rail-btn.rail-special { background: #f3ecfd; border-color: #c7aef5; color: #6d3fbf; }
+.pos-rail .rail-btn.rail-special b { color: #5c33a5; }
+.pos-rail .rail-btn.rail-special:hover, .pos-rail .rail-btn.rail-special.active { background: #7c4fc0; border-color: #7c4fc0; color: #fff; }
+.pos-rail .rail-btn.rail-special.active b, .pos-rail .rail-btn.rail-special:hover b { color: #fff; }
+.pos-rail .rail-btn.rail-hold { background: #f7f2e6; border-color: #ddd0a8; color: #85712e; }
+.pos-rail .rail-btn.rail-hold b { color: #6f5d24; }
+.pos-rail .rail-btn.rail-register { background: #e6f9f1; border-color: #8ce3bf; color: #0b7a52; }
+.pos-rail .rail-btn.rail-register b { color: #096344; }
+.pos-rail .rail-btn.rail-register:hover { background: #0fae7a; border-color: #0fae7a; color: #fff; }
+.pos-rail .rail-btn.rail-register:hover b { color: #fff; }
+.pos-rail .rail-btn.rail-manage { background: #fdf8df; border-color: #e6d489; color: #8a6d07; }
+.pos-rail .rail-btn.rail-manage b { color: #735906; }
+.pos-rail .rail-btn.rail-manage:hover { background: #a18507; border-color: #a18507; color: #fff; }
+.pos-rail .rail-btn.rail-manage:hover b { color: #fff; }
+.pos-rail .rail-btn.rail-register kbd, .pos-rail .rail-btn.rail-manage kbd, .pos-rail .rail-btn.rail-hold kbd { background: #f2f1ea; color: inherit; border-color: #e3e0d5; }
+.rail-exit { border-color: #e7dfd4; background: #fdf9f2; color: #8a7550; }
+.rail-exit:hover { border-color: #d9c9a8; color: #6f5a35; background: #fbf5e8; }
+.pos-rail .rail-brand .brand-logo { border-color: var(--line); background: #ffffff; }
+.rail-badge { border-color: #fbfdfc; }
+/* มือถือ: แถบล่าง (dock) ก็เป็นสีเดียวกับแอป — เส้นบน + เงาอ่อน */
+@media (max-width: 560px) {
+  .pos-rail { background: #fbfdfc; border-right: 0; border-top: 1px solid var(--line); box-shadow: 0 -8px 22px rgba(64, 51, 24, .10); }
+  .rail-badge { border-color: #fbfdfc; }
+}
+/* ตามบุคลิก UI ที่เลือก — รางใช้สี sidebar ของสไตล์นั้น */
+[data-style="apple"] .pos-rail { background: #f5f5f7; }
+[data-style="microsoft"] .pos-rail { background: #faf9f8; }
+[data-style="android"] .pos-rail { background: #f7f1fc; }
+[data-style="apple"] .rail-badge { border-color: #f5f5f7; }
+[data-style="microsoft"] .rail-badge { border-color: #faf9f8; }
+[data-style="android"] .rail-badge { border-color: #f7f1fc; }
+
+/* ② มุมมอง "แยกตามรายการในบิล" — สมุดขายรายบรรทัด */
+.line-items-wrap { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.line-items-table td { vertical-align: top; }
+.line-items-table .cell-mono { font-size: 10px; color: #565e52; }
+.line-items-table tbody tr:hover td { background: #f4faf7; }
+.line-items-note { color: var(--muted); font-size: 10px; padding: 0 2px; }
+
+/* กดแถวช่วงเวลาใน timeline → ขยายดูรายการสินค้า */
+.timeline-row { cursor: pointer; }
+.timeline-row:hover td { background: #f4faf7; }
+.timeline-row.expanded td { background: var(--teal-mist); border-bottom-color: transparent; }
+.drill-caret { display: inline-block; width: 13px; margin-right: 3px; font-size: 9px; font-style: normal; color: #9aa89d; transition: transform .16s ease; }
+.timeline-row.expanded .drill-caret { transform: rotate(180deg); color: var(--teal-dark); }
+.timeline-drill-row > td { padding: 0 8px 12px 24px !important; background: linear-gradient(180deg, var(--teal-mist), rgba(234, 245, 241, .35)); border-bottom: 1px solid var(--line); }
+.timeline-drill-table { width: 100%; border-collapse: collapse; font-size: 11px; background: #fff; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; box-shadow: var(--shadow); }
+.timeline-drill-table th { background: #eef5f1; color: #52604f; padding: 5px 10px; text-align: left; font-size: 10px; }
+.timeline-drill-table th.num, .timeline-drill-table td.num { text-align: right; }
+.timeline-drill-table td { padding: 4.5px 10px; border-top: 1px solid #eef1ec; }
+.timeline-drill-table tbody tr:nth-child(even) td { background: #f8fbf9; }
+.timeline-drill-table small { margin-left: 6px; }
+.timeline-drill-loading { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; padding: 4px 2px; }
+.timeline-drill-loading.error { color: var(--red); }
+
+/* ③ โมดัลพรีวิวก่อนส่งออก */
+.export-preview-modal { width: min(940px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); display: flex; flex-direction: column; }
+.export-preview-summary { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 10px; }
+.preview-chip { display: inline-flex; align-items: center; gap: 5px; border: 1px solid #cfe4d9; background: var(--teal-mist); color: #2e463e; border-radius: 999px; padding: 3px 10px; font-size: 10.5px; font-weight: 600; }
+.preview-chip.ok { background: var(--teal-soft); border-color: #bcdcb9; }
+.preview-chip.mute { background: #f6f4ee; border-color: var(--line); color: var(--muted); font-weight: 500; }
+.export-preview-table-wrap { border: 1px solid var(--line); border-radius: 11px; overflow: auto; max-height: min(52vh, 560px); background: #fff; }
+.export-preview-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.export-preview-table th { position: sticky; top: 0; z-index: 1; background: #2f7c5f; color: #fff; text-align: left; padding: 7px 9px; white-space: nowrap; font-weight: 600; }
+.export-preview-table td { padding: 5px 9px; border-bottom: 1px solid #eef1ec; color: #33403a; font-variant-numeric: tabular-nums; white-space: nowrap; max-width: 300px; overflow: hidden; text-overflow: ellipsis; }
+.export-preview-table tbody tr:nth-child(even) td { background: #f8fbf9; }
+.export-preview-table tbody tr:hover td { background: #f1f8f4; }
+.export-preview-table th.num, .export-preview-table td.num { text-align: right; }
+.export-preview-table th.rownum, .export-preview-table td.rownum { width: 36px; text-align: right; font-size: 9.5px; color: #9aa294; background: #f6f8f4; }
+.export-preview-table tfoot td { position: sticky; bottom: 0; background: #ecf5ef; font-weight: 700; border-top: 2px solid #2f7c5f; color: #26433a; }
+.export-preview-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; }
+.preview-format-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.preview-format-btn { position: relative; display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 7px 12px; color: #4c554b; transition: .15s ease; text-align: left; }
+.preview-format-btn:hover { border-color: #8fce9f; background: var(--teal-mist); }
+.preview-format-btn svg { color: var(--teal); flex: 0 0 auto; }
+.preview-format-btn b { display: block; font-size: 11.5px; }
+.preview-format-btn small { display: block; font-size: 9px; color: var(--muted); margin-top: 1px; }
+.preview-format-btn.preferred { border-color: var(--teal); background: var(--teal-mist); box-shadow: 0 0 0 3px var(--teal-glow); }
+.preferred-dot { position: absolute; top: -4px; right: -4px; width: 9px; height: 9px; border-radius: 50%; background: var(--teal); border: 2px solid #fff; }
+@media (max-width: 700px) {
+  .export-preview-modal { width: calc(100vw - 20px); }
+  .export-preview-actions { flex-direction: column; align-items: stretch; }
+  .preview-format-list { display: grid; grid-template-columns: 1fr 1fr; }
+  .preview-format-btn small { display: none; }
+  .export-preview-table td, .export-preview-table th { max-width: 160px; }
+}

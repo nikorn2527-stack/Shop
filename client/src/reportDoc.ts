@@ -60,11 +60,14 @@ function buildPage(config: ReportDocConfig, rows: string[][], pageIndex: number,
   table.className = "rd-table";
   const thead = document.createElement("thead");
   const headRow = document.createElement("tr");
-  for (const column of config.columns) {
+  // ROUND 48 (user) — หัวคอลัมน์ตัวเลขต้องชิดขวาเหมือนข้อมูลใต้มัน ไม่งั้นในไฟล์
+  // ที่ส่งออก หัวจะเรียงชิดซ้ายในขณะที่ตัวเลขชิดขวา = ดูเหมือนเยื้องกัน
+  config.columns.forEach((column, index) => {
     const th = document.createElement("th");
     th.textContent = column;
+    if (numeric.has(index)) th.className = "num";
     headRow.appendChild(th);
-  }
+  });
   thead.appendChild(headRow);
   table.appendChild(thead);
   const tbody = document.createElement("tbody");
@@ -157,7 +160,8 @@ export function printReportDoc(config: ReportDocConfig) {
   const totalsRow = config.totalsRow
     ? `<tfoot><tr>${config.totalsRow.map((cell, index) => `<td${numeric.has(index) ? ' class="num"' : ""}>${escapeHtml(cell)}</td>`).join("")}</tr></tfoot>`
     : "";
-  const headCells = config.columns.map((column) => `<th>${escapeHtml(column)}</th>`).join("");
+  // ROUND 48 — th คอลัมน์ตัวเลขชิดขวาให้ตรงแนวกับข้อมูล (เหมือนหน้าจอ)
+  const headCells = config.columns.map((column, index) => `<th${numeric.has(index) ? ' class="num"' : ""}>${escapeHtml(column)}</th>`).join("");
   const html = `<!DOCTYPE html>
 <html lang="th"><head><meta charset="utf-8" /><title>${escapeHtml(config.title)}</title>
 <style>

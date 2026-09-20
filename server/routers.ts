@@ -28,6 +28,7 @@ import {
   salesByCashier,
   salesByCategory,
   salesByProduct,
+  salesLineItems,
   deleteAppSession,
   deleteMember,
   findAppUserByUsername,
@@ -870,6 +871,10 @@ export const appRouter = router({
     byProduct: publicProcedure
       .input(reportRangeInput)
       .query(({ input }) => withStoreErrors(() => salesByProduct(getWelfareDb(), input ?? {}))),
+    /** ROUND 48 — รายการสินค้าทุกบรรทัดจากทุกบิลในช่วงเวลา (แยกตามรายการในบิล) */
+    lineItems: publicProcedure
+      .input(reportRangeInput)
+      .query(({ input }) => withStoreErrors(() => salesLineItems(getWelfareDb(), input ?? {}))),
     byCashier: publicProcedure
       .input(reportRangeInput)
       .query(({ input }) => withStoreErrors(() => salesByCashier(getWelfareDb(), input ?? {}))),

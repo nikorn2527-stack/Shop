@@ -135,12 +135,10 @@ export function applyThemeColor(theme: string | undefined | null): string {
     "--teal-dark": build(clamp(l - 0.07, 0.12, 0.82)),
     "--teal-soft": build(0.9, sat * 0.62),
     "--teal-mist": build(0.945, sat * 0.38),
+    // เฉดเข้มของสีธีม — ยังใช้โดะ member-balance-card (การ์ดยอดเงินคงเหลือ)
     "--rail-a": build(0.2, sat * 0.92),
-    "--rail-b": build(0.12, sat * 0.95),
-    // ROUND 47 — แถบราง POS ใช้สีพื้นเดียว (solid) แทน gradient: เอาเฉดกลางระหว่าง a-b
-    // ส่วน --rail-edge คือเส้นขอบขวาเข้มกว่าพื้นนิดหน่อย ให้แยกจากพื้นที่ขายสินค้า
-    "--rail-solid": build(0.17, sat * 0.93),
-    "--rail-edge": build(0.1, sat * 0.95),
+    // ROUND 48 — ราง POS ไม่ตามสีธีมแล้ว: ใช้สีเดียวกับแอปตามที่ผู้ใช้ขอ (ปุ่มเท่านั้นที่มีสีของใครของมัน)
+    // ตัวแปร --rail-b / --rail-solid / --rail-edge จึงปลดลง (index.css ROUND 48)
     "--teal-glow": `rgba(${r}, ${g}, ${b}, .22)`,
   };
   for (const [key, value] of Object.entries(vars)) root.style.setProperty(key, value);
