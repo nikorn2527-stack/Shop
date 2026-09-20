@@ -68,7 +68,12 @@ export function BarcodeCameraModal({
     (async () => {
       if (typeof window !== "undefined" && !window.isSecureContext) {
         setPhase("error");
-        setErrorMsg("เบราว์เซอร์เปิดกล้องได้เฉพาะ HTTPS หรือ localhost เท่านั้น — ถ้าเข้าด้วย IP วงใน (เช่น http://192.168.x.x:3001) ให้เปิดหน้านี้ที่เครื่องเซิร์ฟเวอร์ (localhost) หรือตั้งค่า HTTPS ก่อน");
+        setErrorMsg(
+          "เบราว์เซอร์อนุญาตให้เปิดกล้องเฉพาะ HTTPS หรือ localhost เท่านั้น — " +
+            "คุณกำลังเข้าด้วย http ผ่าน IP วงใน วิธีแก้: (1) เปิดโหมด HTTPS ที่เซิร์ฟเวอร์ " +
+            "(เพิ่ม HTTPS=1 ในไฟล์ .env แล้วรีสตาร์ท แล้วเข้าด้วย https://... — ดูวิธีเต็มที่ ตั้งค่า → การเชื่อมต่อ) " +
+            "หรือ (2) เปิดหน้านี้ที่เครื่องเซิร์ฟเวอร์ด้วย localhost"
+        );
         return;
       }
       if (!navigator.mediaDevices?.getUserMedia) {

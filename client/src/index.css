@@ -4491,3 +4491,19 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
   .row-action button, .row-action .outline-button, .row-action .mini-button { min-height: 34px; min-width: 34px; }
   td .icon-button { width: 34px; height: 34px; }
 }
+
+/* ============================================================
+   ROUND 57 — HTTPS สำหรับกล้องบนอุปกรณ์ที่เข้าผ่าน IP วงแลน
+   (แท็บการเชื่อมต่อ: การ์ดคู่มือกล้อง + สถานะ https)
+   ============================================================ */
+/* โน้ตสีเหลืองอำพัน — เตือนว่ายังเป็น http กล้องเปิดไม่ได้ (คู่กับ .settings-inline-note เขียวเดิม) */
+.settings-inline-note.amber { color: #8a6d3b; background: #fdf8ec; border: 1px dashed #e6cf9c; }
+.settings-inline-note.amber svg { color: #c2964c; }
+/* ขั้นตอนในการ์ดคู่มือกล้อง: ตัวอักษร ก/ข ให้เด่นแบบเดียวกับเลขขั้นตอน printer-step */
+.printer-step b.step-letter { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 9px; background: #eef6f2; color: #2f8c6d; font-size: 13px; flex: none; }
+/* มือถือ: การ์ดคู่มือกล้องกะทัดรัดลง */
+@media (max-width: 560px) {
+  .printer-flow-steps.lan-steps .printer-step { gap: 9px; }
+  .printer-flow-steps.lan-steps .printer-step small { font-size: 10.5px; }
+}
+

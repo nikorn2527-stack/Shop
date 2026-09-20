@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
+import { createServer as createHttpsServer, type Server as HttpsServer } from "https";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
@@ -11,6 +12,7 @@ import { serveStatic, setupVite } from "./vite";
 import { backupSqliteDatabase, listSqliteBackups, pruneSqliteBackupsByCount } from "../sqliteBackup";
 import { getBackupDir, getWelfareDb, getWelfareDbPath } from "../welfareStore";
 import { getSettings, logAction } from "../sqliteStore";
+import { ensureLanHttpsCert, getHttpsCertDir } from "./https";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -59,7 +61,24 @@ function startBackupScheduler() {
 
 async function startServer() {
   const app = express();
-  const server = createServer(app);
+  // ROUND 57 (user) — โหมด HTTPS (env HTTPS=1) สำหรับเปิดกล้องบนอุปกรณ์ที่เข้า
+  // ผ่าน IP วงแลน: เบราว์เซอร์อนุญาต getUserMedia เฉพาะ secure context
+  // (https หรือ localhost) — http://192.168.x.x จะกล้องติด
+  const useHttps = process.env.HTTPS === "1";
+  let lanIps: string[] = [];
+  let server: import("http").Server | HttpsServer;
+  if (useHttps) {
+    const ensured = await ensureLanHttpsCert(getHttpsCertDir());
+    lanIps = ensured.ips;
+    server = createHttpsServer({ key: ensured.cert.key, cert: ensured.cert.cert }, app);
+    console.log(
+      ensured.regenerated
+        ? "[HTTPS] สร้างใบรับรอง self-signed ใหม่ (ครั้งแรก หรือไอพีเครื่องเปลี่ยน)"
+        : "[HTTPS] ใช้ใบรับรองเดิมจาก data/https/"
+    );
+  } else {
+    server = createServer(app);
+  }
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
@@ -88,7 +107,16 @@ async function startServer() {
   }
 
   server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/`);
+    const scheme = useHttps ? "https" : "http";
+    console.log(`Server running on ${scheme}://localhost:${port}/`);
+    if (useHttps) {
+      for (const ip of lanIps) {
+        console.log(`  อุปกรณ์อื่น (แท็บเล็ต/มือถือ): ${scheme}://${ip}:${port}/`);
+      }
+      console.log(
+        "  ครั้งแรกที่อุปกรณ์เข้า URL นี้ จะมีหน้าเตือนความปลอดภัย — กด ขั้นสูง → ดำเนินการต่อไป (ครั้งเดียวต่อเครื่อง) จากนั้นกล้องสแกนบาร์โค้ดใช้ได้"
+      );
+    }
     // ROUND 38 (ข้อ 39) — ตัวตรวจสำรองข้อมูลอัตโนมัติ (รอบแรกหลังบูต 30 วินาที)
     startBackupScheduler();
   });

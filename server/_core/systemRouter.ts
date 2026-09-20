@@ -31,6 +31,9 @@ export const systemRouter = router({
     return {
       addresses,
       port: parseInt(process.env.PORT || "3000", 10),
+      // ROUND 57 — เซิร์ฟเวอร์กำลังรัน https อยู่ไหม (HTTPS=1) เพื่อให้หน้า
+      // การเชื่อมต่อเสนอ URL ที่ถูก scheme + บอกสถานะกล้องได้ถูกต้อง
+      https: process.env.HTTPS === "1",
       uptimeSeconds: Math.round(process.uptime()),
       hostname: os.hostname(),
       platform: `${os.type()} ${os.release()}`,
