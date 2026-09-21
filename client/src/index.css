@@ -4168,10 +4168,14 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
    (2) .report-staff-filter = ดรอปดาวน์เลือกพนักงานขาย ใช้ร่วมกับทุกมุมมอง
    ============================================================ */
 .print-preview-modal { width: min(620px, calc(100vw - 28px)); }
+/* ROUND 68 (user) — เอกสาร A4 (ใบนับสต็อก/รายงานสมาชิก) เคยถูกบีบอยู่ในโมดัล 620px
+   ทำให้ตารางล้นแล้วต้องเลื่อนซ้าย-ขวาดูรายละเอียด — ขยายโมดัลเฉพาะกรณีกระดาษ A4 */
+.print-preview-modal:has(.print-preview-stage.paper-a4) { width: min(1060px, calc(100vw - 28px)); }
 .print-preview-stage { margin-top: 4px; border-radius: 12px; padding: 18px 14px; max-height: min(58vh, 560px); overflow: auto; display: grid; place-items: start center; background: repeating-linear-gradient(-45deg, #f4f8f6 0 14px, #eff4f1 14px 28px); border: 1px solid #e2ebe7; }
+.print-preview-modal:has(.print-preview-stage.paper-a4) .print-preview-stage { max-height: min(66vh, 660px); }
 .print-preview-stage .print-preview-paper { min-height: 40px; }
 .print-preview-stage.paper-thermal .print-preview-paper { width: 300px; max-width: 100%; }
-.print-preview-stage.paper-a4 .print-preview-paper { width: min(470px, 100%); }
+.print-preview-stage.paper-a4 .print-preview-paper { width: min(800px, 100%); }
 .print-preview-stage.paper-card .print-preview-paper { width: 323px; }
 /* เอกสารที่ปกติซ่อนบนหน้าจอ (โผล่เฉพาะตอนพิมพ์) ต้องแสดงในพรีวิว */
 .print-preview-paper .cutoff-report, .print-preview-paper .printer-test-slip { display: block !important; width: 300px; max-width: 100%; margin: 0 auto; }
@@ -4226,6 +4230,8 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
    ============================================================ */
 .stock-count-sheet { display: none; }
 .print-preview-paper .stock-count-sheet { display: block; width: 100%; background: #fff; color: #26251f; font-family: "Sarabun", "TH Sarabun New", "Leelawadee UI", Tahoma, sans-serif; }
+/* ROUND 68 — CSS กลางมี table { min-width: 680px } ทำให้ตารางเอกสารในพรีวิวเกินจอเล็ก (มือถือ/แท็บเล็ต) ล้นจนต้องเลื่อนซ้าย-ขวา — ยกเลิกให้ย่อตามกระดาษได้ */
+.print-preview-paper table { min-width: 0; }
 .scs-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; border-bottom: 2px solid #0d7a55; padding-bottom: 8px; }
 .scs-brand { display: flex; align-items: center; gap: 8px; }
 .scs-mark { width: 36px; height: 36px; border-radius: 9px; background: #0d7a55; color: #fff; display: grid; place-items: center; font-size: 18px; font-weight: 700; flex: 0 0 auto; }
@@ -4246,7 +4252,8 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .scs-cat td { background: #ecf5ef; color: #14563b; font-weight: 700; font-size: 10.5px; border-bottom: 1px solid #d3e6da; }
 .scs-no { width: 34px; text-align: center; color: #6d7466; }
 .scs-name { min-width: 150px; }
-.scs-name b { font-weight: 600; color: #26251f; }
+.scs-name b { font-weight: 600; color: #26251f; overflow-wrap: anywhere; }
+.scs-note { overflow-wrap: anywhere; }
 .scs-name small { color: #79806f; font-size: 9px; }
 .scs-sku { font-family: "IBM Plex Mono", monospace; }
 .scs-unit { width: 44px; color: #5c6156; }

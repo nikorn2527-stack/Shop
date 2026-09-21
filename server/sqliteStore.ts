@@ -243,6 +243,9 @@ export type StoreSettings = {
   /** ROUND 63 (user) — บัญชีพร้อมเพย์ของร้าน (เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก)
    *  ใช้สร้าง QR ให้ลูกค้าสแกนจ่ายที่หน้ายืนยันการชำระเงิน · "" = ยังไม่ตั้ง (ไม่แสดง QR) */
   promptpayId: string;
+  /** ROUND 68 (user) — เบอร์โทรศูนย์ช่วยเหลือของร้าน แสดงท้ายหน้าจอทุกหน้า
+   *  (แถบ footer) · "" = ไม่แสดง (เดิมเคยเป็นข้อความล็อก 02-XXX-XXXX แก้ไม่ได้) */
+  helpPhone: string;
 };
 
 /**
@@ -2565,6 +2568,8 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   trialStart: "",
   // ROUND 63 — บัญชีพร้อมเพย์ร้าน ยังไม่ตั้ง → หน้า POS จะแนะนำให้ไปตั้งที่หน้าตั้งค่า การชำระเงิน
   promptpayId: "",
+  // ROUND 68 — เบอร์ศูนย์ช่วยเหลือท้ายหน้าจอ ยังไม่ตั้ง → ไม่แสดงแถบช่วยเหลือใน footer
+  helpPhone: "",
 };
 
 const SETTINGS_KEY = "app_settings";

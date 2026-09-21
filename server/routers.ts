@@ -462,6 +462,8 @@ const settingsPatchInput = z
     goliveChecks: z.string().max(4000).optional(),
     // ROUND 63 (user) — บัญชีพร้อมเพย์ร้าน: เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก
     promptpayId: z.string().max(20).optional(),
+    // ROUND 68 (user) — เบอร์โทรศูนย์ช่วยเหลือ แสดงท้ายหน้าจอ (footer) · "" = ไม่แสดง
+    helpPhone: z.string().max(32).optional(),
   })
   .nullish();
 
