@@ -16,6 +16,7 @@
  * รันบนเครื่องร้าน: หยุดโปรแกรมก่อน → corepack pnpm tsx scripts/seed-real-data.ts → เปิดใหม่
  * ระวัง: ขั้นตอนที่ 2 ลบข้อมูลขาย/สมาชิกทั้งหมด สำรองไว้ก่อนเสมอแล้ว (ขั้นตอนที่ 1)
  */
+import "dotenv/config"; // ROUND 66 — โหลด .env เหมือนที่ server ทำ ให้ SQLITE_DB_PATH ชี้ไฟล์เดียวกัน
 import { mkdirSync, copyFileSync, existsSync, readdirSync, statSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { randomBytes, scryptSync } from "node:crypto";

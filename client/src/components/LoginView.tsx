@@ -1,15 +1,9 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import type { FormEvent } from "react";
-import { Crown, Eye, EyeOff, IdCard, LogIn, ShieldCheck, UserRound } from "lucide-react";
+import { Eye, EyeOff, IdCard, LogIn, ShieldCheck } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { getErrorMessage } from "@/pages/viewFormat";
 import { brandInitial, type BrandSettings } from "@/theme";
-
-/** Demo accounts behind the quick-fill chips (fill only — the user presses เข้าสู่ระบบ). */
-const DEMO_ACCOUNTS = [
-  { label: "เจ้าหน้าที่ · กัญญาณัฐ", username: "kanyanat", password: "1234", admin: false },
-  { label: "ผู้บริหาร · วรพจน์", username: "woraphot", password: "1234", admin: true },
-] as const;
 
 /**
  * Full-screen login card shown by the Home auth gate when auth.me returns no
@@ -23,7 +17,6 @@ export function LoginView({ brand, onAuthed }: { brand?: BrandSettings | null | 
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
-  const formRef = useRef<HTMLFormElement>(null);
   const loginMutation = trpc.auth.login.useMutation({
     onSuccess: () => {
       setError("");
@@ -43,15 +36,6 @@ export function LoginView({ brand, onAuthed }: { brand?: BrandSettings | null | 
     loginMutation.mutate({ username: username.trim(), password });
   };
 
-  const fillDemo = (account: (typeof DEMO_ACCOUNTS)[number]) => {
-    setUsername(account.username);
-    setPassword(account.password);
-    setError("");
-    // Focus the username field so Enter submits immediately after a quick-fill.
-    const field = formRef.current?.elements.namedItem("username");
-    if (field instanceof HTMLInputElement) field.focus();
-  };
-
   return (
     <div className="login-screen">
       <i className="login-blob teal" aria-hidden="true" />
@@ -62,7 +46,7 @@ export function LoginView({ brand, onAuthed }: { brand?: BrandSettings | null | 
           <b>{appName}</b>
           <small>ระบบหน้าร้านและบัญชีสมาชิก</small>
         </div>
-        <form className="login-form" ref={formRef} onSubmit={submit}>
+        <form className="login-form" onSubmit={submit}>
           <label>
             ชื่อผู้ใช้
             <input
@@ -71,7 +55,7 @@ export function LoginView({ brand, onAuthed }: { brand?: BrandSettings | null | 
               onChange={(event) => setUsername(event.target.value)}
               autoComplete="username"
               autoFocus
-              placeholder="กรอกชื่อผู้ใช้ เช่น kanyanat"
+              placeholder="กรอกชื่อผู้ใช้ของบัญชีเจ้าหน้าที่/ผู้บริหาร"
             />
           </label>
           <label>
@@ -99,23 +83,6 @@ export function LoginView({ brand, onAuthed }: { brand?: BrandSettings | null | 
             <LogIn size={16} /> {loginMutation.isPending ? "กำลังตรวจสอบ…" : "เข้าสู่ระบบ"}
           </button>
         </form>
-        {import.meta.env.DEV && (
-          <div className="login-demo">
-            <span>บัญชีทดลองสำหรับทดสอบระบบ (โหมดพัฒนาเท่านั้น)</span>
-            <div className="login-demo-row">
-              {DEMO_ACCOUNTS.map((account) => (
-                <button
-                  key={account.username}
-                  type="button"
-                  className={account.admin ? "login-demo-btn admin" : "login-demo-btn"}
-                  onClick={() => fillDemo(account)}
-                >
-                  {account.admin ? <Crown size={13} /> : <UserRound size={13} />} {account.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
         <div className="login-scope-note" role="note">
           <IdCard size={15} />
           <span>ระบบนี้สำหรับ<b>เจ้าหน้าที่และผู้บริหารร้านค้า</b>เท่านั้น · สมาชิกสวัสดิการไม่มีการเข้าสู่ระบบ — ใช้สิทธิ์ที่เคาน์เตอร์ด้วยหมายเลขสมาชิก</span>

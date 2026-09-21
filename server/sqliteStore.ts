@@ -3547,6 +3547,19 @@ function seedDevAppUsers(db: SqliteDb): void {
   logAction(db, "โหมดพัฒนา", "ระบบ", "สร้างบัญชีทดสอบอัตโนมัติ kanyanat (เจ้าหน้าที่) + woraphot (ผู้บริหาร) · รหัสผ่าน 1234 · ข้ามหน้าลงทะเบียนครั้งแรกให้โหมดพัฒนา", "green", null, createdAt);
 }
 
+/**
+ * ROUND 66 (user) — "ทำไมยังเป็นข้อมูลเดโม": SEED_DEMO_DATA=1 ที่ตั้งค้างไว้ใน .env
+ * เคยฉีดสมาชิกเดโม 5 คน + สินค้าทดสอบ 5 รายการกลับเข้าฐานข้อมูลที่ "ไม่ว่าง"
+ * (เช่น หลังรัน scripts/seed-real-data.ts หรือใช้งานจริงมาแล้ว) ทุกครั้งที่เปิด
+ * โปรแกรมใหม่ — ข้อมูลเดโมปนกับข้อมูลจริงทั้งที่เอกสารเขียนว่า "มีผลเฉพาะฐาน
+ * ข้อมูลที่ยังว่าง" ตอนนี้บังคับเป็นจริง: วัดจากตารางข้อมูลการขายทุกตาราง
+ * (บัญชีผู้ใช้ระบบ/การตั้งค่าร้านไม่นับ — ทะเบียนผู้ใช้เปล่ายังถือว่าว่างได้)
+ */
+function isDatabaseEmpty(db: SqliteDb): boolean {
+  const dataTables = ["members", "member_transactions", "products", "stock_lots", "sales", "sale_items", "audit_logs"];
+  return dataTables.every((table) => countRows(db, table) === 0);
+}
+
 export function openWelfareStore(filename = process.env.SQLITE_DB_PATH ?? "data/welfare-store.sqlite"): SqliteDb {
   if (filename !== ":memory:") {
     mkdirSync(dirname(resolve(filename)), { recursive: true });
@@ -3557,12 +3570,16 @@ export function openWelfareStore(filename = process.env.SQLITE_DB_PATH ?? "data/
   //   1) เทมเพลต .xlsx (ตั้งค่า → นำเข้าข้อมูล) ที่เตรียมให้กรอกตามรูปแบบ
   //   2) กรอกเองผ่านหน้า POS / สต็อก / ลงทะเบียนสมาชิก
   // นักพัฒนาที่ต้องการข้อมูลตัวอย่าง (ทดสอบระบบ): ตั้ง SEED_DEMO_DATA=1 ใน .env
-  //   — จะได้สมาชิก/สินค้า/บิลตัวอย่าง + บัญชีทดสอบ kanyanat/woraphot (dev เท่านั้น)
+  //   — ROUND 66: มีผลเฉพาะฐานข้อมูลที่ยังว่างจริง ๆ เท่านั้น (isDatabaseEmpty)
   if (process.env.SEED_DEMO_DATA === "1") {
-    seedWelfareStoreData(db);
-    // ROUND 48 — dev bypass: ฐานข้อมูลใหม่บน `pnpm dev` ข้าม SetupView ไปหน้าล็อกอินเลย
-    if (process.env.NODE_ENV === "development" && countAppUsers(db) === 0) {
-      seedDevAppUsers(db);
+    if (isDatabaseEmpty(db)) {
+      seedWelfareStoreData(db);
+      // ROUND 48 — dev bypass: ฐานข้อมูลใหม่บน `pnpm dev` ข้าม SetupView ไปหน้าล็อกอินเลย
+      if (process.env.NODE_ENV === "development" && countAppUsers(db) === 0) {
+        seedDevAppUsers(db);
+      }
+    } else {
+      console.warn("[SEED_DEMO_DATA] ข้ามการใส่ข้อมูลตัวอย่าง — ฐานข้อมูลนี้มีข้อมูลอยู่แล้ว ใช้ของเดิมต่อ (ถ้าไม่ต้องการเห็นข้อความนี้ ลบ SEED_DEMO_DATA=1 ใน .env ได้)");
     }
   }
   return db;
