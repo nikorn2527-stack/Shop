@@ -128,19 +128,43 @@ async function main() {
   // patient_code และชนิดธุรกรรม 5 แบบรวม activation/refund)
   const db = createSqliteStore(dbPath);
 
-  // ขั้น 2 — ล้างข้อมูลการขายเดิม (เก็บ app_users + store_settings)
-  db.exec(`
-    DELETE FROM sale_items;
-    DELETE FROM sales;
-    DELETE FROM member_transactions;
-    DELETE FROM members;
-    DELETE FROM order_list_items;
-    DELETE FROM stock_lots;
-    DELETE FROM products;
-    DELETE FROM day_closures;
-    DELETE FROM limit_requests;
-    DELETE FROM audit_logs;
-  `);
+  // ขั้น 2 — ล้างข้อมูลการขายเดิม (เก็บ app_users + app_sessions + store_settings)
+  // ROUND 67 (user): เครื่องร้าน (Windows) เคยพังตรงนี้ด้วย "FOREIGN KEY constraint failed"
+  // เพราะตาราง limit_requests อ้างอิง FK → members แต่ถูกสั่งลบที่หลัง — พอมีประวัติคำขอปรับวงเงินค้างอยู่
+  // DELETE FROM members จึงตายกลางทาง (บิล/ธุรกรรมถูกลบไปแล้วบางส่วน เหลือข้อมูลครึ่ง ๆ) — แก้ 3 ชั้นให้ทนทาน:
+  //   (1) ปิด foreign_keys ชั่วคราวขณะล้าง (2) ลบตารางลูกก่อนพ่อตามลำดับ
+  //   (3) ห่อทั้งบล็อกไว้ในธุรกรรมเดียว พังตรงไหน ROLLBACK ย้อนกลับทั้งหมด ฐานข้อมูลอยู่ครบเสมอ
+  // และล้าง "ตารางที่ไม่รู้จัก"จากเวอร์ชันก่อนด้วย (ถ้ามี) กันข้อมูลเก่าปนข้อมูลใหม่
+  db.exec("PRAGMA foreign_keys = OFF");
+  db.exec("BEGIN");
+  try {
+    db.exec(`
+      DELETE FROM sale_items;
+      DELETE FROM sales;
+      DELETE FROM member_transactions;
+      DELETE FROM limit_requests;
+      DELETE FROM members;
+      DELETE FROM order_list_items;
+      DELETE FROM stock_lots;
+      DELETE FROM products;
+      DELETE FROM day_closures;
+      DELETE FROM audit_logs;
+    `);
+    const knownTables = new Set(["members", "member_transactions", "store_settings", "products", "stock_lots", "sales", "sale_items", "day_closures", "audit_logs", "app_users", "app_sessions", "order_list_items", "limit_requests"]);
+    const unknownTables = (db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`).all() as { name: string }[])
+      .map((row) => row.name)
+      .filter((name) => !knownTables.has(name));
+    for (const table of unknownTables) {
+      const removed = db.prepare(`DELETE FROM "${table}"`).run();
+      if (removed.changes > 0) console.log(`- legacy table wiped: ${table} (${removed.changes} rows)`);
+    }
+    db.exec("COMMIT");
+  } catch (error) {
+    try { db.exec("ROLLBACK"); } catch { /* no active transaction */ }
+    db.exec("PRAGMA foreign_keys = ON");
+    throw error;
+  }
+  db.exec("PRAGMA foreign_keys = ON");
   console.log("✔ ล้างข้อมูลการขาย/สมาชิก/สต๊อกเดิม (บัญชีผู้ใช้และการตั้งค่าถูกเก็บไว้)");
 
   // ขั้น 3 — สินค้าจริง 120 รายการ + ยอดยกมา (Lot 16 ก.ย.)
