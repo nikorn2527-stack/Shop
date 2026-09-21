@@ -11,6 +11,7 @@ import {
   countAppUsers,
   createAppSession,
   createAppUser,
+  createProduct,
   createSqliteStore,
   dailySalesRows,
   dashboardStats,
@@ -28,7 +29,10 @@ import {
   listProducts,
   listStockRows,
   loginLockRemainingMinutes,
+  memberBalances,
   memberSpendingStats,
+  stockBalanceReport,
+  walletTx,
   openWelfareStore,
   receiveStock,
   registerLoginFailure,
@@ -497,8 +501,66 @@ describe("member registration numbering", () => {
     const database = freshDb();
     const detail = registerMember(database, { firstName: "ทดสอบ", lastName: "เงิน", initialDeposit: 150 });
     expect(detail.member.balance).toBe(150);
-    expect(detail.transactions[0]?.type).toBe("deposit");
+    // ROUND 65 — เงินเริ่มต้นตอนลงทะเบียนบันทึกเป็น "เปิดใช้บัตร" ตามรายงานโรงพยาบาล
+    expect(detail.transactions[0]?.type).toBe("activation");
     expect(detail.transactions[0]?.balanceAfter).toBe(150);
+  });
+
+  it("ROUND 65 — ลงทะเบียนพร้อมรหัสบัตร/รหัสผู้ป่วย และห้ามใช้รหัสบัตรซ้ำ", () => {
+    const database = freshDb();
+    const detail = registerMember(database, { firstName: "สมชาย", lastName: "ใจดี", prename: "นาย", cardNumber: "2395100201", patientCode: "70001", initialDeposit: 500 });
+    expect(detail.member.cardNumber).toBe("2395100201");
+    expect(detail.member.patientCode).toBe("70001");
+    expect(() => registerMember(database, { firstName: "มาลี", lastName: "ใจดี", cardNumber: "2395100201" })).toThrowError(/รหัสบัตร 2395100201 ถูกใช้/);
+    // ค้นหาจากรหัสบัตรและรหัสผู้ป่วยเจอสมาชิก
+    expect(listMembers(database, "2395100201").map((row) => row.memberNumber)).toContain(detail.member.memberNumber);
+    expect(listMembers(database, "70001").map((row) => row.memberNumber)).toContain(detail.member.memberNumber);
+  });
+
+  it("ROUND 65 — คืนบัตรเงินสด (refund) หักยอดเหมือนถอน และขึ้นรายงานยอดเงินในบัตรถูกต้อง", () => {
+    const database = freshDb();
+    const detail = registerMember(database, { firstName: "สมศรี", lastName: "สุขสวัสดิ์", initialDeposit: 1000 });
+    const untouched = registerMember(database, { firstName: "มานะ", lastName: "ตั้งใจดี", initialDeposit: 300 });
+    const refunded = walletTx(database, { memberNumber: detail.member.memberNumber, type: "refund", amount: 1000, actor: "นายนิกร พันโนนงิ้ว" });
+    expect(refunded.balanceAfter).toBe(0);
+    expect(() => walletTx(database, { memberNumber: detail.member.memberNumber, type: "refund", amount: 5 })).toThrowError(/ยอดเงินคงเหลือไม่พอ/);
+    const balances = memberBalances(database);
+    const row = balances.find((entry) => entry.memberNumber === detail.member.memberNumber)!;
+    expect(row.totalIn).toBe(1000);
+    expect(row.totalOut).toBe(1000);
+    expect(row.balance).toBe(0);
+    const other = balances.find((entry) => entry.memberNumber === untouched.member.memberNumber)!;
+    expect(other.totalIn).toBe(300);
+    expect(other.totalOut).toBe(0);
+    expect(other.balance).toBe(300);
+  });
+
+  it("ROUND 65 — รายงานสินค้าคงคลัง: ยอดยกมา = คงเหลือ + ขายในช่วง − รับเข้าในช่วง", () => {
+    const database = freshDb();
+    const product = createProduct(database, { sku: "WS-001", barcode: "885000000001", name: "น้ำดื่มทดสอบ", unit: "ขวด", price: 6, cost: 4, stock: 0 });
+    const dayOffset = (days: number) => {
+      const date = new Date(Date.now() + days * 86_400_000);
+      const pad = (value: number) => String(value).padStart(2, "0");
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} 09:00:00`;
+    };
+    // ยกมา: รับเข้า 10 ชิ้นเมื่อ 8 วันก่อน — อยู่นอกช่วงรายงาน 7 วันล่าสุด
+    database.prepare(`INSERT INTO stock_lots (product_id, lot, expiry_date, qty, cost, received_at) VALUES (?, 'LOT-A', NULL, 10, 4, ?)`).run(product.id, dayOffset(-8));
+    database.prepare(`UPDATE products SET stock = 10 WHERE id = ?`).run(product.id);
+    // ขาย 3 ชิ้นเมื่อวาน — อยู่ในช่วงรายงาน (จำลองบิลจริงแบบย้อนหลัง)
+    const sale = database.prepare(`INSERT INTO sales (order_number, payment_method, member_number, subtotal, discount, total, cashier, created_at) VALUES ('RC-TEST-001', 'เงินสด', NULL, 18, 0, 18, 'นายอุดร แสงจันทร์', ?)`).run(dayOffset(-1));
+    database.prepare(`INSERT INTO sale_items (sale_id, product_id, name, qty, price, cost, unit) VALUES (?, ?, 'น้ำดื่มทดสอบ', 3, 6, 4, 'ขวด')`).run(Number(sale.lastInsertRowid), product.id);
+    database.prepare(`UPDATE products SET stock = stock - 3 WHERE id = ?`).run(product.id);
+    const rows = stockBalanceReport(database, {});
+    const row = rows.find((entry) => entry.productId === product.id)!;
+    expect(row.opening).toBe(10);
+    expect(row.sold).toBe(3);
+    expect(row.remaining).toBe(7);
+    expect(row.code).toBe("885000000001");
+    // รับเข้าเพิ่มในช่วง 5 ชิ้น → ยอดยกมายังเป็น 10 เท่าเดิม แต่คงเหลือเพิ่มเป็น 12
+    receiveStock(database, product.id, "LOT-B", null, 5, 4, "นายนิกร พันโนนงิ้ว");
+    const refreshed = stockBalanceReport(database, {}).find((entry) => entry.productId === product.id)!;
+    expect(refreshed.opening).toBe(10);
+    expect(refreshed.remaining).toBe(12);
   });
 });
 

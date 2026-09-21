@@ -42,6 +42,11 @@ export type MemberLite = {
   balance: number;
   status: "active" | "suspended";
   lastTransactionAt: string | null;
+  /** ROUND 65 — รหัสบัตรเงินสด / รหัสผู้ป่วย (HN) · null/undefined = ยังไม่ผูก */
+  cardNumber?: string | null;
+  patientCode?: string | null;
+  /** วันที่ลงทะเบียน (วันที่เปิดใช้บัตร) — มีเฉพาะข้อมูลจาก member.detail */
+  createdAt?: string | null;
   photoUrl?: string | null;
   gender?: string | null;
   /** ROUND 34 (req 23.2) — วงเงินซื้อสินค้าต่อวัน · null/undefined = ไม่จำกัด

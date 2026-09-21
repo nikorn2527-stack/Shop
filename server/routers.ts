@@ -50,7 +50,9 @@ import {
   listStockRows,
   logAction,
   loginLockRemainingMinutes,
+  memberBalances,
   memberSpendingStats,
+  stockBalanceReport,
   receiveStock,
   requestLimitReduction,
   decideLimitRequest,
@@ -162,6 +164,9 @@ const memberRegisterInput = z.object({
   photoUrl: z.string().max(600_000).optional(),
   initialDeposit: z.number().positive("จำนวนเงินต้องมากกว่า 0").optional(),
   memberNumber: z.string().optional(),
+  // ROUND 65 — รหัสบัตรเงินสด + รหัสผู้ป่วย (HN) ของสมาชิกโรงพยาบาล
+  cardNumber: z.string().max(30, "รหัสบัตรยาวเกินไป").optional(),
+  patientCode: z.string().max(30, "รหัสผู้ป่วยยาวเกินไป").optional(),
   actor: z.string().optional(),
   actorRole: z.string().optional(),
 });
@@ -175,7 +180,8 @@ const memberSetStatusInput = z.object({
 
 const memberWalletInput = z.object({
   memberNumber: z.string().min(1),
-  type: z.enum(["deposit", "withdrawal"]),
+  // ROUND 65 — 'refund' = คืนบัตรเงินสด (ผู้ป่วยคืนบัตร จ่ายเงินคืนตามยอดคงเหลือ)
+  type: z.enum(["deposit", "withdrawal", "refund"]),
   amount: z.number(),
   note: z.string().optional(),
   actor: z.string().optional(),
@@ -196,6 +202,9 @@ const memberUpdateInput = z.object({
   photoUrl: z.string().max(600_000).nullish(),
   // Req 23.2 — วงเงินซื้อสินค้าต่อวัน (null = ไม่จำกัด)
   creditLimit: z.number().min(1).max(1000000).nullable().optional(),
+  // ROUND 65 — รหัสบัตรเงินสด / รหัสผู้ป่วย (HN)
+  cardNumber: z.string().max(30, "รหัสบัตรยาวเกินไป").nullish(),
+  patientCode: z.string().max(30, "รหัสผู้ป่วยยาวเกินไป").nullish(),
   actor: z.string().optional(),
   actorRole: z.string().optional(),
 });
@@ -394,10 +403,27 @@ const reportsDailyInput = z
 const memberTransactionsInput = z
   .object({
     memberNumber: z.string().optional(),
-    type: z.enum(["purchase", "deposit", "withdrawal", "limit_request"]).optional(),
+    // ROUND 65 — เพิ่ม activation (เปิดใช้บัตร) และ refund (คืนบัตรเงินสด)
+    type: z.enum(["purchase", "deposit", "withdrawal", "activation", "refund", "limit_request"]).optional(),
     from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
     to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
     limit: z.number().int().min(1).max(1000).optional(),
+  })
+  .nullish();
+
+// ROUND 65 (user) — รายงานยอดเงินในบัตรสมาชิกทุกใบ (ชีทโรงพยาบาล "ยอดเงินในบัตร")
+const memberBalancesInput = z
+  .object({
+    search: z.string().max(120).optional(),
+  })
+  .nullish();
+
+// ROUND 65 (user) — รายงานสินค้าคงคลังตามช่วงเวลา (ยอดยกมา/ยอดขาย/คงเหลือ)
+const stockBalanceInput = z
+  .object({
+    from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
+    to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
+    search: z.string().max(120).optional(),
   })
   .nullish();
 
@@ -1013,6 +1039,16 @@ export const appRouter = router({
         requireEdition("reportsAdvanced"); // ROUND 61 — ธุรกรรมสมาชิกทั้งระบบ = เวอร์ชันโปรขึ้นไป (สเตตเมนต์รายคนยังใช้ได้ทุกเวอร์ชัน)
         return memberTransactions(getWelfareDb(), input ?? {});
       })),
+    /** ROUND 65 (user) — รายงาน "ยอดเงินในบัตร" ทุกใบ: รหัสบัตร · ยอดทั้งหมด · ยอดจ่าย ·
+     * คงเหลือ · วันที่เปิดใช้บัตร · รหัสผู้ป่วย · ชื่อ (ตรงกับชีทรายงานโรงพยาบาล) */
+    memberBalances: publicProcedure
+      .input(memberBalancesInput)
+      .query(({ input }) => withStoreErrors(() => memberBalances(getWelfareDb(), input ?? {}))),
+    /** ROUND 65 (user) — รายงานสินค้าคงคลังตามช่วงเวลา: รหัสสินค้า · ยอดยกมา · ยอดขาย ·
+     * คงเหลือ (ตรงกับชีทรายงานสินค้าคงคลังของโรงพยาบาล) */
+    stockBalance: publicProcedure
+      .input(stockBalanceInput)
+      .query(({ input }) => withStoreErrors(() => stockBalanceReport(getWelfareDb(), input ?? {}))),
     // Req 23.2 — คำขอลดวงเงินทั้งหมด (รอพิจารณาขึ้นก่อน) + จำนวนค้างพิจารณาสำหรับ badge
     limitRequests: publicProcedure
       .input(z.object({ status: z.enum(["pending", "approved", "rejected"]).optional(), limit: z.number().int().min(1).max(200).optional() }).optional())

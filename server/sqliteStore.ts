@@ -33,12 +33,16 @@ export type SqliteMember = {
   gender: string | null;
   /** วงเงินซื้อสินค้าต่อวัน (req 23.2) — null = ไม่จำกัด */
   creditLimit: number | null;
+  /** ROUND 65 (user) — รหัสบัตรเงินสดของสมาชิก (เช่น 2395100201) · null = ยังไม่ผูกบัตร */
+  cardNumber: string | null;
+  /** ROUND 65 (user) — รหัสผู้ป่วย (HN) ที่ผูกกับบัตร · null = ไม่มี */
+  patientCode: string | null;
 };
 
 export type SqliteTransaction = {
   id: number;
   memberNumber: string;
-  type: "purchase" | "deposit" | "withdrawal";
+  type: "purchase" | "deposit" | "withdrawal" | "activation" | "refund";
   detail: string;
   amount: number;
   paymentMethod: string | null;
@@ -64,6 +68,9 @@ export type SqliteMemberSummary = {
   gender: string | null;
   /** วงเงินซื้อสินค้าต่อวัน — null = ไม่จำกัด */
   creditLimit: number | null;
+  /** ROUND 65 — รหัสบัตรเงินสด / รหัสผู้ป่วย (แสดงในรายการและรายงานยอดเงินในบัตร) */
+  cardNumber: string | null;
+  patientCode: string | null;
 };
 
 export type SqliteProduct = {
@@ -259,10 +266,12 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
       status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended')),
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
+    -- ROUND 65 (user): type เพิ่ม 'activation' (เปิดใช้บัตร = ลงทะเบียนพร้อมเงินเริ่มต้น)
+    -- และ 'refund' (คืนบัตรเงินสด = ผู้ป่วยคืนบัตร ร้านจ่ายเงินคืนตามยอดคงเหลือ)
     CREATE TABLE IF NOT EXISTS member_transactions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       member_number TEXT NOT NULL,
-      type TEXT NOT NULL CHECK (type IN ('purchase', 'deposit', 'withdrawal')),
+      type TEXT NOT NULL CHECK (type IN ('purchase', 'deposit', 'withdrawal', 'activation', 'refund')),
       detail TEXT NOT NULL,
       amount REAL NOT NULL,
       payment_method TEXT,
@@ -422,6 +431,16 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
   // รายการเติม/ถอนเงินสมาชิก เก็บเป็น data-URL JPEG (ย่อ ~800px ฝั่ง client ก่อนส่ง)
   ensureColumn(db, "sales", "slip_url", "TEXT");
   ensureColumn(db, "member_transactions", "slip_url", "TEXT");
+  // ROUND 65 (user) — รหัสบัตรเงินสด (23951…) และรหัสผู้ป่วย (HN) ของสมาชิกร้านค้าสวัสดิการ
+  ensureColumn(db, "members", "card_number", "TEXT");
+  ensureColumn(db, "members", "patient_code", "TEXT");
+  // ROUND 65 (user) — DB เดิมสร้าง member_transactions ด้วย CHECK 3 ชนิดเดิม →
+  // ขยายเป็น 5 ชนิด (เพิ่ม activation/refund) ด้วยการสร้างตารางใหม่แล้วคัดลอกข้อมูล
+  upgradeMemberTransactionsTypes(db);
+  // ROUND 65 (user) — จำนวนที่ "รับเข้าจริง" ของแต่ละ Lot (qty ปัจจุบันโดนหักตอนขาย
+  // ไปแล้ว) ใช้คำนวณยอดยกมาของรายงานสินค้าคงคลังให้ตรงชีทโรงพยาบาล
+  ensureColumn(db, "stock_lots", "received_qty", "INTEGER");
+  db.prepare("UPDATE stock_lots SET received_qty = qty WHERE received_qty IS NULL").run();
   // Backfill units for sale_items rows written before the column existed (idempotent).
   db.prepare("UPDATE sale_items SET unit = (SELECT p.unit FROM products p WHERE p.id = sale_items.product_id) WHERE unit IS NULL").run();
   return db;
@@ -433,6 +452,40 @@ function ensureColumn(db: SqliteDb, table: string, column: string, definition: s
   if (!columns.some((entry) => entry.name === column)) {
     db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
   }
+}
+
+/**
+ * ROUND 65 (user) — ขยายชนิดธุรกรรมสมาชิกจาก 3 เป็น 5 ชนิด (เพิ่ม 'activation' เปิดใช้บัตร
+ * และ 'refund' คืนบัตรเงินสด) ให้กับฐานข้อมูลที่สร้างตารางไว้ก่อนหน้า — SQLite
+ * แก้ CHECK ไม่ได้โดยตรง จึงสร้างตารางใหม่→คัดลอก→สลับชื่อ (idempotent: ถ้าเจอ
+ * 'activation' ในคำนิยามเดิมแล้วถือว่าย้ายเสร็จ ข้ามทันที)
+ */
+function upgradeMemberTransactionsTypes(db: SqliteDb) {
+  const row = db.prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'member_transactions'`).get() as { sql: string } | undefined;
+  if (!row?.sql || row.sql.includes("'activation'")) return;
+  db.exec(`
+    CREATE TABLE member_transactions_new (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      member_number TEXT NOT NULL,
+      type TEXT NOT NULL CHECK (type IN ('purchase', 'deposit', 'withdrawal', 'activation', 'refund')),
+      detail TEXT NOT NULL,
+      amount REAL NOT NULL,
+      payment_method TEXT,
+      balance_after REAL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (member_number) REFERENCES members(member_number)
+    );
+  `);
+  db.exec(`
+    INSERT INTO member_transactions_new (id, member_number, type, detail, amount, payment_method, balance_after, created_at)
+      SELECT id, member_number, type, detail, amount, payment_method, balance_after, created_at FROM member_transactions;
+    DROP TABLE member_transactions;
+    ALTER TABLE member_transactions_new RENAME TO member_transactions;
+  `);
+  // คอลัมน์เสริมที่เคยเพิ่มด้วย ensureColumn ในรอบก่อนต้องกลับมาให้ครบหลังสลับตาราง
+  ensureColumn(db, "member_transactions", "balance_after", "REAL");
+  ensureColumn(db, "member_transactions", "actor", "TEXT");
+  ensureColumn(db, "member_transactions", "slip_url", "TEXT");
 }
 
 export function seedSqliteDemoData(db: SqliteDb) {
@@ -449,7 +502,7 @@ export function seedSqliteDemoData(db: SqliteDb) {
 }
 
 export function getMemberDetail(db: SqliteDb, memberNumber: string, transactionLimit = 50) {
-  const member = db.prepare(`SELECT id, member_number as memberNumber, prename, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, credit_limit as creditLimit FROM members WHERE member_number = ?`).get(memberNumber) as SqliteMember | undefined;
+  const member = db.prepare(`SELECT id, member_number as memberNumber, prename, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, credit_limit as creditLimit, card_number as cardNumber, patient_code as patientCode FROM members WHERE member_number = ?`).get(memberNumber) as SqliteMember | undefined;
   if (!member) return undefined;
   const transactions = db.prepare(`SELECT id, member_number as memberNumber, type, detail, amount, payment_method as paymentMethod, balance_after as balanceAfter, created_at as createdAt, slip_url IS NOT NULL AS hasSlip FROM member_transactions WHERE member_number = ? ORDER BY created_at DESC, id DESC LIMIT ?`).all(memberNumber, transactionLimit) as unknown as SqliteTransaction[];
   return { member, transactions };
@@ -694,7 +747,7 @@ export function receiveStock(
   const lotLabel = lot?.trim() || `LOT-${formatDate()}`;
   const createdAt = formatDateTime();
   return runInTransaction(db, () => {
-    const result = db.prepare(`INSERT INTO stock_lots (product_id, lot, expiry_date, qty, cost, received_at) VALUES (?, ?, ?, ?, ?, ?)`).run(productId, lotLabel, expiryDate || null, qty, effectiveCost, createdAt);
+    const result = db.prepare(`INSERT INTO stock_lots (product_id, lot, expiry_date, qty, cost, received_at, received_qty) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(productId, lotLabel, expiryDate || null, qty, effectiveCost, createdAt, qty);
     db.prepare(`UPDATE products SET stock = stock + ?, cost = ? WHERE id = ?`).run(qty, effectiveCost, productId);
     logAction(db, "รับเข้าสินค้า", actor?.trim() || "ระบบ", `${product.name} · Lot ${lotLabel} · +${qty} ${product.unit}`, "green", actorRole ?? null, createdAt);
     return {
@@ -1509,7 +1562,7 @@ export function getSaleSlip(db: SqliteDb, id: number): { slipUrl: string | null 
 
 // --- members & wallet -------------------------------------------------------
 
-const MEMBER_SELECT = `SELECT id, member_number as memberNumber, prename, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, photo_url as photoUrl, gender, credit_limit as creditLimit FROM members WHERE member_number = ?`;
+const MEMBER_SELECT = `SELECT id, member_number as memberNumber, prename, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, photo_url as photoUrl, gender, credit_limit as creditLimit, card_number as cardNumber, patient_code as patientCode FROM members WHERE member_number = ?`;
 
 function getMemberByNumber(db: SqliteDb, memberNumber: string): SqliteMember | undefined {
   return db.prepare(MEMBER_SELECT).get(memberNumber) as SqliteMember | undefined;
@@ -1519,7 +1572,8 @@ export function listMembers(db: SqliteDb, search?: string, status?: "active" | "
   const conditions: string[] = [];
   const params: string[] = [];
   if (search?.trim()) {
-    conditions.push(`(first_name || ' ' || last_name || ' ' || member_number) LIKE ?`);
+    // ROUND 65 — ค้นหาเจอจากรหัสบัตรและรหัสผู้ป่วยด้วย (นอกจากชื่อ/เลขสมาชิก)
+    conditions.push(`(first_name || ' ' || last_name || ' ' || member_number || ' ' || COALESCE(card_number, '') || ' ' || COALESCE(patient_code, '')) LIKE ?`);
     params.push(`%${search.trim()}%`);
   }
   if (status) {
@@ -1527,7 +1581,7 @@ export function listMembers(db: SqliteDb, search?: string, status?: "active" | "
     params.push(status);
   }
   const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
-  return db.prepare(`SELECT m.id, m.member_number AS memberNumber, m.prename AS prename, m.first_name AS firstName, m.last_name AS lastName, m.type, m.balance, m.status, m.created_at AS createdAt, m.photo_url AS photoUrl, m.gender, m.credit_limit AS creditLimit, (SELECT MAX(t.created_at) FROM member_transactions t WHERE t.member_number = m.member_number) AS lastTransactionAt FROM members m${where} ORDER BY m.member_number`).all(...params) as unknown as SqliteMemberSummary[];
+  return db.prepare(`SELECT m.id, m.member_number AS memberNumber, m.prename AS prename, m.first_name AS firstName, m.last_name AS lastName, m.type, m.balance, m.status, m.created_at AS createdAt, m.photo_url AS photoUrl, m.gender, m.credit_limit AS creditLimit, m.card_number AS cardNumber, m.patient_code AS patientCode, (SELECT MAX(t.created_at) FROM member_transactions t WHERE t.member_number = m.member_number) AS lastTransactionAt FROM members m${where} ORDER BY m.member_number`).all(...params) as unknown as SqliteMemberSummary[];
 }
 
 function nextMemberSequence(db: SqliteDb, prefix: string) {
@@ -1565,6 +1619,10 @@ export type RegisterMemberInput = {
   photoUrl?: string;
   initialDeposit?: number;
   memberNumber?: string;
+  /** ROUND 65 — รหัสบัตรเงินสดที่ออกให้สมาชิก (เช่น 2395100201) */
+  cardNumber?: string;
+  /** ROUND 65 — รหัสผู้ป่วย (HN) ที่ผูกกับบัตร */
+  patientCode?: string;
   actor?: string;
   actorRole?: string;
 };
@@ -1578,10 +1636,19 @@ export function registerMember(db: SqliteDb, input: RegisterMemberInput) {
   if (db.prepare(`SELECT id FROM members WHERE member_number = ?`).get(memberNumber)) {
     throw new StoreError(`หมายเลขสมาชิก ${memberNumber} ถูกใช้แล้ว`);
   }
+  // ROUND 65 — รหัสบัตร/รหัสผู้ป่วย: ห้ามซ้ำกับสมาชิกคนอื่น (ว่างได้ = ยังไม่ผูก)
+  const cardNumber = input.cardNumber?.trim() || null;
+  const patientCode = input.patientCode?.trim() || null;
+  if (cardNumber && db.prepare(`SELECT id FROM members WHERE card_number = ?`).get(cardNumber)) {
+    throw new StoreError(`รหัสบัตร ${cardNumber} ถูกใช้กับสมาชิกอื่นแล้ว`);
+  }
+  if (patientCode && db.prepare(`SELECT id FROM members WHERE patient_code = ?`).get(patientCode)) {
+    throw new StoreError(`รหัสผู้ป่วย ${patientCode} ถูกใช้กับสมาชิกอื่นแล้ว`);
+  }
   const initialDeposit = input.initialDeposit ? round2(input.initialDeposit) : 0;
   const createdAt = formatDateTime();
   runInTransaction(db, () => {
-    db.prepare(`INSERT INTO members (member_number, prename, first_name, last_name, id_card, phone, type, balance, status, created_at, photo_url, gender) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)`).run(
+    db.prepare(`INSERT INTO members (member_number, prename, first_name, last_name, id_card, phone, type, balance, status, created_at, photo_url, gender, card_number, patient_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)`).run(
       memberNumber,
       input.prename?.trim() || null,
       firstName,
@@ -1593,17 +1660,20 @@ export function registerMember(db: SqliteDb, input: RegisterMemberInput) {
       createdAt,
       input.photoUrl?.trim() || null,
       input.gender?.trim() || null,
+      cardNumber,
+      patientCode,
     );
     if (initialDeposit > 0) {
-      db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, created_at) VALUES (?, 'deposit', ?, ?, 'เงินสด', ?, ?)`).run(
+      // ROUND 65 — เงินเริ่มต้นตอนลงทะเบียน = "เปิดใช้บัตร" (ตรงกับรายงานโรงพยาบาล)
+      db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, created_at) VALUES (?, 'activation', ?, ?, 'เงินสด', ?, ?)`).run(
         memberNumber,
-        "เงินเริ่มต้นตอนลงทะเบียน · เงินสด",
+        `เปิดใช้บัตร · เงินเริ่มต้นตอนลงทะเบียน · เงินสด`,
         initialDeposit,
         initialDeposit,
         createdAt,
       );
     }
-    logAction(db, "ลงทะเบียนสมาชิก", input.actor?.trim() || "ระบบ", `${memberNumber} · ${firstName} ${lastName}${initialDeposit > 0 ? ` · เงินเริ่มต้น ${money(initialDeposit)}` : ""}`, "green", input.actorRole ?? null, createdAt);
+    logAction(db, "ลงทะเบียนสมาชิก", input.actor?.trim() || "ระบบ", `${memberNumber} · ${firstName} ${lastName}${initialDeposit > 0 ? ` · เปิดใช้บัตรพร้อมเงิน ${money(initialDeposit)}` : ""}`, "green", input.actorRole ?? null, createdAt);
   });
   return getMemberDetail(db, memberNumber)!;
 }
@@ -1632,7 +1702,8 @@ export function setMemberStatus(db: SqliteDb, memberNumber: string, suspended: b
 
 export type WalletTxInput = {
   memberNumber: string;
-  type: "deposit" | "withdrawal";
+  /** ROUND 65 — 'refund' = คืนบัตรเงินสด (ผู้ป่วยคืนบัตร ร้านจ่ายเงินคืน) คิดเหมือนถอน */
+  type: "deposit" | "withdrawal" | "refund";
   amount: number;
   note?: string;
   actor?: string;
@@ -1644,16 +1715,21 @@ export type WalletTxInput = {
 export function walletTx(db: SqliteDb, input: WalletTxInput) {
   if (!(input.amount > 0)) throw new StoreError("จำนวนเงินต้องมากกว่า 0");
   const amount = round2(input.amount);
-  const member = db.prepare(`SELECT id, member_number as memberNumber, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, credit_limit as creditLimit FROM members WHERE member_number = ?`).get(input.memberNumber?.trim()) as SqliteMember | undefined;
+  const member = db.prepare(`SELECT id, member_number as memberNumber, prename, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, credit_limit as creditLimit, card_number as cardNumber, patient_code as patientCode FROM members WHERE member_number = ?`).get(input.memberNumber?.trim()) as SqliteMember | undefined;
   if (!member) throw new StoreError(`ไม่พบสมาชิก ${input.memberNumber} ในระบบ`);
   if (member.status !== "active") throw new StoreError(`สมาชิกถูกระงับการใช้งาน · ${member.memberNumber}`);
-  if (input.type === "withdrawal" && member.balance < amount) {
-    throw new StoreError(`ยอดเงินคงเหลือไม่พอ · ถอน ${money(amount)} คงเหลือ ${money(member.balance)}`);
+  if (input.type !== "deposit" && member.balance < amount) {
+    throw new StoreError(`ยอดเงินคงเหลือไม่พอ · ${input.type === "refund" ? "คืนบัตร" : "ถอน"} ${money(amount)} คงเหลือ ${money(member.balance)}`);
   }
   const signedAmount = input.type === "deposit" ? amount : -amount;
   const balanceAfter = round2(member.balance + signedAmount);
   const note = input.note?.trim();
-  const detail = note || (input.type === "deposit" ? "เติมเงินเข้าบัญชีสมาชิก · เงินสด" : "ถอนเงินจากบัญชีสมาชิก · เงินสด");
+  const fallbackDetail = input.type === "deposit"
+    ? "เติมเงินเข้าบัญชีสมาชิก · เงินสด"
+    : input.type === "refund"
+      ? "คืนบัตรเงินสด · จ่ายเงินคืนตามยอดคงเหลือ"
+      : "ถอนเงินจากบัญชีสมาชิก · เงินสด";
+  const detail = note || fallbackDetail;
   const actor = input.actor?.trim() || "เจ้าหน้าที่ร้านค้า";
   const createdAt = formatDateTime();
   // ROUND 63 — รูปหลักฐานที่แนบมากับการเติม/ถอน (เช่น สลิปโอนเข้า) เก็บไปกับรายการ
@@ -1672,10 +1748,10 @@ export function walletTx(db: SqliteDb, input: WalletTxInput) {
     );
     logAction(
       db,
-      input.type === "deposit" ? "เติมเงินสมาชิก" : "ถอนเงินสมาชิก",
+      input.type === "deposit" ? "เติมเงินสมาชิก" : input.type === "refund" ? "คืนบัตรเงินสด" : "ถอนเงินสมาชิก",
       actor,
       `${member.memberNumber} · ${money(amount)} · ${note || "เงินสด"}${slipImage ? " · แนบหลักฐานแล้ว" : ""}`,
-      input.type === "deposit" ? "green" : "purple",
+      input.type === "deposit" ? "green" : input.type === "refund" ? "amber" : "purple",
       input.actorRole ?? null,
       createdAt,
     );
@@ -1703,6 +1779,10 @@ export type UpdateMemberInput = {
   photoUrl?: string | null;
   /** วงเงินซื้อสินค้าต่อวัน — null = ไม่จำกัด (req 23.2) */
   creditLimit?: number | null;
+  /** ROUND 65 — รหัสบัตรเงินสด · "" = ล้าง */
+  cardNumber?: string | null;
+  /** ROUND 65 — รหัสผู้ป่วย (HN) · "" = ล้าง */
+  patientCode?: string | null;
   actor?: string;
   actorRole?: string;
 };
@@ -1766,6 +1846,31 @@ export function updateMember(db: SqliteDb, input: UpdateMemberInput): SqliteMemb
     assignments.push("credit_limit = ?");
     values.push(input.creditLimit === null ? null : round2(input.creditLimit));
     changedLabels.push("วงเงินซื้อสินค้าต่อวัน");
+  }
+  // ROUND 65 — รหัสบัตร/รหัสผู้ป่วย: ตรวจซ้ำกับสมาชิกคนอื่นก่อนบันทึก
+  if (input.cardNumber !== undefined) {
+    const nextCard = normalizeOptional(input.cardNumber);
+    if (nextCard && nextCard !== member.cardNumber) {
+      const clash = db.prepare(`SELECT member_number FROM members WHERE card_number = ? AND member_number != ?`).get(nextCard, member.memberNumber) as { member_number: string } | undefined;
+      if (clash) throw new StoreError(`รหัสบัตร ${nextCard} ถูกใช้กับสมาชิก ${clash.member_number} อยู่แล้ว`);
+    }
+    if (nextCard !== member.cardNumber) {
+      assignments.push("card_number = ?");
+      values.push(nextCard);
+      changedLabels.push("รหัสบัตร");
+    }
+  }
+  if (input.patientCode !== undefined) {
+    const nextPatient = normalizeOptional(input.patientCode);
+    if (nextPatient && nextPatient !== member.patientCode) {
+      const clash = db.prepare(`SELECT member_number FROM members WHERE patient_code = ? AND member_number != ?`).get(nextPatient, member.memberNumber) as { member_number: string } | undefined;
+      if (clash) throw new StoreError(`รหัสผู้ป่วย ${nextPatient} ถูกใช้กับสมาชิก ${clash.member_number} อยู่แล้ว`);
+    }
+    if (nextPatient !== member.patientCode) {
+      assignments.push("patient_code = ?");
+      values.push(nextPatient);
+      changedLabels.push("รหัสผู้ป่วย");
+    }
   }
 
   const displayName = `${input.firstName?.trim() || member.firstName} ${input.lastName?.trim() || member.lastName}`.trim();
@@ -2124,7 +2229,10 @@ export type MemberTransactionRow = {
   id: number;
   memberNumber: string;
   memberName: string | null;
-  type: "purchase" | "deposit" | "withdrawal" | "limit_request";
+  /** ROUND 65 — รหัสบัตรเงินสด/รหัสผู้ป่วยของสมาชิก (จากตาราง members) */
+  cardNumber: string | null;
+  patientCode: string | null;
+  type: "purchase" | "deposit" | "withdrawal" | "activation" | "refund" | "limit_request";
   /** "tx" = รายการกระเงินเดิม · "limit" = คำขอลดวงเงิน (req 23.2) */
   kind: "tx" | "limit";
   detail: string;
@@ -2142,7 +2250,7 @@ export type MemberTransactionRow = {
 
 export type MemberTransactionsInput = {
   memberNumber?: string;
-  type?: "purchase" | "deposit" | "withdrawal" | "limit_request";
+  type?: "purchase" | "deposit" | "withdrawal" | "activation" | "refund" | "limit_request";
   from?: string;
   to?: string;
   limit?: number;
@@ -2180,7 +2288,7 @@ export function memberTransactions(db: SqliteDb, input: MemberTransactionsInput 
       params.push(`${input.to} 23:59:59`);
     }
     const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
-    const txRows = db.prepare(`SELECT t.id, t.member_number AS memberNumber, NULLIF(TRIM(m.first_name || ' ' || m.last_name), '') AS memberName, t.type, t.detail, t.amount, t.payment_method AS paymentMethod, t.balance_after AS balanceAfter, t.actor, t.created_at AS createdAt FROM member_transactions t LEFT JOIN members m ON m.member_number = t.member_number${where} ORDER BY t.created_at DESC, t.id DESC`).all(...params) as unknown as MemberTransactionRow[];
+    const txRows = db.prepare(`SELECT t.id, t.member_number AS memberNumber, NULLIF(TRIM(m.first_name || ' ' || m.last_name), '') AS memberName, m.card_number AS cardNumber, m.patient_code AS patientCode, t.type, t.detail, t.amount, t.payment_method AS paymentMethod, t.balance_after AS balanceAfter, t.actor, t.created_at AS createdAt FROM member_transactions t LEFT JOIN members m ON m.member_number = t.member_number${where} ORDER BY t.created_at DESC, t.id DESC`).all(...params) as unknown as MemberTransactionRow[];
     rows.push(...txRows.map((row) => ({ ...row, kind: "tx" as const })));
   }
 
@@ -2208,6 +2316,8 @@ export function memberTransactions(db: SqliteDb, input: MemberTransactionsInput 
         id: 1_000_000 + request.id,
         memberNumber: request.memberNumber,
         memberName: request.memberName,
+        cardNumber: null as null,
+        patientCode: null as null,
         type: "limit_request" as const,
         kind: "limit" as const,
         detail: `ขอลดวงเงิน ${request.currentLimit != null ? `จาก ${money(request.currentLimit)}` : "จากไม่จำกัด"} เหลือ ${money(request.requestedLimit)}${request.reason ? ` · เหตุผล: ${request.reason}` : ""}`,
@@ -2225,6 +2335,133 @@ export function memberTransactions(db: SqliteDb, input: MemberTransactionsInput 
   }
   rows.sort((a, b) => (a.createdAt === b.createdAt ? b.id - a.id : a.createdAt < b.createdAt ? 1 : -1));
   return rows.slice(0, limit);
+}
+
+// --- ROUND 65 (user): รายงานยอดเงินในบัตรสมาชิก --------------------------------
+// ตรงกับชีทโรงพยาบาล "รายงานแสดงยอดเงินในบัตรเงินสด": รหัสบัตร · ยอดทั้งหมด (เงินเข้า
+// รวมเปิดใช้บัตร+เติมเงิน) · ยอดจ่าย (ใช้ซื้อ+ถอน+คืนบัตร) · คงเหลือ · วันที่เปิดใช้บัตร ·
+// รหัสผู้ป่วย · ชื่อผู้ป่วย ---------------------------------------------------------
+
+export type MemberBalanceRow = {
+  id: number;
+  memberNumber: string;
+  cardNumber: string | null;
+  patientCode: string | null;
+  prename: string | null;
+  firstName: string;
+  lastName: string;
+  type: string;
+  status: "active" | "suspended";
+  /** วันที่เปิดใช้บัตร = วันที่ลงทะเบียนสมาชิกในระบบ */
+  createdAt: string;
+  /** ยอดทั้งหมด (บาท) — เงินเข้ารวมทุกช่องทาง: เปิดใช้บัตร + เติมเงิน */
+  totalIn: number;
+  /** ยอดจ่าย (บาท) — ใช้ซื้อสินค้า + ถอน + คืนบัตรเงินสด (ค่าบวก) */
+  totalOut: number;
+  /** คงเหลือ (บาท) = ยอดคงเหลือในบัญชีสมาชิกขณะนี้ */
+  balance: number;
+};
+
+export type MemberBalancesInput = { search?: string };
+
+/**
+ * ROUND 65 — รายงาน "ยอดเงินในบัตร" ทุกใบในระบบ (ยอดทั้งหมด/ยอดจ่าย/คงเหลือ
+ * คำนวณจาก member_transactions ทั้งหมด) · เรียงตามหมายเลขสมาชิก · ค้นหาได้จาก
+ * ชื่อ/เลขสมาชิก/รหัสบัตร/รหัสผู้ป่วย
+ */
+export function memberBalances(db: SqliteDb, input: MemberBalancesInput = {}): MemberBalanceRow[] {
+  const search = input.search?.trim();
+  const where = search
+    ? ` WHERE (m.first_name || ' ' || m.last_name || ' ' || m.member_number || ' ' || COALESCE(m.card_number, '') || ' ' || COALESCE(m.patient_code, '')) LIKE ?`
+    : "";
+  const params = search ? [`%${search}%`] : [];
+  return db.prepare(`
+    SELECT m.id, m.member_number AS memberNumber, m.card_number AS cardNumber, m.patient_code AS patientCode,
+      m.prename, m.first_name AS firstName, m.last_name AS lastName, m.type, m.status,
+      m.created_at AS createdAt, m.balance,
+      ROUND(COALESCE(SUM(CASE WHEN t.type IN ('deposit', 'activation') THEN t.amount END), 0), 2) AS totalIn,
+      ROUND(COALESCE(SUM(CASE WHEN t.type IN ('purchase', 'withdrawal', 'refund') THEN -t.amount END), 0), 2) AS totalOut
+    FROM members m
+    LEFT JOIN member_transactions t ON t.member_number = m.member_number
+    ${where}
+    GROUP BY m.id
+    ORDER BY m.member_number
+  `).all(...params) as unknown as MemberBalanceRow[];
+}
+
+// --- ROUND 65 (user): รายงานสินค้าคงคลังแบบมีช่วงเวลา ---------------------------
+// ตรงกับชีทโรงพยาบาล "รายงานสินค้าคงคลัง": รหัสสินค้า · ชื่อสินค้า · ยอดยกมา ·
+// ยอดขาย · คงเหลือ — ยอดยกมาคำนวณย้อนกลับจากสต็อกปัจจุบัน (ยกมา = ปัจจุบัน +
+// ที่ขายในช่วง − ที่รับเข้าในช่วง) --------------------------------------------------
+
+export type StockBalanceRow = {
+  productId: number;
+  /** รหัสสินค้า — บาร์โค้ดถ้ามี ไม่มีก็ใช้ SKU */
+  code: string;
+  sku: string;
+  barcode: string | null;
+  name: string;
+  unit: string;
+  category: string;
+  active: number;
+  /** จำนวนยกมาต้นช่วง */
+  opening: number;
+  /** จำนวนที่ขายออกในช่วง */
+  sold: number;
+  /** จำนวนที่รับเข้าในช่วง */
+  received: number;
+  /** จำนวนคงเหลือปัจจุบัน */
+  remaining: number;
+};
+
+export type StockBalanceInput = { from?: string; to?: string; search?: string };
+
+export function stockBalanceReport(db: SqliteDb, input: StockBalanceInput = {}): StockBalanceRow[] {
+  const fromDate = input.from && ISO_DATE_ONLY.test(input.from) ? input.from : formatDate(addDays(new Date(), -6));
+  const rawTo = input.to && ISO_DATE_ONLY.test(input.to) ? input.to : formatDate(new Date());
+  const toDate = rawTo < fromDate ? fromDate : rawTo;
+  const since = `${fromDate} 00:00:00`;
+  const until = `${toDate} 23:59:59`;
+  // ยอดยกมา (จำนวนต้นช่วง) ต้องคิดจาก "ทุกอย่างที่เกิดหลังจากต้นช่วงจนถึงปัจจุบัน" เสมอ
+  // เพราะคงเหลือคือสต็อกปัจจุบัน — ถ้าเลือก "ถึง" ย้อนหลัง ยอดขายหลังจากนั้นก็ยัง
+  // ถูกหักออกจากสต็อกจริง จึงต้องบวกกลับให้ครบถึงวันนี้ (ยอดขายคอลัมน์แสดงตามช่วง)
+  const sinceNow = `${formatDate(new Date())} 23:59:59`;
+
+  const soldByProduct = new Map<number, number>();
+  for (const row of db.prepare(`SELECT si.product_id AS productId, COALESCE(SUM(si.qty), 0) AS qty FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE si.product_id IS NOT NULL AND s.created_at >= ? AND s.created_at <= ? GROUP BY si.product_id`).all(since, until) as unknown as { productId: number; qty: number }[]) {
+    soldByProduct.set(row.productId, Number(row.qty));
+  }
+  const soldSinceStart = new Map<number, number>();
+  for (const row of db.prepare(`SELECT si.product_id AS productId, COALESCE(SUM(si.qty), 0) AS qty FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE si.product_id IS NOT NULL AND s.created_at >= ? AND s.created_at <= ? GROUP BY si.product_id`).all(since, sinceNow) as unknown as { productId: number; qty: number }[]) {
+    soldSinceStart.set(row.productId, Number(row.qty));
+  }
+  const receivedByProduct = new Map<number, number>();
+  for (const row of db.prepare(`SELECT product_id AS productId, COALESCE(SUM(COALESCE(received_qty, qty)), 0) AS qty FROM stock_lots WHERE received_at >= ? AND received_at <= ? GROUP BY product_id`).all(since, sinceNow) as unknown as { productId: number; qty: number }[]) {
+    receivedByProduct.set(row.productId, Number(row.qty));
+  }
+
+  const search = input.search?.trim();
+  const where = search ? ` WHERE (name LIKE ? OR sku LIKE ? OR COALESCE(barcode, '') LIKE ?)` : "";
+  const params = search ? [`%${search}%`, `%${search}%`, `%${search}%`] : [];
+  const products = db.prepare(`SELECT id, sku, barcode, name, unit, category, stock, active FROM products${where} ORDER BY id`).all(...params) as unknown as { id: number; sku: string; barcode: string | null; name: string; unit: string; category: string; stock: number; active: number }[];
+  return products.map((product) => {
+    const sold = soldByProduct.get(product.id) ?? 0;
+    const received = receivedByProduct.get(product.id) ?? 0;
+    return {
+      productId: product.id,
+      code: product.barcode ?? product.sku,
+      sku: product.sku,
+      barcode: product.barcode,
+      name: product.name,
+      unit: product.unit,
+      category: product.category,
+      active: product.active,
+      opening: product.stock + (soldSinceStart.get(product.id) ?? 0) - received,
+      sold,
+      received,
+      remaining: product.stock,
+    };
+  });
 }
 
 export function dashboardStats(db: SqliteDb, rangeDays = 30): DashboardStats {
@@ -3267,17 +3504,17 @@ export function seedWelfareStoreData(db: SqliteDb) {
       if (info.changes > 0) {
         const created = db.prepare(`SELECT id FROM products WHERE sku = ?`).get(product.sku) as { id: number } | undefined;
         if (created) {
-          db.prepare(`INSERT INTO stock_lots (product_id, lot, expiry_date, qty, cost, received_at) VALUES (?, ?, ?, ?, ?, ?)`)
-            .run(created.id, `TEST-${product.sku}`, null, product.stock, product.cost, new Date().toISOString().slice(0, 19).replace("T", " "));
+          db.prepare(`INSERT INTO stock_lots (product_id, lot, expiry_date, qty, cost, received_at, received_qty) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+            .run(created.id, `TEST-${product.sku}`, null, product.stock, product.cost, new Date().toISOString().slice(0, 19).replace("T", " "), product.stock);
         }
       }
     }
   }
   if (countRows(db, "stock_lots") === 0) {
-    const insertLot = db.prepare(`INSERT INTO stock_lots (product_id, lot, expiry_date, qty, cost, received_at) VALUES (?, ?, ?, ?, ?, ?)`);
+    const insertLot = db.prepare(`INSERT INTO stock_lots (product_id, lot, expiry_date, qty, cost, received_at, received_qty) VALUES (?, ?, ?, ?, ?, ?, ?)`);
     for (const lot of SEED_STOCK_LOTS) {
       const product = db.prepare(`SELECT id FROM products WHERE sku = ?`).get(lot.sku) as { id: number } | undefined;
-      if (product) insertLot.run(product.id, lot.lot, lot.expiry, lot.qty, lot.cost, lot.receivedAt);
+      if (product) insertLot.run(product.id, lot.lot, lot.expiry, lot.qty, lot.cost, lot.receivedAt, lot.qty);
     }
   }
   if (countRows(db, "sales") === 0) {

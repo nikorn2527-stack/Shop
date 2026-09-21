@@ -22,6 +22,9 @@ export const WALLET_TX_META: Record<string, { label: string; tone: string }> = {
   purchase: { label: "ซื้อสินค้า", tone: "blue" },
   deposit: { label: "เติมเงิน", tone: "green" },
   withdrawal: { label: "ถอนเงิน", tone: "purple" },
+  // ROUND 65 — ประเภทใหม่ตามรายงานโรงพยาบาล (เปิดใช้บัตร / คืนบัตรเงินสด)
+  activation: { label: "เปิดใช้บัตร", tone: "green" },
+  refund: { label: "คืนบัตรเงินสด", tone: "amber" },
 };
 
 const THAI_SHORT_MONTHS = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];

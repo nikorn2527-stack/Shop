@@ -25,6 +25,9 @@ export type MemberCardData = {
   gender?: string | null;
   /** ROUND 34 — วงเงินซื้อต่อวัน (ชำระหักบัญชี) แสดงเฉพาะโหมดยืนยัน */
   creditLimit?: number | null;
+  /** ROUND 65 — รหัสบัตรเงินสด / รหัสผู้ป่วย (HN) — แสดงบนบัตรเมื่อมีข้อมูล */
+  cardNumber?: string | null;
+  patientCode?: string | null;
 };
 
 /** "2026-09-18 14:42:33" → "18 ก.ย. 2569" */
@@ -133,7 +136,7 @@ export function MemberCardModal({
           </div>
           <div className="member-card-identity">
             <div className={`member-card-name${nameFit}`}>{displayName}</div>
-            <div className="member-card-number">{member.memberNumber}</div>
+            <div className="member-card-number">{member.memberNumber}</div>{member.cardNumber ? <div className="member-card-patient">{`บัตร ${member.cardNumber}${member.patientCode ? ` · HN ${member.patientCode}` : ""}`}</div> : null}
             <div className="member-card-meta">
               {member.createdAt ? <span>สมาชิกตั้งแต่ {formatCardDate(member.createdAt)}</span> : <span className="now">พร้อมใช้จ่ายที่เคาน์เตอร์</span>}
               <span className={member.status === "active" ? "ok" : "suspended"}>{member.status === "active" ? "ใช้จ่ายได้ปกติ" : "ระงับการใช้จ่าย"}</span>

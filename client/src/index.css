@@ -4782,3 +4782,43 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
   .bulk-summary { width: 100%; }
   .bulk-actions .primary-button { flex: 1 1 auto; }
 }
+
+/* ============================= ROUND 65 (user) =============================
+ * รายงานตามชีทโรงพยาบาล: แท็บยอดเงินในบัตร + สินค้าคงคลัง · รหัสบัตร/รหัสผู้ป่วย
+ * ปุ่มคืนบัตรเงินสด · สรุปธุรกรรม 6 การ์ด · บัตรสมาชิกแสดงรหัสบัตร/HN
+ * ========================================================================== */
+
+/* สรุปธุรกรรม 6 การ์ด — 3 คอลัมน์บนจอกว้าง แทน 4 */
+.tx-summary-cards.six { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+@media (max-width: 920px) {
+  .tx-summary-cards.six { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 620px) {
+  .tx-summary-cards.six { grid-template-columns: 1fr; }
+}
+
+/* ไอคอนประวัติรายการสมาชิก: คืนบัตรเงินสด (ส้ม) และสถานะแดงกันพลาด */
+.history-icon.amber { color: #b8863d; background: #fdf4e7; }
+.history-icon.red { color: #c16b6e; background: #fdf0f0; }
+
+/* ปุ่ม "คืนบัตรเงินสด" ที่หน้ารายละเอียดสมาชิก — เด่นกว่าปุ่มธรรมดา เตือนว่าจ่ายเงินคืน */
+.refund-card-button { border-color: #ecd9ae !important; background: #fffaf0 !important; color: #9a7431 !important; }
+.refund-card-button:hover { background: #fdf3dd !important; }
+
+/* ตารางรายงานใหม่: เลขลำดับ/รหัสเป็น mono เท่ากันทั้งคอลัมน์ */
+.balances-table td.cell-mono, .stock-balance-table td.cell-mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+.balances-table tbody tr.row-muted { opacity: .55; }
+.balances-table td.cell-mono strong, .stock-balance-table td.cell-mono strong { font-weight: 600; }
+
+/* รายชื่อสมาชิก: บรรทัดรหัสบัตรใต้เลขสมาชิก */
+.cell-mono-line { display: block; margin-top: 3px; font-size: 9px; color: #9aa093; font-family: "IBM Plex Mono", ui-monospace, monospace; }
+
+/* บัตรสมาชิก: บรรทัดรหัสบัตร/HN ใต้เลขสมาชิก */
+.member-card-patient { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 11px; color: #4f8a75; margin-top: 3px; letter-spacing: .4px; }
+
+/* หัวรายละเอียดสมาชิก: บรรทัดรหัสบัตร/ผู้ป่วย อ่านง่ายขึ้น */
+.member-detail-profile p b.cell-mono { color: #5f8272; font-weight: 600; }
+.report-range-note { color: #8a8f7f; font-size: 10.5px; }
+/* ROUND 65 — ช่องวันที่กำหนดเองของแท็บสินค้าคงคลัง (ใช้สไตล์เดียวกับแท็บยอดขาย) */
+.report-range-row .report-custom-range { display: flex; align-items: center; gap: 7px; }
+.report-range-row .report-custom-range .range-sep { color: #9aa093; }
