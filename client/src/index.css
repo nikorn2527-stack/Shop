@@ -1235,7 +1235,7 @@ td small { font-size: 11px; }
 .statement-hint { display: inline-flex; align-items: center; gap: 5px; margin-right: auto; color: #747965; font-size: 11px; }
 
 /* (2) The paper — A4 proportions on screen (210:297), real A4 in print */
-.statement-paper { width: 100%; max-width: 660px; background: #fff; border: 1px solid #d3e0da; box-shadow: 0 12px 30px rgba(40, 70, 58, .14); padding: 26px 28px 22px; color: #33473f; font-size: 11px; }
+.statement-paper { width: 100%; max-width: 660px; background: #fff; border: 1px solid #d3e0da; box-shadow: 0 12px 30px rgba(40, 70, 58, .14); padding: 26px 28px 22px; color: #33473f; font-size: 12px; }
 
 .statement-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding-bottom: 12px; border-bottom: 2px solid #2d8a6c; }
 .statement-brand { display: flex; gap: 9px; align-items: center; }
@@ -1261,32 +1261,32 @@ td small { font-size: 11px; }
 .statement-summary .st-out { color: #a06bc9; }
 .statement-summary .st-buy { color: #b8863d; }
 
-.statement-table { width: 100%; border-collapse: collapse; font-size: 11px; table-layout: fixed; min-width: 0; }
-.statement-table th { text-align: left; color: #f2f7f5; background: #2d8a6c; font-weight: 600; font-size: 10.5px; padding: 7px 9px; }
+.statement-table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; min-width: 0; }
+.statement-table th { text-align: left; color: #f2f7f5; background: #2d8a6c; font-weight: 700; font-size: 11.5px; padding: 7px 9px; }
 .statement-table th:first-child { border-radius: 6px 0 0 0; }
 .statement-table th:last-child { border-radius: 0 6px 0 0; }
-.statement-table td { padding: 6.5px 9px; border-bottom: 1px solid #edf3f0; color: #626752; vertical-align: top; }
+.statement-table td { padding: 6.5px 9px; border-bottom: 1px solid #edf3f0; color: #4d5442; font-weight: 500; vertical-align: top; }
 .statement-table tr:nth-child(even) td { background: #f9fcfa; }
 .statement-table .st-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
-.statement-table .st-strong { color: #2d5a49; font-weight: 600; }
+.statement-table .st-strong { color: #2d5a49; font-weight: 700; }
 .statement-table .st-time { white-space: nowrap; color: #646859; font-family: "IBM Plex Mono", monospace; font-size: 10px; }
 .statement-table .st-detail { color: #7b806d; }
-.statement-table .st-in { color: #3d8f71; font-weight: 600; }
-.statement-table .st-out { color: #c26568; font-weight: 600; }
+.statement-table .st-in { color: #3d8f71; font-weight: 700; }
+.statement-table .st-out { color: #c26568; font-weight: 700; }
 .statement-table .st-type { display: inline-block; padding: 2px 7px; border-radius: 12px; font-size: 10px; white-space: nowrap; }
 .statement-table .st-type.green { color: #3d8f71; background: #e9f6f0; }
 .statement-table .st-type.blue { color: #5d91b5; background: #edf6fb; }
 .statement-table .st-type.purple { color: #8870af; background: #f3edfb; }
 .statement-table .st-empty { text-align: center; color: #797e69; padding: 22px 0; }
 
-.statement-note { margin-top: 9px; color: #656a58; font-size: 10.5px; }
+.statement-note { margin-top: 9px; color: #5c614f; font-size: 11px; font-weight: 500; }
 
 .statement-sign { display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px; margin-top: 26px; }
 .statement-sign > div { text-align: center; }
 .statement-sign span { display: block; color: #7b806d; font-size: 11px; margin-bottom: 34px; }
 .statement-sign i { display: block; border-top: 1px dotted #aeb49d; }
 
-.statement-foot { margin-top: 16px; padding-top: 9px; border-top: 1px solid #e7efeb; color: #848b70; font-size: 9.5px; text-align: center; }
+.statement-foot { margin-top: 16px; padding-top: 9px; border-top: 1px solid #e7efeb; color: #747b66; font-size: 10.5px; text-align: center; }
 
 /* (3) Phones — the paper stays readable, member grid stacks */
 @media (max-width: 560px) {
@@ -1323,7 +1323,7 @@ td small { font-size: 11px; }
   body:has(#member-statement) .modal-heading,
   body:has(#member-statement) .statement-actions { display: none !important; }
   body:has(#member-statement) .statement-stage { background: none; border: 0; padding: 0; border-radius: 0; }
-  body:has(#member-statement) .statement-paper { width: 100%; max-width: none; border: 0; box-shadow: none; padding: 6mm 4mm; font-size: 11.5px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body:has(#member-statement) .statement-paper { width: 100%; max-width: none; border: 0; box-shadow: none; padding: 6mm 4mm; font-size: 13px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body:has(#member-statement) .statement-member { grid-template-columns: repeat(3, 1fr); }
   body:has(#member-statement) .statement-summary { grid-template-columns: repeat(4, 1fr); }
 }
@@ -3180,29 +3180,29 @@ th { font-weight: 600; }
 .tx-date-range .thai-date-picker:last-child .thai-date-pop { left: auto; right: 0; }
 
 /* --- ROUND 31-10 : เอกสารรายงาน A4 (ออกจอ ใช้เฉพาะตอนจับภาพ) --------- */
-.report-doc { width: 794px; min-height: 1123px; background: #ffffff; color: #26312b; font-family: "Sarabun", "Leelawadee UI", Tahoma, sans-serif; padding: 46px 50px 40px; display: flex; flex-direction: column; box-sizing: border-box; }
-.rd-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding-bottom: 14px; border-bottom: 2.5px solid #2f7c5f; }
+.report-doc { width: 794px; min-height: 1123px; background: #ffffff; color: #26312b; font-family: "Sarabun", "Leelawadee UI", Tahoma, sans-serif; padding: 40px 44px 34px; display: flex; flex-direction: column; box-sizing: border-box; }
+.rd-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding-bottom: 13px; border-bottom: 2.5px solid #2f7c5f; }
 .rd-brand { display: flex; align-items: center; gap: 11px; }
-.rd-brand img { width: 44px; height: 44px; object-fit: contain; border-radius: 10px; }
-.rd-mark { width: 44px; height: 44px; display: grid; place-items: center; background: #2f7c5f; color: #fff; border-radius: 10px; font-size: 20px; font-weight: 700; }
-.rd-brand b { display: block; font-size: 17px; color: #1f3a2e; }
-.rd-brand small { display: block; color: #6d7a6d; font-size: 10.5px; margin-top: 1px; }
-.rd-stamp { color: #7c857c; font-size: 10px; text-align: right; }
-.rd-title { margin-top: 22px; }
-.rd-title h1 { margin: 0; font-size: 21px; color: #1f3a2e; letter-spacing: .2px; }
-.rd-title p { margin: 6px 0 0; color: #5d6a5f; font-size: 11.5px; }
-.rd-meta { display: flex; flex-wrap: wrap; gap: 8px 26px; margin-top: 14px; padding: 11px 14px; background: #f3f8f5; border: 1px solid #dcebe2; border-radius: 8px; }
+.rd-brand img { width: 46px; height: 46px; object-fit: contain; border-radius: 10px; }
+.rd-mark { width: 46px; height: 46px; display: grid; place-items: center; background: #2f7c5f; color: #fff; border-radius: 10px; font-size: 22px; font-weight: 700; }
+.rd-brand b { display: block; font-size: 19px; font-weight: 700; color: #1f3a2e; }
+.rd-brand small { display: block; color: #6d7a6d; font-size: 11.5px; margin-top: 1px; }
+.rd-stamp { color: #66705f; font-size: 11.5px; text-align: right; }
+.rd-title { margin-top: 20px; }
+.rd-title h1 { margin: 0; font-size: 25px; font-weight: 800; color: #1f3a2e; letter-spacing: .2px; }
+.rd-title p { margin: 6px 0 0; color: #556158; font-size: 13px; font-weight: 500; }
+.rd-meta { display: flex; flex-wrap: wrap; gap: 8px 26px; margin-top: 13px; padding: 11px 14px; background: #f3f8f5; border: 1px solid #dcebe2; border-radius: 8px; }
 .rd-meta > div { display: flex; gap: 7px; align-items: baseline; }
-.rd-meta span { color: #6d7a6d; font-size: 10.5px; }
-.rd-meta b { color: #273930; font-size: 11.5px; font-variant-numeric: tabular-nums; }
-.rd-table { width: 100%; border-collapse: collapse; margin-top: 18px; font-size: 10.5px; }
-.rd-table th { background: #2f7c5f; color: #fff; font-weight: 600; text-align: left; padding: 8px 10px; font-size: 10.5px; }
-.rd-table td { padding: 7.5px 10px; border-bottom: 1px solid #e4ece7; color: #33403a; font-variant-numeric: tabular-nums; }
+.rd-meta span { color: #66705f; font-size: 12px; }
+.rd-meta b { color: #273930; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rd-table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 13px; line-height: 1.45; }
+.rd-table th { background: #2f7c5f; color: #fff; font-weight: 700; text-align: left; padding: 8px 9px; font-size: 12.5px; }
+.rd-table td { padding: 7px 9px; font-weight: 500; border-bottom: 1px solid #e4ece7; color: #2d3a32; font-variant-numeric: tabular-nums; }
 .rd-table tbody tr:nth-child(even) td { background: #f8fbf9; }
 .rd-table td.num, .rd-table th.num { text-align: right; }
 .rd-table tfoot td { background: #e7f2ec !important; border-top: 2px solid #2f7c5f; border-bottom: 0; font-weight: 700; color: #1f3a2e; }
-.rd-note { margin-top: 12px; color: #6d7a6d; font-size: 9.5px; line-height: 1.55; }
-.rd-foot { margin-top: auto; padding-top: 22px; color: #8a948a; font-size: 9px; border-top: 1px dashed #d8e2da; margin-top: 22px; display: flex; justify-content: space-between; }
+.rd-note { margin-top: 12px; color: #5f6b5f; font-size: 11px; line-height: 1.55; font-weight: 500; }
+.rd-foot { margin-top: auto; padding-top: 20px; color: #79837a; font-size: 10.5px; border-top: 1px dashed #d8e2da; display: flex; justify-content: space-between; }
 
 /* ═══ ROUND 32 — POS พิมพ์จำนวนตรงๆ + ปุ่มลัดครบ F1-F8 + สมาชิกใหม่ที่ POS + รายงาน/สต็อก/ค้นหาฉลาด ═══ */
 
@@ -3950,9 +3950,9 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 
 /* (3) ตาราง statement — กำหนดความกว้างคอลัมน์ตายตัว (หน้าจอ + พิมพ์)
        เวลา/ประเภท/จำนวนเงิน/ยอดคงเหลือ พอดี รายละเอียดยืดหยุ่น + ตัดคำได้ */
-.statement-table th:nth-child(1), .statement-table td.st-time { width: 104px; }
-.statement-table th:nth-child(2) { width: 72px; }
-.statement-table th:nth-child(4), .statement-table th:nth-child(5) { width: 80px; }
+.statement-table th:nth-child(1), .statement-table td.st-time { width: 118px; }
+.statement-table th:nth-child(2) { width: 76px; }
+.statement-table th:nth-child(4), .statement-table th:nth-child(5) { width: 86px; }
 .statement-table td.st-detail { overflow-wrap: anywhere; }
 .statement-table .st-type { max-width: 100%; box-sizing: border-box; }
 

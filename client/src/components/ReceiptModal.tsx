@@ -64,7 +64,7 @@ export function ReceiptModal({ receipt, onClose, onNewSale, onPrinted, mode = "n
     if (!element) return;
     setReceiptBusy(format);
     try {
-      const canvas = await html2canvas(element, { scale: 2, backgroundColor: "#ffffff" });
+      const canvas = await html2canvas(element, { scale: 2.5, backgroundColor: "#ffffff" });
       const filename = `${receipt.orderNumber}.${format === "pdf" ? "pdf" : "png"}`;
       if (format === "image") {
         const link = document.createElement("a");
@@ -72,8 +72,14 @@ export function ReceiptModal({ receipt, onClose, onNewSale, onPrinted, mode = "n
         link.href = canvas.toDataURL("image/png");
         link.click();
       } else {
-        const pdf = new jsPDF({ orientation: "portrait", unit: "px", format: [canvas.width, canvas.height] });
-        pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, canvas.width, canvas.height);
+        // ROUND 73 — เดิมตั้งหน้ากระดาษด้วยหน่วย px เท่า canvas (scale 2 → หน้ากว้าง
+        // 8 นิ้วกว่า) พอพิมพ์ลงกระดาษจริงตัวอักษรถูกย่อ ~50% เล็กและบางผิดปกติ
+        // ตอนนี้ยึดความกว้างกระดาษต่อเนื่อง 80 มม. (226.77pt) — สลิปออกมาขนาด
+        // พอดีกับหัวระบาย 58–80 มม. ที่ร้านใช้ ตัวอักษรคมชัดระดับ 240 DPI
+        const WIDTH_MM = 80;
+        const pageHeightMm = (canvas.height / canvas.width) * WIDTH_MM;
+        const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: [WIDTH_MM, pageHeightMm] });
+        pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, WIDTH_MM, pageHeightMm);
         pdf.save(filename);
       }
     } finally { setReceiptBusy(""); }

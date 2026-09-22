@@ -114,31 +114,65 @@ function escapeHtml(value: string) {
 
 /** สร้างและดาวน์โหลด PDF จากข้อมูลที่เลือก — แบ่งหน้า A4 ให้อัตโนมัติ */
 export async function downloadReportPdf(config: ReportDocConfig) {
-  const rowsPerPage = 26;
-  const chunks: string[][][] = [];
-  for (let index = 0; index < config.rows.length; index += rowsPerPage) chunks.push(config.rows.slice(index, index + rowsPerPage));
-  if (chunks.length === 0) chunks.push([]);
+  // ROUND 73 — ตัวอักษรในไฟล์ PDF เล็ก+บางผิดปกติ ต้นเหตุคือหน้ากระดาษ:
+  // เดิมสร้างหน้าด้วยหน่วย px ขนาดเท่า canvas (scale 2 → กว้าง 1588px = กระดาษจริง
+  // 16.5 นิ้ว!) พอพิมพ์/ดูบน A4 ทั้งหน้าถูกย่อ ~50% ตัวหนังสือ 10.5px เลยเหลือแค่ ~4pt
+  // แก้ 3 ชั้น: (1) ยึดความกว้าง A4 จริง 595.28pt ทุกหน้า (794 CSS px = 595pt พอดี A4)
+  // (2) เพิ่มขนาด/ความหนาฟอนต์ .rd-* ให้อ่านชัดแบบเอกสารราชการไทย (3) จัดหน้าแบบ
+  // วัดจริง — ใส่แถวทีละแถวจนพอดีความสูง A4 (แถวชื่อยาว wrap 2 บรรทัดก็ไม่ล้น)
+  // ไม่ใช่ตัดเป็นก้อนแถวเท่ากันทุกหน้าแบบเดิม ที่ทำให้หน้าสูงกว่า A4 แล้วโดนย่อตอนพิมพ์
+  // A4 สูง 297mm = 1122.5 CSS px @96dpi — หน้าเปล่าถูก min-height 1123 ดันไว้
+  // พอดี (เท้ากระดาษเกาะก้นหน้า) ขีดจำกัดจึงต้องเท่ากับ 1123 ไม่ใช่ต่ำกว่า
+  // ไม่งั้นทุกหน้า (แม้หน้าเปล่า) จะถูกวัดว่า "ล้น" แล้วหดเหลือแถวเดียวต่อหน้า
+  const PAGE_HEIGHT_LIMIT = 1123;
+  const MAX_ROWS_PER_PAGE = 30;
   const stage = document.createElement("div");
   stage.style.position = "fixed";
   stage.style.left = "-10000px";
   stage.style.top = "0";
   stage.style.background = "#ffffff";
   document.body.appendChild(stage);
+  /** วัดหน้าจริงบน DOM: ถ้าเกินความสูง A4 ตัดแถวท้ายออกทีละแถวจนพอดี */
+  const fitRows = (rows: string[][]): string[][] => {
+    let current = rows;
+    for (;;) {
+      const probe = buildPage(config, current, 0, 1);
+      stage.appendChild(probe);
+      const fits = probe.scrollHeight <= PAGE_HEIGHT_LIMIT;
+      stage.removeChild(probe);
+      if (fits || current.length <= 1) return current;
+      current = current.slice(0, current.length - 1);
+    }
+  };
   try {
+    // ผ่านแรก — แบ่งหน้าตามความสูงจริง (ยังไม่วาดภาพ เร็ว) เพื่อนับจำนวนหน้า
+    // สำหรับเขียน "หน้า x / y" ให้ถูกต้องในผ่านที่สอง
+    const pages: string[][][] = [];
+    let rest = config.rows.slice();
+    while (rest.length > 0) {
+      const fitted = fitRows(rest.slice(0, MAX_ROWS_PER_PAGE));
+      pages.push(fitted);
+      rest = rest.slice(fitted.length);
+    }
+    if (pages.length === 0) pages.push([]);
     const canvases: HTMLCanvasElement[] = [];
-    for (let pageIndex = 0; pageIndex < chunks.length; pageIndex += 1) {
-      const page = buildPage(config, chunks[pageIndex], pageIndex, chunks.length);
+    for (let pageIndex = 0; pageIndex < pages.length; pageIndex += 1) {
+      const page = buildPage(config, pages[pageIndex], pageIndex, pages.length);
       stage.appendChild(page);
       // eslint-disable-next-line no-await-in-loop
-      const canvas = await html2canvas(page, { scale: 2, backgroundColor: "#ffffff" });
+      const canvas = await html2canvas(page, { scale: 2.5, backgroundColor: "#ffffff" });
       canvases.push(canvas);
       stage.removeChild(page);
     }
     const first = canvases[0];
-    const pdf = new jsPDF({ orientation: "portrait", unit: "px", format: [first.width, first.height], compress: true });
+    // ความกว้าง A4 (595.28pt) เป็นตัวยึดทุกหน้า — หน้าไหนแถวเดี่ยวสูงมากจริง ๆ
+    // (ข้อความยาวหลายบรรทัดในแถวเดียว) สูงขึ้นเท่าที่จำเป็น ไม่มีอะไรโดนตัด
+    const A4_WIDTH_PT = 595.28;
+    const pdf = new jsPDF({ orientation: "portrait", unit: "pt", format: [A4_WIDTH_PT, (first.height / first.width) * A4_WIDTH_PT], compress: true });
     canvases.forEach((canvas, index) => {
-      if (index > 0) pdf.addPage([canvas.width, canvas.height], "portrait");
-      pdf.addImage(canvas.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, canvas.width, canvas.height);
+      const pageHeight = (canvas.height / canvas.width) * A4_WIDTH_PT;
+      if (index > 0) pdf.addPage([A4_WIDTH_PT, pageHeight], "portrait");
+      pdf.addImage(canvas.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, A4_WIDTH_PT, pageHeight);
     });
     pdf.save(config.fileName.endsWith(".pdf") ? config.fileName : `${config.fileName}.pdf`);
   } finally {
@@ -169,26 +203,26 @@ export function printReportDoc(config: ReportDocConfig) {
   * { box-sizing: border-box; }
   body { margin: 0; font-family: "Sarabun", "TH Sarabun New", "Leelawadee UI", Tahoma, sans-serif; color: #26251f; background: #fff; }
   .doc { padding: 4px 2px; }
-  .rd-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #0d7a55; padding-bottom: 8px; }
-  .rd-brand { display: flex; align-items: center; gap: 9px; }
-  .rd-brand img { width: 38px; height: 38px; object-fit: contain; border-radius: 9px; }
-  .rd-mark { width: 38px; height: 38px; border-radius: 9px; background: #0d7a55; color: #fff; display: grid; place-items: center; font-size: 19px; font-weight: 700; }
-  .rd-brand b { font-size: 14px; }
-  .rd-brand small { display: block; color: #6f7466; font-size: 10px; }
-  .rd-stamp { font-size: 10px; color: #6f7466; text-align: right; }
-  h1 { font-size: 17px; margin: 12px 0 2px; }
-  .rd-title p { margin: 0 0 8px; color: #5c6156; font-size: 11px; }
-  .rd-meta { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 6px 0 10px; }
-  .meta-item { font-size: 11px; color: #5c6156; }
-  .meta-item b { color: #26251f; margin-left: 5px; }
-  table { width: 100%; border-collapse: collapse; font-size: 10.5px; }
-  th { background: #0d7a55; color: #fff; text-align: left; padding: 6px 7px; white-space: nowrap; }
+  .rd-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 2.5px solid #0d7a55; padding-bottom: 9px; }
+  .rd-brand { display: flex; align-items: center; gap: 10px; }
+  .rd-brand img { width: 42px; height: 42px; object-fit: contain; border-radius: 9px; }
+  .rd-mark { width: 42px; height: 42px; border-radius: 9px; background: #0d7a55; color: #fff; display: grid; place-items: center; font-size: 21px; font-weight: 700; }
+  .rd-brand b { font-size: 16px; }
+  .rd-brand small { display: block; color: #6f7466; font-size: 11px; }
+  .rd-stamp { font-size: 11px; color: #6f7466; text-align: right; }
+  h1 { font-size: 22px; font-weight: 800; margin: 14px 0 3px; }
+  .rd-title p { margin: 0 0 9px; color: #5c6156; font-size: 12.5px; }
+  .rd-meta { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 7px 0 11px; }
+  .meta-item { font-size: 12px; color: #5c6156; }
+  .meta-item b { color: #26251f; font-weight: 700; margin-left: 5px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th { background: #0d7a55; color: #fff; font-weight: 700; text-align: left; padding: 7px 8px; white-space: nowrap; }
   th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
-  td { padding: 5px 7px; border-bottom: 1px solid #e6e9e2; }
+  td { padding: 6px 8px; font-weight: 500; border-bottom: 1px solid #e6e9e2; }
   tbody tr:nth-child(even) { background: #f7faf8; }
   tfoot td { font-weight: 700; background: #ecf5ef; border-top: 2px solid #0d7a55; }
-  .rd-note { margin-top: 8px; font-size: 10px; color: #6f7466; }
-  .rd-foot { margin-top: 14px; border-top: 1px solid #dfe4da; padding-top: 6px; font-size: 9.5px; color: #84897b; display: flex; justify-content: space-between; }
+  .rd-note { margin-top: 9px; font-size: 11px; color: #6f7466; }
+  .rd-foot { margin-top: 14px; border-top: 1px solid #dfe4da; padding-top: 7px; font-size: 10px; color: #84897b; display: flex; justify-content: space-between; }
 </style></head>
 <body><div class="doc">
   <div class="rd-head">

@@ -739,8 +739,8 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
   };
   const payDisabled = cart.length === 0 || checkoutMutation.isPending;
   const idleStatus = cart.length === 0
-    ? "พร้อมรับรายการ · ยิงบาร์โค้ดที่ช่องด้านบน หรือกดสินค้าจากแผงด้านขวา · F6 สมาชิกใหม่"
-    : "ตรวจรายการแล้วกดชำระเงินด้านล่าง · F2 เติมเงิน · F3 ถอนเงิน · F4 รายการพิเศษ · F5 พักบิล · F8 สแกน";
+    ? "พร้อมรับรายการ · ยิงบาร์โค้ดที่ช่องด้านบน หรือกดสินค้าจากแผงด้านขวา · F6 สมาชิกใหม่ · F9 เมนูหลัก"
+    : "ตรวจรายการแล้วกดชำระเงินด้านล่าง · F2 เติมเงิน · F3 ถอนเงิน · F4 รายการพิเศษ · F5 พักบิล · F8 สแกน · F9 เมนูหลัก";
   // Parked bills persist on this device; announce the count so the Home rail
   // badge (⏸️) stays in sync with what POS is holding.
   useEffect(() => {
@@ -771,7 +771,7 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
     window.addEventListener("pos-rail", onRail);
     return () => window.removeEventListener("pos-rail", onRail);
   });
-  // F1–F8 — ปุ่มลัดครบทุกปุ่มบนราง (round 32-14): ลูกค้า/เติม/ถอน/พิเศษ/พักบิล/
+  // F1–F9 — ปุ่มลัดครบทุกปุ่มบนราง (round 32-14 + r73 F9): ลูกค้า/เติม/ถอน/พิเศษ/พักบิล/เมนู/
   // สมาชิกใหม่/จัดแผง/สแกน — Esc ค่อยๆ ถอยทีละขั้น
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -783,6 +783,7 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
       if (event.key === "F6") { event.preventDefault(); setRegisterOpen((open) => !open); return; }
       if (event.key === "F7") { event.preventDefault(); setQuickManageOpen((open) => !open); return; }
       if (event.key === "F8") { event.preventDefault(); focusScan(); return; }
+      if (event.key === "F9") { event.preventDefault(); if (!document.querySelector(".modal-backdrop")) window.dispatchEvent(new CustomEvent("pos-open-menu")); return; }
       if (event.key === "Escape" && !receiptOpen) {
         if (payConfirm) { setPayConfirm(null); return; }
         if (scanMember) { setScanMember(null); return; }
