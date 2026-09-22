@@ -745,6 +745,66 @@ export function createProduct(db: SqliteDb, input: CreateProductInput): SqlitePr
   return getProductById(db, Number(result.lastInsertRowid))!;
 }
 
+/**
+ * ROUND 77 (user) — รับเข้าสินค้า "ต้นทุนต่างกันแต่ละรอบ" ได้:
+ * สินค้าชนิดเดียวกัน รอบละราคาไม่เท่ากัน (เช่น รอบนี้ 10 ห่อ @฿200 แถมอีก 2 ห่อ)
+ * ต้นทุนที่ fix คงที่ใช้ไม่ได้ → ระบบเก็บเป็น "ต้นทุนถัวเฉลี่ย" (weighted average):
+ * ผสมมูลค่าของเดิมในคลังกับทุกบรรทัดที่รับเข้ารอบนี้ บรรทัดแถม (ต้นทุน ฿0) จะดึง
+ * ค่าเฉลี่ยลงให้เอง — รายงานกำไรจึงถูกต้องตามของจริงเสมอ
+ */
+export type ReceiveStockLine = { qty: number; cost?: number };
+
+export type ReceiveStockLotRow = { id: number; productId: number; lot: string; expiry: string | null; qty: number; cost: number; receivedAt: string };
+
+export type ReceiveStockResult = {
+  /** ทุกบรรทัดที่รับเข้ารอบนี้ (แต่ละบรรทัด = 1 stock_lot ใช้ Lot เดียวกัน) */
+  lots: ReceiveStockLotRow[];
+  /** บรรทัดแรก — ผู้เรียกแบบเดิม (บรรทัดเดียว) ยังอ่านได้ตามรูปเก่า */
+  lot: ReceiveStockLotRow;
+  product: SqliteProduct;
+  /** ต้นทุนถัวเฉลี่ยใหม่ที่เก็บในสินค้า (ของเดิมในคลัง + ทุกบรรทัดรอบนี้) */
+  averageCost: number;
+  /** ต้นทุนเฉลี่ยก่อนรับเข้ารอบนี้ */
+  previousCost: number;
+};
+
+export function receiveStockLines(
+  db: SqliteDb,
+  input: { productId: number; lot?: string; expiryDate?: string | null; lines: (ReceiveStockLine | null | undefined)[] | null | undefined; actor?: string; actorRole?: string },
+): ReceiveStockResult {
+  const lines = (input.lines ?? []).filter((line): line is ReceiveStockLine => line != null);
+  if (lines.length === 0) throw new StoreError("กรุณาระบุจำนวนที่รับเข้าอย่างน้อย 1 บรรทัด");
+  for (const line of lines) {
+    if (!Number.isInteger(line.qty) || line.qty <= 0) throw new StoreError("จำนวนต้องมากกว่า 0");
+    if (line.cost !== undefined && !(line.cost >= 0)) throw new StoreError("ต้นทุนต่อหน่วยต้องเป็นตัวเลข 0 ขึ้นไป");
+  }
+  const product = getProductById(db, input.productId);
+  if (!product || !product.active) throw new StoreError(`ไม่พบสินค้ารหัส ${input.productId} ในระบบ`);
+  const parsed = lines.map((line) => ({ qty: line.qty, cost: line.cost === undefined ? undefined : round2(line.cost) }));
+  const totalQty = parsed.reduce((sum, line) => sum + line.qty, 0);
+  const previousCost = product.cost;
+  // บรรทัดที่ไม่ใส่ต้นทุน = ใช้ต้นทุนเฉลี่ยปัจจุบันของสินค้า (พฤติกรรมเดิม)
+  const lineValue = parsed.reduce((sum, line) => sum + line.qty * (line.cost ?? previousCost), 0);
+  const oldQty = Math.max(0, Math.trunc(product.stock));
+  const averageCost = round2((oldQty * previousCost + lineValue) / (oldQty + totalQty));
+  const lotLabel = input.lot?.trim() || `LOT-${formatDate()}`;
+  const createdAt = formatDateTime();
+  return runInTransaction(db, () => {
+    const insert = db.prepare(`INSERT INTO stock_lots (product_id, lot, expiry_date, qty, cost, received_at, received_qty) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+    const lots = parsed.map((line) => {
+      const result = insert.run(input.productId, lotLabel, input.expiryDate || null, line.qty, line.cost ?? previousCost, createdAt, line.qty);
+      return { id: Number(result.lastInsertRowid), productId: input.productId, lot: lotLabel, expiry: input.expiryDate || null, qty: line.qty, cost: line.cost ?? previousCost, receivedAt: createdAt };
+    });
+    db.prepare(`UPDATE products SET stock = stock + ?, cost = ? WHERE id = ?`).run(totalQty, averageCost, input.productId);
+    // Log: บรรทัดเดียวไม่ใส่ต้นทุน = ข้อความเดิม · มีต้นทุน/หลายบรรทัด = สรุปทุกบรรทัด + ต้นทุนเฉลี่ยใหม่
+    const anyCost = parsed.some((line) => line.cost !== undefined);
+    const lineSummary = anyCost ? ` · ${parsed.map((line) => `${line.qty}×${money(line.cost ?? previousCost)}${line.cost === 0 ? " แถม" : ""}`).join(" + ")}` : "";
+    const avgSummary = anyCost ? ` · ต้นทุนเฉลี่ย ${money(averageCost)} (เดิม ${money(previousCost)})` : "";
+    logAction(db, "รับเข้าสินค้า", input.actor?.trim() || "ระบบ", `${product.name} · Lot ${lotLabel} · +${totalQty} ${product.unit}${lineSummary}${avgSummary}`, "green", input.actorRole ?? null, createdAt);
+    return { lots, lot: lots[0], product: getProductById(db, input.productId)!, averageCost, previousCost };
+  });
+}
+
 export function receiveStock(
   db: SqliteDb,
   productId: number,
@@ -755,21 +815,9 @@ export function receiveStock(
   actor?: string,
   actorRole?: string,
 ) {
-  if (!Number.isInteger(qty) || qty <= 0) throw new StoreError("จำนวนต้องมากกว่า 0");
-  const product = getProductById(db, productId);
-  if (!product || !product.active) throw new StoreError(`ไม่พบสินค้ารหัส ${productId} ในระบบ`);
-  const effectiveCost = cost === undefined ? product.cost : round2(cost);
-  const lotLabel = lot?.trim() || `LOT-${formatDate()}`;
-  const createdAt = formatDateTime();
-  return runInTransaction(db, () => {
-    const result = db.prepare(`INSERT INTO stock_lots (product_id, lot, expiry_date, qty, cost, received_at, received_qty) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(productId, lotLabel, expiryDate || null, qty, effectiveCost, createdAt, qty);
-    db.prepare(`UPDATE products SET stock = stock + ?, cost = ? WHERE id = ?`).run(qty, effectiveCost, productId);
-    logAction(db, "รับเข้าสินค้า", actor?.trim() || "ระบบ", `${product.name} · Lot ${lotLabel} · +${qty} ${product.unit}`, "green", actorRole ?? null, createdAt);
-    return {
-      lot: { id: Number(result.lastInsertRowid), productId, lot: lotLabel, expiry: expiryDate || null, qty, cost: effectiveCost, receivedAt: createdAt },
-      product: getProductById(db, productId)!,
-    };
-  });
+  const result = receiveStockLines(db, { productId, lot, expiryDate, lines: [{ qty, cost }], actor, actorRole });
+  // รูปเอาต์พุตเดิม { lot, product } + เผื่อ averageCost ไว้ให้ผู้เรียกรุ่นใหม่
+  return { lot: result.lot, product: result.product, averageCost: result.averageCost };
 }
 
 export function listStockRows(db: SqliteDb): SqliteStockRow[] {
@@ -2266,6 +2314,8 @@ export type MemberTransactionRow = {
 export type MemberTransactionsInput = {
   memberNumber?: string;
   type?: "purchase" | "deposit" | "withdrawal" | "activation" | "refund" | "limit_request";
+  /** ROUND 77 (user) — เลือกหลายประเภทพร้อมกัน (รวมกับ type เดี่ยว ถ้าส่งทั้งคู่) */
+  types?: ("purchase" | "deposit" | "withdrawal" | "activation" | "refund" | "limit_request")[];
   from?: string;
   to?: string;
   limit?: number;
@@ -2281,18 +2331,30 @@ export function memberTransactions(db: SqliteDb, input: MemberTransactionsInput 
   const memberNumber = input.memberNumber?.trim();
   const limit = Math.max(1, Math.min(1000, Math.floor(input.limit ?? 300)));
   const rows: MemberTransactionRow[] = [];
+  // ROUND 77 (user) — เลือกหลายประเภทพร้อมกัน: รวม type เดี่ยวกับ types เป็นชุดเดียว
+  // (ไม่ซ้ำค่า) · ชุดว่าง = ทุกประเภท (พฤติกรรมเดิม)
+  const typeSet = new Set<string>([...(input.types ?? []), ...(input.type ? [input.type] : [])]);
 
   // Regular wallet entries (purchase / deposit / withdrawal).
-  if (input.type !== "limit_request") {
+  if (!typeSet.has("limit_request") || typeSet.size > 1 || typeSet.size === 0) {
     const conditions: string[] = [];
     const params: (string | number)[] = [];
     if (memberNumber) {
       conditions.push("t.member_number LIKE ?");
       params.push(`%${memberNumber}%`);
     }
-    if (input.type) {
-      conditions.push("t.type = ?");
-      params.push(input.type);
+    const txTypes = Array.from(typeSet).filter((type) => type !== "limit_request");
+    if (typeSet.size > 0 && txTypes.length > 0) {
+      if (txTypes.length === 1) {
+        conditions.push("t.type = ?");
+        params.push(txTypes[0]);
+      } else {
+        conditions.push(`t.type IN (${txTypes.map(() => "?").join(", ")})`);
+        params.push(...txTypes);
+      }
+    } else if (typeSet.size > 0 && txTypes.length === 0) {
+      // เลือกเฉพาะ limit_request — ไม่ต้องดึงธุรกรรมกระเป๋าเงินเลย
+      conditions.push("1 = 0");
     }
     if (input.from && ISO_DATE_ONLY.test(input.from)) {
       conditions.push("t.created_at >= ?");
@@ -2308,7 +2370,7 @@ export function memberTransactions(db: SqliteDb, input: MemberTransactionsInput 
   }
 
   // การขอลดวงเงิน — merged into the same history (same member/date filters).
-  if (input.type === undefined || input.type === "limit_request") {
+  if (typeSet.size === 0 || typeSet.has("limit_request")) {
     const conditions: string[] = [];
     const params: (string | number)[] = [];
     if (memberNumber) {

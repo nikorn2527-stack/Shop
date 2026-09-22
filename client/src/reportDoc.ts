@@ -38,7 +38,7 @@ function thaiStamp(date: Date) {
 function buildPage(config: ReportDocConfig, rows: string[][], pageIndex: number, pageCount: number) {
   const numeric = new Set(config.numericCols ?? []);
   const page = document.createElement("div");
-  // ROUND 75 — ฟอนต์สารบรรณ 16pt เป็นฐาน · ฟอร์มตารางกว้างใช้ .compact ลดขนาดตามฟอร์ม
+  // ROUND 77 (user) — ฟอนต์สารบรรณ 13pt เป็นฐาน (เดิม 16pt ใหญ่เกิน) · ฟอร์มตารางกว้างใช้ .compact ลดขนาดตามฟอร์ม
   page.className = `report-doc${config.compact ? " compact" : ""}`;
   const head = document.createElement("div");
   head.className = "rd-head";
@@ -212,9 +212,9 @@ export function printReportDoc(config: ReportDocConfig) {
   const html = `<!DOCTYPE html>
 <html lang="th"><head><meta charset="utf-8" /><title>${escapeHtml(config.title)}</title>
 <style>
-  /* ROUND 75 (user) — ฟอนต์ไทยสารบรรณจากไฟล์ในเครื่อง (เหมือนหน้าแอป) + ขนาด 16pt
-     สำหรับรายละเอียด + หัวคอลัมน์พื้นขาวตัวหนาเส้นดำ + ไม่มีโลโก้ — ทั้งฉบับเป็นโทนกลาง
-     พิมพ์ขาว-ดำกับพิมพ์สีเหมือนกันทุกประการ */
+  /* ROUND 77 (user) — ฟอนต์ไทยสารบรรณจากไฟล์ในเครื่อง (เหมือนหน้าแอป) + ลดขนาดจาก 16pt
+     เหลือ 13pt ตามที่ผู้ใช้สรุปว่า 16 ใหญ่เกิน + หัวคอลัมน์พื้นขาวตัวหนาเส้นดำ + ไม่มีโลโก้ —
+     ทั้งฉบับเป็นโทนกลาง พิมพ์ขาว-ดำกับพิมพ์สีเหมือนกันทุกประการ */
   @font-face { font-family: "Sarabun"; font-weight: 400; font-style: normal; src: url("/fonts/Sarabun-400-thai.woff2") format("woff2"), url("/fonts/Sarabun-400-latin.woff2") format("woff2"); }
   @font-face { font-family: "Sarabun"; font-weight: 500; font-style: normal; src: url("/fonts/Sarabun-500-thai.woff2") format("woff2"), url("/fonts/Sarabun-500-latin.woff2") format("woff2"); }
   @font-face { font-family: "Sarabun"; font-weight: 600; font-style: normal; src: url("/fonts/Sarabun-600-thai.woff2") format("woff2"), url("/fonts/Sarabun-600-latin.woff2") format("woff2"); }
@@ -222,28 +222,28 @@ export function printReportDoc(config: ReportDocConfig) {
   @font-face { font-family: "Sarabun"; font-weight: 800; font-style: normal; src: url("/fonts/Sarabun-800-thai.woff2") format("woff2"), url("/fonts/Sarabun-800-latin.woff2") format("woff2"); }
   @page { size: A4; margin: 12mm; }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: "Sarabun", "TH Sarabun New", "Leelawadee UI", Tahoma, sans-serif; color: #1c1c1a; background: #fff; font-size: ${config.compact ? "14px" : "16pt"}; }
+  body { margin: 0; font-family: "Sarabun", "TH Sarabun New", "Leelawadee UI", Tahoma, sans-serif; color: #1c1c1a; background: #fff; font-size: ${config.compact ? "12px" : "13pt"}; }
   .doc { padding: 4px 2px; }
   .rd-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; border-bottom: 2.5px solid #1c1c1a; padding-bottom: 12px; }
   .rd-brand { display: flex; align-items: center; gap: 10px; }
   .rd-brand img { display: none; }
-  .rd-brand b { font-size: 17.5pt; color: #111; }
-  .rd-brand small { display: block; color: #555; font-size: 11.5pt; margin-top: 2px; font-weight: 500; }
-  .rd-stamp { font-size: 11.5pt; color: #444; text-align: right; font-weight: 500; }
-  h1 { font-size: 21.5pt; font-weight: 800; margin: 16px 0 4px; color: #111; }
-  .rd-title p { margin: 0 0 10px; color: #444; font-size: 12.5pt; font-weight: 500; }
+  .rd-brand b { font-size: 14pt; color: #111; }
+  .rd-brand small { display: block; color: #555; font-size: 10pt; margin-top: 2px; font-weight: 500; }
+  .rd-stamp { font-size: 10pt; color: #444; text-align: right; font-weight: 500; }
+  h1 { font-size: 17pt; font-weight: 800; margin: 16px 0 4px; color: #111; }
+  .rd-title p { margin: 0 0 10px; color: #444; font-size: 11pt; font-weight: 500; }
   .rd-meta { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 8px 0 12px; padding: 10px 14px; background: #f5f5f4; border: 1px solid #cfcfca; border-radius: 8px; }
-  .meta-item { font-size: 12pt; color: #555; }
+  .meta-item { font-size: 10.5pt; color: #555; }
   .meta-item b { color: #1c1c1a; font-weight: 700; margin-left: 5px; }
-  table { width: 100%; border-collapse: collapse; font-size: ${config.compact ? "12.5pt" : "16pt"}; line-height: 1.38; }
+  table { width: 100%; border-collapse: collapse; font-size: ${config.compact ? "11pt" : "13pt"}; line-height: 1.38; }
   th { background: #ffffff; color: #111; font-weight: 700; text-align: left; padding: 8px 9px; border-top: 2px solid #111; border-bottom: 2px solid #111; white-space: nowrap; }
   th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
   td { padding: 6.5px 9px; font-weight: 500; border-bottom: 1px solid #d8d8d3; }
   th, td { overflow-wrap: anywhere; } /* ป้องกันหัวคอลัมน์ไทยยาวดันตารางกว้างเกินหน้า A4 */
   tbody tr:nth-child(even) { background: #f4f4f2; }
   tfoot td { font-weight: 800; background: #ffffff; border-top: 3.5pt double #111; border-bottom: 2px solid #111; color: #111; }
-  .rd-note { margin-top: 10px; font-size: 11.5pt; color: #444; font-weight: 500; line-height: 1.5; }
-  .rd-foot { margin-top: 14px; border-top: 1px dashed #bbb; padding-top: 7px; font-size: 10.5pt; color: #666; display: flex; justify-content: space-between; }
+  .rd-note { margin-top: 10px; font-size: 10pt; color: #444; font-weight: 500; line-height: 1.5; }
+  .rd-foot { margin-top: 14px; border-top: 1px dashed #bbb; padding-top: 7px; font-size: 9.5pt; color: #666; display: flex; justify-content: space-between; }
 </style></head>
 <body><div class="doc">
   <div class="rd-head">
