@@ -440,7 +440,9 @@ const settingsPatchInput = z
     appName: z.string().max(80).optional(),
     appLogo: z.string().max(600_000).optional(),
     appTheme: z.string().max(32).optional(),
-    autoPrintReceipt: z.boolean().optional(),
+    // ROUND 75 (user) — ลบ autoPrintReceipt (ห้ามเด้งหน้าสั่งพิมพ์หลังชำระเงิน) ·
+    // เพิ่มเมนูลัดหน้าร้าน: JSON array ของ key ปุ่ม POS ที่ปิดใช้งาน เช่น ["withdraw","special"]
+    posRailHidden: z.string().max(200).optional(),
     showBalanceOnReceipt: z.boolean().optional(),
     lowBalanceAlert: z.boolean().optional(),
     lowBalanceThreshold: z.number().min(0).optional(),

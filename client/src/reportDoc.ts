@@ -19,11 +19,14 @@ export type ReportDocConfig = {
   /** คอลัมน์ (index) ที่ชิดขวา + ตัวเลข */
   numericCols?: number[];
   rows: string[][];
-  /** แถวรวมท้ายตาราง (ตัวหนา พื้นอ่อน) */
+  /** แถวรวมท้ายตาราง (ตัวหนา เส้นคู่) — ROUND 75: ทุกฟอร์มต้องมีสรุปยอดรวมท้ายตาราง */
   totalsRow?: string[];
   brandName: string;
+  /** @deprecated ROUND 75 — เอกสารไม่ใส่โลโก้อีกต่อไป (พิมพ์ขาว-ดำ/สีเหมือนกัน) ฟิลด์นี้เหลือไว้เพื่อรองรับผู้เรียกเดิม แต่จะไม่ถูกวาด */
   brandLogo?: string;
   footnote?: string;
+  /** ROUND 75 — ตารางกว้าง 7-10 คอลัมน์: ลดขนาดตัวอักษรตามฟอร์ม (~13pt) ให้อยู่บรรทัดเดียวได้ */
+  compact?: boolean;
 };
 
 const THAI_MONTHS_SHORT = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
@@ -35,11 +38,14 @@ function thaiStamp(date: Date) {
 function buildPage(config: ReportDocConfig, rows: string[][], pageIndex: number, pageCount: number) {
   const numeric = new Set(config.numericCols ?? []);
   const page = document.createElement("div");
-  page.className = "report-doc";
+  // ROUND 75 — ฟอนต์สารบรรณ 16pt เป็นฐาน · ฟอร์มตารางกว้างใช้ .compact ลดขนาดตามฟอร์ม
+  page.className = `report-doc${config.compact ? " compact" : ""}`;
   const head = document.createElement("div");
   head.className = "rd-head";
+  // ROUND 75 (user) — เอกสารไม่ใส่โลโก้/ตราสัญลักษณ์: หัวกระดาษเป็นชื่อร้านตัวหนาล้วน
+  // (พิมพ์ขาว-ดำกับพิมพ์สีเหมือนกันทุกประการ)
   head.innerHTML = `
-    <div class="rd-brand">${config.brandLogo ? `<img src="${config.brandLogo}" alt="" />` : `<span class="rd-mark">ร</span>`}<div><b>${escapeHtml(config.brandName)}</b><small>ระบบร้านค้าสวัสดิการ · Welfare Store</small></div></div>
+    <div class="rd-brand"><div><b>${escapeHtml(config.brandName)}</b><small>ระบบร้านค้าสวัสดิการ · Welfare Store</small></div></div>
     <div class="rd-stamp">สร้างเมื่อ ${thaiStamp(new Date())}</div>`;
   page.appendChild(head);
   const title = document.createElement("div");
@@ -145,6 +151,13 @@ export async function downloadReportPdf(config: ReportDocConfig) {
     }
   };
   try {
+    // ROUND 75 — รอฟอนต์สารบรรณ (ไฟล์ในเครื่อง) โหลดเสร็จก่อนจับภาพทุกครั้ง
+    // กันกรณีเพิ่งเปิดหน้าแล้วสั่ง export ทันที — ฟอนต์ยังไม่ทันพร้อม ตัวไทยจะหลุดเป็น fallback ตัวบาง
+    if (document.fonts?.load) {
+      // eslint-disable-next-line no-await-in-loop
+      await Promise.all(["300", "400", "500", "600", "700", "800"].map((weight) => document.fonts.load(`${weight} 21px Sarabun`, "ก0A")));
+    }
+    if (document.fonts?.ready) await document.fonts.ready;
     // ผ่านแรก — แบ่งหน้าตามความสูงจริง (ยังไม่วาดภาพ เร็ว) เพื่อนับจำนวนหน้า
     // สำหรับเขียน "หน้า x / y" ให้ถูกต้องในผ่านที่สอง
     const pages: string[][][] = [];
@@ -199,34 +212,42 @@ export function printReportDoc(config: ReportDocConfig) {
   const html = `<!DOCTYPE html>
 <html lang="th"><head><meta charset="utf-8" /><title>${escapeHtml(config.title)}</title>
 <style>
+  /* ROUND 75 (user) — ฟอนต์ไทยสารบรรณจากไฟล์ในเครื่อง (เหมือนหน้าแอป) + ขนาด 16pt
+     สำหรับรายละเอียด + หัวคอลัมน์พื้นขาวตัวหนาเส้นดำ + ไม่มีโลโก้ — ทั้งฉบับเป็นโทนกลาง
+     พิมพ์ขาว-ดำกับพิมพ์สีเหมือนกันทุกประการ */
+  @font-face { font-family: "Sarabun"; font-weight: 400; font-style: normal; src: url("/fonts/Sarabun-400-thai.woff2") format("woff2"), url("/fonts/Sarabun-400-latin.woff2") format("woff2"); }
+  @font-face { font-family: "Sarabun"; font-weight: 500; font-style: normal; src: url("/fonts/Sarabun-500-thai.woff2") format("woff2"), url("/fonts/Sarabun-500-latin.woff2") format("woff2"); }
+  @font-face { font-family: "Sarabun"; font-weight: 600; font-style: normal; src: url("/fonts/Sarabun-600-thai.woff2") format("woff2"), url("/fonts/Sarabun-600-latin.woff2") format("woff2"); }
+  @font-face { font-family: "Sarabun"; font-weight: 700; font-style: normal; src: url("/fonts/Sarabun-700-thai.woff2") format("woff2"), url("/fonts/Sarabun-700-latin.woff2") format("woff2"); }
+  @font-face { font-family: "Sarabun"; font-weight: 800; font-style: normal; src: url("/fonts/Sarabun-800-thai.woff2") format("woff2"), url("/fonts/Sarabun-800-latin.woff2") format("woff2"); }
   @page { size: A4; margin: 12mm; }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: "Sarabun", "TH Sarabun New", "Leelawadee UI", Tahoma, sans-serif; color: #26251f; background: #fff; }
+  body { margin: 0; font-family: "Sarabun", "TH Sarabun New", "Leelawadee UI", Tahoma, sans-serif; color: #1c1c1a; background: #fff; font-size: ${config.compact ? "14px" : "16pt"}; }
   .doc { padding: 4px 2px; }
-  .rd-head { display: flex; justify-content: space-between; align-items: center; border-bottom: 2.5px solid #0d7a55; padding-bottom: 9px; }
+  .rd-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; border-bottom: 2.5px solid #1c1c1a; padding-bottom: 12px; }
   .rd-brand { display: flex; align-items: center; gap: 10px; }
-  .rd-brand img { width: 42px; height: 42px; object-fit: contain; border-radius: 9px; }
-  .rd-mark { width: 42px; height: 42px; border-radius: 9px; background: #0d7a55; color: #fff; display: grid; place-items: center; font-size: 21px; font-weight: 700; }
-  .rd-brand b { font-size: 16px; }
-  .rd-brand small { display: block; color: #6f7466; font-size: 11px; }
-  .rd-stamp { font-size: 11px; color: #6f7466; text-align: right; }
-  h1 { font-size: 22px; font-weight: 800; margin: 14px 0 3px; }
-  .rd-title p { margin: 0 0 9px; color: #5c6156; font-size: 12.5px; }
-  .rd-meta { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 7px 0 11px; }
-  .meta-item { font-size: 12px; color: #5c6156; }
-  .meta-item b { color: #26251f; font-weight: 700; margin-left: 5px; }
-  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-  th { background: #0d7a55; color: #fff; font-weight: 700; text-align: left; padding: 7px 8px; white-space: nowrap; }
+  .rd-brand img { display: none; }
+  .rd-brand b { font-size: 17.5pt; color: #111; }
+  .rd-brand small { display: block; color: #555; font-size: 11.5pt; margin-top: 2px; font-weight: 500; }
+  .rd-stamp { font-size: 11.5pt; color: #444; text-align: right; font-weight: 500; }
+  h1 { font-size: 21.5pt; font-weight: 800; margin: 16px 0 4px; color: #111; }
+  .rd-title p { margin: 0 0 10px; color: #444; font-size: 12.5pt; font-weight: 500; }
+  .rd-meta { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 8px 0 12px; padding: 10px 14px; background: #f5f5f4; border: 1px solid #cfcfca; border-radius: 8px; }
+  .meta-item { font-size: 12pt; color: #555; }
+  .meta-item b { color: #1c1c1a; font-weight: 700; margin-left: 5px; }
+  table { width: 100%; border-collapse: collapse; font-size: ${config.compact ? "12.5pt" : "16pt"}; line-height: 1.38; }
+  th { background: #ffffff; color: #111; font-weight: 700; text-align: left; padding: 8px 9px; border-top: 2px solid #111; border-bottom: 2px solid #111; white-space: nowrap; }
   th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
-  td { padding: 6px 8px; font-weight: 500; border-bottom: 1px solid #e6e9e2; }
-  tbody tr:nth-child(even) { background: #f7faf8; }
-  tfoot td { font-weight: 700; background: #ecf5ef; border-top: 2px solid #0d7a55; }
-  .rd-note { margin-top: 9px; font-size: 11px; color: #6f7466; }
-  .rd-foot { margin-top: 14px; border-top: 1px solid #dfe4da; padding-top: 7px; font-size: 10px; color: #84897b; display: flex; justify-content: space-between; }
+  td { padding: 6.5px 9px; font-weight: 500; border-bottom: 1px solid #d8d8d3; }
+  th, td { overflow-wrap: anywhere; } /* ป้องกันหัวคอลัมน์ไทยยาวดันตารางกว้างเกินหน้า A4 */
+  tbody tr:nth-child(even) { background: #f4f4f2; }
+  tfoot td { font-weight: 800; background: #ffffff; border-top: 3.5pt double #111; border-bottom: 2px solid #111; color: #111; }
+  .rd-note { margin-top: 10px; font-size: 11.5pt; color: #444; font-weight: 500; line-height: 1.5; }
+  .rd-foot { margin-top: 14px; border-top: 1px dashed #bbb; padding-top: 7px; font-size: 10.5pt; color: #666; display: flex; justify-content: space-between; }
 </style></head>
 <body><div class="doc">
   <div class="rd-head">
-    <div class="rd-brand">${config.brandLogo ? `<img src="${config.brandLogo}" alt="" />` : `<span class="rd-mark">ร</span>`}<div><b>${escapeHtml(config.brandName)}</b><small>ระบบร้านค้าสวัสดิการ · Welfare Store</small></div></div>
+    <div class="rd-brand"><div><b>${escapeHtml(config.brandName)}</b><small>ระบบร้านค้าสวัสดิการ · Welfare Store</small></div></div>
     <div class="rd-stamp">พิมพ์เมื่อ ${thaiStamp(new Date())}</div>
   </div>
   <div class="rd-title"><h1>${escapeHtml(config.title)}</h1>${config.periodLabel ? `<p>${escapeHtml(config.periodLabel)}</p>` : ""}</div>
@@ -235,7 +256,7 @@ export function printReportDoc(config: ReportDocConfig) {
   ${config.footnote ? `<div class="rd-note">${escapeHtml(config.footnote)}</div>` : ""}
   <div class="rd-foot"><span>พิมพ์จากระบบร้านค้าสวัสดิการ</span><span>เอกสารรายงาน A4</span></div>
 </div>
-<script>window.addEventListener("load", () => { setTimeout(() => window.print(), 150); });</script>
+<script>window.addEventListener("load", () => { const go = () => window.setTimeout(() => window.print(), 120); if (document.fonts && document.fonts.ready) { document.fonts.ready.then(go); } else { go(); } });</script>
 </body></html>`;
   const frame = document.createElement("iframe");
   frame.setAttribute("aria-hidden", "true");

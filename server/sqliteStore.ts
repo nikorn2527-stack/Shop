@@ -207,7 +207,11 @@ export type StoreSettings = {
   appLogo: string;
   /** สีธีมหลัก: preset id เช่น "emerald" หรือ hex "#007a55" */
   appTheme: string;
-  autoPrintReceipt: boolean;
+  /** ROUND 75 (user) — หน้าแจ้งผลหลังชำระเงิน ไม่เด้งไปหน้าสั่งพิมพ์อีกต่อไป:
+   *  แสดงหน้าใบเสร็จพร้อมปุ่ม พิมพ์/บันทึกรูป/ดาวน์โหลด PDF ให้ผู้ใช้กดเอง —
+   *  ตัวตั้ง autoPrintReceipt เดิมถูกลบออก (พฤติกรรม window.print() อัตโนมัติ)
+   *  · เพิ่ม posRailHidden: ปุ่มรางซ้าย POS ที่ปิดใช้งาน (JSON array ของ key) */
+  posRailHidden: string;
   showBalanceOnReceipt: boolean;
   lowBalanceAlert: boolean;
   lowBalanceThreshold: number;
@@ -2550,7 +2554,8 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   appName: "ร้านค้าสวัสดิการ",
   appLogo: "",
   appTheme: "emerald",
-  autoPrintReceipt: true,
+  // ROUND 75 — เมนูลัดหน้าร้าน: "" = เปิดใช้ทุกปุ่มบนรางซ้าย POS
+  posRailHidden: "",
   showBalanceOnReceipt: true,
   lowBalanceAlert: true,
   lowBalanceThreshold: 100,

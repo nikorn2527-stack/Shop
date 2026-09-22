@@ -1113,12 +1113,13 @@ describe("settings", () => {
     const updated = setSettings(database, {
       storeName: "ร้านค้าทดสอบ",
       lowBalanceThreshold: 250,
-      autoPrintReceipt: false,
+      posRailHidden: '["withdraw","special"]',
       memberNumberMode: "year",
     });
     expect(updated.storeName).toBe("ร้านค้าทดสอบ");
     expect(updated.lowBalanceThreshold).toBe(250);
-    expect(updated.autoPrintReceipt).toBe(false);
+    // ROUND 75 — เมนูลัดหน้าร้าน: ปุ่มที่ปิดใช้งานเก็บเป็น JSON array กลับไปกลับมาได้
+    expect(updated.posRailHidden).toBe('["withdraw","special"]');
     expect(updated.memberNumberMode).toBe("year");
     expect(getMemberNumberMode(database)).toBe("year");
     expect(getSettings(database).storeName).toBe("ร้านค้าทดสอบ");
