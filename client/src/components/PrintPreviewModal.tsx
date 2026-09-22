@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Printer, X } from "lucide-react";
+import { toast } from "sonner";
 
 /**
  * ROUND 51 (user) — "ทุกหน้าที่มีการสั่งพิมพ์ ควรมีการพรีวิวเหมือนกัน"
@@ -68,6 +69,10 @@ export function PrintPreviewModal({
   }, [onClose]);
 
   const doPrint = () => {
+    // ROUND 72 (user) — ปิด toast ที่ยังเด้งอยู่ทั้งหมดก่อนสั่งพิมพ์
+    // (เคยมีข้อความแจ้งเตือนค้างอยู่บนจอ แล้วหลุดไปติดในสลิปที่พิมพ์ออกมา —
+    // คู่กับกฎ @media print ที่ซ่อน [data-sonner-toaster] ใน index.css)
+    toast.dismiss();
     window.print();
     onPrint?.();
   };

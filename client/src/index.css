@@ -4233,6 +4233,16 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 /* ซ่อนโมดัลพรีวิวทุกครั้งที่พิมพ์จริง — ให้ @media print ของเอกสารต้นฉบับทำงานล้วน ๆ */
 @media print { .print-preview-scope { display: none !important; } }
 
+/* ROUND 72 (user) — toast แจ้งเตือนที่ยังเด้งอยู่บนจอ ต้องไม่หลุดไปติดในงานพิมพ์
+   เคยมีข้อความ "บันทึกแล้ว / สต็อกต่ำ" ค้างอยู่ขณะกด "พิมพ์เลย" → ข้อความลอยไปโผล่
+   ในสลิป/ใบนับสต็อกที่พิมพ์ออกมา — ซ่อนทุกชนิดเอกสาร ไม่ต้องแยกกฎต่อเอกสาร
+   (sonner render ไว้ที่ระดับ #root นอก .page-content กฎ body:has() จึงไม่เคยครอบมัน)
+   รวมถึง tooltip/popup ของ Radix ที่ portal ไว้ที่ body ด้วย */
+@media print {
+  [data-sonner-toaster],
+  [data-radix-popper-content-wrapper] { display: none !important; }
+}
+
 /* ============================================================
    ROUND 53 (user) — ใบนับสต็อก A4 สำหรับพิมพ์ออกไปนับมือ
    ซ่อนบนจอ · แสดงในพรีวิว (PrintPreviewModal) · พิมพ์แบบ
@@ -4858,3 +4868,61 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .category-sku-hint { display: inline-flex; align-items: center; gap: 4px; color: #7b806c; font-size: 10.5px; white-space: nowrap; }
 .category-sku-hint b { color: #3e7a63; font-family: var(--mono); letter-spacing: .3px; }
 @media (max-width: 560px) { .category-sku-hint { white-space: normal; } }
+
+/* ============================= ROUND 72 (user) =============================
+ * หน้ารายงาน · ประวัติธุรกรรม: การ์ดสรุป 6 ใบ "ใหญ่เกิน จนตารางข้อมูล
+ * เห็นแค่ 1 แถว" — ยุบการ์ดให้กระทัดรัด (จอกว้าง = แถวเดียว 6 ช่อง จากเดิม
+ * 3 คอลัมน์ 2 แถว สูง 185px) + กันจอเตี้ย: พาเนลตารางต้องเห็นตารางเสมอ
+ * (ส่วนหัวกินพื้นที่จน .table-wrap ถูกบีบเหลือ 0px → ให้พาเนลเลื่อนแทน)
+ * ========================================================================== */
+
+/* (1) การ์ดสรุปธุรกรรม 6 ใบ กระทัดรัด — ทุกขนาดจอ */
+.tx-summary-cards.six { gap: 7px; margin: 9px 0 0; }
+.tx-summary-cards.six > div { padding: 7px 10px 6px; border-radius: 9px; }
+.tx-summary-cards.six small { font-size: 9.5px; }
+.tx-summary-cards.six strong { font-size: 13.5px; margin-top: 2px; letter-spacing: -.2px; }
+.tx-summary-cards.six span { font-size: 9px; margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* จอกว้างพอ (≥1150px): แถวเดียว 6 ช่อง — ประหยัดแนวตั้งเกือบ 130px ให้ตาราง */
+@media (min-width: 1150px) {
+  .tx-summary-cards.six { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+}
+/* มือถือ/จอแคบ: 2 คอลัมน์แทนช่องเดียว (การ์ดกระทัดรัดแล้ว 2 ช่องกว้างพอ จะได้
+   ไม่ต้องเลื่อนผ่านการ์ดยาว 6 ใบก่อนถึงตาราง) — แค่จอเล็กมาก ≤360px ค่อยเหลือช่องเดียว */
+@media (max-width: 620px) {
+  .tx-summary-cards.six { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 360px) {
+  .tx-summary-cards.six { grid-template-columns: 1fr; }
+}
+
+/* (2) กันจอเตี้ย/จอแคบ: ทุกแท็บรายงานที่มีตาราง (ประวัติบิล · ประวัติธุรกรรม
+   สินค้าคงคลัง · ยอดเงินในบัตร) ตารางต้องได้ความสูงขั้นต่ำเสมอ ถ้าส่วนหัว+
+   การ์ด+ตัวกรอง กินพื้นที่เกินที่เหลือของจอ ให้พาเนลเลื่อนแนวตั้งลงมาดูต่อ
+   — แทนที่จะตารางถูกบีบเหลือ 0px มองไม่เห็นเลย */
+.report-workbench .dash-tab-body > section.panel:has(> .table-wrap) { overflow-y: auto; }
+.report-workbench .dash-tab-body > section.panel:has(> .table-wrap) > .table-wrap { min-height: 240px; }
+/* จอเตี้ย (สูง ≤ 800px เช่น แล็ปท็อป 1366×768): ลดความสูงขั้นต่ำลงให้พอดีจอเดียว
+   ไม่เกิดแถบเลื่อนซ้อน 2 ชั้น (พาเนลเลื่อนนิดหน่อยแล้วตารางก็ไม่โตขึ้น — ไม่มีประโยชน์) */
+@media (max-height: 800px) and (min-width: 561px) {
+  .report-workbench .dash-tab-body > section.panel:has(> .table-wrap) > .table-wrap { min-height: 190px; }
+}
+/* ตอนพิมพ์/ส่งออก: คลายกันจอเตี้ยกลับเป็น flow ปกติ ให้เนื้อหายาวเท่ากระดาษ */
+@media print {
+  .report-workbench .dash-tab-body > section.panel:has(> .table-wrap) { overflow: visible; }
+  .report-workbench .dash-tab-body > section.panel:has(> .table-wrap) > .table-wrap { min-height: 0; }
+}
+/* เก็บระยะห่างภายในแท็บธุรกรรมให้กระชับขึ้น (ประหยัดแนวตั้งให้ตาราง) */
+#tx-report .tx-filter-bar { margin-top: 8px; }
+#tx-report .tx-log-strip { margin: 5px 0 7px; }
+#tx-report > .table-wrap { margin-top: 9px; }
+
+/* (3) ย้ายช่วงวันที่ขึ้นไปอยู่แถบเครื่องมือ (ข้างปุ่ม CSV/Excel/PDF) —
+   แถบตัวกรองด้านล่างเหลือช่องค้นหาสมาชิก + ปุ่มประเภท อยู่บรรทัดเดียวกัน
+   ไม่ต้องซ้อน 2 แถวเปลืองความสูงของตารางข้อมูลอีก */
+#tx-report .toolbar-actions { flex-wrap: wrap; justify-content: flex-end; }
+#tx-report .tx-date-range { background: #fcfefd; border: 1px solid #e2eae7; border-radius: 9px; padding: 3px 8px; }
+#tx-report .tx-date-range .thai-date-field { height: 24px; padding: 0 8px; font-size: 11px; }
+/* คุมความกว้างบล็อกชื่อหัวข้อ ให้ปุ่ม+ช่วงวันที่อยู่บรรทัดเดียวกันได้พอดี
+   (เดิมชื่อยาว 483px + ปุ่ม 486px = ชนขอบพอดี แล้วโดนดันลงแถวใหม่) */
+#tx-report .table-toolbar > div:first-child { min-width: 0; max-width: 430px; }
+
