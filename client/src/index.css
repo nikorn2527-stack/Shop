@@ -4850,3 +4850,11 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 /* ROUND 65 — ช่องวันที่กำหนดเองของแท็บสินค้าคงคลัง (ใช้สไตล์เดียวกับแท็บยอดขาย) */
 .report-range-row .report-custom-range { display: flex; align-items: center; gap: 7px; }
 .report-range-row .report-custom-range .range-sep { color: #9aa093; }
+
+/* ROUND 71 — ช่องหมวดสินค้าในฟอร์มเพิ่ม/แก้ไขสินค้า: select + พรีวิวรหัสอัตโนมัติตามหมวด */
+.category-field { display: flex; flex-direction: column; gap: 6px; }
+.category-select-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.category-field .category-select-row select { flex: 1 1 230px; min-width: 0; width: auto; }
+.category-sku-hint { display: inline-flex; align-items: center; gap: 4px; color: #7b806c; font-size: 10.5px; white-space: nowrap; }
+.category-sku-hint b { color: #3e7a63; font-family: var(--mono); letter-spacing: .3px; }
+@media (max-width: 560px) { .category-sku-hint { white-space: normal; } }

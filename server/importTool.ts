@@ -382,7 +382,9 @@ export function importMembers(db: SqliteDb, options: ImportMembersOptions): Impo
 // import สินค้า
 // ---------------------------------------------------------------------------
 
-const IMPORT_SKU_PREFIXES: Record<string, string> = { "เครื่องดื่ม": "DRK", "อาหาร": "FD", "ของใช้": "HYG", "ขนม": "SNK" };
+// ROUND 71 — ชุดเดียวกับ CATEGORY_SKU_PREFIXES ใน server/sqliteStore.ts: รหัสอัตโนมัติแยกตามหมวด
+// (เครื่องดื่ม=DRK · ของใช้ส่วนตัว=HYG · ขนม=SNK · อาหาร=FD · ของใช้ในครัวเรือน=HH · เครื่องเขียน=ST)
+const IMPORT_SKU_PREFIXES: Record<string, string> = { "เครื่องดื่ม": "DRK", "อาหาร": "FD", "ของใช้": "HYG", "ของใช้ส่วนตัว": "HYG", "ของใช้ในครัวเรือน": "HH", "ขนม": "SNK", "เครื่องเขียน": "ST" };
 
 function nextImportSku(db: SqliteDb, category: string): string {
   const prefix = IMPORT_SKU_PREFIXES[category] ?? "GEN";

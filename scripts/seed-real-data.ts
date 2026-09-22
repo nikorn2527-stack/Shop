@@ -50,13 +50,13 @@ const MEMBERS: SeedMember[] = [
   { prename: "นาย", firstName: "สมชาย", lastName: "ใจดี", gender: "ชาย", cardNumber: "2395100201", patientCode: "70001", phone: "081-234-5001", openedAt: "2026-04-25 10:12:00", activation: 5000, preHistory: [{ daysBefore: 120, type: "purchase", amount: 640, detail: "ซื้อของใช้ที่ร้าน" }, { daysBefore: 60, type: "deposit", amount: 1000, detail: "เติมเงินสดที่เคาน์เตอร์" }, { daysBefore: 21, type: "purchase", amount: 425, detail: "ซื้อของใช้ที่ร้าน" }] },
   { prename: "นาย", firstName: "มานะ", lastName: "ตั้งใจดี", gender: "ชาย", cardNumber: "2395100202", patientCode: "70002", phone: "081-234-5002", openedAt: "2026-05-12 09:30:00", activation: 1000, preHistory: [{ daysBefore: 90, type: "deposit", amount: 500, detail: "เติมเงินสดที่เคาน์เตอร์" }, { daysBefore: 30, type: "purchase", amount: 996, detail: "ซื้อของใช้ที่ร้าน" }] },
   { prename: "นาย", firstName: "ประเสริฐ", lastName: "ศรีสุข", gender: "ชาย", cardNumber: "2395100203", patientCode: "70003", phone: "082-345-6003", openedAt: "2026-05-28 13:45:00", activation: 2000, preHistory: [{ daysBefore: 75, type: "purchase", amount: 1496, detail: "ซื้อของใช้ที่ร้าน" }] },
-  { prename: "นาย", firstName: "วิชัย", lastName: "รักดี", gender: "ชาย", cardNumber: "2395100204", patientCode: "70004", phone: "082-345-6004", openedAt: "2026-06-15 08:20:00", activation: 10000, preHistory: [{ daysBefore: 50, type: "deposit", amount: 2000, detail: "เติมเงินสดที่เคาน์เตอร์" }, { daysBefore: 45, type: "purchase", amount: 10_204, detail: "ซื้อของใช้ที่ร้าน" }] },
+  { prename: "นาย", firstName: "วิชัย", lastName: "รักดี", gender: "ชาย", cardNumber: "2395100204", patientCode: "70004", phone: "082-345-6004", openedAt: "2026-06-15 08:20:00", activation: 10000, preHistory: [{ daysBefore: 45, type: "deposit", amount: 2000, detail: "เติมเงินสดที่เคาน์เตอร์" }, { daysBefore: 50, type: "purchase", amount: 10_204, detail: "ซื้อของใช้ที่ร้าน" }] },
   { prename: "นาย", firstName: "ธนกร", lastName: "ใจงาม", gender: "ชาย", cardNumber: "2395100205", patientCode: "70005", phone: "083-456-7005", openedAt: "2026-07-02 15:05:00", activation: 500, preHistory: [] },
   { prename: "นาย", firstName: "พิชัย", lastName: "ชาญชัย", gender: "ชาย", cardNumber: "2395100206", patientCode: "70006", phone: "083-456-7006", openedAt: "2026-07-19 11:40:00", activation: 1500, preHistory: [{ daysBefore: 40, type: "purchase", amount: 1218, detail: "ซื้อของใช้ที่ร้าน" }] },
   { prename: "นาย", firstName: "อดุลย์", lastName: "สุขเกษม", gender: "ชาย", cardNumber: "2395100207", patientCode: "70007", phone: "084-567-8007", openedAt: "2026-08-05 10:00:00", activation: 1000, preHistory: [] },
   { prename: "นาย", firstName: "กิตติ", lastName: "พงษ์ไทย", gender: "ชาย", cardNumber: "2395100208", patientCode: "70008", phone: "084-567-8008", openedAt: "2026-08-21 14:25:00", activation: 3000, preHistory: [{ daysBefore: 15, type: "deposit", amount: 1000, detail: "เติมเงินสดที่เคาน์เตอร์" }, { daysBefore: 10, type: "purchase", amount: 2450, detail: "ซื้อของใช้ที่ร้าน" }] },
   { prename: "นางสาว", firstName: "มาลี", lastName: "ใจดี", gender: "หญิง", cardNumber: "2395100209", patientCode: "70009", phone: "085-678-9009", openedAt: "2026-04-30 09:15:00", activation: 1000, preHistory: [{ daysBefore: 100, type: "deposit", amount: 1495, detail: "เติมเงินสดที่เคาน์เตอร์" }, { daysBefore: 55, type: "purchase", amount: 896, detail: "ซื้อของใช้ที่ร้าน" }] },
-  { prename: "นางสาว", firstName: "สมศรี", lastName: "สุขสวัสดิ์", gender: "หญิง", cardNumber: "2395100210", patientCode: "70010", phone: "085-678-9010", openedAt: "2026-05-20 10:50:00", activation: 2000, preHistory: [{ daysBefore: 80, type: "purchase", amount: 3096, detail: "ซื้อของใช้ที่ร้าน" }, { daysBefore: 25, type: "deposit", amount: 500, detail: "เติมเงินสดที่เคาน์เตอร์" }] },
+  { prename: "นางสาว", firstName: "สมศรี", lastName: "สุขสวัสดิ์", gender: "หญิง", cardNumber: "2395100210", patientCode: "70010", phone: "085-678-9010", openedAt: "2026-05-20 10:50:00", activation: 2000, preHistory: [{ daysBefore: 25, type: "deposit", amount: 500, detail: "เติมเงินสดที่เคาน์เตอร์" }, { daysBefore: 80, type: "purchase", amount: 2196, detail: "ซื้อของใช้ที่ร้าน" }] },
   { prename: "นางสาว", firstName: "ปิ่นทอง", lastName: "แสงทอง", gender: "หญิง", cardNumber: "2395100211", patientCode: "70011", phone: "086-789-1011", openedAt: "2026-06-08 16:30:00", activation: 500, preHistory: [{ daysBefore: 65, type: "deposit", amount: 500, detail: "เติมเงินสดที่เคาน์เตอร์" }] },
   { prename: "นางสาว", firstName: "กนกพร", lastName: "รุ่งเรือง", gender: "หญิง", cardNumber: "2395100212", patientCode: "70012", phone: "086-789-1012", openedAt: "2026-06-24 08:45:00", activation: 1500, preHistory: [{ daysBefore: 48, type: "purchase", amount: 504, detail: "ซื้อของใช้ที่ร้าน" }] },
   { prename: "นาง", firstName: "อรุณี", lastName: "ทองดี", gender: "หญิง", cardNumber: "2395100213", patientCode: "70013", phone: "087-890-2013", openedAt: "2026-07-11 13:20:00", activation: 1000, preHistory: [] },
@@ -224,7 +224,12 @@ async function main() {
       .run(memberNumber, m.prename, m.firstName, m.lastName, m.phone, 0, m.openedAt, m.gender, m.cardNumber, m.patientCode);
     db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, actor, created_at) VALUES (?, 'activation', ?, ?, 'เงินสด', ?, ?, ?)`)
       .run(memberNumber, "เปิดใช้บัตร · เงินเริ่มต้นตอนลงทะเบียน · เงินสด", m.activation, m.activation, cashierNames[0], m.openedAt);
-    for (const entry of m.preHistory) {
+    // ROUND 71 — เรียงรายการตามลำดับเวลาจริง (daysBefore น้อย = เกิดก่อน) ก่อนคำนวณยอดคงเหลือ
+    // เดิมคำนวณตามลำดับใน array ทำให้ balance_after ในบัญชีเดินสะสมไม่ตรงตามวันที่เมื่อแสดงผล
+    // และเติมกั้น: ยอดสมาชิกติดลบไม่มีทางเกิดจากการขายจริง (checkout บล็อก "ยอดเงินคงเหลือไม่พอ")
+    // ข้อมูล seed ที่ทำให้ติดลบ = บั๊กข้อมูล — หยุดเลยเพื่อให้แก้ตัวเลขก่อน
+    const chronological = [...m.preHistory].sort((a, b) => a.daysBefore - b.daysBefore);
+    for (const entry of chronological) {
       // daysBefore = จำนวนวันหลังเปิดบัตร (กันเลย 17 ก.ย.: อัดให้จบก่อนต้นช่วง)
       const openedMs = new Date(`${m.openedAt.replace(" ", "T")}`).getTime();
       const rawAt = openedMs + entry.daysBefore * 86_400_000;
@@ -232,10 +237,16 @@ async function main() {
       const at = new Date(Math.min(rawAt, capMs));
       if (entry.type === "deposit") {
         balance += entry.amount;
+      } else {
+        balance -= entry.amount;
+      }
+      if (balance < 0) {
+        throw new Error(`ข้อมูล seed สมาชิก ${m.firstName} (${memberNumber}) ทำให้ยอดติดลบ ${balance.toFixed(2)} ที่รายการ ${entry.type} ${entry.amount} — ปรับจำนวนเงินใน preHistory ก่อนรัน seed`);
+      }
+      if (entry.type === "deposit") {
         db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, actor, created_at) VALUES (?, 'deposit', ?, ?, 'เงินสด', ?, ?, ?)`)
           .run(memberNumber, entry.detail, entry.amount, round2(balance), cashierNames[randInt(0, 2)], fmt(at));
       } else {
-        balance -= entry.amount;
         db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, actor, created_at) VALUES (?, 'purchase', ?, ?, 'หักบัญชีสมาชิก', ?, ?, ?)`)
           .run(memberNumber, entry.detail, -entry.amount, round2(balance), cashierNames[randInt(0, 2)], fmt(at));
       }
@@ -263,6 +274,11 @@ async function main() {
   }
 
   const walletMembers = memberNumbers.filter((_, i) => (memberBalances.get(memberNumbers[i]) ?? 0) > 100);
+  // ROUND 71 — เลือกสมาชิกเฉพาะที่ "เปิดบัตรแล้ว" ณ เวลานั้น: เดิมสุ่มจากทั้ง 16 คน ทำให้สมาชิกที่มาเปิดบัตรช่วง 17-20 ก.ย.
+  // มีรายการเติมเงิน/ซื้อของ "ก่อนวันเปิดบัตร" ค้างในบัญชี (M-000016 เปิดบัตร 20 ก.ย. แต่มีรายการ 17 ก.ย.)
+  const openedAtByMember = new Map<string, number>();
+  for (let i = 0; i < MEMBERS.length; i += 1) openedAtByMember.set(`M-${String(i + 1).padStart(6, "0")}`, new Date(`${MEMBERS[i].openedAt.replace(" ", "T")}`).getTime());
+  const memberIsOpen = (memberNumber: string, at: Date) => (openedAtByMember.get(memberNumber) ?? 0) <= at.getTime();
   const money = (n: number) => `฿${n.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const summarize = (items: { name: string; qty: number; unit: string }[]) => items.slice(0, 3).map((item) => `${item.name} ${item.qty} ${item.unit}`).join(", ") + (items.length > 3 ? ` และอีก ${items.length - 3} รายการ` : "");
 
@@ -275,13 +291,24 @@ async function main() {
     const billsToday = day === daysToFill ? randInt(3, 4) : randInt(5, 7);
     const dayStats = { bills: 0, pieces: 0, revenue: 0, cash: 0, qr: 0, wallet: 0, deposits: 0, withdrawals: 0 };
     orderSeqByDay.set(day, 0);
+    // ROUND 71 — เวลาในวันเดียวกันไล่ตามลำดับที่สร้างเสมอ (นาฬิกาวิ่งไปหน้า ไม่ย้อนหลัง)
+    // เดิมสุ่มชั่วโมงอิสระ ทำให้เช่น เติมเงิน 12:15 ถูกบันทึกก่อนบิล 11:52 แต่ยอดคงเหลือ (balance_after)
+    // คิดตามลำดับการสร้าง — พอแสดงบัญชีเรียงตามเวลา ยอดสะสมจึงไม่ตรงกัน 7/16 คน
+    let minuteOfDay = 8 * 60 + randInt(0, 30); // เปิดร้านราว 08:00-08:30
+    const nextTimeOfDay = (maxGap = 55) => {
+      minuteOfDay += randInt(12, maxGap);
+      if (minuteOfDay >= 20 * 60) return null; // ปิดร้านก่อน 20:00 น. — วันนั้นจบ
+      return dayAt(day, Math.floor(minuteOfDay / 60), minuteOfDay % 60);
+    };
 
     // 6.2 เติมเงิน (ลดยอดเงิน = ถอน · คืนบัตรเงินสด = refund)
     const depositsToday = day === 0 ? 2 : day === daysToFill ? 1 : randInt(1, 3);
     for (let d = 0; d < depositsToday; d += 1) {
-      const at = dayAt(day, randInt(9, 16), randInt(0, 59));
+      const at = nextTimeOfDay();
       if (!at) break;
-      const memberNumber = pick(memberNumbers);
+      const openMembers = memberNumbers.filter((mn) => memberIsOpen(mn, at));
+      if (openMembers.length === 0) break;
+      const memberNumber = pick(openMembers);
       const amount = pick([300, 500, 500, 1000, 1000, 1495, 2000]);
       const before = memberBalances.get(memberNumber) ?? 0;
       const after = round2(before + amount);
@@ -292,18 +319,19 @@ async function main() {
       depositCount += 1;
     }    // 6.1 บิลขาย
     for (let bill = 0; bill < billsToday; bill += 1) {
-      const at = dayAt(day, randInt(8, day === daysToFill ? 11 : 19), randInt(0, 59));
+      const at = nextTimeOfDay();
       if (!at) break;
       const cashier = cashierNames[(day + bill) % cashierNames.length];
       const roll = rnd();
       const paymentMethod = roll < 0.5 ? "เงินสด" : roll < 0.75 ? "QR / สแกน" : "หักบัญชีสมาชิก";
       let memberNumber: string | null = null;
       if (paymentMethod === "หักบัญชีสมาชิก") {
-        const candidates = walletMembers.filter((mn) => (memberBalances.get(mn) ?? 0) > 60);
+        const candidates = walletMembers.filter((mn) => (memberBalances.get(mn) ?? 0) > 60 && memberIsOpen(mn, at));
         if (candidates.length === 0) continue;
         memberNumber = pick(candidates);
       } else if (rnd() < 0.3) {
-        memberNumber = pick(memberNumbers);
+        const openMembers = memberNumbers.filter((mn) => memberIsOpen(mn, at));
+        if (openMembers.length > 0) memberNumber = pick(openMembers);
       }
       const lineCount = randInt(1, 4);
       const lines: { productId: number; name: string; unit: string; qty: number; price: number; cost: number }[] = [];
@@ -349,9 +377,9 @@ async function main() {
 
 
     if (day >= 1 && day % 2 === 1 && day < daysToFill) {
-      const at = dayAt(day, randInt(10, 15), randInt(0, 59));
+      const at = nextTimeOfDay();
       if (at) {
-        const memberNumber = pick(walletMembers.filter((mn) => (memberBalances.get(mn) ?? 0) > 400));
+        const memberNumber = pick(walletMembers.filter((mn) => (memberBalances.get(mn) ?? 0) > 400 && memberIsOpen(mn, at)));
         if (memberNumber) {
           const amount = pick([200, 300, 1000]);
           const before = memberBalances.get(memberNumber) ?? 0;
@@ -369,9 +397,9 @@ async function main() {
 
     // คืนบัตรเงินสด: 19 ก.ย. และวันสุดท้าย — ผู้ป่วยออกจากโรงพยาบาล คืนบัตรรับเงินคืน
     if (day === 2 || day === daysToFill) {
-      const at = dayAt(day, randInt(10, 15), randInt(0, 59));
+      const at = nextTimeOfDay();
       if (at) {
-        const candidates = walletMembers.filter((mn) => (memberBalances.get(mn) ?? 0) > 150);
+        const candidates = walletMembers.filter((mn) => (memberBalances.get(mn) ?? 0) > 150 && memberIsOpen(mn, at));
         const memberNumber = candidates.length > 0 ? candidates[day % candidates.length] : null;
         if (memberNumber) {
           const before = memberBalances.get(memberNumber) ?? 0;
@@ -415,6 +443,31 @@ async function main() {
   const totalIn = (db.prepare(`SELECT ROUND(SUM(CASE WHEN type IN ('deposit','activation') THEN amount END), 2) AS total FROM member_transactions`).get() as { total: number }).total;
   const totalOut = (db.prepare(`SELECT ROUND(SUM(CASE WHEN type IN ('purchase','withdrawal','refund') THEN -amount END), 2) AS total FROM member_transactions`).get() as { total: number }).total;
   console.log(`ยอดเงินในบัตร: เข้ารวม ${money(totalIn)} − จ่ายรวม ${money(totalOut)} = คงเหลือ ${money(totalBalance)} ${Math.abs(totalIn - totalOut - totalBalance) < 0.01 ? "(ตรงกัน ✓)" : "(ไม่ตรง!)"}`);
+
+  // ROUND 71 — ตรวจ 2 ข้อที่เคยพัง: (1) สมาชิกยอดติดลบ (2) balance_after ในบัญชีไม่ไล่ตามลำดับเวลา
+  const negativeMembers = db.prepare(`SELECT member_number, first_name, balance FROM members WHERE balance < 0`).all() as { member_number: string; first_name: string; balance: number }[];
+  if (negativeMembers.length > 0) {
+    console.log(`✗ พบสมาชิกยอดติดลบ ${negativeMembers.length} คน: ${negativeMembers.map((row) => `${row.member_number} ${row.first_name} ${row.balance}`).join(" · ")}`);
+    confirmExit("ยอดสมาชิกติดลบ — การขายจริงไม่มีทางสร้างยอดติดลบ (checkout บล็อกไว้) ต้องแก้ข้อมูล seed");
+  }
+  let ledgerErrors = 0;
+  for (const memberNumber of memberNumbers) {
+    const rows = db.prepare(`SELECT amount, balance_after FROM member_transactions WHERE member_number = ? ORDER BY created_at, rowid`).all(memberNumber) as { amount: number; balance_after: number }[];
+    let running = 0;
+    for (const row of rows) {
+      running = round2(running + row.amount);
+      if (Math.abs(running - row.balance_after) > 0.01) {
+        ledgerErrors += 1;
+        console.log(`✗ บัญชีเดินสะสมไม่ตรง: ${memberNumber} — รวมถึงแถวนี้ ${running} แต่บันทึก ${row.balance_after}`);
+        break;
+      }
+    }
+  }
+  console.log(`บัญชีเดินสะสมสมาชิก (balance_after ไล่ตามวันที่): ${ledgerErrors === 0 ? `ผ่านทั้ง ${memberNumbers.length} คน ✓` : `พบปัญหา ${ledgerErrors} คน!`}`);
+  if (ledgerErrors > 0) confirmExit("บัญชีเดินสะสมไม่ตรงตามลำดับเวลา");
+  const skuByCategory = db.prepare(`SELECT category, COUNT(*) AS n, MIN(sku) AS firstSku, MAX(sku) AS lastSku FROM products GROUP BY category ORDER BY n DESC`).all() as { category: string; n: number; firstSku: string; lastSku: string }[];
+  console.log("รหัสสินค้าแยกตามหมวด:");
+  for (const row of skuByCategory) console.log(`  ${row.category}: ${row.n} รายการ (${row.firstSku} … ${row.lastSku})`);
   console.log("\nเสร็จสิ้น — เปิดโปรแกรมแล้วดู: รายงาน → ยอดเงินในบัตร / สินค้าคงคลัง / ประวัติธุรกรรม");
 }
 

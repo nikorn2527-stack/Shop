@@ -645,10 +645,18 @@ export type CreateProductInput = {
   actorRole?: string;
 };
 
+// ROUND 71 — รหัสสินค้าอัตโนมัติแยกตามหมวด (ตามชุดข้อมูลจริง 120 รายการ):
+// เครื่องดื่ม=DRK · ของใช้ส่วนตัว=HYG · ขนม=SNK · อาหาร=FD · ของใช้ในครัวเรือน=HH · เครื่องเขียน=ST
+// ("ของใช้" คือหมวดเดโมรุ่นเก่า — ให้ HYG เหมือนเดิม) — ชุดเดียวกันใช้ที่ scripts/seed-data-products.ts
+// และ IMPORT_SKU_PREFIXES ใน server/importTool.ts เพื่อให้ import XLSX ออกรหัสชุดเดียวกัน
 const CATEGORY_SKU_PREFIXES: Record<string, string> = {
   "เครื่องดื่ม": "DRK",
   "อาหาร": "FD",
   "ของใช้": "HYG",
+  "ของใช้ส่วนตัว": "HYG",
+  "ของใช้ในครัวเรือน": "HH",
+  "ขนม": "SNK",
+  "เครื่องเขียน": "ST",
 };
 
 function generateSku(db: SqliteDb, category: string) {
