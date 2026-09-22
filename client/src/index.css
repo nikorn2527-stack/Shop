@@ -3125,6 +3125,12 @@ th { font-weight: 600; }
 .quickpick-toggle.on { background: #eaf7f0; border-color: #9ed3bd; color: #2f6a52; font-weight: 600; }
 .quickpick-toggle svg { color: #c9b45a; }
 .quickpick-toggle:not(.on) svg { color: #b3b9ab; }
+/* ROUND 70 — quickpick ในฟอร์มเพิ่ม/แก้ไขสินค้า: ครอบด้วย .quickpick-field (หัวข้อ + ปุ่ม) ให้ปุ่มอยู่ระดับเดียวกับ input/select คู่ข้าง ๆ ไม่เยื้องเป็นขั้นบันได */
+.quickpick-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.quickpick-field .field-label { color: #7f8471; font-size: 11.5px; font-weight: 600; }
+.modal-backdrop .quickpick-field .field-label { color: #4f5444; font-size: 12px; font-weight: 600; }
+.quickpick-field .quickpick-toggle { width: 100%; height: 42px; justify-content: center; font-size: 11.5px; align-self: stretch; }
+.modal-backdrop .quickpick-field .quickpick-toggle { height: 38px; }
 .tier-editor { border: 1px solid #dfeae3; background: #fafcfb; border-radius: 10px; padding: 11px 12px; display: flex; flex-direction: column; gap: 7px; }
 .tier-editor-head { display: flex; flex-direction: column; gap: 4px; }
 .tier-col-labels { display: grid; grid-template-columns: 1.2fr .7fr .9fr 26px; gap: 6px; }
@@ -3152,6 +3158,10 @@ th { font-weight: 600; }
 .thai-date-field:hover { border-color: #a9d2c0; }
 .thai-date-field svg:first-child { color: var(--teal); }
 .thai-date-field .thai-date-caret { color: #98a094; transform: rotate(90deg); }
+/* ROUND 70 — ThaiDatePicker ที่อยู่ใน label ของฟอร์มกริด (เช่น วันหมดอายุในโมดัลรับเข้า): ขึ้นบรรทัดใหม่ใต้ข้อความ กว้างเต็มช่อง สูงเท่า input รอบข้าง ไม่ลอยติดข้อความ */
+.form-grid label .thai-date-picker, .compact-form label .thai-date-picker, .wallet-form label .thai-date-picker { display: flex; margin-top: 5px; }
+.form-grid label .thai-date-field, .compact-form label .thai-date-field, .wallet-form label .thai-date-field { width: 100%; height: 42px; }
+.modal-backdrop .form-grid label .thai-date-field, .modal-backdrop .compact-form label .thai-date-field, .modal-backdrop .wallet-form label .thai-date-field { height: 38px; }
 .thai-date-pop { position: absolute; top: calc(100% + 6px); left: 0; z-index: 60; width: 246px; background: #fff; border: 1px solid #e2ebe6; border-radius: 12px; box-shadow: 0 14px 34px rgba(38, 62, 51, .18); padding: 10px 11px 11px; }
 .thai-date-nav { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 7px; }
 .thai-date-nav b { color: #2f4a3d; font-size: 12.5px; }
