@@ -4692,6 +4692,15 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .modal-backdrop .outline-button, .modal-backdrop .primary-button, .modal-backdrop .danger-button, .modal-backdrop .danger-outline-button { font-size: 12px; font-weight: 600; }
 .modal-backdrop .quick-manage-info b { font-size: 12px; }
 .modal-backdrop .quick-manage-info small { font-size: 10.5px; }
+/* R74 — จัดแผงลัดหน้าร้าน: สองช่วงรายการ (ของบนแผงตอนนี้ + คลังทั้งหมด) */
+.quick-manage-section-title { display: flex; align-items: center; gap: 6px; margin: 13px 2px 0; color: #56635a; font-size: 11px; font-weight: 700; }
+.quick-manage-section-title svg { color: #6fa288; flex: 0 0 auto; }
+.quick-manage-list.on-panel { margin-top: 7px; max-height: 224px; border-color: #cbe6d8; background: #f6fcf8; }
+.quick-manage-list.on-panel .quick-manage-row { border-bottom-color: #e3f1e9; }
+.quick-manage-empty { padding: 16px 12px; color: #8d9384; font-size: 11.5px; text-align: center; }
+.quick-manage-more { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; padding: 9px 10px; border: 0; border-top: 1px dashed #d5e5dc; background: #f5faf7; color: #5f8a74; font-size: 10.5px; font-weight: 600; cursor: pointer; transition: background .15s ease; }
+.quick-manage-more:hover { background: #ecf6f0; }
+@media (max-width: 560px) { .quick-manage-list { max-height: 260px; } .quick-manage-list.on-panel { max-height: 176px; } }
 .modal-backdrop .pay-confirm-items > .pay-confirm-item { font-size: 12px; }
 .modal-backdrop .pay-confirm-items-head { font-size: 10.5px; }
 .modal-backdrop .slip-heading { font-size: 12px; color: #5f6455; font-weight: 600; }
