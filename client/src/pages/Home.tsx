@@ -70,6 +70,7 @@ import {
   QrCode,
 } from "lucide-react";
 import { toast } from "sonner";
+import { blocker } from "@/components/BlockerAlert";
 
 import { EDITIONS, EDITION_COMPARE_ROWS, EDITION_FEATURE_INFO, EDITION_TRIAL_DAYS, editionStatusLabel, type Edition, type EditionFeatureKey } from "@shared/editions";
 import { DevKeygenTool, EditionCompareTable, EditionPill, EditionUpgradeModal, useEditionStatus } from "@/components/EditionUi";
@@ -270,7 +271,9 @@ function MemberDetail({ member, onBack, role, userName, onDeleted }: { member: M
       void utils.member.list.invalidate();
       void utils.member.detail.invalidate();
     },
-    onError: (mutationError) => setError(getErrorMessage(mutationError)),
+    // ROUND 78 — เติม/ถอน/คืนบัตรไม่สำเร็จ (เช่น "ยอดเงินคงเหลือไม่พอ") — เด้งกลางจอ
+    // ให้ชัด (notice-bar ในโมดัลยังอยู่เป็นหลักฐานหลังปิดกล่อง)
+    onError: (mutationError) => { setError(getErrorMessage(mutationError)); blocker.error("บันทึกรายการไม่สำเร็จ", getErrorMessage(mutationError), { hint: "รายการนี้ยังไม่ถูกบันทึก — แก้ไขจำนวนแล้วยืนยันใหม่ได้เลย" }); },
   });
   // ROUND 77 — ปิดสลิป (และล้างผลลัพธ์) กลับไปหน้ารายละเอียดสมาชิก
   const closeWalletSlip = () => {

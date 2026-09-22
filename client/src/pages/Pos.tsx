@@ -5,6 +5,7 @@ import {
   ArrowDownToLine, ArrowUpFromLine, Camera, Check, ChevronDown, CircleAlert, CircleHelp, CreditCard, Download, FileImage, History, IdCard, ImagePlus, LayoutGrid, Lock, Minus, PackageSearch, Pause, Plus, Printer, QrCode, RotateCcw, ScanLine, Search, ShieldCheck, Sparkles, Star, StarOff, ShoppingCart, Trash2, Upload, UserRound, WalletCards, X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { blocker } from "@/components/BlockerAlert";
 import type { CartItem, HeldBill, MemberLite, Product, Role } from "./pageData";
 import { HELD_BILLS_LIMIT, PRENAME_OPTIONS, addScannedItem, addTierItem, calculateCartSubtotal, compressImageToDataUrl, formatMemberNumber, isAdminRole, loadHeldBills, memberFullName, money, parsePriceTiers, roleThaiLabel, scanMatches, smartMatchScore } from "./pageData";
 import type { PriceTier } from "./pageData";
@@ -313,7 +314,8 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
       // ROUND 37 (req 35) — แจ้งเตือนใหญ่ชัดเจน: toast พร้อมเลขบิล วิธีชำระ และยอด
       toast.success("ชำระเงินสำเร็จ", { description: `บิล ${result.orderNumber} · ${result.paymentMethod} · ยอด ${money(result.total)}`, duration: 4500 });
     },
-    onError: (mutationError) => { setError(getErrorMessage(mutationError)); toast.error("ชำระเงินไม่สำเร็จ", { description: getErrorMessage(mutationError), duration: 5200 }); },
+    // ROUND 78 — ชำระเงินไม่สำเร็จ (เงินไม่พอ · สต็อกไม่พอ · เซิร์ฟเวอร์ error) ต้องเห็นกลางจอทันที
+    onError: (mutationError) => { setError(getErrorMessage(mutationError)); blocker.error("ชำระเงินไม่สำเร็จ", getErrorMessage(mutationError), { hint: "บิลนี้ยังไม่ถูกบันทึก — แก้ไขแล้วกดยืนยันใหม่ได้เลย" }); },
   });
   const walletMutation = trpc.member.wallet.useMutation({
     onSuccess: (result) => {
@@ -326,7 +328,8 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
       void utils.logs.list.invalidate();
       void utils.dashboard.stats.invalidate();
     },
-    onError: (mutationError) => setError(getErrorMessage(mutationError)),
+    // ROUND 78 — เติม/ถอนไม่สำเร็จ (เช่น ยอดเงินคงเหลือไม่พอ) เด้งกลางจอ — ก่อนหน้านี้ error ไปอยู่บรรทัดสถานะเล็ก ๆ ที่โดนโมดูลบัง มองไม่เห็น
+    onError: (mutationError) => { setError(getErrorMessage(mutationError)); blocker.error("บันทึกรายการไม่สำเร็จ", getErrorMessage(mutationError), { hint: "รายการนี้ยังไม่ถูกบันทึก — แก้ไขจำนวนแล้วยืนยันใหม่ได้เลย" }); },
   });
   // Round 32-16 — ลงทะเบียนสมาชิกใหม่ที่ POS จุดเดียว: บันทึกเสร็จเปิดบัตรให้พิมพ์
   // ทันที แล้วเลือกสมาชิกใหม่เข้าบิลปัจจุบันให้อัตโนมัติ
@@ -394,7 +397,8 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
     setScanMember(null);
     if (member.status === "suspended") {
       setError(`บัตร ${member.memberNumber} ถูกระงับการใช้จ่าย — ชำระด้วยเงินสดหรือ QR แทนได้`);
-      toast.error("บัตรนี้ถูกระงับการใช้จ่าย", { description: `${memberFullName(member)} · ${member.memberNumber} — ตรวจสอบกับผู้บริหาร หรือชำระด้วยเงินสด/QR แทน`, duration: 5200 });
+      // ROUND 78 — บัตรถูกระงับ: กลางจอใหญ่ชัด พนักงานเห็นทันทีตอนยืนยันบัตร
+      blocker.warning("บัตรสมาชิกถูกระงับการใช้จ่าย", `${memberFullName(member)} · ${member.memberNumber}\nตรวจสอบกับผู้บริหาร — บิลนี้ชำระด้วยเงินสดหรือ QR แทนได้`);
       focusScan();
       return;
     }
@@ -422,13 +426,13 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
     const store = products.find((item) => item.id === product.id);
     if (store?.sellMode === "money" && parsePriceTiers(store.priceTiers).length > 0) {
       setError(`${product.name} ขายเป็นราคา — กดปุ่มราคา (฿1 / ฿5 / ฿10) บนการ์ดเพื่อเลือกขนาด`);
-      toast.error("สินค้านี้ขายเป็นราคา", { description: `${product.name} — เลือกขนาดที่ปุ่มราคา (฿1 / ฿5 / ฿10) บนการ์ดด้านขวา` });
+      blocker.warning("สินค้านี้ขายเป็นราคา — กดปุ่มราคาบนการ์ด", `${product.name} — เลือกขนาดที่ปุ่มราคา (฿1 / ฿5 / ฿10) บนการ์ดสินค้า`);
       return;
     }
     const currentQty = cart.reduce((sum, item) => (item.id === product.id && !item.variant ? sum + item.qty : sum), 0);
     if (store && currentQty + 1 > store.stock) {
       setError(`สต็อกไม่พอ · ${product.name} เหลือ ${store.stock} ${store.unit}`);
-      toast.error("สต็อกไม่พอ", { description: `${product.name} เหลือ ${store.stock} ${store.unit} — รับเข้าเพิ่มได้ที่หน้าสต็อกสินค้า` });
+      blocker.error("สต็อกไม่พอ — เพิ่มเข้าบิลไม่ได้", `${product.name} เหลือ ${store.stock} ${store.unit} ในคลัง\nรับเข้าเพิ่มได้ที่หน้าสต็อกสินค้า`);
       return;
     }
     setCart((items) => addScannedItem(items, product));
@@ -442,7 +446,7 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
     const inBill = cart.reduce((sum, item) => (item.id === product.id ? sum + item.qty : sum), 0);
     if (inBill + tier.qty > product.stock) {
       setError(`สต็อกไม่พอ · ${product.name} เหลือ ${formatBillQty(product.stock, product.unit)}`);
-      toast.error("สต็อกไม่พอ", { description: `${product.name} เหลือ ${formatBillQty(product.stock, product.unit)}` });
+      blocker.error("สต็อกไม่พอ — เพิ่มเข้าบิลไม่ได้", `${product.name} เหลือ ${formatBillQty(product.stock, product.unit)} ในคลัง`);
       return;
     }
     clearNotices();
@@ -460,7 +464,7 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
       const others = cart.reduce((sum,entry) => (entry.id === item.id && (entry.variant ?? "") !== (item.variant ?? "") ? sum + entry.qty : sum), 0);
       if (qty + others > store.stock) {
         setError(`สต็อกไม่พอ · ${store.name} เหลือ ${formatBillQty(store.stock, store.unit)} (ในบิลแล้ว ${formatBillQty(others, store.unit)})`);
-        toast.error("สต็อกไม่พอสำหรับจำนวนที่ตั้ง", { description: `${store.name} เหลือ ${formatBillQty(store.stock, store.unit)} (ในบิลแล้ว ${formatBillQty(others, store.unit)})` });
+        blocker.error("สต็อกไม่พอสำหรับจำนวนที่ตั้ง", `${store.name} เหลือ ${formatBillQty(store.stock, store.unit)} ในคลัง\nในบิลนี้มีอยู่แล้ว ${formatBillQty(others, store.unit)}`);
         return;
       }
     }
@@ -468,7 +472,7 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
       const others = cart.reduce((sum, entry) => (entry.id === item.id && entry.variant !== item.variant ? sum + entry.qty : sum), 0);
       if (qty + others > store.stock) {
         setError(`สต็อกไม่พอ · ${store.name} เหลือ ${formatBillQty(store.stock, store.unit)}`);
-        toast.error("สต็อกไม่พอสำหรับจำนวนที่ตั้ง", { description: `${store.name} เหลือ ${formatBillQty(store.stock, store.unit)}` });
+        blocker.error("สต็อกไม่พอสำหรับจำนวนที่ตั้ง", `${store.name} เหลือ ${formatBillQty(store.stock, store.unit)} ในคลัง`);
         return;
       }
     }
@@ -513,7 +517,7 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
       const inBill = cart.reduce((sum, item) => (item.id === id ? sum + item.qty : sum), 0);
       if (store && inBill + delta * step > store.stock) {
         setError(`สต็อกไม่พอ · ${store.name} เหลือ ${store.stock} ${store.unit}`);
-        toast.error("สต็อกไม่พอ", { description: `${store.name} เหลือ ${store.stock} ${store.unit}` });
+        blocker.error("สต็อกไม่พอ — เพิ่มจำนวนไม่ได้", `${store.name} เหลือ ${store.stock} ${store.unit} ในคลัง`);
         return;
       }
     }
@@ -567,7 +571,8 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
       return;
     }
     setError(`ไม่พบสินค้าหรือสมาชิกสำหรับ "${code}" · ลองยิงบาร์โค้ดจริง เช่น ${sampleCodes[0]?.barcode ?? "8850000000017"} หรือรหัส SKU เช่น DRK-001`);
-    toast.error("ไม่พบรายการที่ค้นหา", { description: `ลองยิงบาร์โค้ดจริง เช่น ${sampleCodes[0]?.barcode ?? "8850000000017"} หรือรหัส SKU เช่น DRK-001`, duration: 4200 });
+    // ROUND 78 — ยิงบาร์โค้ดไม่เจอ: เด้งกลางจอ (ปืนสแกนไม่มีเสียงบี๊บ พนักงานต้องเห็นสาเหตุ)
+    blocker.warning("ไม่พบรายการที่สแกน", `ไม่พบสินค้าหรือสมาชิกสำหรับ "${code}"\nลองยิงบาร์โค้ดจริง เช่น ${sampleCodes[0]?.barcode ?? "8850000000017"} หรือรหัส SKU เช่น DRK-001`);
   };
   const handleSlip = async (file?: File) => {
     if (!file) return;
@@ -600,12 +605,12 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
     if (cart.length === 0) return;
     if (method === "หักบัญชีสมาชิก" && !selectedMember) {
       setError("กรุณาเลือกสมาชิกก่อนชำระแบบหักบัญชี");
-      toast.error("ยังไม่ได้เลือกสมาชิก", { description: "ยิงบัตรสมาชิกที่ช่องสแกน หรือกด F1 เพื่อเลือกสมาชิกก่อน" });
+      blocker.warning("ยังไม่ได้เลือกสมาชิก", "ชำระแบบหักบัญชีสมาชิก ต้องมีสมาชิกในบิลก่อน\nยิงบัตรสมาชิกที่ช่องสแกน หรือกด F1 เพื่อเลือกสมาชิก");
       return;
     }
     if (discountValue > subtotal) {
       setError("ส่วนลดมากกว่ายอดรวมสินค้า");
-      toast.error("ส่วนลดมากกว่ายอดรวมสินค้า", { description: "ปรับส่วนลดให้ไม่เกินยอดรวมก่อนชำระเงิน" });
+      blocker.warning("ส่วนลดมากกว่ายอดรวมสินค้า", "ปรับส่วนลดให้ไม่เกินยอดรวม แล้วชำระเงินใหม่ได้เลย");
       return;
     }
     clearNotices();
@@ -614,7 +619,7 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
   };
   const completePayment = (method: PaymentMethod) => {
     if (cart.length === 0) return;
-    if (discountValue > subtotal) { setError("ส่วนลดมากกว่ายอดรวมสินค้า"); toast.error("ส่วนลดมากกว่ายอดรวมสินค้า", { description: "ปรับส่วนลดให้ไม่เกินยอดรวมก่อนชำระเงิน" }); return; }
+    if (discountValue > subtotal) { setError("ส่วนลดมากกว่ายอดรวมสินค้า"); blocker.warning("ส่วนลดมากกว่ายอดรวมสินค้า", "ปรับส่วนลดให้ไม่เกินยอดรวม แล้วกดยืนยันใหม่ได้เลย"); return; }
     clearNotices();
     checkoutMutation.mutate({
       items: cart.map((item) => item.special
@@ -633,9 +638,9 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
   };
   const submitWallet = () => {
     const memberNumber = walletMemberNumber || selectedMemberNumber;
-    if (!memberNumber) { setError("กรุณาเลือกสมาชิกก่อนบันทึกรายการ"); toast.error("ยังไม่ได้เลือกสมาชิก", { description: "ยิงบัตรสมาชิกที่ช่องด้านบน หรือเลือกจากรายการก่อนบันทึก" }); return; }
+    if (!memberNumber) { setError("กรุณาเลือกสมาชิกก่อนบันทึกรายการ"); blocker.warning("ยังไม่ได้เลือกสมาชิก", "ยิงบัตรสมาชิกที่ช่องด้านบน หรือเลือกจากรายการก่อนบันทึกรายการ"); return; }
     const amount = Number(walletAmount);
-    if (!(amount > 0)) { setError("กรุณาระบุจำนวนเงินมากกว่า 0"); toast.error("กรุณาระบุจำนวนเงินมากกว่า 0", { description: "ใส่ยอดเงินที่จะเติมหรือถอนให้ครบถ้วน" }); return; }
+    if (!(amount > 0)) { setError("กรุณาระบุจำนวนเงินมากกว่า 0"); blocker.warning("กรุณาระบุจำนวนเงินให้ถูกต้อง", "ใส่ยอดเงินที่จะเติมหรือถอนเป็นตัวเลขมากกว่า 0"); return; }
     clearNotices();
     setWalletStep("confirm");
   };
@@ -685,8 +690,8 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
     const price = Number(specialPrice);
     const qty = Math.max(1, Math.floor(Number(specialQty) || 1));
     const unit = specialUnit.trim() || "รายการ";
-    if (!name) { setError("กรุณาระบุชื่อรายการพิเศษ"); toast.error("กรุณาระบุชื่อรายการพิเศษ", { description: "เช่น ข้าวราดแกงนอกรายการ / ค่าฝากของ" }); return; }
-    if (!(price > 0)) { setError("ราคาต่อหน่วยต้องมากกว่า 0"); toast.error("ราคาต่อหน่วยต้องมากกว่า 0", { description: "ใส่ราคาของรายการพิเศษนี้ให้ถูกต้อง" }); return; }
+    if (!name) { setError("กรุณาระบุชื่อรายการพิเศษ"); blocker.warning("กรุณาระบุชื่อรายการพิเศษ", "เช่น ข้าวราดแกงนอกรายการ / ค่าฝากของ"); return; }
+    if (!(price > 0)) { setError("ราคาต่อหน่วยต้องมากกว่า 0"); blocker.warning("ราคาต่อหน่วยต้องมากกว่า 0", "ใส่ราคาของรายการพิเศษนี้ให้ถูกต้องก่อนเพิ่มเข้าบิล"); return; }
     const specialId = -(Date.now() + ++specialSeq.current);
     setCart((items) => [...items, { id: specialId, name, price, qty, unit, special: true }]);
     setSpecialName("");
@@ -709,12 +714,12 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
   const holdBill = () => {
     if (cart.length === 0) {
       if (heldBills.length > 0) { setMessage(`มีบิลที่ถูกพักอยู่ ${heldBills.length} บิล · เรียกคืนได้จากแถบใต้ช่องสแกน`); toast.info(`มีบิลที่พักอยู่ ${heldBills.length} บิล`, { description: "เรียกคืนได้จากแถบใต้ช่องสแกน" }); }
-      else { setError("ยังไม่มีรายการในบิลปัจจุบันที่จะพักไว้"); toast.error("ยังไม่มีรายการในบิลที่จะพักไว้", { description: "เพิ่มสินค้าก่อน แล้วกดพักบิล (F5)" }); }
+      else { setError("ยังไม่มีรายการในบิลปัจจุบันที่จะพักไว้"); blocker.warning("ยังไม่มีรายการในบิลที่จะพักไว้", "เพิ่มสินค้าเข้าบิลก่อน แล้วกดพักบิล (F5)"); }
       return;
     }
     if (heldBills.length >= HELD_BILLS_LIMIT) {
       setError(`พักบิลได้สูงสุด ${HELD_BILLS_LIMIT} บิล · เรียกคืนหรือยกเลิกบิลที่พักไว้ก่อน`);
-      toast.error(`พักบิลได้สูงสุด ${HELD_BILLS_LIMIT} บิล`, { description: "เรียกคืนหรือยกเลิกบิลที่พักไว้ก่อน" });
+      blocker.warning(`พักบิลได้สูงสุด ${HELD_BILLS_LIMIT} บิล`, "เรียกคืนหรือยกเลิกบิลที่พักไว้ก่อน แล้วจึงพักบิลใหม่ได้");
       return;
     }
     setHeldBills((bills) => [...bills, { id: Date.now(), savedAt: Date.now(), items: cart, discount, memberNumber: selectedMemberNumber }]);

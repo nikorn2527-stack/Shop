@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Camera, PackageSearch, ScanLine, X } from "lucide-react";
 import { toast } from "sonner";
+import { blocker } from "@/components/BlockerAlert";
 import type { SqliteProduct } from "../../../server/sqliteStore";
 import type { MemberLite } from "@/pages/pageData";
 import { money, memberFullName, scanMatches, smartMatchScore } from "@/pages/pageData";
@@ -107,7 +108,8 @@ export function MemberScanPicker({
   const confirmPending = () => {
     if (!pending) return;
     if (pending.status === "suspended") {
-      toast.error("บัตรนี้ถูกระงับการใช้จ่าย", { description: `${memberFullName(pending)} · ${pending.memberNumber} — ตรวจสอบกับผู้บริหารก่อนใช้รายการนี้` });
+      // ROUND 78 — บัตรถูกระงับ: เด้งกลางจอให้ชัด (เดิม toast มุมขวาล่างมองไม่เห็น)
+      blocker.warning("บัตรสมาชิกถูกระงับการใช้จ่าย", `${memberFullName(pending)} · ${pending.memberNumber}\nตรวจสอบกับผู้บริหารก่อนใช้รายการนี้`);
       return;
     }
     onSelect(pending);
