@@ -902,14 +902,17 @@ function Reports({ focusBill, onFocusBillConsumed, role, userName }: { focusBill
     meta: [["ชนิดธุรกรรม", txTypes.length === 0 ? "ทั้งหมด" : txTypes.map((type) => TX_TYPE_LABEL[type]).join(" + ")], ["ช่วงวันที่", txFrom || txTo ? `${txFrom || "ต้นช่วง"} → ${txTo || "ปัจจุบัน"}` : "ทั้งหมด"], ["จำนวนรายการ", `${txRows.length} รายการ`]],
     columns: ["วันที่ · เวลา", "เลขสมาชิก", "ชื่อสมาชิก", "ประเภท", "รายละเอียด", "ยอด (บาท)", "คงเหลือหลังรายการ (บาท)", "เจ้าหน้าที่ผู้ทำรายการ"], numericCols: [5, 6],
     rows: txRows.map((row) => [formatLogDateTime(row.createdAt), row.memberNumber, row.memberName ?? "—", TX_TYPE_LABEL[row.type], row.detail, exportNumber(row.amount), row.balanceAfter !== null ? exportNumber(row.balanceAfter) : "—", row.actor ?? "ไม่ระบุ"]),
-    // ROUND 75 (user) — ฟอร์มไหนก็ต้องมีแถวสรุปยอดรวมท้ายตารางเหมือนฟอร์มอื่น
-    // ธุรกรรมมี ทั้งเติม(+) ถอน(−) ซื้อ(−) — สรุปแยกประเภทในช่องรายละเอียด + ยอดเน็ตในช่องยอด
-    totalsRow: [
-      `รวมทั้งหมด ${txRows.length} รายการ`, "—", "—", "—",
-      `เติม +${exportNumber(txTotals.deposit)} (${exportCount(txTotals.depositCount)}) · ถอน −${exportNumber(txTotals.withdraw)} (${exportCount(txTotals.withdrawCount)}) · ซื้อ −${exportNumber(txTotals.spend)} (${exportCount(txTotals.spendCount)})${txTotals.activationCount > 0 ? ` · เปิดบัตร +${exportNumber(txTotals.activation)} (${exportCount(txTotals.activationCount)})` : ""}${txTotals.refundCount > 0 ? ` · คืนเงิน +${exportNumber(txTotals.refund)} (${exportCount(txTotals.refundCount)})` : ""}`,
-      exportNumber(txRows.reduce((sum, row) => sum + row.amount, 0)), "—", "—",
+    // แยกสรุปประเภทเงินออกเป็นกล่อง เพื่อไม่ให้ข้อความยาวถูกบีบอยู่ในคอลัมน์รายละเอียด
+    summaryBlocks: [
+      ["เติมเงิน", `+${exportNumber(txTotals.deposit)} · ${exportCount(txTotals.depositCount)} รายการ`],
+      ["ถอนเงิน", `-${exportNumber(txTotals.withdraw)} · ${exportCount(txTotals.withdrawCount)} รายการ`],
+      ["ซื้อสินค้า", `-${exportNumber(txTotals.spend)} · ${exportCount(txTotals.spendCount)} รายการ`],
+      ["เปิดใช้บัตร", `+${exportNumber(txTotals.activation)} · ${exportCount(txTotals.activationCount)} รายการ`],
+      ["คืนเงิน", `+${exportNumber(txTotals.refund)} · ${exportCount(txTotals.refundCount)} รายการ`],
+      ["ยอดสุทธิ", exportNumber(txRows.reduce((sum, row) => sum + row.amount, 0))],
     ],
-    brandName: "ร้านค้าสวัสดิการ", footnote: "ข้อมูลจากบัญชีสมาชิกโดยตรง · ใช้จ่าย / เติมเงิน / ถอนเงิน พร้อมผู้ทำรายการทุกครั้ง",
+    totalsRow: [`รวมทั้งหมด ${txRows.length} รายการ`, "—", "—", "—", "—", "—", "—", "—"],
+    brandName: "ร้านค้าสวัสดิการ", footnote: "ข้อมูลจากบัญชีสมาชิกโดยตรง · แยกสรุปยอดเติมเงิน ถอนเงิน ซื้อสินค้า เปิดใช้บัตร และคืนเงินด้านบน",
     compact: true, // ตาราง 10 คอลัมน์ — ลดขนาดตามฟอร์มให้อยู่บรรทัดเดียว
   });
   const openTxExportPreview = (preferred: ExportFormat) => {

@@ -21,6 +21,8 @@ export type ReportDocConfig = {
   rows: string[][];
   /** แถวรวมท้ายตาราง (ตัวหนา เส้นคู่) — ROUND 75: ทุกฟอร์มต้องมีสรุปยอดรวมท้ายตาราง */
   totalsRow?: string[];
+  /** กล่องสรุปย่อยเหนือ/ใต้ตาราง เช่น ยอดเติมเงิน/ถอน/ซื้อ แยกอ่านง่าย */
+  summaryBlocks?: [string, string][];
   brandName: string;
   /** @deprecated ROUND 75 — เอกสารไม่ใส่โลโก้อีกต่อไป (พิมพ์ขาว-ดำ/สีเหมือนกัน) ฟิลด์นี้เหลือไว้เพื่อรองรับผู้เรียกเดิม แต่จะไม่ถูกวาด */
   brandLogo?: string;
@@ -61,6 +63,16 @@ function buildPage(config: ReportDocConfig, rows: string[][], pageIndex: number,
       meta.appendChild(item);
     }
     page.appendChild(meta);
+  }
+  if (config.summaryBlocks?.length) {
+    const summary = document.createElement("div");
+    summary.className = "rd-summary-grid";
+    for (const [label, value] of config.summaryBlocks) {
+      const block = document.createElement("div");
+      block.innerHTML = `<span>${escapeHtml(label)}</span><b>${escapeHtml(value)}</b>`;
+      summary.appendChild(block);
+    }
+    page.appendChild(summary);
   }
   const table = document.createElement("table");
   table.className = "rd-table";
@@ -201,6 +213,7 @@ export async function downloadReportPdf(config: ReportDocConfig) {
 export function printReportDoc(config: ReportDocConfig) {
   const numeric = new Set(config.numericCols ?? []);
   const metaRows = (config.meta ?? []).map(([label, text]) => `<div class="meta-item"><span>${escapeHtml(label)}</span><b>${escapeHtml(text)}</b></div>`).join("");
+  const summaryRows = (config.summaryBlocks ?? []).map(([label, text]) => `<div><span>${escapeHtml(label)}</span><b>${escapeHtml(text)}</b></div>`).join("");
   const bodyRows = config.rows
     .map((row) => `<tr>${row.map((cell, index) => `<td${numeric.has(index) ? ' class="num"' : ""}>${escapeHtml(cell)}</td>`).join("")}</tr>`)
     .join("");
@@ -243,6 +256,11 @@ export function printReportDoc(config: ReportDocConfig) {
   .rd-meta { display: flex; flex-wrap: wrap; gap: 5px 16px; margin: 7px 0 9px; padding: 8px 12px; background: #f5f5f4; border: 1px solid #cfcfca; border-radius: 8px; }
   .meta-item { font-size: 10.5px; color: #555; }
   .meta-item b { color: #1c1c1a; font-weight: 700; margin-left: 5px; }
+  .rd-summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 8px 0 10px; break-inside: avoid; page-break-inside: avoid; }
+  .rd-summary-grid > div { min-width: 0; padding: 6px 8px; border: 1px solid #cfcfca; border-radius: 5px; background: #fafafa; }
+  .rd-summary-grid span, .rd-summary-grid b { display: block; }
+  .rd-summary-grid span { color: #555; font-size: 10px; }
+  .rd-summary-grid b { margin-top: 2px; color: #111; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
   table { width: 100%; border-collapse: collapse; font-size: ${config.compact ? "11.5px" : "13px"}; line-height: 1.35; page-break-inside: auto; }
   thead { display: table-header-group; }
   tbody tr { break-inside: avoid; page-break-inside: avoid; }
@@ -262,6 +280,7 @@ export function printReportDoc(config: ReportDocConfig) {
   </div>
   <div class="rd-title"><h1>${escapeHtml(config.title)}</h1>${config.periodLabel ? `<p>${escapeHtml(config.periodLabel)}</p>` : ""}</div>
   ${metaRows ? `<div class="rd-meta">${metaRows}</div>` : ""}
+  ${summaryRows ? `<div class="rd-summary-grid">${summaryRows}</div>` : ""}
   <table><thead><tr>${headCells}</tr></thead><tbody>${bodyRows}</tbody>${totalsRow}</table>
   ${config.footnote ? `<div class="rd-note">${escapeHtml(config.footnote)}</div>` : ""}
   <div class="rd-foot"><span>พิมพ์จากระบบร้านค้าสวัสดิการ</span><span>เอกสารรายงาน A4</span></div>
