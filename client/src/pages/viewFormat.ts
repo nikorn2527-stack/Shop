@@ -116,7 +116,7 @@ export function parseBahtFromDetail(detail: string | null | undefined) {
 }
 
 /** Mirrors the backend numbering rules to preview the next member number client-side. */
-export function nextMemberSequence(members: readonly { memberNumber: string }[], mode: "running" | "year" | "manual", format: { prefix?: string; yearMode?: "none" | "buddhist" | "gregorian"; yearDigits?: 2 | 4; resetMonth?: number } = {}) {
+export function nextMemberSequence(members: readonly { memberNumber: string }[], mode: "running" | "year" | "manual", format: { prefix?: string; yearMode?: "none" | "buddhist" | "gregorian"; yearDigits?: 2 | 4; resetMonth?: number; separator?: "-" | "/" | "_" | "" } = {}) {
   if (mode === "manual") return 0;
   if (mode === "year" && format.yearMode === "none") {
     const prefix = `${String(new Date().getFullYear() + 543).slice(-2)}-`;
@@ -135,7 +135,8 @@ export function nextMemberSequence(members: readonly { memberNumber: string }[],
   const cycleYear = now.getMonth() + 1 < resetMonth ? now.getFullYear() - 1 : now.getFullYear();
   const yearValue = yearMode === "buddhist" ? cycleYear + 543 : cycleYear;
   const yearText = yearMode === "none" ? "" : String(yearValue).slice(format.yearDigits === 4 ? -4 : -2);
-  const prefix = `${[prefixText.trim(), yearText].filter(Boolean).join("-")}${prefixText.trim() || yearText ? "-" : ""}`;
+  const separator = format.separator ?? "-";
+  const prefix = `${[prefixText.trim(), yearText].filter(Boolean).join(separator)}${prefixText.trim() || yearText ? separator : ""}`;
   let max = 0;
   for (const member of members) {
     if (!member.memberNumber.startsWith(prefix)) continue;

@@ -117,6 +117,7 @@ export type MemberNumberFormat = {
   yearDigits?: 2 | 4;
   resetMonth?: number;
   sequenceDigits?: number;
+  separator?: "-" | "/" | "_" | "";
 };
 
 export function formatMemberNumber(mode: "running" | "year" | "manual", sequence: number, format: MemberNumberFormat = {}) {
@@ -131,7 +132,8 @@ export function formatMemberNumber(mode: "running" | "year" | "manual", sequence
   const cycleYear = now.getMonth() + 1 < resetMonth ? now.getFullYear() - 1 : now.getFullYear();
   const yearValue = yearMode === "buddhist" ? cycleYear + 543 : cycleYear;
   const yearText = yearMode === "none" ? "" : String(yearValue).slice(yearDigits === 4 ? -4 : -2);
-  const head = [prefix.trim(), yearText].filter(Boolean).join("-");
+  const separator = format.separator ?? "-";
+  const head = [prefix.trim(), yearText].filter(Boolean).join(separator);
   const digits = Math.min(10, Math.max(1, format.sequenceDigits ?? (mode === "year" ? 5 : 6)));
   return `${head ? `${head}-` : ""}${String(sequence).padStart(digits, "0")}`;
 }

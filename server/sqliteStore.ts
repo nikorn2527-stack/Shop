@@ -201,6 +201,7 @@ export type StoreSettings = {
   memberNumberPrefix: string;
   memberNumberYearMode: "none" | "buddhist" | "gregorian";
   memberNumberYearDigits: 2 | 4;
+  memberNumberSeparator: "-" | "/" | "_" | "";
   memberNumberResetMonth: number;
   memberNumberSequenceDigits: number;
   storeName: string;
@@ -540,9 +541,12 @@ export function getMemberNumberMode(db: SqliteDb) {
 function memberNumberSettings(db: SqliteDb) {
   const settings = getSettings(db);
   return {
-    prefix: settings.memberNumberPrefix.trim().replace(/[^A-Za-z0-9ก-๙._-]/g, "").slice(0, 20) || "M",
+    // An empty prefix is intentional: it enables formats such as 69-00001
+    // or 6900001 instead of silently restoring the historical "M" prefix.
+    prefix: settings.memberNumberPrefix.trim().replace(/[^A-Za-z0-9ก-๙._-]/g, "").slice(0, 20),
     yearMode: settings.memberNumberYearMode,
     yearDigits: settings.memberNumberYearDigits === 4 ? 4 : 2,
+    separator: settings.memberNumberSeparator === "" || settings.memberNumberSeparator === "/" || settings.memberNumberSeparator === "_" ? settings.memberNumberSeparator : "-",
     resetMonth: Math.min(12, Math.max(1, Math.floor(settings.memberNumberResetMonth || 1))),
     sequenceDigits: Math.min(10, Math.max(1, Math.floor(settings.memberNumberSequenceDigits || 6))),
   };
@@ -1691,8 +1695,8 @@ function generateMemberNumber(db: SqliteDb, mode: "running" | "year" | "manual",
   const cycleYear = now.getMonth() + 1 < config.resetMonth ? now.getFullYear() - 1 : now.getFullYear();
   const yearValue = config.yearMode === "buddhist" ? cycleYear + 543 : cycleYear;
   const yearText = config.yearMode === "none" ? "" : String(yearValue).slice(config.yearDigits === 4 ? -4 : -2);
-  const prefix = [config.prefix, yearText].filter(Boolean).join("-");
-  const separator = prefix ? `${prefix}-` : "";
+  const head = [config.prefix, yearText].filter(Boolean).join(config.separator);
+  const separator = head ? `${head}${config.separator}` : "";
   return `${separator}${String(nextMemberSequence(db, separator)).padStart(config.sequenceDigits, "0")}`;
 }
 
@@ -2651,6 +2655,7 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   memberNumberPrefix: "M",
   memberNumberYearMode: "none",
   memberNumberYearDigits: 2,
+  memberNumberSeparator: "-",
   memberNumberResetMonth: 1,
   memberNumberSequenceDigits: 6,
   storeName: "ร้านค้าสวัสดิการ",

@@ -391,7 +391,7 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
     onError: (mutationError) => setError(getErrorMessage(mutationError)),
   });
   const numberMode = settingsQuery.data?.memberNumberMode ?? "running";
-  const numberFormat = settingsQuery.data ? { prefix: settingsQuery.data.memberNumberPrefix, yearMode: settingsQuery.data.memberNumberYearMode, yearDigits: settingsQuery.data.memberNumberYearDigits, resetMonth: settingsQuery.data.memberNumberResetMonth, sequenceDigits: settingsQuery.data.memberNumberSequenceDigits } : undefined;
+  const numberFormat = settingsQuery.data ? { prefix: settingsQuery.data.memberNumberPrefix, yearMode: settingsQuery.data.memberNumberYearMode, yearDigits: settingsQuery.data.memberNumberYearDigits, resetMonth: settingsQuery.data.memberNumberResetMonth, sequenceDigits: settingsQuery.data.memberNumberSequenceDigits, separator: settingsQuery.data.memberNumberSeparator } : undefined;
   const nextNumber = formatMemberNumber(numberMode, nextMemberSequence(members, numberMode, numberFormat), numberFormat);
   const openRegister = () => { setRegisterOpen(true); setError(""); };
   const onRegisterPhotoPick = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -888,6 +888,7 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
       if (isShortcut(event, "register", "F6") && !railHidden.has("register")) { event.preventDefault(); setRegisterOpen((open) => !open); return; }
       if (isShortcut(event, "manage", "F7") && !railHidden.has("manage")) { event.preventDefault(); setQuickManageOpen((open) => !open); return; }
       if (isShortcut(event, "scan", "F8") && !railHidden.has("scan")) { event.preventDefault(); focusScan(); return; }
+      if (isShortcut(event, "inventory", "F9") && !railHidden.has("inventory")) { event.preventDefault(); setInventoryQuickOpen(true); return; }
       if (event.key === "Escape" && !receiptOpen) {
         if (payConfirm) { setPayConfirm(null); return; }
         if (scanMember) { setScanMember(null); return; }

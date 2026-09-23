@@ -455,6 +455,7 @@ const settingsPatchInput = z
     memberNumberPrefix: z.string().max(20).optional(),
     memberNumberYearMode: z.enum(["none", "buddhist", "gregorian"]).optional(),
     memberNumberYearDigits: z.union([z.literal(2), z.literal(4)]).optional(),
+    memberNumberSeparator: z.enum(["-", "/", "_", ""]).optional(),
     memberNumberResetMonth: z.number().int().min(1).max(12).optional(),
     memberNumberSequenceDigits: z.number().int().min(1).max(10).optional(),
     storeName: z.string().optional(),
