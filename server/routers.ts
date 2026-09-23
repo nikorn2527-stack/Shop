@@ -375,6 +375,10 @@ const stockReceiveInput = z.object({
   productId: z.number().int(),
   lot: z.string().optional(),
   expiryDate: z.string().nullish(),
+  // รับสินค้าแบบธุรกิจจริง: ซื้อกี่หน่วย + แถมกี่หน่วย + จ่ายเงินจริงเท่าไร
+  purchaseQty: z.number().int().positive("จำนวนที่ซื้อต้องมากกว่า 0").optional(),
+  freeQty: z.number().int().min(0, "จำนวนแถมต้องเป็น 0 ขึ้นไป").optional(),
+  paidAmount: z.number().min(0, "เงินที่จ่ายจริงต้องเป็น 0 ขึ้นไป").optional(),
   // ROUND 77 (user) — รับเข้าหลายบรรทัดในรอบเดียว: สินค้าเดียวกัน ต้นทุนต่างกันได้
   // (เช่น 10 ห่อ @฿200 + แถม 2 ห่อ) แต่ละบรรทัดกลายเป็น Lot ของตัวเอง
   // และต้นทุนสินค้าถูกคำนวณใหม่เป็นต้นทุนถัวเฉลี่ยทันที
@@ -863,8 +867,13 @@ export const appRouter = router({
       .input(stockReceiveInput)
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input);
-        // ROUND 77 — lines (หลายบรรทัด ต้นทุนต่างกัน) เป็นค่าหลัก · qty/cost เดิมยังใช้ได้
-        const lines = input.lines ?? (input.qty !== undefined ? [{ qty: input.qty, cost: input.cost }] : []);
+        // รับแบบซื้อ/แถมเป็นค่าหลัก; lines และ qty/cost เดิมยังรองรับฐานข้อมูล/ผู้เรียกรุ่นเก่า
+        const lines = input.purchaseQty !== undefined
+          ? [
+              { qty: input.purchaseQty, cost: input.paidAmount === undefined ? undefined : input.paidAmount / input.purchaseQty },
+              ...(input.freeQty && input.freeQty > 0 ? [{ qty: input.freeQty, cost: 0 }] : []),
+            ]
+          : input.lines ?? (input.qty !== undefined ? [{ qty: input.qty, cost: input.cost }] : []);
         return withStoreErrors(() =>
           receiveStockLines(
             getWelfareDb(),

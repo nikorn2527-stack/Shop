@@ -3194,6 +3194,14 @@ th { font-weight: 600; }
 .receive-lines-total { border-top: 1px dashed #cfe0d6; padding-top: 8px; color: #5c6a5f; font-size: 11.5px; }
 .receive-lines-total b { color: #2d5c4a; font-family: "IBM Plex Mono", monospace; }
 .receive-lines-hint { color: #7d8a7f; font-size: 10.5px; line-height: 1.45; }
+.receive-cost-entry { border: 1px solid #d8e4dd; background: #fbfdfb; border-radius: 10px; padding: 10px 12px 11px; display: flex; flex-direction: column; gap: 8px; grid-column: 1 / -1; }
+.receive-purchase-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.receive-purchase-grid label { color: #74806f; font-size: 10px; }
+.receive-purchase-grid input { display: block; width: 100%; margin-top: 4px; }
+.receive-cost-summary { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 8px; border-top: 1px dashed #cfe0d6; color: #5c6a5f; font-size: 11px; }
+.receive-cost-summary span { padding: 5px 8px; border-radius: 7px; background: #f0f7f3; }
+.receive-cost-summary b { color: #2d5c4a; font-family: "IBM Plex Mono", monospace; }
+@media (max-width: 560px) { .receive-purchase-grid { grid-template-columns: 1fr; } }
 @media (max-width: 560px) { .receive-line-row { grid-template-columns: 1fr 1fr; } .receive-line-ext { display: none; } }
 
 .bag-helper { border: 1px dashed #cfe0d6; background: #f6faf7; border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 7px; }
@@ -5149,6 +5157,8 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .receive-cart-row .receive-cart-qty em { display: block; font-style: normal; font-size: 9px; color: #4b987b; margin-top: 2px; }
 .receive-cart-row .receive-cart-cost { width: 78px; text-align: right; color: #52604f; font-size: 11.5px; font-weight: 600; font-family: "IBM Plex Mono", monospace; }
 .receive-cart-row .receive-cart-actions { display: flex; gap: 4px; }
+.stock-catalog-actions { display: inline-flex; align-items: center; gap: 6px; padding: 4px; border: 1px solid #d7e7df; border-radius: 10px; background: #f7fbf8; }
+.stock-catalog-actions > span { padding: 0 5px; color: #668072; font-size: 10px; font-weight: 700; white-space: nowrap; }
 @media (max-width: 560px) {
   .receive-cart-row { flex-wrap: wrap; }
   .receive-cart-row .receive-cart-cost { width: auto; margin-left: auto; }
