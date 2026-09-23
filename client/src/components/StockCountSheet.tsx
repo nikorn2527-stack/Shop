@@ -32,7 +32,6 @@ export function StockCountSheet({ products }: { products: SqliteProduct[] }) {
     <div className="stock-count-sheet" id="stock-count-sheet">
       <div className="scs-head">
         <div className="scs-brand">
-          <span className="scs-mark">ร</span>
           <div>
             <b>ร้านค้าสวัสดิการ</b>
             <small>Welfare Store · ระบบร้านค้า</small>

@@ -5,7 +5,6 @@ import { Download, FileText, Printer, X } from "lucide-react";
 import { money } from "../pages/pageData";
 import { WALLET_TX_META } from "../pages/viewFormat";
 import { trpc } from "@/lib/trpc";
-import { brandInitial } from "@/theme";
 import { PrintPreviewModal } from "./PrintPreviewModal";
 
 /** A wallet transaction row as returned by member.detail (DESC order, ≤50). */
@@ -63,7 +62,6 @@ export function StatementModal({ member, transactions, onClose }: { member: Stat
   // Round 43 — แบรนด์ตามที่ผู้บริหารตั้งใน ตั้งค่า → ชื่อร้านและโลโก้ (เหมือนใบเสร็จ)
   const settingsQuery = trpc.settings.get.useQuery(undefined);
   const brandName = (settingsQuery.data?.appName ?? "").trim() || "ร้านค้าสวัสดิการ";
-  const brandLogo = settingsQuery.data?.appLogo ?? "";
   const displayName = [member.prename?.trim() || "", member.firstName, member.lastName].filter(Boolean).join(" ");
   const generatedAt = useMemo(() => new Date(), []);
 
@@ -131,7 +129,7 @@ export function StatementModal({ member, transactions, onClose }: { member: Stat
     <div className="statement-stage">
       <div className="statement-paper" id="member-statement">
         <div className="statement-head">
-          <div className="statement-brand">{brandLogo ? <img className="brand-logo statement-logo" src={brandLogo} alt={brandName} /> : <span className="statement-brand-mark">{brandInitial(brandName)}</span>}<div><b>{brandName}</b><small>Welfare Store · ระบบร้านค้า</small></div></div>
+          <div className="statement-brand"><div><b>{brandName}</b><small>Welfare Store · ระบบร้านค้า</small></div></div>
           <div className="statement-title">
             <b>รายงานยอดเงินคงเหลือและประวัติการทำรายการ</b>
             <small>ออกเมื่อ {formatFullThaiDate(generatedAt.toISOString())} · Statement {member.memberNumber}</small>
@@ -165,6 +163,11 @@ export function StatementModal({ member, transactions, onClose }: { member: Stat
               </tr>;
             })}
           </tbody>
+          <tfoot><tr>
+            <td colSpan={3}>รวมทั้งหมด {totals.count} รายการ{totals.truncated ? " (แสดงล่าสุด)" : ""}</td>
+            <td className="st-num">{transactions.reduce((sum, tx) => sum + tx.amount, 0) >= 0 ? "+" : "−"}{money(Math.abs(transactions.reduce((sum, tx) => sum + tx.amount, 0)))}</td>
+            <td className="st-num">{money(member.balance)}</td>
+          </tr></tfoot>
         </table>
         <div className="statement-note">
           {totals.truncated

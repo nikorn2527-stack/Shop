@@ -35,6 +35,7 @@ import {
   walletTx,
   openWelfareStore,
   receiveStock,
+  receiveStockLines,
   registerLoginFailure,
   registerMember,
   revokeAppSession,
@@ -332,10 +333,58 @@ describe("stock receiving", () => {
     const result = receiveStock(database, water.id, "CR-260918-01", "2027-09-01", 10, 4.5, "นายวรพจน์ ด.");
 
     expect(result.product.stock).toBe(water.stock + 10);
-    expect(result.product.cost).toBe(4.5);
+    // ROUND 77 (user) — ต้นทุนสินค้าเป็น "ต้นทุนถัวเฉลี่ย": ของเดิมในคลังผสมบรรทัดที่รับเข้า
+    // (124×4.2 + 10×4.5) / 134 = 4.22 — ไม่ใช่ replace เป็น 4.5 แบบเดิมอีกต่อไป
+    expect(result.product.cost).toBe(4.22);
+    expect(result.averageCost).toBe(4.22);
     expect(tableCount(database, "stock_lots")).toBe(lotsBefore + 1);
     expect(listStockRows(database).some((row) => row.lot === "CR-260918-01" && row.qty === 10)).toBe(true);
     expect(listAuditLogs(database, 1)[0].action).toBe("รับเข้าสินค้า");
+  });
+
+  it("ROUND 77 — receives one round with different prices (10×฿200 + แถม 2×฿0): 2 lots, weighted average cost", () => {
+    const database = freshDb();
+    // สินค้าใหม่เปล่า ๆ ในคลัง (stock 0) เพื่อให้ค่าเฉลี่ยมาจากรอบนี้ล้วน ๆ
+    const product = createProduct(database, { name: "นมผงถุงละ 1 กก.", sku: "TST-R77", category: "ของใช้", unit: "ห่อ", price: 250, cost: 200, stock: 0, actor: "นายวรพจน์ ด." });
+    const lotsBefore = tableCount(database, "stock_lots");
+
+    const result = receiveStockLines(database, {
+      productId: product.id,
+      lot: "R77-ROUND1",
+      expiryDate: "2027-06-01",
+      lines: [
+        { qty: 10, cost: 200 },
+        { qty: 2, cost: 0 },
+      ],
+      actor: "นายวรพจน์ ด.",
+    });
+
+    // แถม 2 ห่อดึงค่าเฉลี่ยลง: (10×200 + 2×0) / 12 = 166.67
+    expect(result.product.stock).toBe(12);
+    expect(result.averageCost).toBe(166.67);
+    expect(result.product.cost).toBe(166.67);
+    expect(result.lots).toHaveLength(2);
+    expect(result.lots.map((lot) => lot.qty).reduce((sum, qty) => sum + qty, 0)).toBe(12);
+    expect(tableCount(database, "stock_lots")).toBe(lotsBefore + 2);
+    const audit = listAuditLogs(database, 1)[0];
+    expect(audit.detail).toContain("ต้นทุนเฉลี่ย ฿166.67");
+    expect(audit.detail).toContain("แถม");
+  });
+
+  it("ROUND 77 — later round at a different price blends with stock already in store", () => {
+    const database = freshDb();
+    const product = createProduct(database, { name: "บะหมี่กึ่งสำเร็จรูป", sku: "TST-R77B", category: "อาหาร", unit: "แพ็ก", price: 9, cost: 6, stock: 30, actor: "นายวรพจน์ ด." });
+
+    const result = receiveStockLines(database, {
+      productId: product.id,
+      lot: "R77-ROUND2",
+      lines: [{ qty: 20, cost: 7.5 }],
+      actor: "นายวรพจน์ ด.",
+    });
+
+    // (30×6 + 20×7.5) / 50 = 6.6
+    expect(result.averageCost).toBe(6.6);
+    expect(result.product.stock).toBe(50);
   });
 
   it("refuses zero quantities with a Thai error", () => {
@@ -1113,12 +1162,13 @@ describe("settings", () => {
     const updated = setSettings(database, {
       storeName: "ร้านค้าทดสอบ",
       lowBalanceThreshold: 250,
-      autoPrintReceipt: false,
+      posRailHidden: '["withdraw","special"]',
       memberNumberMode: "year",
     });
     expect(updated.storeName).toBe("ร้านค้าทดสอบ");
     expect(updated.lowBalanceThreshold).toBe(250);
-    expect(updated.autoPrintReceipt).toBe(false);
+    // ROUND 75 — เมนูลัดหน้าร้าน: ปุ่มที่ปิดใช้งานเก็บเป็น JSON array กลับไปกลับมาได้
+    expect(updated.posRailHidden).toBe('["withdraw","special"]');
     expect(updated.memberNumberMode).toBe("year");
     expect(getMemberNumberMode(database)).toBe("year");
     expect(getSettings(database).storeName).toBe("ร้านค้าทดสอบ");

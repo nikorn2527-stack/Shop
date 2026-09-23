@@ -53,7 +53,7 @@ import {
   memberBalances,
   memberSpendingStats,
   stockBalanceReport,
-  receiveStock,
+  receiveStockLines,
   requestLimitReduction,
   decideLimitRequest,
   registerLoginFailure,
@@ -371,7 +371,11 @@ const stockReceiveInput = z.object({
   productId: z.number().int(),
   lot: z.string().optional(),
   expiryDate: z.string().nullish(),
-  qty: z.number().int().positive("จำนวนต้องมากกว่า 0"),
+  // ROUND 77 (user) — รับเข้าหลายบรรทัดในรอบเดียว: สินค้าเดียวกัน ต้นทุนต่างกันได้
+  // (เช่น 10 ห่อ @฿200 + แถม 2 ห่อ) แต่ละบรรทัดกลายเป็น Lot ของตัวเอง
+  // และต้นทุนสินค้าถูกคำนวณใหม่เป็นต้นทุนถัวเฉลี่ยทันที
+  lines: z.array(z.object({ qty: z.number().int().positive("จำนวนต้องมากกว่า 0"), cost: z.number().min(0).optional() })).min(1).optional(),
+  qty: z.number().int().positive("จำนวนต้องมากกว่า 0").optional(),
   cost: z.number().min(0).optional(),
   actor: z.string().optional(),
   actorRole: z.string().optional(),
@@ -387,6 +391,8 @@ const reportRangeInput = z
     to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
     /** ROUND 51 — กรองเฉพาะพนักงานขายคนนี้ ("" = ทุกคน · "ไม่ระบุพนักงาน" = บิลที่ไม่มีชื่อ) */
     cashier: z.string().trim().max(120).optional(),
+    /** ROUND 79 (user) — เลือกหลายพนักงานพร้อมกันได้ (เช่น รวม 2 กะ) · ว่าง = ทุกคน */
+    cashiers: z.array(z.string().trim().max(120)).max(30).optional(),
   })
   .nullish();
 
@@ -397,6 +403,8 @@ const reportsDailyInput = z
     to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
     /** ROUND 51 — กรองเฉพาะพนักงานขายคนนี้ ("" = ทุกคน · "ไม่ระบุพนักงาน" = บิลที่ไม่มีชื่อ) */
     cashier: z.string().trim().max(120).optional(),
+    /** ROUND 79 (user) — เลือกหลายพนักงานพร้อมกันได้ (เช่น รวม 2 กะ) · ว่าง = ทุกคน */
+    cashiers: z.array(z.string().trim().max(120)).max(30).optional(),
   })
   .nullish();
 
@@ -405,6 +413,8 @@ const memberTransactionsInput = z
     memberNumber: z.string().optional(),
     // ROUND 65 — เพิ่ม activation (เปิดใช้บัตร) และ refund (คืนบัตรเงินสด)
     type: z.enum(["purchase", "deposit", "withdrawal", "activation", "refund", "limit_request"]).optional(),
+    // ROUND 77 (user) — เลือกหลายประเภทพร้อมกันได้ (เช่น เติมเงิน+ถอนเงิน) · ว่าง/ไม่ส่ง = ทุกประเภท
+    types: z.array(z.enum(["purchase", "deposit", "withdrawal", "activation", "refund", "limit_request"])).optional(),
     from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
     to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
     limit: z.number().int().min(1).max(1000).optional(),
@@ -440,7 +450,9 @@ const settingsPatchInput = z
     appName: z.string().max(80).optional(),
     appLogo: z.string().max(600_000).optional(),
     appTheme: z.string().max(32).optional(),
-    autoPrintReceipt: z.boolean().optional(),
+    // ROUND 75 (user) — ลบ autoPrintReceipt (ห้ามเด้งหน้าสั่งพิมพ์หลังชำระเงิน) ·
+    // เพิ่มเมนูลัดหน้าร้าน: JSON array ของ key ปุ่ม POS ที่ปิดใช้งาน เช่น ["withdraw","special"]
+    posRailHidden: z.string().max(200).optional(),
     showBalanceOnReceipt: z.boolean().optional(),
     lowBalanceAlert: z.boolean().optional(),
     lowBalanceThreshold: z.number().min(0).optional(),
@@ -847,16 +859,19 @@ export const appRouter = router({
       .input(stockReceiveInput)
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input);
+        // ROUND 77 — lines (หลายบรรทัด ต้นทุนต่างกัน) เป็นค่าหลัก · qty/cost เดิมยังใช้ได้
+        const lines = input.lines ?? (input.qty !== undefined ? [{ qty: input.qty, cost: input.cost }] : []);
         return withStoreErrors(() =>
-          receiveStock(
+          receiveStockLines(
             getWelfareDb(),
-            input.productId,
-            input.lot ?? "",
-            input.expiryDate ?? null,
-            input.qty,
-            input.cost,
-            actor,
-            actorRole,
+            {
+              productId: input.productId,
+              lot: input.lot ?? "",
+              expiryDate: input.expiryDate ?? null,
+              lines,
+              actor,
+              actorRole,
+            },
           ),
         );
       }),

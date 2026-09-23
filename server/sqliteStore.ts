@@ -207,7 +207,11 @@ export type StoreSettings = {
   appLogo: string;
   /** สีธีมหลัก: preset id เช่น "emerald" หรือ hex "#007a55" */
   appTheme: string;
-  autoPrintReceipt: boolean;
+  /** ROUND 75 (user) — หน้าแจ้งผลหลังชำระเงิน ไม่เด้งไปหน้าสั่งพิมพ์อีกต่อไป:
+   *  แสดงหน้าใบเสร็จพร้อมปุ่ม พิมพ์/บันทึกรูป/ดาวน์โหลด PDF ให้ผู้ใช้กดเอง —
+   *  ตัวตั้ง autoPrintReceipt เดิมถูกลบออก (พฤติกรรม window.print() อัตโนมัติ)
+   *  · เพิ่ม posRailHidden: ปุ่มรางซ้าย POS ที่ปิดใช้งาน (JSON array ของ key) */
+  posRailHidden: string;
   showBalanceOnReceipt: boolean;
   lowBalanceAlert: boolean;
   lowBalanceThreshold: number;
@@ -741,6 +745,66 @@ export function createProduct(db: SqliteDb, input: CreateProductInput): SqlitePr
   return getProductById(db, Number(result.lastInsertRowid))!;
 }
 
+/**
+ * ROUND 77 (user) — รับเข้าสินค้า "ต้นทุนต่างกันแต่ละรอบ" ได้:
+ * สินค้าชนิดเดียวกัน รอบละราคาไม่เท่ากัน (เช่น รอบนี้ 10 ห่อ @฿200 แถมอีก 2 ห่อ)
+ * ต้นทุนที่ fix คงที่ใช้ไม่ได้ → ระบบเก็บเป็น "ต้นทุนถัวเฉลี่ย" (weighted average):
+ * ผสมมูลค่าของเดิมในคลังกับทุกบรรทัดที่รับเข้ารอบนี้ บรรทัดแถม (ต้นทุน ฿0) จะดึง
+ * ค่าเฉลี่ยลงให้เอง — รายงานกำไรจึงถูกต้องตามของจริงเสมอ
+ */
+export type ReceiveStockLine = { qty: number; cost?: number };
+
+export type ReceiveStockLotRow = { id: number; productId: number; lot: string; expiry: string | null; qty: number; cost: number; receivedAt: string };
+
+export type ReceiveStockResult = {
+  /** ทุกบรรทัดที่รับเข้ารอบนี้ (แต่ละบรรทัด = 1 stock_lot ใช้ Lot เดียวกัน) */
+  lots: ReceiveStockLotRow[];
+  /** บรรทัดแรก — ผู้เรียกแบบเดิม (บรรทัดเดียว) ยังอ่านได้ตามรูปเก่า */
+  lot: ReceiveStockLotRow;
+  product: SqliteProduct;
+  /** ต้นทุนถัวเฉลี่ยใหม่ที่เก็บในสินค้า (ของเดิมในคลัง + ทุกบรรทัดรอบนี้) */
+  averageCost: number;
+  /** ต้นทุนเฉลี่ยก่อนรับเข้ารอบนี้ */
+  previousCost: number;
+};
+
+export function receiveStockLines(
+  db: SqliteDb,
+  input: { productId: number; lot?: string; expiryDate?: string | null; lines: (ReceiveStockLine | null | undefined)[] | null | undefined; actor?: string; actorRole?: string },
+): ReceiveStockResult {
+  const lines = (input.lines ?? []).filter((line): line is ReceiveStockLine => line != null);
+  if (lines.length === 0) throw new StoreError("กรุณาระบุจำนวนที่รับเข้าอย่างน้อย 1 บรรทัด");
+  for (const line of lines) {
+    if (!Number.isInteger(line.qty) || line.qty <= 0) throw new StoreError("จำนวนต้องมากกว่า 0");
+    if (line.cost !== undefined && !(line.cost >= 0)) throw new StoreError("ต้นทุนต่อหน่วยต้องเป็นตัวเลข 0 ขึ้นไป");
+  }
+  const product = getProductById(db, input.productId);
+  if (!product || !product.active) throw new StoreError(`ไม่พบสินค้ารหัส ${input.productId} ในระบบ`);
+  const parsed = lines.map((line) => ({ qty: line.qty, cost: line.cost === undefined ? undefined : round2(line.cost) }));
+  const totalQty = parsed.reduce((sum, line) => sum + line.qty, 0);
+  const previousCost = product.cost;
+  // บรรทัดที่ไม่ใส่ต้นทุน = ใช้ต้นทุนเฉลี่ยปัจจุบันของสินค้า (พฤติกรรมเดิม)
+  const lineValue = parsed.reduce((sum, line) => sum + line.qty * (line.cost ?? previousCost), 0);
+  const oldQty = Math.max(0, Math.trunc(product.stock));
+  const averageCost = round2((oldQty * previousCost + lineValue) / (oldQty + totalQty));
+  const lotLabel = input.lot?.trim() || `LOT-${formatDate()}`;
+  const createdAt = formatDateTime();
+  return runInTransaction(db, () => {
+    const insert = db.prepare(`INSERT INTO stock_lots (product_id, lot, expiry_date, qty, cost, received_at, received_qty) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+    const lots = parsed.map((line) => {
+      const result = insert.run(input.productId, lotLabel, input.expiryDate || null, line.qty, line.cost ?? previousCost, createdAt, line.qty);
+      return { id: Number(result.lastInsertRowid), productId: input.productId, lot: lotLabel, expiry: input.expiryDate || null, qty: line.qty, cost: line.cost ?? previousCost, receivedAt: createdAt };
+    });
+    db.prepare(`UPDATE products SET stock = stock + ?, cost = ? WHERE id = ?`).run(totalQty, averageCost, input.productId);
+    // Log: บรรทัดเดียวไม่ใส่ต้นทุน = ข้อความเดิม · มีต้นทุน/หลายบรรทัด = สรุปทุกบรรทัด + ต้นทุนเฉลี่ยใหม่
+    const anyCost = parsed.some((line) => line.cost !== undefined);
+    const lineSummary = anyCost ? ` · ${parsed.map((line) => `${line.qty}×${money(line.cost ?? previousCost)}${line.cost === 0 ? " แถม" : ""}`).join(" + ")}` : "";
+    const avgSummary = anyCost ? ` · ต้นทุนเฉลี่ย ${money(averageCost)} (เดิม ${money(previousCost)})` : "";
+    logAction(db, "รับเข้าสินค้า", input.actor?.trim() || "ระบบ", `${product.name} · Lot ${lotLabel} · +${totalQty} ${product.unit}${lineSummary}${avgSummary}`, "green", input.actorRole ?? null, createdAt);
+    return { lots, lot: lots[0], product: getProductById(db, input.productId)!, averageCost, previousCost };
+  });
+}
+
 export function receiveStock(
   db: SqliteDb,
   productId: number,
@@ -751,21 +815,9 @@ export function receiveStock(
   actor?: string,
   actorRole?: string,
 ) {
-  if (!Number.isInteger(qty) || qty <= 0) throw new StoreError("จำนวนต้องมากกว่า 0");
-  const product = getProductById(db, productId);
-  if (!product || !product.active) throw new StoreError(`ไม่พบสินค้ารหัส ${productId} ในระบบ`);
-  const effectiveCost = cost === undefined ? product.cost : round2(cost);
-  const lotLabel = lot?.trim() || `LOT-${formatDate()}`;
-  const createdAt = formatDateTime();
-  return runInTransaction(db, () => {
-    const result = db.prepare(`INSERT INTO stock_lots (product_id, lot, expiry_date, qty, cost, received_at, received_qty) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(productId, lotLabel, expiryDate || null, qty, effectiveCost, createdAt, qty);
-    db.prepare(`UPDATE products SET stock = stock + ?, cost = ? WHERE id = ?`).run(qty, effectiveCost, productId);
-    logAction(db, "รับเข้าสินค้า", actor?.trim() || "ระบบ", `${product.name} · Lot ${lotLabel} · +${qty} ${product.unit}`, "green", actorRole ?? null, createdAt);
-    return {
-      lot: { id: Number(result.lastInsertRowid), productId, lot: lotLabel, expiry: expiryDate || null, qty, cost: effectiveCost, receivedAt: createdAt },
-      product: getProductById(db, productId)!,
-    };
-  });
+  const result = receiveStockLines(db, { productId, lot, expiryDate, lines: [{ qty, cost }], actor, actorRole });
+  // รูปเอาต์พุตเดิม { lot, product } + เผื่อ averageCost ไว้ให้ผู้เรียกรุ่นใหม่
+  return { lot: result.lot, product: result.product, averageCost: result.averageCost };
 }
 
 export function listStockRows(db: SqliteDb): SqliteStockRow[] {
@@ -2083,18 +2135,31 @@ const ISO_DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 /** ROUND 51 — ชื่อพนักงานพิเศษ: แทนบิลที่ไม่ได้ระบุชื่อผู้ขาย (เก่า ๆ / นำเข้า) */
 export const UNASSIGNED_CASHIER = "ไม่ระบุพนักงาน";
 
-export type DailyRangeInput = { days?: number; from?: string; to?: string; cashier?: string };
+export type DailyRangeInput = { days?: number; from?: string; to?: string; cashier?: string; cashiers?: string[] };
 
 /**
  * ROUND 51 (user) — ตัวกรองพนักงานขายใช้ร่วมกับทุกรายงานยอดขาย
- * "" = ทุกคน · UNASSIGNED_CASHIER = เฉพาะบิลที่ไม่มีชื่อผู้ขาย · ชื่ออื่น = เจาะจงคนนั้น
+ * ROUND 79 (user) — เลือกได้หลายคนพร้อมกัน (cashiers[]) เช่น ดู 2 กะรวมกัน
+ * ว่าง/ไม่ส่ง = ทุกคน · UNASSIGNED_CASHIER ปนในลิสต์ได้ = รวมบิลที่ไม่มีชื่อผู้ขายด้วย
  * (เทียบแบบ TRIM เพื่อให้ตรงกับการจัดกลุ่มของ salesByCashier เสมอ)
  */
-function cashierWhere(alias: string, cashier?: string): { sql: string; params: string[] } {
-  const name = cashier?.trim();
-  if (!name) return { sql: "", params: [] };
-  if (name === UNASSIGNED_CASHIER) return { sql: ` AND TRIM(COALESCE(${alias}.cashier, '')) = ''`, params: [] };
-  return { sql: ` AND TRIM(COALESCE(${alias}.cashier, '')) = ?`, params: [name] };
+function cashierWhere(alias: string, input: DailyRangeInput): { sql: string; params: string[] } {
+  const names = [
+    ...(input.cashier?.trim() ? [input.cashier.trim()] : []),
+    ...(input.cashiers ?? []).map((name) => name.trim()).filter((name) => name !== ""),
+  ];
+  if (names.length === 0) return { sql: "", params: [] };
+  const regular = Array.from(new Set(names.filter((name) => name !== UNASSIGNED_CASHIER)));
+  const unassigned = names.includes(UNASSIGNED_CASHIER);
+  const parts: string[] = [];
+  const params: string[] = [];
+  if (regular.length > 0) {
+    parts.push(`TRIM(COALESCE(${alias}.cashier, '')) IN (${regular.map(() => "?").join(", ")})`);
+    params.push(...regular);
+  }
+  if (unassigned) parts.push(`TRIM(COALESCE(${alias}.cashier, '')) = ''`);
+  if (parts.length === 0) return { sql: "", params: [] };
+  return { sql: ` AND (${parts.join(" OR ")})`, params };
 }
 
 function resolveRangeDates(input: DailyRangeInput): { fromDate: Date; toDate: Date } {
@@ -2119,7 +2184,7 @@ export function dailySalesRows(db: SqliteDb, input: number | DailyRangeInput = 3
   const { fromDate, toDate } = resolveRangeDates(options);
   const since = `${formatDate(fromDate)} 00:00:00`;
   const until = `${formatDate(toDate)} 23:59:59`;
-  const filter = cashierWhere("s", options.cashier);
+  const filter = cashierWhere("s", options);
   const salesByDay = new Map<string, { orders: number; revenue: number }>();
   for (const row of db.prepare(`SELECT substr(s.created_at, 1, 10) AS date, COUNT(*) AS orders, ROUND(SUM(s.total), 2) AS revenue FROM sales s WHERE s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY date`).all(since, until, ...filter.params) as unknown as { date: string; orders: number; revenue: number }[]) {
     salesByDay.set(row.date, { orders: row.orders, revenue: round2(row.revenue) });
@@ -2149,7 +2214,7 @@ export function salesByCategory(db: SqliteDb, input: DailyRangeInput = {}): Sale
   const { fromDate, toDate } = resolveRangeDates(input);
   const since = `${formatDate(fromDate)} 00:00:00`;
   const until = `${formatDate(toDate)} 23:59:59`;
-  const filter = cashierWhere("s", input.cashier);
+  const filter = cashierWhere("s", input);
   const rows = db.prepare(`SELECT COALESCE(NULLIF(TRIM(p.category), ''), 'ไม่ระบุหมวด') AS category, COUNT(DISTINCT si.sale_id) AS orders, COALESCE(SUM(si.qty), 0) AS qty, ROUND(COALESCE(SUM(si.qty * si.price), 0), 2) AS revenue, ROUND(COALESCE(SUM(si.qty * si.cost), 0), 2) AS cogs FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id WHERE s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY category ORDER BY revenue DESC`).all(since, until, ...filter.params) as unknown as { category: string; orders: number; qty: number; revenue: number; cogs: number }[];
   return rows.map((row) => ({ ...row, qty: Number(row.qty), profit: round2(row.revenue - row.cogs) }));
 }
@@ -2177,7 +2242,7 @@ export function salesByProduct(db: SqliteDb, input: DailyRangeInput = {}): Sales
   const { fromDate, toDate } = resolveRangeDates(input);
   const since = `${formatDate(fromDate)} 00:00:00`;
   const until = `${formatDate(toDate)} 23:59:59`;
-  const filter = cashierWhere("s", input.cashier);
+  const filter = cashierWhere("s", input);
   const rows = db.prepare(`SELECT si.product_id AS productId, CASE WHEN si.product_id IS NULL THEN 'รายการพิเศษ' ELSE COALESCE(p.name, si.name) END AS name, p.sku AS sku, p.barcode AS barcode, NULLIF(TRIM(p.category), '') AS category, COUNT(DISTINCT si.sale_id) AS bills, COALESCE(SUM(si.qty), 0) AS qty, ROUND(COALESCE(SUM(si.qty * si.price), 0), 2) AS revenue, ROUND(COALESCE(SUM(si.qty * si.cost), 0), 2) AS cogs FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id WHERE s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY si.product_id ORDER BY revenue DESC`).all(since, until, ...filter.params) as unknown as { productId: number | null; name: string; sku: string | null; barcode: string | null; category: string | null; bills: number; qty: number; revenue: number; cogs: number }[];
   return rows.map((row) => ({ ...row, bills: Number(row.bills), qty: Number(row.qty), profit: round2(row.revenue - row.cogs) }));
 }
@@ -2206,7 +2271,7 @@ export function salesLineItems(db: SqliteDb, input: DailyRangeInput = {}): Sales
   const { fromDate, toDate } = resolveRangeDates(input);
   const since = `${formatDate(fromDate)} 00:00:00`;
   const until = `${formatDate(toDate)} 23:59:59`;
-  const filter = cashierWhere("s", input.cashier);
+  const filter = cashierWhere("s", input);
   return db.prepare(`SELECT s.order_number AS orderNumber, s.created_at AS createdAt, si.name AS productName, COALESCE(si.unit, p.unit, 'ชิ้น') AS unit, si.qty, si.price, ROUND(si.qty * si.price, 2) AS amount, s.payment_method AS paymentMethod, COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, s.member_number AS memberNumber, CASE WHEN m.member_number IS NULL THEN NULL WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id LEFT JOIN members m ON m.member_number = s.member_number WHERE s.created_at >= ? AND s.created_at <= ?${filter.sql} ORDER BY s.created_at DESC, s.id DESC, si.id ASC LIMIT 1000`).all(since, until, ...filter.params) as unknown as SalesLineItemRow[];
 }
 
@@ -2217,7 +2282,7 @@ export function salesByCashier(db: SqliteDb, input: DailyRangeInput = {}): Sales
   const { fromDate, toDate } = resolveRangeDates(input);
   const since = `${formatDate(fromDate)} 00:00:00`;
   const until = `${formatDate(toDate)} 23:59:59`;
-  const filter = cashierWhere("s", input.cashier);
+  const filter = cashierWhere("s", input);
   const base = db.prepare(`SELECT COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, COUNT(*) AS orders, ROUND(COALESCE(SUM(s.discount), 0), 2) AS discount, ROUND(COALESCE(SUM(s.total), 0), 2) AS total, SUM(CASE WHEN s.member_number IS NOT NULL AND s.member_number != '' THEN 1 ELSE 0 END) AS memberBills FROM sales s WHERE s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY cashier ORDER BY total DESC`).all(since, until, ...filter.params) as unknown as { cashier: string; orders: number; discount: number; total: number; memberBills: number }[];
   const itemsByCashier = new Map<string, number>();
   for (const row of db.prepare(`SELECT COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, COALESCE(SUM(si.qty), 0) AS items FROM sales s JOIN sale_items si ON si.sale_id = s.id WHERE s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY cashier`).all(since, until, ...filter.params) as unknown as { cashier: string; items: number }[]) {
@@ -2262,6 +2327,8 @@ export type MemberTransactionRow = {
 export type MemberTransactionsInput = {
   memberNumber?: string;
   type?: "purchase" | "deposit" | "withdrawal" | "activation" | "refund" | "limit_request";
+  /** ROUND 77 (user) — เลือกหลายประเภทพร้อมกัน (รวมกับ type เดี่ยว ถ้าส่งทั้งคู่) */
+  types?: ("purchase" | "deposit" | "withdrawal" | "activation" | "refund" | "limit_request")[];
   from?: string;
   to?: string;
   limit?: number;
@@ -2277,18 +2344,30 @@ export function memberTransactions(db: SqliteDb, input: MemberTransactionsInput 
   const memberNumber = input.memberNumber?.trim();
   const limit = Math.max(1, Math.min(1000, Math.floor(input.limit ?? 300)));
   const rows: MemberTransactionRow[] = [];
+  // ROUND 77 (user) — เลือกหลายประเภทพร้อมกัน: รวม type เดี่ยวกับ types เป็นชุดเดียว
+  // (ไม่ซ้ำค่า) · ชุดว่าง = ทุกประเภท (พฤติกรรมเดิม)
+  const typeSet = new Set<string>([...(input.types ?? []), ...(input.type ? [input.type] : [])]);
 
   // Regular wallet entries (purchase / deposit / withdrawal).
-  if (input.type !== "limit_request") {
+  if (!typeSet.has("limit_request") || typeSet.size > 1 || typeSet.size === 0) {
     const conditions: string[] = [];
     const params: (string | number)[] = [];
     if (memberNumber) {
       conditions.push("t.member_number LIKE ?");
       params.push(`%${memberNumber}%`);
     }
-    if (input.type) {
-      conditions.push("t.type = ?");
-      params.push(input.type);
+    const txTypes = Array.from(typeSet).filter((type) => type !== "limit_request");
+    if (typeSet.size > 0 && txTypes.length > 0) {
+      if (txTypes.length === 1) {
+        conditions.push("t.type = ?");
+        params.push(txTypes[0]);
+      } else {
+        conditions.push(`t.type IN (${txTypes.map(() => "?").join(", ")})`);
+        params.push(...txTypes);
+      }
+    } else if (typeSet.size > 0 && txTypes.length === 0) {
+      // เลือกเฉพาะ limit_request — ไม่ต้องดึงธุรกรรมกระเป๋าเงินเลย
+      conditions.push("1 = 0");
     }
     if (input.from && ISO_DATE_ONLY.test(input.from)) {
       conditions.push("t.created_at >= ?");
@@ -2304,7 +2383,7 @@ export function memberTransactions(db: SqliteDb, input: MemberTransactionsInput 
   }
 
   // การขอลดวงเงิน — merged into the same history (same member/date filters).
-  if (input.type === undefined || input.type === "limit_request") {
+  if (typeSet.size === 0 || typeSet.has("limit_request")) {
     const conditions: string[] = [];
     const params: (string | number)[] = [];
     if (memberNumber) {
@@ -2550,7 +2629,8 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   appName: "ร้านค้าสวัสดิการ",
   appLogo: "",
   appTheme: "emerald",
-  autoPrintReceipt: true,
+  // ROUND 75 — เมนูลัดหน้าร้าน: "" = เปิดใช้ทุกปุ่มบนรางซ้าย POS
+  posRailHidden: "",
   showBalanceOnReceipt: true,
   lowBalanceAlert: true,
   lowBalanceThreshold: 100,
