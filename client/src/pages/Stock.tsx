@@ -94,7 +94,8 @@ function parseTierRows(json?: string | null): TierRow[] {
 const stockStatusFilters = ["ทั้งหมด", "ปกติ", "สต็อกต่ำ", "ใกล้หมดอายุ", "ปิดการขาย"] as const;
 type StockStatusFilter = (typeof stockStatusFilters)[number];
 
-export function Stock({ role, userName }: { role: Role; userName: string }) {
+export type StockInitialAction = "receive" | "add";
+export function Stock({ role, userName, initialAction }: { role: Role; userName: string; initialAction?: StockInitialAction }) {
   // ROUND 61 — สิทธิ์เวอร์ชัน: งานนับสต็อก (โปรพลัส) · การส่งออก CSV/Excel/พิมพ์ (โปร)
   const edition = useEditionStatus();
   const hasStockCount = edition.status?.has("stockCount") ?? false;
@@ -124,6 +125,10 @@ export function Stock({ role, userName }: { role: Role; userName: string }) {
   const [manageSearch, setManageSearch] = useState("");
   const [manageNotice, setManageNotice] = useState("");
   const [manageError, setManageError] = useState("");
+  useEffect(() => {
+    if (initialAction === "receive") setReceiveOpen(true);
+    if (initialAction === "add") setAddOpen(true);
+  }, [initialAction]);
   const [editOpen, setEditOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<SqliteProduct | null>(null);
   // ROUND 38 (ข้อ 37) — ถ่ายรูปสินค้าจากกล้อง (เพิ่มใหม่ + แก้ไข)

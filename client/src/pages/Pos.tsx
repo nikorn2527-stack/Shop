@@ -172,6 +172,7 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
   // R74 — โมดัลจัดแผง: กด "แสดงเพิ่ม" เปิดคลังทั้งหมด (รีเซ็ตทุกครั้งที่เปิดโมดัลใหม่)
   const [quickManageShowAll, setQuickManageShowAll] = useState(false);
   const [inventoryQuickOpen, setInventoryQuickOpen] = useState(false);
+  const [inventoryQuickAction, setInventoryQuickAction] = useState<"receive" | "add">("receive");
   // Round 32-13 — จำนวนแบบพิมพ์ตรงๆ: แต่ละแถวบิลเป็นช่องจำนวนที่เคอร์เซอร์รออยู่
   // หลังเพิ่มสินค้า (พิมพ์เลข = ตั้งจำนวนทันที) + ยิงบาร์โค้ดใส่ช่องจำนวนก็ได้
   const [qtyDrafts, setQtyDrafts] = useState<Record<string, string>>({});
@@ -871,7 +872,7 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
       else if (action === "hold") holdBill();
       else if (action === "register") openRegister();
       else if (action === "quickmanage") { setQuickManageOpen(true); setQuickManageSearch(""); setQuickManageNotice(""); setQuickManageShowAll(false); }
-      else if (action === "inventory") setInventoryQuickOpen(true);
+      else if (action === "receive" || action === "add") { setInventoryQuickAction(action); setInventoryQuickOpen(true); }
     };
     window.addEventListener("pos-rail", onRail);
     return () => window.removeEventListener("pos-rail", onRail);
@@ -888,7 +889,8 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
       if (isShortcut(event, "register", "F6") && !railHidden.has("register")) { event.preventDefault(); setRegisterOpen((open) => !open); return; }
       if (isShortcut(event, "manage", "F7") && !railHidden.has("manage")) { event.preventDefault(); setQuickManageOpen((open) => !open); return; }
       if (isShortcut(event, "scan", "F8") && !railHidden.has("scan")) { event.preventDefault(); focusScan(); return; }
-      if (isShortcut(event, "inventory", "F9") && !railHidden.has("inventory")) { event.preventDefault(); setInventoryQuickOpen(true); return; }
+      if (isShortcut(event, "receive", "F9") && !railHidden.has("receive")) { event.preventDefault(); setInventoryQuickAction("receive"); setInventoryQuickOpen(true); return; }
+      if (isShortcut(event, "add", "F10") && !railHidden.has("add")) { event.preventDefault(); setInventoryQuickAction("add"); setInventoryQuickOpen(true); return; }
       if (event.key === "Escape" && !receiptOpen) {
         if (payConfirm) { setPayConfirm(null); return; }
         if (scanMember) { setScanMember(null); return; }
@@ -940,8 +942,8 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
     document.querySelector(".scan-drop-row.active")?.scrollIntoView({ block: "nearest" });
   }, [scanHighlight]);
   return <>
-    {inventoryQuickOpen && <div className="modal-backdrop pos-inventory-backdrop" role="dialog" aria-modal="true" aria-label="จัดการสินค้าและรับสินค้าเข้า"><div className="pos-inventory-modal"><div className="pos-inventory-modal-head"><div><b>จัดการสินค้าและรับสินค้าเข้า</b><small>ทำงานจากหน้า POS ได้ทันที · ไม่ต้องออกไปเมนูอื่น</small></div><button type="button" className="icon-button" onClick={() => setInventoryQuickOpen(false)} aria-label="ปิดหน้าต่าง"><X size={18} /></button></div><div className="pos-inventory-modal-body"><Stock role={role} userName={userName} /></div></div></div>}
-    <SectionHeader eyebrow="หน้าร้าน / จุดขายสินค้า" title="POS · ขายสินค้า" description="สแกนบาร์โค้ดที่ช่องด้านบน · สินค้าไม่มีบาร์โค้ดปรับจำนวนได้ที่การ์ดด้านขวา · สรุปยอดและปุ่มชำระเงินล็อคอยู่ด้านล่างตลอดเวลา" action={<div className="pos-header-actions"><div className="pos-status"><span className="live-dot" /> จุดขายที่ 01 · เปิดให้บริการ</div><button type="button" className="outline-button compact" onClick={() => setInventoryQuickOpen(true)}><PackageSearch size={15} /> สินค้าและรับเข้า</button></div>} />
+    {inventoryQuickOpen && <div className="modal-backdrop pos-inventory-backdrop" role="dialog" aria-modal="true" aria-label="จัดการสินค้าและรับสินค้าเข้า"><div className="pos-inventory-modal"><div className="pos-inventory-modal-head"><div><b>{inventoryQuickAction === "receive" ? "รับเข้าสินค้า" : "เพิ่มไอเทมใหม่"}</b><small>ทำงานจากหน้า POS ได้ทันที · เปิดหน้าที่เลือกให้แล้ว</small></div><button type="button" className="icon-button" onClick={() => setInventoryQuickOpen(false)} aria-label="ปิดหน้าต่าง"><X size={18} /></button></div><div className="pos-inventory-modal-body"><Stock role={role} userName={userName} initialAction={inventoryQuickAction} /></div></div></div>}
+    <SectionHeader eyebrow="หน้าร้าน / จุดขายสินค้า" title="POS · ขายสินค้า" description="สแกนบาร์โค้ดที่ช่องด้านบน · สินค้าไม่มีบาร์โค้ดปรับจำนวนได้ที่การ์ดด้านขวา · สรุปยอดและปุ่มชำระเงินล็อคอยู่ด้านล่างตลอดเวลา" action={<div className="pos-header-actions"><div className="pos-status"><span className="live-dot" /> จุดขายที่ 01 · เปิดให้บริการ</div><button type="button" className="outline-button compact" onClick={() => { setInventoryQuickAction("receive"); setInventoryQuickOpen(true); }}><PackageSearch size={15} /> รับเข้าสินค้า</button><button type="button" className="outline-button compact" onClick={() => { setInventoryQuickAction("add"); setInventoryQuickOpen(true); }}><Plus size={15} /> เพิ่มไอเทมใหม่</button></div>} />
     <div className="pos-layout">
       <section className="panel cart-panel" ref={cartPanelRef}>
         <div className="pos-head">
