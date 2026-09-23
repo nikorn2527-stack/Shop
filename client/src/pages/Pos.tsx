@@ -173,6 +173,19 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
   const [quickManageShowAll, setQuickManageShowAll] = useState(false);
   const [inventoryQuickOpen, setInventoryQuickOpen] = useState(false);
   const [inventoryQuickAction, setInventoryQuickAction] = useState<"receive" | "add">("receive");
+  useEffect(() => {
+    if (!inventoryQuickOpen) return;
+    const html = document.documentElement;
+    const body = document.body;
+    const previousHtmlOverflow = html.style.overflow;
+    const previousBodyOverflow = body.style.overflow;
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    return () => {
+      html.style.overflow = previousHtmlOverflow;
+      body.style.overflow = previousBodyOverflow;
+    };
+  }, [inventoryQuickOpen]);
   // Round 32-13 — จำนวนแบบพิมพ์ตรงๆ: แต่ละแถวบิลเป็นช่องจำนวนที่เคอร์เซอร์รออยู่
   // หลังเพิ่มสินค้า (พิมพ์เลข = ตั้งจำนวนทันที) + ยิงบาร์โค้ดใส่ช่องจำนวนก็ได้
   const [qtyDrafts, setQtyDrafts] = useState<Record<string, string>>({});
@@ -942,7 +955,7 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
     document.querySelector(".scan-drop-row.active")?.scrollIntoView({ block: "nearest" });
   }, [scanHighlight]);
   return <>
-    {inventoryQuickOpen && <div className="modal-backdrop pos-inventory-backdrop" role="dialog" aria-modal="true" aria-label="จัดการสินค้าและรับสินค้าเข้า"><div className="pos-inventory-modal"><div className="pos-inventory-modal-head"><div><b>{inventoryQuickAction === "receive" ? "รับเข้าสินค้า" : "เพิ่มไอเทมใหม่"}</b><small>ทำงานจากหน้า POS ได้ทันที · เปิดหน้าที่เลือกให้แล้ว</small></div><button type="button" className="icon-button" onClick={() => setInventoryQuickOpen(false)} aria-label="ปิดหน้าต่าง"><X size={18} /></button></div><div className="pos-inventory-modal-body"><Stock role={role} userName={userName} initialAction={inventoryQuickAction} embeddedAction /></div></div></div>}
+    {inventoryQuickOpen && <div className="modal-backdrop pos-inventory-backdrop" role="dialog" aria-modal="true" aria-label="จัดการสินค้าและรับสินค้าเข้า"><div className="pos-inventory-modal"><div className="pos-inventory-modal-body"><Stock role={role} userName={userName} initialAction={inventoryQuickAction} embeddedAction /></div></div></div>}
     <SectionHeader eyebrow="หน้าร้าน / จุดขายสินค้า" title="POS · ขายสินค้า" description="สแกนบาร์โค้ดที่ช่องด้านบน · สินค้าไม่มีบาร์โค้ดปรับจำนวนได้ที่การ์ดด้านขวา · สรุปยอดและปุ่มชำระเงินล็อคอยู่ด้านล่างตลอดเวลา" action={<div className="pos-header-actions"><div className="pos-status"><span className="live-dot" /> จุดขายที่ 01 · เปิดให้บริการ</div><button type="button" className="outline-button compact" onClick={() => { setInventoryQuickAction("receive"); setInventoryQuickOpen(true); }}><PackageSearch size={15} /> รับเข้าสินค้า</button><button type="button" className="outline-button compact" onClick={() => { setInventoryQuickAction("add"); setInventoryQuickOpen(true); }}><Plus size={15} /> เพิ่มไอเทมใหม่</button></div>} />
     <div className="pos-layout">
       <section className="panel cart-panel" ref={cartPanelRef}>

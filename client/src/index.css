@@ -5174,17 +5174,14 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .member-number-format-grid input, .member-number-format-grid select { display: block; width: 100%; margin-top: 5px; }
 @media (max-width: 680px) { .member-number-format-grid { grid-template-columns: 1fr; } }
 .pos-header-actions { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
-.pos-inventory-backdrop { z-index: 120; align-items: flex-start; padding: 24px; overflow: auto; }
-.pos-inventory-modal { width: min(1180px, 100%); max-height: calc(100vh - 48px); overflow: auto; background: var(--surface, #fff); border: 1px solid #d8e6df; border-radius: 18px; box-shadow: 0 24px 70px rgba(18, 49, 35, .25); }
-.pos-inventory-modal-head { position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 14px 18px; background: #f7fbf8; border-bottom: 1px solid #dce9e2; }
-.pos-inventory-modal-head b, .pos-inventory-modal-head small { display: block; }
-.pos-inventory-modal-head small { margin-top: 3px; color: #6c7f75; font-size: 11px; }
+.pos-inventory-backdrop { z-index: 120; align-items: flex-start; padding: 24px; overflow: hidden; overscroll-behavior: contain; }
+.pos-inventory-modal { width: min(1180px, 100%); max-height: calc(100vh - 48px); overflow: auto; overscroll-behavior: contain; background: var(--surface, #fff); border: 1px solid #d8e6df; border-radius: 18px; box-shadow: 0 24px 70px rgba(18, 49, 35, .25); }
 .pos-inventory-modal-body { padding: 0 18px 20px; }
 .pos-inventory-modal-body > .section-header { margin-top: 12px; }
-.pos-inventory-modal-body > .stock-embedded > .section-header,
-.pos-inventory-modal-body > .stock-embedded > .stock-overview,
-.pos-inventory-modal-body > .stock-embedded > .stock-workbench,
-.pos-inventory-modal-body > .stock-embedded > .notice-bar { display: none !important; }
+/* Embedded Stock must contribute one form only: its own backdrop becomes transparent content. */
+.pos-inventory-modal-body > .stock-embedded > *:not(.modal-backdrop) { display: none !important; }
+.pos-inventory-modal-body > .stock-embedded > .modal-backdrop { position: static; inset: auto; display: block; padding: 0; overflow: visible; background: transparent; backdrop-filter: none; animation: none; }
+.pos-inventory-modal-body > .stock-embedded > .modal-backdrop > .form-modal { width: 100%; max-width: none; max-height: none; overflow: visible; border: 0; border-radius: 0; box-shadow: none; animation: none; }
 .member-number-presets { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-top: 14px; padding: 10px 12px; border: 1px solid #dce9e2; border-radius: 10px; background: #fbfdfc; }
 .member-number-presets b { font-size: 11px; color: #52695d; }
 .member-number-presets small { color: #718178; font-size: 10.5px; }
@@ -5193,7 +5190,10 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .pos-shortcut-custom-head small { margin-top: 4px; color: #708078; font-size: 11px; }
 .pos-shortcut-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
 .pos-shortcut-grid label { color: #66786e; font-size: 11px; }
-.pos-shortcut-grid input { display: block; width: 100%; margin-top: 5px; text-transform: uppercase; }
+.pos-shortcut-grid input, .pos-shortcut-grid button { display: block; width: 100%; margin-top: 5px; text-transform: uppercase; }
+.pos-rail-key-input { min-height: 32px; padding: 6px 9px; border: 1px solid #d5e2dc; border-radius: 7px; background: #fff; color: #52665b; font: 600 11px "IBM Plex Mono", monospace; text-align: left; cursor: pointer; }
+.pos-rail-key-input:hover:not(:disabled), .pos-rail-key-input:focus-visible { border-color: #8fc5b0; box-shadow: 0 0 0 3px #eaf6f1; outline: none; }
+.pos-rail-key-input:disabled { cursor: not-allowed; opacity: .55; }
 @media (max-width: 760px) { .pos-shortcut-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 680px) { .pos-inventory-backdrop { padding: 8px; } .pos-inventory-modal { max-height: calc(100vh - 16px); border-radius: 12px; } .pos-inventory-modal-body { padding: 0 10px 14px; } }
 @media (max-width: 560px) {
