@@ -265,7 +265,7 @@ export function printReportDoc(config: ReportDocConfig) {
   thead { display: table-header-group; }
   tbody tr { break-inside: avoid; page-break-inside: avoid; }
   th { background: #ffffff; color: #111; font-weight: 700; text-align: left; padding: 5px 7px; border-top: 2px solid #111; border-bottom: 2px solid #111; white-space: nowrap; }
-  th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; overflow-wrap: normal; word-break: keep-all; }
   td { padding: 5px 7px; font-weight: 500; border-bottom: 1px solid #d8d8d3; }
   th, td { overflow-wrap: anywhere; } /* ป้องกันหัวคอลัมน์ไทยยาวดันตารางกว้างเกินหน้า A4 */
   tbody tr:nth-child(even) { background: #f4f4f2; }
