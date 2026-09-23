@@ -5150,3 +5150,45 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
   .report-cards-dense .report-card strong { font-size: 15.5px; }
   .report-cards-dense .report-card-facts i { font-size: 9px; }
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ROUND 80 (user) — อุปกรณ์ต่อพ่วงและความสะดวกการใช้งานหน้าร้าน
+   (1) HelpDisclosure — ข้อแนะนำพับเก็บได้: ผู้ใช้ขอให้ลดข้อความรกหน้าจอ
+       เก็บรายละเอียดไว้กดเปิดดูเองใน "วิธีใช้ / ข้อแนะนำ"
+   ═══════════════════════════════════════════════════════════════════════ */
+.help-disclosure { margin-top: 6px; }
+.help-disclosure-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 8px; border: 1px dashed #cfe4db; border-radius: 20px; background: #f7fbf9; color: #6f755d; font-size: 10.5px; font-weight: 600; line-height: 1.4; cursor: pointer; transition: background .15s ease, border-color .15s ease, color .15s ease; }
+.help-disclosure-toggle:hover { background: #eef7f2; border-color: #9bcdba; color: #3d7d65; }
+.help-disclosure-toggle:focus-visible { outline: 2px solid #57b391; outline-offset: 2px; }
+.help-disclosure-toggle svg { color: #4b9d7f; }
+.help-disclosure-chevron { transition: transform .18s ease; }
+.help-disclosure.open .help-disclosure-chevron { transform: rotate(180deg); }
+.help-disclosure-body { margin-top: 6px; padding: 8px 11px; border: 1px dashed #cfe4db; border-radius: 10px; background: #f6fbf9; color: #6f755d; font-size: 11px; line-height: 1.65; }
+.help-disclosure-body > span, .help-disclosure-body > p { display: block; }
+.help-disclosure-steps { display: grid; gap: 6px; }
+.help-disclosure-steps ol { margin: 0; padding-left: 18px; display: grid; gap: 4px; color: #6f755d; }
+.help-disclosure-steps b { color: #3d7d65; }
+.help-disclosure-muted { color: #97a08a; font-size: 10.5px; }
+
+/* วาง help toggle ให้เข้ากับแถบ note ที่ย่อแล้ว (Users / Members) */
+.user-scope-note { flex-wrap: wrap; align-items: center; row-gap: 4px; }
+.user-scope-note .help-disclosure, .member-scope-note .help-disclosure { margin-top: 0; margin-left: 2px; }
+.member-scope-note.compact { align-items: center; }
+.member-scope-note.compact > div { flex: 0 0 auto; }
+.member-scope-note .help-disclosure-toggle { margin-left: 4px; }
+
+/* พรีวิวก่อนพิมพ์ (ROUND 80): ปุ่มชิดขวา หลังตัด note ยาว ๆ ออกเป็น
+   HelpDisclosure + chip ความยาวสลิป */
+.print-preview-actions { justify-content: flex-end; }
+.print-preview-actions .print-preview-buttons { margin-left: auto; }
+
+/* (2) ความยาวกระดาษสลิปตามจำนวนรายการจริง — บีบช่องว่างท้ายสลิป
+       ตอนพิมพ์ (คู่กับกฎ @page margin 0 + size ตามความสูงเนื้อหา
+       ที่ PrintPreviewModal ฉีดให้ตอนกด "พิมพ์เลย") */
+@media print {
+  body:has(#receipt-paper) .receipt-thanks,
+  body:has(#wallet-slip) .receipt-thanks,
+  body:has(#member-wallet-slip) .receipt-thanks,
+  body:has(#printer-test-slip) .receipt-thanks { margin-top: 5px; padding-top: 5px; }
+}

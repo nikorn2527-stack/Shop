@@ -5,6 +5,7 @@ import { blocker } from "@/components/BlockerAlert";
 import type { SqliteProduct } from "../../../server/sqliteStore";
 import type { MemberLite } from "@/pages/pageData";
 import { money, memberFullName, scanMatches, smartMatchScore } from "@/pages/pageData";
+import { SCAN_LAYOUT_TOAST, useScanLayout } from "../scanLayout";
 import { MemberAvatar } from "./MemberAvatar";
 import { MemberCardModal } from "./MemberCardModal";
 import { BarcodeCameraModal } from "./BarcodeCameraModal";
@@ -59,6 +60,9 @@ export function MemberScanPicker({
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const inputName = useNoHistoryName("pos-member-scan");
+  // ROUND 80 — ยิงบาร์โค้ดตอนวินโดว์เป็นภาษาไทย: จับปุ่มจริง + จังหวะปืนสแกน
+  // แล้วแปลงกลับเป็นเลข/อังกฤษให้เอง (เดิมต้องสลับ EN ก่อนทุกครั้ง)
+  const scanLayout = useScanLayout();
   const selected = members.find((member) => member.memberNumber === selectedNumber) ?? null;
 
   // Round 32-19 — smart ranking: exact > prefix (เลขสมาชิกตัดหน้า) > contains >
@@ -119,10 +123,19 @@ export function MemberScanPicker({
 
   // codeArg = รหัสที่มาจากกล้อง (ROUND 55) — commit ให้เลยไม่ต้องรอ Enter
   const commit = (codeArg?: string) => {
-    const value = (codeArg ?? term).trim();
+    let value = (codeArg ?? term).trim();
     if (value === "") {
       setOpen(false);
       return;
+    }
+    // ROUND 80 — คีย์บอร์ดไทย: เลขสมาชิก/บาร์โค้ดที่ยิงมาเป็นอักขระไทย แปลงกลับให้อัตโนมัติ
+    if (codeArg === undefined) {
+      const fixed = scanLayout.normalize(value);
+      if (fixed.convertedFrom !== undefined) {
+        value = fixed.value;
+        setTerm(fixed.value);
+        toast.info(SCAN_LAYOUT_TOAST.message, { description: SCAN_LAYOUT_TOAST.description(fixed.convertedFrom, fixed.value), duration: 3200 });
+      }
     }
     const exact =
       members.find((member) => scanMatches(member.memberNumber, value)) ??
@@ -167,6 +180,7 @@ export function MemberScanPicker({
               autoCorrect="off"
               autoCapitalize="off"
               spellCheck={false}
+              onKeyDownCapture={scanLayout.onKeyDownCapture}
               onChange={(event) => {
                 setTerm(event.target.value);
                 // Round 44 — เปิดรายการเฉพาะตอนมีคำค้นจริง (คีย์/สแกน)
@@ -311,6 +325,8 @@ export function ProductScanPicker({
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const inputName = useNoHistoryName("pos-product-scan");
+  // ROUND 80 — ยิงบาร์โค้ดตอนวินโดว์เป็นภาษาไทย (เดียวกับช่องสมาชิก)
+  const scanLayout = useScanLayout();
   const selected = products.find((product) => product.id === selectedId) ?? null;
 
   // Round 32-19 — smart ranking for products: barcode/SKU exact หรือท้ายรหัส
@@ -357,10 +373,20 @@ export function ProductScanPicker({
 
   // codeArg = รหัสที่มาจากกล้อง (ROUND 55) — บาร์โค้ดที่ยิงตรงเข้าเลือกสินค้าทันที
   const commit = (codeArg?: string) => {
-    const value = (codeArg ?? term).trim();
+    let value = (codeArg ?? term).trim();
     if (value === "") {
       setOpen(false);
       return;
+    }
+    // ROUND 80 — คีย์บอร์ดไทย: บาร์โค้ด/SKU ที่ยิงมาเป็นอักขระไทย แปลงกลับให้อัตโนมัติ
+    if (codeArg === undefined) {
+      const fixed = scanLayout.normalize(value);
+      if (fixed.convertedFrom !== undefined) {
+        value = fixed.value;
+        setTerm(fixed.value);
+        setMissed("");
+        toast.info(SCAN_LAYOUT_TOAST.message, { description: SCAN_LAYOUT_TOAST.description(fixed.convertedFrom, fixed.value), duration: 3200 });
+      }
     }
     const exact =
       products.find(
@@ -411,6 +437,7 @@ export function ProductScanPicker({
             autoCapitalize="off"
             spellCheck={false}
             autoFocus={autoFocus}
+            onKeyDownCapture={scanLayout.onKeyDownCapture}
             onChange={(event) => {
               setTerm(event.target.value);
               setMissed("");
