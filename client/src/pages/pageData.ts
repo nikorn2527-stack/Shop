@@ -111,10 +111,29 @@ export function isStockAlert(stock: number, reorderLevel = 10) {
   return stock <= reorderLevel;
 }
 
-export function formatMemberNumber(mode: "running" | "year" | "manual", sequence: number) {
+export type MemberNumberFormat = {
+  prefix?: string;
+  yearMode?: "none" | "buddhist" | "gregorian";
+  yearDigits?: 2 | 4;
+  resetMonth?: number;
+  sequenceDigits?: number;
+};
+
+export function formatMemberNumber(mode: "running" | "year" | "manual", sequence: number, format: MemberNumberFormat = {}) {
   if (mode === "manual") return "กรอกเอง";
-  if (mode === "year") return `69-${String(sequence).padStart(5, "0")}`;
-  return `M-${String(sequence).padStart(6, "0")}`;
+  const legacyYearMode = mode === "year" && format.yearMode === "none";
+  if (legacyYearMode) return `69-${String(sequence).padStart(5, "0")}`;
+  const prefix = format.prefix ?? (mode === "year" ? "" : "M");
+  const yearMode = format.yearMode ?? (mode === "year" ? "buddhist" : "none");
+  const yearDigits = format.yearDigits === 4 ? 4 : 2;
+  const resetMonth = Math.min(12, Math.max(1, format.resetMonth ?? 1));
+  const now = new Date();
+  const cycleYear = now.getMonth() + 1 < resetMonth ? now.getFullYear() - 1 : now.getFullYear();
+  const yearValue = yearMode === "buddhist" ? cycleYear + 543 : cycleYear;
+  const yearText = yearMode === "none" ? "" : String(yearValue).slice(yearDigits === 4 ? -4 : -2);
+  const head = [prefix.trim(), yearText].filter(Boolean).join("-");
+  const digits = Math.min(10, Math.max(1, format.sequenceDigits ?? (mode === "year" ? 5 : 6)));
+  return `${head ? `${head}-` : ""}${String(sequence).padStart(digits, "0")}`;
 }
 
 export const navItems: { id: View; label: string; caption: string; icon: LucideIcon }[] = [

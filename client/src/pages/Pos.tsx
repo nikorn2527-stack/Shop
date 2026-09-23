@@ -25,6 +25,7 @@ import { downloadSlipFile } from "@/exportUtils";
 import { SCAN_LAYOUT_TOAST, useScanLayout } from "../scanLayout";
 import { HelpDisclosure } from "@/components/HelpDisclosure";
 import { trpc } from "@/lib/trpc";
+import { Stock } from "./Stock";
 
 /** Product row straight from trpc.product.list (backend SqliteProduct). */
 type StoreProduct = Product & {
@@ -112,6 +113,18 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
       return new Set<string>();
     }
   }, [settingsQuery.data?.posRailHidden]);
+  const shortcutKeys = useMemo(() => {
+    try {
+      const parsed: unknown = JSON.parse(settingsQuery.data?.posShortcutKeys || "{}");
+      return parsed && typeof parsed === "object" ? parsed as Record<string, string> : {};
+    } catch {
+      return {};
+    }
+  }, [settingsQuery.data?.posShortcutKeys]);
+  const isShortcut = (event: KeyboardEvent, action: string, fallback: string) => {
+    const assigned = (shortcutKeys[action] || fallback).trim().toUpperCase();
+    return assigned !== "ESC" && (event.key.toUpperCase() === assigned || event.code.toUpperCase() === assigned);
+  };
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("ทั้งหมด");
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -158,6 +171,7 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
   const [quickManageNotice, setQuickManageNotice] = useState("");
   // R74 — โมดัลจัดแผง: กด "แสดงเพิ่ม" เปิดคลังทั้งหมด (รีเซ็ตทุกครั้งที่เปิดโมดัลใหม่)
   const [quickManageShowAll, setQuickManageShowAll] = useState(false);
+  const [inventoryQuickOpen, setInventoryQuickOpen] = useState(false);
   // Round 32-13 — จำนวนแบบพิมพ์ตรงๆ: แต่ละแถวบิลเป็นช่องจำนวนที่เคอร์เซอร์รออยู่
   // หลังเพิ่มสินค้า (พิมพ์เลข = ตั้งจำนวนทันที) + ยิงบาร์โค้ดใส่ช่องจำนวนก็ได้
   const [qtyDrafts, setQtyDrafts] = useState<Record<string, string>>({});
@@ -377,7 +391,8 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
     onError: (mutationError) => setError(getErrorMessage(mutationError)),
   });
   const numberMode = settingsQuery.data?.memberNumberMode ?? "running";
-  const nextNumber = formatMemberNumber(numberMode, nextMemberSequence(members, numberMode));
+  const numberFormat = settingsQuery.data ? { prefix: settingsQuery.data.memberNumberPrefix, yearMode: settingsQuery.data.memberNumberYearMode, yearDigits: settingsQuery.data.memberNumberYearDigits, resetMonth: settingsQuery.data.memberNumberResetMonth, sequenceDigits: settingsQuery.data.memberNumberSequenceDigits } : undefined;
+  const nextNumber = formatMemberNumber(numberMode, nextMemberSequence(members, numberMode, numberFormat), numberFormat);
   const openRegister = () => { setRegisterOpen(true); setError(""); };
   const onRegisterPhotoPick = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -856,6 +871,7 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
       else if (action === "hold") holdBill();
       else if (action === "register") openRegister();
       else if (action === "quickmanage") { setQuickManageOpen(true); setQuickManageSearch(""); setQuickManageNotice(""); setQuickManageShowAll(false); }
+      else if (action === "inventory") setInventoryQuickOpen(true);
     };
     window.addEventListener("pos-rail", onRail);
     return () => window.removeEventListener("pos-rail", onRail);
@@ -864,20 +880,21 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
   // สมาชิกใหม่/จัดแผง/สแกน — Esc ค่อยๆ ถอยทีละขั้น
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "F2" && !railHidden.has("deposit")) { event.preventDefault(); setShortcut(shortcut === "เติมเงิน" ? "" : "เติมเงิน"); return; }
-      if (event.key === "F3" && !railHidden.has("withdraw")) { event.preventDefault(); setShortcut(shortcut === "ถอนเงิน" ? "" : "ถอนเงิน"); return; }
-      if (event.key === "F4" && !railHidden.has("special")) { event.preventDefault(); toggleSpecial(); return; }
-      if (event.key === "F1" && !railHidden.has("customer")) { event.preventDefault(); document.getElementById("pos-member-input")?.focus(); return; }
-      if (event.key === "F5" && !railHidden.has("hold")) { event.preventDefault(); holdBill(); return; }
-      if (event.key === "F6" && !railHidden.has("register")) { event.preventDefault(); setRegisterOpen((open) => !open); return; }
-      if (event.key === "F7" && !railHidden.has("manage")) { event.preventDefault(); setQuickManageOpen((open) => !open); return; }
-      if (event.key === "F8" && !railHidden.has("scan")) { event.preventDefault(); focusScan(); return; }
+      if (isShortcut(event, "deposit", "F2") && !railHidden.has("deposit")) { event.preventDefault(); setShortcut(shortcut === "เติมเงิน" ? "" : "เติมเงิน"); return; }
+      if (isShortcut(event, "withdraw", "F3") && !railHidden.has("withdraw")) { event.preventDefault(); setShortcut(shortcut === "ถอนเงิน" ? "" : "ถอนเงิน"); return; }
+      if (isShortcut(event, "special", "F4") && !railHidden.has("special")) { event.preventDefault(); toggleSpecial(); return; }
+      if (isShortcut(event, "customer", "F1") && !railHidden.has("customer")) { event.preventDefault(); document.getElementById("pos-member-input")?.focus(); return; }
+      if (isShortcut(event, "hold", "F5") && !railHidden.has("hold")) { event.preventDefault(); holdBill(); return; }
+      if (isShortcut(event, "register", "F6") && !railHidden.has("register")) { event.preventDefault(); setRegisterOpen((open) => !open); return; }
+      if (isShortcut(event, "manage", "F7") && !railHidden.has("manage")) { event.preventDefault(); setQuickManageOpen((open) => !open); return; }
+      if (isShortcut(event, "scan", "F8") && !railHidden.has("scan")) { event.preventDefault(); focusScan(); return; }
       if (event.key === "Escape" && !receiptOpen) {
         if (payConfirm) { setPayConfirm(null); return; }
         if (scanMember) { setScanMember(null); return; }
         if (cardForNew) { setCardForNew(null); return; }
         if (registerOpen) { setRegisterOpen(false); return; }
         if (quickManageOpen) { setQuickManageOpen(false); return; }
+        if (inventoryQuickOpen) { setInventoryQuickOpen(false); return; }
         if (shortcut === "เติมเงิน" || shortcut === "ถอนเงิน") {
           if (walletStep === "success") { finishWallet(); return; }
           if (walletStep === "confirm") { setWalletStep("form"); return; }
@@ -922,7 +939,8 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
     document.querySelector(".scan-drop-row.active")?.scrollIntoView({ block: "nearest" });
   }, [scanHighlight]);
   return <>
-    <SectionHeader eyebrow="หน้าร้าน / จุดขายสินค้า" title="POS · ขายสินค้า" description="สแกนบาร์โค้ดที่ช่องด้านบน · สินค้าไม่มีบาร์โค้ดปรับจำนวนได้ที่การ์ดด้านขวา · สรุปยอดและปุ่มชำระเงินล็อคอยู่ด้านล่างตลอดเวลา" action={<div className="pos-status"><span className="live-dot" /> จุดขายที่ 01 · เปิดให้บริการ</div>} />
+    {inventoryQuickOpen && <div className="modal-backdrop pos-inventory-backdrop" role="dialog" aria-modal="true" aria-label="จัดการสินค้าและรับสินค้าเข้า"><div className="pos-inventory-modal"><div className="pos-inventory-modal-head"><div><b>จัดการสินค้าและรับสินค้าเข้า</b><small>ทำงานจากหน้า POS ได้ทันที · ไม่ต้องออกไปเมนูอื่น</small></div><button type="button" className="icon-button" onClick={() => setInventoryQuickOpen(false)} aria-label="ปิดหน้าต่าง"><X size={18} /></button></div><div className="pos-inventory-modal-body"><Stock role={role} userName={userName} /></div></div></div>}
+    <SectionHeader eyebrow="หน้าร้าน / จุดขายสินค้า" title="POS · ขายสินค้า" description="สแกนบาร์โค้ดที่ช่องด้านบน · สินค้าไม่มีบาร์โค้ดปรับจำนวนได้ที่การ์ดด้านขวา · สรุปยอดและปุ่มชำระเงินล็อคอยู่ด้านล่างตลอดเวลา" action={<div className="pos-header-actions"><div className="pos-status"><span className="live-dot" /> จุดขายที่ 01 · เปิดให้บริการ</div><button type="button" className="outline-button compact" onClick={() => setInventoryQuickOpen(true)}><PackageSearch size={15} /> สินค้าและรับเข้า</button></div>} />
     <div className="pos-layout">
       <section className="panel cart-panel" ref={cartPanelRef}>
         <div className="pos-head">

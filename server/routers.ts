@@ -452,6 +452,11 @@ const logsListInput = z
 const settingsPatchInput = z
   .object({
     memberNumberMode: z.enum(["running", "year", "manual"]).optional(),
+    memberNumberPrefix: z.string().max(20).optional(),
+    memberNumberYearMode: z.enum(["none", "buddhist", "gregorian"]).optional(),
+    memberNumberYearDigits: z.union([z.literal(2), z.literal(4)]).optional(),
+    memberNumberResetMonth: z.number().int().min(1).max(12).optional(),
+    memberNumberSequenceDigits: z.number().int().min(1).max(10).optional(),
     storeName: z.string().optional(),
     storeCode: z.string().optional(),
     storeAddress: z.string().optional(),
@@ -461,6 +466,7 @@ const settingsPatchInput = z
     // ROUND 75 (user) — ลบ autoPrintReceipt (ห้ามเด้งหน้าสั่งพิมพ์หลังชำระเงิน) ·
     // เพิ่มเมนูลัดหน้าร้าน: JSON array ของ key ปุ่ม POS ที่ปิดใช้งาน เช่น ["withdraw","special"]
     posRailHidden: z.string().max(200).optional(),
+    posShortcutKeys: z.string().max(1200).optional(),
     showBalanceOnReceipt: z.boolean().optional(),
     lowBalanceAlert: z.boolean().optional(),
     lowBalanceThreshold: z.number().min(0).optional(),
