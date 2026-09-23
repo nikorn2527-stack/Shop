@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { existsSync, readFileSync, rmSync, statSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+const { DatabaseSync } = require("node:sqlite") as typeof import("node:sqlite");
 import { join } from "node:path";
 import { COOKIE_NAME } from "@shared/const";
 import { EDITIONS, EDITION_TRIAL_DAYS, STANDARD_MAX_USERS, type Edition, type EditionFeatureKey } from "@shared/editions";
@@ -1242,6 +1246,67 @@ export const appRouter = router({
           return { file: input.file, sizeBytes: statSync(backupPath).size, base64: readFileSync(backupPath).toString("base64") };
         }),
       ),
+    // r87 — อัปโหลดไฟล์ฐานข้อมูล .sqlite จากเครื่องอื่น (ย้ายร้าน/ขึ้นคลาวด์) เข้ารายการไฟล์สำรอง
+    // ก่อนกดกู้คืน: ตรวจ magic header + integrity + ตารางของระบบจริง ทุกไฟล์ทุกครั้ง
+    upload: publicProcedure
+      .input(z.object({
+        fileName: z.string().max(160).optional(),
+        dataBase64: z.string().min(1, "ไม่พบข้อมูลไฟล์"),
+      }))
+      .mutation(({ ctx, input }) => {
+        const { actor, actorRole } = resolveActor(ctx, {});
+        return withStoreErrors(() => {
+          if (!isAdminCtx(ctx, {})) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "การอัปโหลดไฟล์สำรองต้องใช้สิทธิ์ผู้บริหาร" });
+          }
+          requireEdition("backupRestore");
+          const buffer = Buffer.from(input.dataBase64, "base64");
+          if (buffer.byteLength < 1024) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "ไฟล์เล็กผิดปกติ — ไม่ใช่ไฟล์ฐานข้อมูล SQLite ที่ใช้งานได้" });
+          }
+          if (buffer.byteLength > 200 * 1024 * 1024) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "ไฟล์ใหญ่เกิน 200 MB — ติดต่อผู้ดูแลระบบเพื่อย้ายด้วยวิธีอื่น" });
+          }
+          if (buffer.subarray(0, 16).toString("latin1") !== "SQLite format 3\u0000") {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "ไฟล์นี้ไม่ใช่ฐานข้อมูล SQLite — ต้องเลือกไฟล์ welfare-store.sqlite หรือไฟล์สำรองของระบบเท่านั้น" });
+          }
+          const backupDir = getBackupDir();
+          mkdirSync(backupDir, { recursive: true });
+          const stamp = (date: Date) => date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+          let finalName = `welfare-store-${stamp(new Date())}.sqlite`;
+          for (let bump = 1; bump <= 60 && existsSync(join(backupDir, finalName)); bump += 1) {
+            finalName = `welfare-store-${stamp(new Date(Date.now() + bump * 1000))}.sqlite`;
+          }
+          const stagingPath = join(backupDir, `.upload-staging-${Date.now()}.sqlite`);
+          const finalPath = join(backupDir, finalName);
+          try {
+            writeFileSync(stagingPath, buffer);
+            verifySqliteBackup(stagingPath);
+            // กันไฟล์ SQLite ของโปรแกรมอื่น: ต้องมีตารางของระบบร้านค้าสวัสดิการจริงอย่างน้อย 2 ตาราง
+            const probe = new DatabaseSync(stagingPath, { readOnly: true });
+            try {
+              const row = probe.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table' AND name IN ('app_users', 'members', 'store_settings', 'products')").get() as { n: number };
+              if (row.n < 2) throw new Error("ไม่พบตารางของระบบร้านค้าสวัสดิการในไฟล์นี้ — ไฟล์นี้เป็นฐานข้อมูลของโปรแกรมอื่น");
+            } finally {
+              probe.close();
+            }
+            renameSync(stagingPath, finalPath);
+          } catch (error) {
+            rmSync(stagingPath, { force: true });
+            rmSync(finalPath, { force: true });
+            throw new TRPCError({ code: "BAD_REQUEST", message: `ไฟล์ไม่ผ่านการตรวจสอบ: ${error instanceof Error ? error.message : String(error)}` });
+          }
+          logAction(
+            getWelfareDb(),
+            "อัปโหลดไฟล์สำรอง",
+            actor ?? "ผู้บริหาร",
+            `อัปโหลดไฟล์ฐานข้อมูลจากเครื่องอื่นเข้ารายการสำรองเป็น ${finalName}${input.fileName ? ` (ไฟล์ต้นทาง: ${input.fileName})` : ""}`,
+            "blue",
+            actorRole ?? null,
+          );
+          return { file: finalName, sizeBytes: buffer.byteLength };
+        });
+      }),
     restore: publicProcedure
       .input(backupFileInput)
       .mutation(({ ctx, input }) => {
