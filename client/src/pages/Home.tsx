@@ -905,7 +905,7 @@ function Reports({ focusBill, onFocusBillConsumed, role, userName }: { focusBill
     // ธุรกรรมมี ทั้งเติม(+) ถอน(−) ซื้อ(−) — สรุปแยกประเภทในช่องรายละเอียด + ยอดเน็ตในช่องยอด
     totalsRow: [
       `รวมทั้งหมด ${txRows.length} รายการ`, "—", "—", "—", "—", "—",
-      `เติม +${exportCount(txTotals.deposit)} (${txTotals.depositCount}) · ถอน −${exportCount(txTotals.withdraw)} (${txTotals.withdrawCount}) · ซื้อ −${exportCount(txTotals.spend)} (${txTotals.spendCount})${txTotals.activationCount > 0 ? ` · เปิดบัตร +${exportCount(txTotals.activation)} (${txTotals.activationCount})` : ""}${txTotals.refundCount > 0 ? ` · คืนเงิน +${exportCount(txTotals.refund)} (${txTotals.refundCount})` : ""}`,
+      `เติม +${exportNumber(txTotals.deposit)} (${exportCount(txTotals.depositCount)}) · ถอน −${exportNumber(txTotals.withdraw)} (${exportCount(txTotals.withdrawCount)}) · ซื้อ −${exportNumber(txTotals.spend)} (${exportCount(txTotals.spendCount)})${txTotals.activationCount > 0 ? ` · เปิดบัตร +${exportNumber(txTotals.activation)} (${exportCount(txTotals.activationCount)})` : ""}${txTotals.refundCount > 0 ? ` · คืนเงิน +${exportNumber(txTotals.refund)} (${exportCount(txTotals.refundCount)})` : ""}`,
       exportNumber(txRows.reduce((sum, row) => sum + row.amount, 0)), "—", "—",
     ],
     brandName: "ร้านค้าสวัสดิการ", footnote: "ข้อมูลจากบัญชีสมาชิกโดยตรง · ใช้จ่าย / เติมเงิน / ถอนเงิน พร้อมผู้ทำรายการทุกครั้ง",
