@@ -5181,6 +5181,10 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .pos-inventory-modal-head small { margin-top: 3px; color: #6c7f75; font-size: 11px; }
 .pos-inventory-modal-body { padding: 0 18px 20px; }
 .pos-inventory-modal-body > .section-header { margin-top: 12px; }
+.pos-inventory-modal-body > .stock-embedded > .section-header,
+.pos-inventory-modal-body > .stock-embedded > .stock-overview,
+.pos-inventory-modal-body > .stock-embedded > .stock-workbench,
+.pos-inventory-modal-body > .stock-embedded > .notice-bar { display: none !important; }
 .member-number-presets { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-top: 14px; padding: 10px 12px; border: 1px solid #dce9e2; border-radius: 10px; background: #fbfdfc; }
 .member-number-presets b { font-size: 11px; color: #52695d; }
 .member-number-presets small { color: #718178; font-size: 10.5px; }
