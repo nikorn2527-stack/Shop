@@ -4176,13 +4176,13 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .preview-chip.mute { background: #f6f4ee; border-color: var(--line); color: var(--muted); font-weight: 500; }
 .export-preview-table-wrap { border: 1px solid var(--line); border-radius: 11px; overflow: auto; max-height: min(52vh, 560px); background: #fff; }
 .export-preview-table { width: 100%; border-collapse: collapse; font-size: 11px; }
-.export-preview-table th { position: sticky; top: 0; z-index: 1; background: #2f7c5f; color: #fff; text-align: left; padding: 7px 9px; white-space: nowrap; font-weight: 600; }
+.export-preview-table th { position: sticky; top: 0; z-index: 1; background: #ffffff; color: #111111; text-align: left; padding: 8px 9px; white-space: nowrap; font-weight: 700; border-top: 2px solid #111111; border-bottom: 2px solid #111111; }
 .export-preview-table td { padding: 5px 9px; border-bottom: 1px solid #eef1ec; color: #33403a; font-variant-numeric: tabular-nums; white-space: nowrap; max-width: 300px; overflow: hidden; text-overflow: ellipsis; }
 .export-preview-table tbody tr:nth-child(even) td { background: #f8fbf9; }
 .export-preview-table tbody tr:hover td { background: #f1f8f4; }
 .export-preview-table th.num, .export-preview-table td.num { text-align: right; }
 .export-preview-table th.rownum, .export-preview-table td.rownum { width: 36px; text-align: right; font-size: 9.5px; color: #9aa294; background: #f6f8f4; }
-.export-preview-table tfoot td { position: sticky; bottom: 0; background: #ecf5ef; font-weight: 700; border-top: 2px solid #2f7c5f; color: #26433a; }
+.export-preview-table tfoot td { position: sticky; bottom: 0; background: #ffffff; font-weight: 800; border-top: 3.5px double #111111; border-bottom: 2.5px solid #111111; color: #111111; }
 .export-preview-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; }
 .preview-format-list { display: flex; flex-wrap: wrap; gap: 8px; }
 .preview-format-btn { position: relative; display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 7px 12px; color: #4c554b; transition: .15s ease; text-align: left; }
@@ -5064,3 +5064,89 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .member-card-modal { max-height: calc(100vh - 40px); overflow-y: auto; }
 .member-card-modal .modal-actions { position: sticky; bottom: -20px; margin: 16px -20px -20px; padding: 12px 20px 13px; background: #fff; border-top: 1px solid #edf2f0; border-radius: 0 0 13px 13px; box-shadow: 0 -8px 20px rgba(24, 61, 48, .07); }
 @media (max-width: 560px) { .member-card-modal { max-height: calc(100vh - 28px); } .member-card-modal .modal-actions { bottom: -15px; margin: 14px -15px -15px; padding: 11px 15px 12px; } }
+
+/* ==========================================================================
+   ROUND 79 (user) — หัวรายการและแถบปุ่มของโมดัลต้องเห็นตลอด (ทุกหน้าเมนู)
+   ฟอร์มยาว ๆ (เพิ่มไอเทมสินค้า / รับเข้าสินค้า / นับสต็อก / แก้ไขสินค้า /
+   สมาชิกใหม่ / ผู้ใช้ ฯลฯ) เลื่อนลงไปกรอกข้อมูลด้านล่างแล้วหัวเรื่องหายไปจากจอ
+   และปุ่มยืนยัน/ยกเลิกตกไปอยู่นอกจอ ต้องเลื่อนหาทุกครั้ง — ใช้งานสับสน
+   แก้แบบรวมทุกหน้าในครั้งเดียว: หัวโมดัล stick ติดขอบบน + แถบปุ่ม stick ติดขอบ
+   ล่างของกรอบโมดัลเสมอ (สูตรเดียวกับ footer บัตรสมาชิกที่ใช้ใน r78:
+   sticky + negative margin กินพื้นที่ padding ของโมดัลให้เต็มความกว้าง)
+   — .modal-actions ใช้ :last-child เท่านั้น กันเคสที่มีเนื้อหาต่อท้ายหลังปุ่ม
+   (เช่นขั้นยืนยันซ้ำของโมดัลวงเงิน) จะได้ไม่ทับกับส่วนนั้น
+   ========================================================================== */
+.form-modal > .modal-heading {
+  position: sticky; top: -22px; z-index: 70;
+  margin: -22px -24px 14px; padding: 20px 24px 12px;
+  background: #fff; border-bottom: 1px solid #e9f1ed;
+  box-shadow: 0 9px 18px -15px rgba(24, 61, 48, .55);
+}
+.form-modal > .modal-actions:last-child,
+.form-modal > .stock-detail-actions:last-child {
+  position: sticky; bottom: -22px; z-index: 70;
+  margin: 14px -24px -22px; padding: 12px 24px 20px;
+  background: #fff; border-top: 1px solid #e9f1ed;
+  box-shadow: 0 -9px 20px -15px rgba(24, 61, 48, .5);
+}
+/* มือถือ: form-modal กลับมา padding 15px จริง (กฎเดิมถูกกฎ padding: 22px 24px
+   ที่ประกาศท้ายไฟล์ทับมาตลอด — ประกาศใหม่ตรงนี้ชนะเพราะอยู่หลังสุด)
+   แล้วปรับ negative margin ของหัว/ท้าย sticky ให้กินพื้นที่พอดี */
+@media (max-width: 560px) {
+  .form-modal { padding: 15px; }
+  .form-modal > .modal-heading { top: -15px; margin: -15px -15px 12px; padding: 14px 15px 10px; }
+  .form-modal > .modal-actions:last-child,
+  .form-modal > .stock-detail-actions:last-child { bottom: -15px; margin: 12px -15px -15px; padding: 10px 15px 14px; }
+}
+
+/* ==========================================================================
+   ROUND 79 (user) — รับเข้าสินค้า: การ์ดยืนยันชื่อสินค้า + ตะกร้ารับเข้าหลายรายการ
+   (ยิงบาร์โค้ด → กรอกจำนวน → Enter → ยิงตัวถัดไป แล้วบันทึกพร้อมกันทีเดียว)
+   ========================================================================== */
+.receive-confirm-card { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #f2faf6; border: 1px solid #cfe9de; border-radius: 11px; }
+.receive-confirm-card .receive-confirm-thumb { width: 42px; height: 42px; flex: 0 0 42px; border-radius: 9px; background: #fff; border: 1px solid #dfeee7; display: grid; place-items: center; overflow: hidden; color: #4b8d77; }
+.receive-confirm-card .receive-confirm-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.receive-confirm-card .receive-confirm-info { min-width: 0; flex: 1; }
+.receive-confirm-card .receive-confirm-info b { display: block; color: #2e5b4a; font-size: 14.5px; line-height: 1.3; }
+.receive-confirm-card .receive-confirm-info small { display: block; color: #75817a; font-size: 10.5px; margin-top: 3px; font-family: "IBM Plex Mono", monospace; }
+.receive-confirm-card .receive-confirm-badge { flex: 0 0 auto; max-width: 138px; font-size: 9.5px; color: #a5762f; background: #fff5e6; border: 1px solid #f0dcb8; border-radius: 20px; padding: 4px 9px; text-align: center; line-height: 1.4; }
+.receive-cart { margin-top: 13px; border: 1px solid #d5e7df; border-radius: 12px; background: #fff; overflow: hidden; max-height: 274px; overflow-y: auto; }
+.receive-cart-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 13px; background: #eef8f3; border-bottom: 1px solid #d5e7df; position: sticky; top: 0; z-index: 2; }
+.receive-cart-head b { color: #2e5b4a; font-size: 11.5px; white-space: nowrap; }
+.receive-cart-row { display: flex; align-items: center; gap: 10px; padding: 9px 13px; border-bottom: 1px solid #f0f5f2; }
+.receive-cart-row:last-child { border-bottom: 0; }
+.receive-cart-row .receive-cart-thumb { width: 34px; height: 34px; flex: 0 0 34px; border-radius: 8px; background: #f4f9f6; border: 1px solid #e2ede8; display: grid; place-items: center; overflow: hidden; color: #4b8d77; }
+.receive-cart-row .receive-cart-thumb img { width: 100%; height: 100%; object-fit: cover; }
+.receive-cart-row .receive-cart-info { min-width: 0; flex: 1; }
+.receive-cart-row .receive-cart-info b { display: block; color: #33544a; font-size: 12.5px; }
+.receive-cart-row .receive-cart-info small { display: block; color: #7f887e; font-size: 10px; margin-top: 2px; }
+.receive-cart-row .receive-cart-qty { text-align: right; }
+.receive-cart-row .receive-cart-qty b { display: block; color: #2c7a5b; font-size: 14.5px; }
+.receive-cart-row .receive-cart-qty em { display: block; font-style: normal; font-size: 9px; color: #4b987b; margin-top: 2px; }
+.receive-cart-row .receive-cart-cost { width: 78px; text-align: right; color: #52604f; font-size: 11.5px; font-weight: 600; font-family: "IBM Plex Mono", monospace; }
+.receive-cart-row .receive-cart-actions { display: flex; gap: 4px; }
+@media (max-width: 560px) {
+  .receive-cart-row { flex-wrap: wrap; }
+  .receive-cart-row .receive-cart-cost { width: auto; margin-left: auto; }
+  .receive-cart-row .receive-cart-actions { margin-left: auto; }
+  .receive-confirm-card .receive-confirm-badge { display: none; }
+}
+
+/* ==========================================================================
+   ROUND 79 (user) — รายงาน: การ์ดสรุป 4 ใบเตี้ยลงแต่ข้อมูลแน่นขึ้น
+   (ชิ้น · เฉลี่ยต่อบิล · ต้นทุน · มาร์จิ้น · เฉลี่ยต่อบัญชี)
+   + ชิปกรองพนักงานขายแบบกดเลือกหลายคนพร้อมกัน (แทนดรอปดาวน์เดิม)
+   ========================================================================== */
+.report-cards-dense { gap: 8px; margin-bottom: 10px; }
+.report-cards-dense .report-card { padding: 8px 12px 9px; display: flex; flex-direction: column; gap: 1px; }
+.report-cards-dense .report-card > span { font-size: 10px; }
+.report-cards-dense .report-card strong { font-size: 18.5px; margin-top: 2px; }
+.report-cards-dense .report-card-facts { display: flex; flex-wrap: wrap; column-gap: 4px; row-gap: 2px; margin-top: 4px; }
+.report-cards-dense .report-card-facts i { font-style: normal; font-size: 9.5px; color: #7d8272; white-space: nowrap; }
+.report-cards-dense .report-card-facts i:not(:first-child)::before { content: "·"; margin-right: 4px; color: #b3b8a9; }
+.report-staff-pills { flex-wrap: wrap; }
+@media (max-width: 560px) {
+  .report-cards-dense .report-card { padding: 7px 10px 8px; }
+  .report-cards-dense .report-card strong { font-size: 15.5px; }
+  .report-cards-dense .report-card-facts i { font-size: 9px; }
+}

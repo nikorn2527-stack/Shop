@@ -391,6 +391,8 @@ const reportRangeInput = z
     to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
     /** ROUND 51 — กรองเฉพาะพนักงานขายคนนี้ ("" = ทุกคน · "ไม่ระบุพนักงาน" = บิลที่ไม่มีชื่อ) */
     cashier: z.string().trim().max(120).optional(),
+    /** ROUND 79 (user) — เลือกหลายพนักงานพร้อมกันได้ (เช่น รวม 2 กะ) · ว่าง = ทุกคน */
+    cashiers: z.array(z.string().trim().max(120)).max(30).optional(),
   })
   .nullish();
 
@@ -401,6 +403,8 @@ const reportsDailyInput = z
     to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
     /** ROUND 51 — กรองเฉพาะพนักงานขายคนนี้ ("" = ทุกคน · "ไม่ระบุพนักงาน" = บิลที่ไม่มีชื่อ) */
     cashier: z.string().trim().max(120).optional(),
+    /** ROUND 79 (user) — เลือกหลายพนักงานพร้อมกันได้ (เช่น รวม 2 กะ) · ว่าง = ทุกคน */
+    cashiers: z.array(z.string().trim().max(120)).max(30).optional(),
   })
   .nullish();
 
