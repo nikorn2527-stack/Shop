@@ -169,17 +169,19 @@ export function StatementModal({ member, transactions, onClose }: { member: Stat
             <td className="st-num">{money(member.balance)}</td>
           </tr></tfoot>
         </table>
-        <div className="statement-note">
-          {totals.truncated
-            ? `แสดงรายการล่าสุด ${TX_LIMIT} รายการ (จากทั้งหมดในระบบ) · ติดต่อเจ้าหน้าที่เพื่อขอรายงานฉบับเต็ม`
-            : `รวมทั้งสิ้น ${totals.count} รายการ · ยอดเงินคงเหลือสุดท้าย ${money(member.balance)}`}
+        <div className="statement-end">
+          <div className="statement-note">
+            {totals.truncated
+              ? `แสดงรายการล่าสุด ${TX_LIMIT} รายการ (จากทั้งหมดในระบบ) · ติดต่อเจ้าหน้าที่เพื่อขอรายงานฉบับเต็ม`
+              : `รวมทั้งสิ้น ${totals.count} รายการ · ยอดเงินคงเหลือสุดท้าย ${money(member.balance)}`}
+          </div>
+          <div className="statement-sign">
+            <div><span>ลงชื่อเจ้าหน้าที่ร้านค้า</span><i /></div>
+            <div><span>ลงชื่อสมาชิก</span><i /></div>
+            <div><span>วันที่</span><i /></div>
+          </div>
+          <div className="statement-foot">เอกสารนี้ออกโดยระบบร้านค้าสวัสดิการ · ⚡ Powered by PNG TEAM</div>
         </div>
-        <div className="statement-sign">
-          <div><span>ลงชื่อเจ้าหน้าที่ร้านค้า</span><i /></div>
-          <div><span>ลงชื่อสมาชิก</span><i /></div>
-          <div><span>วันที่</span><i /></div>
-        </div>
-        <div className="statement-foot">เอกสารนี้ออกโดยระบบร้านค้าสวัสดิการ · ⚡ Powered by PNG TEAM</div>
       </div>
     </div>
     <div className="statement-actions modal-actions">

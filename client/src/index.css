@@ -1313,6 +1313,7 @@ td small { font-size: 11px; }
 .statement-sign i { display: block; border-top: 1px dotted #8a8a85; }
 
 .statement-foot { margin-top: 16px; padding-top: 9px; border-top: 1px solid #d8d8d3; color: #555555; font-size: 11px; text-align: center; }
+.statement-end { break-inside: avoid; page-break-inside: avoid; }
 
 /* (3) Phones — the paper stays readable, member grid stacks */
 @media (max-width: 560px) {
@@ -1336,6 +1337,7 @@ td small { font-size: 11px; }
 /* (4) Print — isolate the statement onto a clean A4 page
       (same guard pattern as receipt + wallet card) */
 @media print {
+  @page { size: A4 portrait; margin: 8mm; }
   body:has(#member-statement) .sidebar,
   body:has(#member-statement) .topbar,
   body:has(#member-statement) .app-footer,
@@ -1349,9 +1351,18 @@ td small { font-size: 11px; }
   body:has(#member-statement) .modal-heading,
   body:has(#member-statement) .statement-actions { display: none !important; }
   body:has(#member-statement) .statement-stage { background: none; border: 0; padding: 0; border-radius: 0; }
-  body:has(#member-statement) .statement-paper { width: 100%; max-width: none; border: 0; box-shadow: none; padding: 6mm 4mm; font-size: 16px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body:has(#member-statement) .statement-paper { width: 100%; max-width: none; border: 0; box-shadow: none; padding: 3mm 2mm; font-size: 13px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body:has(#member-statement) .statement-member { grid-template-columns: repeat(3, 1fr); }
   body:has(#member-statement) .statement-summary { grid-template-columns: repeat(4, 1fr); }
+  body:has(#member-statement) .statement-member { padding: 8px 0 7px; gap: 5px 10px; }
+  body:has(#member-statement) .statement-summary { margin: 8px 0; gap: 6px; }
+  body:has(#member-statement) .statement-summary > div { padding: 6px 8px; }
+  body:has(#member-statement) .statement-table { font-size: 12px; }
+  body:has(#member-statement) .statement-table th,
+  body:has(#member-statement) .statement-table td { padding: 4px 6px; }
+  body:has(#member-statement) .statement-sign { margin-top: 14px; gap: 18px; }
+  body:has(#member-statement) .statement-sign span { margin-bottom: 20px; }
+  body:has(#member-statement) .statement-foot { margin-top: 9px; padding-top: 6px; }
 }
 
 /* (5) Round 16 detail polish — on-screen reading affordances */
