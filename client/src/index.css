@@ -5157,8 +5157,15 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .receive-cart-row .receive-cart-qty em { display: block; font-style: normal; font-size: 9px; color: #4b987b; margin-top: 2px; }
 .receive-cart-row .receive-cart-cost { width: 78px; text-align: right; color: #52604f; font-size: 11.5px; font-weight: 600; font-family: "IBM Plex Mono", monospace; }
 .receive-cart-row .receive-cart-actions { display: flex; gap: 4px; }
-.stock-catalog-actions { display: inline-flex; align-items: center; gap: 6px; padding: 4px; border: 1px solid #d7e7df; border-radius: 10px; background: #f7fbf8; }
-.stock-catalog-actions > span { padding: 0 5px; color: #668072; font-size: 10px; font-weight: 700; white-space: nowrap; }
+.stock-catalog-actions { position: relative; display: inline-flex; }
+.stock-catalog-trigger { display: inline-flex; align-items: center; gap: 6px; }
+.stock-catalog-menu { position: absolute; top: calc(100% + 7px); right: 0; z-index: 60; width: 290px; padding: 6px; border: 1px solid #d7e7df; border-radius: 12px; background: #fff; box-shadow: 0 12px 28px rgba(30, 71, 54, .18); }
+.stock-catalog-menu button { display: flex; width: 100%; align-items: flex-start; gap: 10px; padding: 10px; border: 0; border-radius: 8px; color: #315848; background: transparent; text-align: left; cursor: pointer; }
+.stock-catalog-menu button:hover, .stock-catalog-menu button:focus-visible { background: #eef8f3; outline: none; }
+.stock-catalog-menu button > svg { flex: 0 0 auto; margin-top: 2px; color: #348267; }
+.stock-catalog-menu button span { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.stock-catalog-menu button b { font-size: 12px; }
+.stock-catalog-menu button small { color: #7b8b82; font-size: 10px; line-height: 1.35; }
 @media (max-width: 560px) {
   .receive-cart-row { flex-wrap: wrap; }
   .receive-cart-row .receive-cart-cost { width: auto; margin-left: auto; }
