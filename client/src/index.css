@@ -5042,8 +5042,8 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .pos-rail-manage-row > div b { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 700; color: #33422f; }
 .pos-rail-manage-row > div b kbd { font-family: "IBM Plex Mono", monospace; font-size: 10px; font-weight: 500; color: #52604f; background: #f1f4f0; border: 1px solid #d5dcd6; border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; }
 .pos-rail-manage-row > div small { display: block; color: #7d8172; font-size: 10.5px; margin-top: 3px; line-height: 1.45; }
-.pos-rail-manage-row .toggle { grid-column: 4; justify-self: start; }
-.pos-rail-key-control { display: inline-flex; grid-column: 3; align-items: center; justify-self: start; gap: 8px; }
+.pos-rail-manage-row .toggle { grid-column: auto; justify-self: start; }
+.pos-rail-key-control { display: inline-flex; grid-column: 3 / 5; align-items: center; justify-self: start; gap: 8px; }
 .pos-rail-key-input { width: 74px; height: 30px; padding: 4px 7px; border: 1px solid #d5dcd6; border-radius: 6px; background: #fff; color: #33422f; font-family: "IBM Plex Mono", monospace; font-size: 11px; text-transform: uppercase; }
 .pos-rail-manage-row.off .pos-rail-key-input { opacity: .55; background: #f4f4f0; }
 .pos-rail-manage-row.locked { background: #f7f9f8; }
