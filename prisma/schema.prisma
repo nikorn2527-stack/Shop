@@ -1,8 +1,14 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// PNG Shop — Prisma schema (Next.js 16 rebuild)
+// Baseline: /tmp/Shop (dev branch) + Technical Review Section 6 data-model upgrade.
+//
+// Design principles:
+// 1. Stock Movement = central ledger (RECEIVE / SALE / ADJUST / TRANSFER / RETURN / VOID).
+//    Never trust stock column alone; `products.stock` is a cached projection kept in sync inside transactions.
+// 2. RBAC: Role + Permission (granular) — replaces the old 3-role hard-coded model (staff/admin/dev).
+// 3. Money stored as Float (SQLite REAL) but rounded with round2() helper at the application layer to match Decimal(10,2).
+// 4. Timestamps stored as DateTime (UTC) and formatted to Asia/Bangkok on display.
+// 5. Signed License: licenseKey stored as opaque string; signature verified server-side.
+// 6. Audit Log on every mutation that touches money / member / stock / settings.
 
 generator client {
   provider = "prisma-client-js"
@@ -13,20 +19,557 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================================================
+// DOMAIN: SECURITY — users, roles, permissions, sessions, audit
+// ============================================================================
+
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                  String    @id @default(cuid())
+  username            String    @unique
+  passwordHash       String
+  displayName        String
+  role                String    @default("cashier") // role name FK -> Role.name (validated at app layer; kept as String for SQLite enum simplicity)
+  roleRef             Role?     @relation(fields: [role], references: [name], onDelete: Restrict)
+  active              Boolean   @default(true)
+  mustChangePassword Boolean   @default(true)
+  failedAttempts     Int       @default(0)
+  lockedUntil        DateTime?
+  lastSignedIn       DateTime? @default(now())
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  sessions   Session[]
+  auditLogs  AuditLog[]
+  sales      Sale[]      @relation("SaleCashier")
+  shifts     CashierShift[]
+  stockMoves StockMovement[] @relation("StockMoveActor")
+  approvals  LimitRequest[]  @relation("LimitApprover")
+  licenses   LicenseActivation[]
+
+  @@index([role])
 }
 
-model Post {
+model Role {
+  name        String  @id // e.g. "cashier", "stock_officer", "supervisor", "manager", "auditor", "administrator"
+  label       String  // Thai display label
+  description String?
+  isSystem    Boolean @default(false) // system roles cannot be deleted
+  createdAt   DateTime @default(now())
+
+  permissions RolePermission[]
+  users       User[]
+}
+
+model Permission {
+  key         String  @id // e.g. "POS.SELL", "STOCK.ADJUST", "REPORT.PROFIT"
+  group       String  // "POS" | "STOCK" | "REPORT" | "MEMBER" | "SYSTEM"
+  description String?
+  createdAt   DateTime @default(now())
+
+  roles       RolePermission[]
+}
+
+model RolePermission {
+  roleId       String
+  permissionKey String
+  role         Role       @relation(fields: [roleId], references: [name], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionKey], references: [key], onDelete: Cascade)
+
+  @@id([roleId, permissionKey])
+}
+
+model Session {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt   DateTime
+  lastSeenAt  DateTime @default(now()) // for idle timeout
+  ip          String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  action     String   // e.g. "ขายสินค้า", "เติมเงิน", "รับเข้าสต็อก", "ล็อกอิน"
+  actorId    String?
+  actor      String?  // display name snapshot
+  actorRole  String?
+  actorIp    String?
+  entity     String?  // e.g. "sale", "member", "stock_lot"
+  entityId   String?
+  detail     String   // Thai message
+  tone       String   @default("blue") // blue/green/red/amber/purple
+  requestId  String?
+  createdAt  DateTime @default(now())
+
+  user       User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([actorId])
+  @@index([entity, entityId])
+}
+
+// ============================================================================
+// DOMAIN: CATALOG — products, categories, barcodes, units
+// ============================================================================
+
+model Category {
   id        String   @id @default(cuid())
-  title     String
-  content   String?
-  published Boolean  @default(false)
-  authorId  String
+  name      String   @unique
+  skuPrefix String?  // e.g. "DRK", "FD", "HYG"
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+
+  products Product[]
+}
+
+model Product {
+  id            String   @id @default(cuid())
+  sku           String   @unique
+  barcode       String?
+  name          String
+  categoryId    String?
+  category      Category? @relation(fields: [categoryId], references: [id])
+  emoji         String   @default("📦")
+  color         String   @default("#6d6157")
+  unit          String   @default("ชิ้น")
+  price         Float    @default(0) // sell price (allows 0 = not yet priced)
+  cost          Float    @default(0) // weighted average cost
+  stock         Int      @default(0) // cached sellable qty — kept in sync via stock_movements
+  reorderPoint  Int      @default(10)
+  active        Boolean  @default(true)
+  size          String?  // "500 ml" / "300 g"
+  imageUrl      String?  // data URL (~480px JPEG)
+  quickPick     Boolean  @default(false) // shown on POS quick-pick rail
+  sellMode      String   @default("unit") // "unit" | "money"
+  priceTiers    String?  // JSON [{label, price, qty}]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  lots           StockLot[]
+  saleItems      SaleItem[]
+  stockMovements StockMovement[]
+  orderListItems OrderListItem[]
+  priceHistory   PriceHistory[]
+
+  @@index([categoryId])
+  @@index([active])
+}
+
+model Unit {
+  id          String  @id @default(cuid())
+  name        String  @unique // "ขวด", "กล่อง", "กรัม"
+  baseUnit    String  // reference unit (e.g. "กรัม" for money-mode)
+  createdAt   DateTime @default(now())
+
+  conversions  UnitConversion[] @relation("FromUnit")
+  conversionsTo UnitConversion[] @relation("ToUnit")
+}
+
+model UnitConversion {
+  id           String @id @default(cuid())
+  fromUnitId   String
+  toUnitId     String
+  factor       Float  // multiply qty in fromUnit to get toUnit
+  fromUnit     Unit   @relation("FromUnit", fields: [fromUnitId], references: [id], onDelete: Cascade)
+  toUnit       Unit   @relation("ToUnit", fields: [toUnitId], references: [id], onDelete: Cascade)
+
+  @@unique([fromUnitId, toUnitId])
+}
+
+// ============================================================================
+// DOMAIN: WAREHOUSE — stock_lots, stock_movements (LEDGER), stock_counts
+// ============================================================================
+
+model Warehouse {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  code      String   @unique // "MAIN", "BR2"
+  address   String?
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  lots        StockLot[]
+  movements   StockMovement[]
+  shifts      CashierShift[]
+  locations   Location[]
+}
+
+model Location {
+  id          String @id @default(cuid())
+  warehouseId String
+  code        String  // "A-1-3" shelf/bin
+  description String?
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@unique([warehouseId, code])
+}
+
+model StockLot {
+  id          String   @id @default(cuid())
+  productId   String
+  product     Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+  lot         String   // e.g. "LOT-2026-09-18", "CR-2608-01"
+  expiryDate  DateTime?
+  qty         Int      @default(0) // remaining qty (decremented by sales)
+  cost        Float    @default(0)
+  receivedAt  DateTime @default(now())
+  receivedQty Int      @default(0)
+
+  movements   StockMovement[]
+
+  @@index([productId, warehouseId])
+  @@index([expiryDate])
+}
+
+model StockMovement {
+  id           String   @id @default(cuid())
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  warehouseId  String
+  warehouse    Warehouse @relation(fields: [warehouseId], references: [id])
+  lotId        String?
+  lot          StockLot? @relation(fields: [lotId], references: [id], onDelete: SetNull)
+  type         String   // RECEIVE | SALE | ADJUST | TRANSFER | RETURN | VOID | COUNT
+  qtyDelta     Int      // signed: +N in, -N out
+  unitCost     Float    @default(0) // snapshot cost at time of movement
+  refType      String?  // "sale" | "purchase_order" | "stock_count" | "refund" | "transfer"
+  refId        String?
+  reason       String?
+  actorId      String?
+  actor        User?    @relation("StockMoveActor", fields: [actorId], references: [id], onDelete: SetNull)
+  actorName    String?
+  createdAt    DateTime @default(now())
+
+  @@index([productId, createdAt])
+  @@index([type])
+  @@index([refType, refId])
+}
+
+model StockCount {
+  id          String   @id @default(cuid())
+  warehouseId String
+  mode        String   // "total" | "lots"
+  note        String?
+  status      String   @default("completed") // "draft" | "completed"
+  actorId     String?
+  actorName   String?
+  createdAt   DateTime @default(now())
+
+  items       StockCountItem[]
+}
+
+model StockCountItem {
+  id           String @id @default(cuid())
+  stockCountId String
+  productId    String
+  lotId        String?
+  systemQty    Int
+  countedQty   Int
+  diff         Int // counted - system
+  stockCount   StockCount @relation(fields: [stockCountId], references: [id], onDelete: Cascade)
+
+  @@index([stockCountId])
+}
+
+// ============================================================================
+// DOMAIN: SALES — sales, sale_items, payments, refunds
+// ============================================================================
+
+model Sale {
+  id            String   @id @default(cuid())
+  orderNumber   String   @unique // "RC-YYMMDD-NNN"
+  cashierId     String?
+  cashier       User?    @relation("SaleCashier", fields: [cashierId], references: [id], onDelete: SetNull)
+  cashierName   String?
+  shiftId       String?  // optional: linked to cashier shift
+  memberNumber  String?  // member snapshot
+  member        Member?  @relation(fields: [memberNumber], references: [memberNumber], onDelete: SetNull)
+  paymentMethod String   // "เงินสด" | "QR / สแกน" | "หักบัญชีสมาชิก"
+  subtotal      Float
+  discount      Float    @default(0)
+  total         Float
+  slipUrl       String?  // QR slip data URL
+  voided        Boolean  @default(false)
+  voidReason    String?
+  voidActorId   String?
+  voidActorName String?
+  voidedAt      DateTime?
+  createdAt     DateTime @default(now())
+
+  items         SaleItem[]
+  refund        Refund?
+  payments      Payment[]
+
+  @@index([createdAt])
+  @@index([cashierId])
+  @@index([memberNumber])
+}
+
+model SaleItem {
+  id        String @id @default(cuid())
+  saleId    String
+  sale      Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  name      String  // snapshot
+  qty       Int
+  price     Float   // snapshot unit price (4 decimals for money-mode handled at app layer)
+  cost      Float   @default(0) // snapshot for COGS
+  unit      String?
+  variant   String? // money-mode tier label
+
+  @@index([saleId])
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  saleId      String
+  sale        Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  method      String   // "cash" | "qr" | "wallet"
+  amount      Float
+  received    Float?   // for cash: amount received from customer
+  change      Float?   // for cash: change given
+  reference   String?  // QR ref / wallet tx ref
+  createdAt   DateTime @default(now())
+
+  @@index([saleId])
+}
+
+model Refund {
+  id             String   @id @default(cuid())
+  saleId         String   @unique // 1-to-1 with sale
+  sale           Sale     @relation(fields: [saleId], references: [id])
+  amount         Float
+  reason         String
+  method         String   // refund payment method
+  actorId        String?
+  actorName      String?
+  approverId     String?
+  approverName   String?
+  status         String   @default("completed") // "pending" | "approved" | "rejected" | "completed"
+  createdAt      DateTime @default(now())
+
+  @@index([saleId])
+}
+
+// ============================================================================
+// DOMAIN: MEMBERS — basic profile + wallet (wallet is part of Core for hospital welfare context)
+// ============================================================================
+
+model Member {
+  id            String   @id @default(cuid())
+  memberNumber  String   @unique
+  prename       String?  // นาย/นาง/นางสาว
+  firstName     String
+  lastName      String
+  idCard        String?
+  phone         String?
+  type          String   @default("สมาชิก") // "สมาชิก" | "เจ้าหน้าที่"
+  balance       Float    @default(0)
+  status        String   @default("active") // "active" | "suspended"
+  photoUrl      String?
+  gender        String?
+  creditLimit   Float?   // null = unlimited
+  cardNumber   String?  // cash card number
+  patientCode   String?  // HN
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  transactions  MemberTransaction[]
+  sales         Sale[]
+  limitRequests LimitRequest[]
+
+  @@index([status])
+  @@index([cardNumber])
+  @@index([patientCode])
+}
+
+// NOTE: Sale.memberNumber references Member.memberNumber via implicit relation defined on Sale model.
+
+model MemberTransaction {
+  id             String   @id @default(cuid())
+  memberNumber   String
+  member         Member   @relation(fields: [memberNumber], references: [memberNumber], onDelete: Cascade)
+  type           String   // "purchase" | "deposit" | "withdrawal" | "activation" | "refund"
+  detail         String
+  amount         Float    // signed: +in / -out
+  balanceAfter   Float?
+  paymentMethod  String?
+  actor          String?
+  slipUrl        String?
+  saleId         String?  // if linked to a sale
+  createdAt      DateTime @default(now())
+
+  @@index([memberNumber, createdAt])
+  @@index([type])
+}
+
+model LimitRequest {
+  id              String   @id @default(cuid())
+  memberNumber    String
+  member          Member   @relation(fields: [memberNumber], references: [memberNumber], onDelete: Cascade)
+  currentLimit    Float?
+  requestedLimit  Float
+  reason          String?
+  status          String   @default("pending") // "pending" | "approved" | "rejected"
+  requestedById   String?
+  requestedByName String?
+  decidedById     String?
+  decidedBy       User?    @relation("LimitApprover", fields: [decidedById], references: [id], onDelete: SetNull)
+  decidedByName   String?
+  decidedAt       DateTime?
+  createdAt       DateTime @default(now())
+
+  @@index([status])
+  @@index([memberNumber])
+}
+
+// ============================================================================
+// DOMAIN: CASHIER SHIFT — open/close, opening cash, counted cash, difference
+// ============================================================================
+
+model CashierShift {
+  id              String    @id @default(cuid())
+  cashierId       String
+  cashier         User      @relation(fields: [cashierId], references: [id])
+  cashierName     String
+  warehouseId     String
+  warehouse       Warehouse @relation(fields: [warehouseId], references: [id])
+  status          String    @default("open") // "open" | "closed"
+  openingCash     Float     @default(0)
+  expectedCash    Float     @default(0) // opening + cash sales - cash refunds - withdrawals
+  countedCash     Float?    // entered when closing
+  cashDifference  Float?    // counted - expected
+  expectedQr       Float    @default(0)
+  expectedWallet  Float    @default(0)
+  billsCount      Int       @default(0)
+  salesTotal      Float     @default(0)
+  note            String?
+  openedAt        DateTime  @default(now())
+  closedAt        DateTime?
+
+  @@index([cashierId, status])
+  @@index([status])
+}
+
+// ============================================================================
+// DOMAIN: DAY CLOSURE — Z-report (cut-off)
+// ============================================================================
+
+model DayClosure {
+  id             String   @id @default(cuid())
+  periodStart    DateTime
+  closedAt       DateTime @default(now())
+  bills          Int      @default(0)
+  pieces         Int      @default(0)
+  revenue        Float    @default(0)
+  cashTotal      Float    @default(0)
+  qrTotal        Float    @default(0)
+  walletTotal    Float    @default(0)
+  deposits       Float    @default(0)
+  withdrawals    Float    @default(0)
+  closedById     String?
+  closedByName   String?
+  note            String?
+
+  @@index([periodStart])
+}
+
+// ============================================================================
+// DOMAIN: ORDER LIST — quick procurement helper (low-friction)
+// ============================================================================
+
+model OrderListItem {
+  id         String   @id @default(cuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  qty        Float    @default(1)
+  note       String?
+  createdById String?
+  createdByName String?
+  createdAt  DateTime @default(now())
+
+  @@index([productId])
+}
+
+// ============================================================================
+// DOMAIN: PRICING — price_history, promotions
+// ============================================================================
+
+model PriceHistory {
+  id         String   @id @default(cuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  price      Float
+  cost       Float?
+  reason     String?
+  actorId    String?
+  actorName  String?
+  createdAt  DateTime @default(now())
+
+  @@index([productId, createdAt])
+}
+
+model Promotion {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   // "bundle" | "happy_hour" | "member_price"
+  rulesJson   String   // JSON rule payload
+  startsAt    DateTime
+  endsAt      DateTime?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}
+
+// ============================================================================
+// DOMAIN: SETTINGS & LICENSE
+// ============================================================================
+
+model StoreSetting {
+  key   String @id
+  value String
+}
+
+model LicenseActivation {
+  id            String   @id @default(cuid())
+  key           String   @unique
+  edition       String   // "standard" | "pro" | "proplus"
+  licensedTo    String?
+  issuedAt      DateTime @default(now())
+  expiresAt     DateTime?
+  signature     String   // Ed25519 / HMAC signature
+  activatedById String?
+  activatedBy   User?    @relation(fields: [activatedById], references: [id], onDelete: SetNull)
+  activatedAt   DateTime @default(now())
+}
+
+model BackupManifest {
+  id          String   @id @default(cuid())
+  fileName    String   @unique
+  sizeBytes   Int
+  sha256      String?
+  createdAt   DateTime @default(now())
+  createdBy   String?
+  kind        String   @default("manual") // "manual" | "auto" | "pre_update" | "pre_import"
+  note        String?
+}
+
+// ============================================================================
+// DOMAIN: SYSTEM UPDATE — versioning + deployment metadata
+// ============================================================================
+
+model SystemVersion {
+  id          String   @id @default(cuid())
+  version     String   @unique // semver "1.4.2"
+  releaseNotes String
+  appliedAt   DateTime @default(now())
+  appliedBy   String?
+  status      String   @default("applied") // "applied" | "rolled_back"
+  rollbackOf  String?  // version rolled back from
 }
