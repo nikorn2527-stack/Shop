@@ -3,6 +3,13 @@ import { mkdirSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
 
+// Store all business timestamps as Thai local wall time. The hosting runtime
+// may run in UTC, while the shop UI and reports are intended for Thailand.
+// Setting TZ before any Date helpers are evaluated keeps saved and displayed
+// sales, stock, wallet, and audit-log times in the same timezone.
+const STORE_TIME_ZONE = "Asia/Bangkok";
+process.env.TZ = STORE_TIME_ZONE;
+
 const require = createRequire(import.meta.url);
 const { DatabaseSync } = require("node:sqlite") as typeof import("node:sqlite");
 
