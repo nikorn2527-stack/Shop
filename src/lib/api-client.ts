@@ -78,18 +78,27 @@ async function request<T>(
     init.body = JSON.stringify(body);
   }
 
+  // 30-second timeout — prevents infinite hang if server is slow to compile.
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30_000);
+
   let res: Response;
   try {
-    res = await fetch(path, init);
+    res = await fetch(path, { ...init, signal: controller.signal });
   } catch (networkErr) {
+    const isAbort = networkErr instanceof DOMException && networkErr.name === "AbortError";
     const err = new Error(
-      "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ · ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่",
+      isAbort
+        ? "คำขอใช้เวลานานเกินไป · ลองอีกครั้งใน 30 วินาที (server อาจจะ compile อยู่)"
+        : "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ · ตรวจสอบอินเทอร์เน็ตแล้วลองใหม่",
     ) as ApiError;
     err.name = "ApiError";
     err.status = 0;
-    err.code = "NETWORK";
+    err.code = isAbort ? "TIMEOUT" : "NETWORK";
     err.payload = networkErr;
     throw err;
+  } finally {
+    clearTimeout(timeoutId);
   }
 
   // Read body once — try JSON, fall back to text, fall back to empty.
@@ -109,14 +118,15 @@ async function request<T>(
   }
 
   if (!res.ok) {
+    // Only auto-reload on 401 if we're NOT on login/setup/change-password pages.
+    // On login page, 401 should show a toast error instead of reloading (which
+    // would make it look like nothing happened).
     if (res.status === 401 && typeof window !== "undefined") {
-      // Force a hard reload at `/` so the auth gate re-evaluates the session.
-      // If we're already at "/", this is equivalent to a refresh.
-      const current = window.location.pathname + window.location.search;
-      if (current !== "/" && current !== "") {
+      const path = window.location.pathname;
+      const isAuthPage = path === "/" || path === "/login" || path === "/setup" || path === "/change-password";
+      if (!isAuthPage) {
         window.location.href = "/";
-      } else {
-        window.location.reload();
+        throw buildApiError(res, parsed);
       }
     }
     throw buildApiError(res, parsed);
