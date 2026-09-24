@@ -1,0 +1,48 @@
+# Build artifacts
+.next/
+node_modules/
+.git/
+.gitignore
+
+# Dev / test files
+*.md
+!README.md
+!DEPLOYMENT.md
+tests/
+__tests__/
+*.test.ts
+*.test.tsx
+*.spec.ts
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Logs / runtime data
+dev.log
+server.log
+*.log
+data/
+backups/
+uploads/
+logs/
+
+# Environment (NEVER bake secrets into image)
+.env
+.env.local
+.env.production
+.env.*.local
+
+# Sandbox-specific (not part of product)
+.zscripts/
+agent-ctx/
+tool-results/
+worklog.md
+mini-services/
+
+# Customer DB backups (must never ship in image)
+*.sqlite
+*.db
+db/custom.db*

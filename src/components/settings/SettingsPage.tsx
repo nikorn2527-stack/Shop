@@ -46,6 +46,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SectionHeader } from "@/components/shared/SectionHeader";
 import { PagePlaceholder } from "@/components/shared/PagePlaceholder";
+import { SystemUpdateView } from "@/components/settings/SystemUpdateView";
 import { apiGet, apiPatch } from "@/lib/api-client";
 import { SYSTEM_ROLES, PERMISSION_CATALOG, roleLabel, type PermissionKey } from "@/lib/rbac";
 import { cn } from "@/lib/utils";
@@ -106,6 +107,7 @@ const SYSTEM_TABS = [
   { id: "import", label: "นำเข้าข้อมูล", icon: Upload },
   { id: "backup", label: "สำรองข้อมูล", icon: Database },
   { id: "edition", label: "รุ่นระบบ", icon: Settings2 },
+  { id: "system_update", label: "อัปเดตระบบ", icon: RefreshCw },
 ] as const;
 
 const DEV_TABS = [
@@ -610,6 +612,9 @@ export function SettingsPage({ role }: SettingsPageProps) {
               </TabsContent>
               <TabsContent value="edition" className="mt-4">
                 <PagePlaceholder title="รุ่นระบบ" icon={Settings2} hint="เร็ว ๆ นี้" />
+              </TabsContent>
+              <TabsContent value="system_update" className="mt-4">
+                <SystemUpdateView />
               </TabsContent>
             </Tabs>
           ) : null}

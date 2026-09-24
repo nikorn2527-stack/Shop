@@ -1,0 +1,70 @@
+# PNG Shop — Docker Compose
+# Usage:
+#   docker compose up -d                (production)
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up  (dev)
+#
+# Persistent volumes (separate from app lifecycle per Deployment Guideline Section 4):
+#   png-shop-data     → /app/data    (SQLite database)
+#   png-shop-uploads  → /app/uploads  (user files)
+#   png-shop-config   → /app/config   (env / certificates)
+#   png-shop-backups  → /app/backups (DB + file backups)
+#   png-shop-logs     → /app/logs     (app logs)
+
+services:
+  png-shop:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: png-shop:1.0.0
+    container_name: png-shop
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=file:/app/data/custom.db
+      - UPLOAD_DIR=/app/uploads
+      - BACKUP_DIR=/app/backups
+      - LOG_DIR=/app/logs
+      - CONFIG_DIR=/app/config
+      # Secrets MUST come from .env file (gitignored) — never inline
+      - SESSION_SECRET=${SESSION_SECRET:-change-me-in-production}
+    env_file:
+      - .env
+    volumes:
+      - png-shop-data:/app/data
+      - png-shop-uploads:/app/uploads
+      - png-shop-config:/app/config
+      - png-shop-backups:/app/backups
+      - png-shop-logs:/app/logs
+      # Optional: mount migration source DB to auto-migrate on first boot
+      - ./migration-source.sqlite:/app/data/migration-source.sqlite:ro
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:3000/api/system/version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 256M
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+volumes:
+  png-shop-data:
+    driver: local
+  png-shop-uploads:
+    driver: local
+  png-shop-config:
+    driver: local
+  png-shop-backups:
+    driver: local
+  png-shop-logs:
+    driver: local
