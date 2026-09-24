@@ -77,7 +77,7 @@ function verifyScrypt(plain: string, hash: string): boolean {
       N: SCRYPT_N,
       r: SCRYPT_R,
       p: SCRYPT_P,
-      maxmem: 128 * SCRYPT_KEYLEN * 1024, // generous bound
+      maxmem: 128 * SCRYPT_R * SCRYPT_N * 4, // generous bound
     })
 
     // Constant-time comparison to prevent timing attacks.
@@ -107,7 +107,7 @@ export function hashPasswordLegacyScrypt(plain: string): string {
     N: SCRYPT_N,
     r: SCRYPT_R,
     p: SCRYPT_P,
-    maxmem: 128 * SCRYPT_KEYLEN * 1024,
+    maxmem: 128 * SCRYPT_R * SCRYPT_N * 4,
   })
   return `scrypt$${salt.toString('hex')}$${key.toString('hex')}`
 }

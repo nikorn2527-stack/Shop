@@ -127,8 +127,7 @@ async function migrateUsers(): Promise<MigrationReport> {
   const report = newReport('app_users → User')
   const rows = source.prepare(`
     SELECT id, username, password_hash, display_name, role, active,
-           created_at, failed_attempts, locked_until, must_change_password,
-           last_signed_in
+           created_at, failed_attempts, locked_until, must_change_password
     FROM app_users
   `).all() as Array<{
     id: number
@@ -141,7 +140,6 @@ async function migrateUsers(): Promise<MigrationReport> {
     failed_attempts: number
     locked_until: string | null
     must_change_password: number
-    last_signed_in: string | null
   }>
 
   report.sourceCount = rows.length
@@ -177,7 +175,7 @@ async function migrateUsers(): Promise<MigrationReport> {
           mustChangePassword: row.must_change_password === 1,
           failedAttempts: row.failed_attempts || 0,
           lockedUntil: parseBangkokTimestamp(row.locked_until),
-          lastSignedIn: parseBangkokTimestamp(row.last_signed_in) ?? parseBangkokTimestamp(row.created_at),
+          lastSignedIn: parseBangkokTimestamp(row.created_at),
           createdAt: parseBangkokTimestamp(row.created_at) ?? new Date(),
         },
       })
@@ -401,7 +399,7 @@ async function migrateSales(): Promise<MigrationReport> {
   const report = newReport('sales → Sale + SaleItem')
   const rows = source.prepare(`
     SELECT id, order_number, payment_method, member_number, subtotal, discount,
-           total, cashier, created_at, slip_url, voided
+           total, cashier, created_at, slip_url
     FROM sales
     ORDER BY created_at ASC
   `).all() as Array<{
@@ -415,7 +413,6 @@ async function migrateSales(): Promise<MigrationReport> {
     cashier: string | null
     created_at: string
     slip_url: string | null
-    voided: number | null
   }>
 
   report.sourceCount = rows.length
@@ -456,14 +453,14 @@ async function migrateSales(): Promise<MigrationReport> {
           discount: row.discount || 0,
           total: row.total || 0,
           slipUrl: row.slip_url,
-          voided: row.voided === 1,
+          voided: false,
           createdAt: parseBangkokTimestamp(row.created_at) ?? new Date(),
         },
       })
 
       // Migrate sale_items
       const items = source.prepare(`
-        SELECT id, product_id, name, qty, price, cost, unit, variant
+        SELECT id, product_id, name, qty, price, cost, unit
         FROM sale_items
         WHERE sale_id = ?
       `).all(row.id) as Array<{
@@ -501,7 +498,7 @@ async function migrateSales(): Promise<MigrationReport> {
             price: item.price,
             cost: item.cost || 0,
             unit: item.unit,
-            variant: item.variant,
+            variant: null,
           },
         })
 
@@ -509,14 +506,14 @@ async function migrateSales(): Promise<MigrationReport> {
         if (newProductId && warehouse) {
           await prisma.stockMovement.create({
             data: {
-              type: row.voided === 1 ? 'VOID' : 'SALE',
+              type: false ? 'VOID' : 'SALE',
               productId: newProductId,
               warehouseId: warehouse.id,
-              qtyDelta: row.voided === 1 ? item.qty : -item.qty,
+              qtyDelta: false ? item.qty : -item.qty,
               unitCost: item.cost || 0,
               refType: 'sale',
               refId: sale.id,
-              reason: `${row.voided === 1 ? 'ยกเลิกบิล' : 'บิล'} ${row.order_number}`,
+              reason: `${false ? 'ยกเลิกบิล' : 'บิล'} ${row.order_number}`,
             },
           })
         }
@@ -553,7 +550,7 @@ async function migrateMemberTransactions(): Promise<MigrationReport> {
   const report = newReport('member_transactions → MemberTransaction')
   const rows = source.prepare(`
     SELECT id, member_number, type, detail, amount, payment_method,
-           balance_after, created_at, actor, slip_url, sale_id
+           balance_after, created_at, actor, slip_url
     FROM member_transactions
     ORDER BY created_at ASC
   `).all() as Array<{
@@ -567,7 +564,6 @@ async function migrateMemberTransactions(): Promise<MigrationReport> {
     created_at: string
     actor: string | null
     slip_url: string | null
-    sale_id: number | null
   }>
 
   report.sourceCount = rows.length
@@ -914,13 +910,106 @@ async function migrateLimitRequests(): Promise<MigrationReport> {
 // Main
 // ---------------------------------------------------------------------------
 
+
+// Inline system seed — avoids importing next/headers (which is Next-only).
+async function ensureSystemSeedInline(): Promise<void> {
+  // Default warehouse
+  await prisma.warehouse.upsert({
+    where: { code: 'MAIN' },
+    update: {},
+    create: { name: 'คลังหลัก', code: 'MAIN', isDefault: true },
+  })
+
+  // Roles + permissions
+  const SYSTEM_ROLES = [
+    { name: 'cashier', label: 'พนักงานขายหน้าร้าน', description: 'เจ้าหน้าที่หน้า POS', isSystem: true, permissions: ['POS.SELL', 'POS.DISCOUNT', 'POS.SPECIAL', 'STOCK.VIEW', 'REPORT.SALES', 'MEMBER.VIEW', 'MEMBER.WALLET'] },
+    { name: 'stock_officer', label: 'เจ้าหน้าที่คลังสินค้า', description: 'ดูแลรับเข้า ปรับยอด นับสต็อก', isSystem: true, permissions: ['STOCK.VIEW', 'STOCK.RECEIVE', 'STOCK.ADJUST', 'STOCK.COUNT', 'REPORT.INVENTORY', 'MEMBER.VIEW'] },
+    { name: 'supervisor', label: 'หัวหน้างาน', description: 'ดูแลหน้าร้าน + อนุมัติการเงินสำคัญ', isSystem: true, permissions: ['POS.SELL', 'POS.VOID', 'POS.REFUND', 'POS.DISCOUNT', 'POS.SPECIAL', 'STOCK.VIEW', 'STOCK.RECEIVE', 'STOCK.ADJUST', 'STOCK.COUNT', 'REPORT.SALES', 'REPORT.INVENTORY', 'MEMBER.VIEW', 'MEMBER.EDIT', 'MEMBER.WALLET', 'MEMBER.LIMIT_APPROVE'] },
+    { name: 'manager', label: 'ผู้จัดการ', description: 'ดูรายงานครบ + อนุมัติคำขอลดวงเงิน', isSystem: true, permissions: ['POS.SELL', 'POS.VOID', 'POS.REFUND', 'POS.DISCOUNT', 'POS.SPECIAL', 'STOCK.VIEW', 'STOCK.RECEIVE', 'STOCK.ADJUST', 'STOCK.COUNT', 'STOCK.TRANSFER', 'REPORT.SALES', 'REPORT.PROFIT', 'REPORT.INVENTORY', 'REPORT.AUDIT', 'MEMBER.VIEW', 'MEMBER.EDIT', 'MEMBER.WALLET', 'MEMBER.DELETE', 'MEMBER.LIMIT_APPROVE', 'SYSTEM.USER_MANAGE', 'SYSTEM.BACKUP'] },
+    { name: 'auditor', label: 'ผู้ตรวจสอบ', description: 'ดู audit log + รายงาน + ประวัติ แต่ไม่แก้ไข', isSystem: true, permissions: ['STOCK.VIEW', 'REPORT.SALES', 'REPORT.PROFIT', 'REPORT.INVENTORY', 'REPORT.AUDIT', 'MEMBER.VIEW'] },
+    { name: 'administrator', label: 'ผู้ดูแลระบบ', description: 'สิทธิ์เต็ม', isSystem: true, permissions: ['POS.SELL', 'POS.VOID', 'POS.REFUND', 'POS.DISCOUNT', 'POS.SPECIAL', 'STOCK.VIEW', 'STOCK.RECEIVE', 'STOCK.ADJUST', 'STOCK.COUNT', 'STOCK.TRANSFER', 'REPORT.SALES', 'REPORT.PROFIT', 'REPORT.INVENTORY', 'REPORT.AUDIT', 'REPORT.ADVANCED', 'MEMBER.VIEW', 'MEMBER.EDIT', 'MEMBER.WALLET', 'MEMBER.DELETE', 'MEMBER.LIMIT_APPROVE', 'SYSTEM.USER_MANAGE', 'SYSTEM.ROLE_MANAGE', 'SYSTEM.BACKUP', 'SYSTEM.RESTORE', 'SYSTEM.SETTING', 'SYSTEM.LICENSE', 'SYSTEM.UPDATE', 'SYSTEM.SESSION_REVOKE'] },
+  ]
+  const PERMISSION_CATALOG = [
+    { key: 'POS.SELL', group: 'POS', description: 'ขายสินค้าและรับชำระ' },
+    { key: 'POS.VOID', group: 'POS', description: 'ยกเลิกบิล' },
+    { key: 'POS.REFUND', group: 'POS', description: 'คืนเงิน / คืนบัตรเงินสด' },
+    { key: 'POS.DISCOUNT', group: 'POS', description: 'ให้ส่วนลดบิล' },
+    { key: 'POS.SPECIAL', group: 'POS', description: 'เปิดรายการพิเศษ' },
+    { key: 'STOCK.VIEW', group: 'STOCK', description: 'ดูสต็อก' },
+    { key: 'STOCK.RECEIVE', group: 'STOCK', description: 'รับสินค้าเข้า' },
+    { key: 'STOCK.ADJUST', group: 'STOCK', description: 'ปรับยอดสต็อก' },
+    { key: 'STOCK.COUNT', group: 'STOCK', description: 'นับสต็อก' },
+    { key: 'STOCK.TRANSFER', group: 'STOCK', description: 'โอนสินค้าระหว่างคลัง' },
+    { key: 'REPORT.SALES', group: 'REPORT', description: 'ดูรายงานยอดขาย' },
+    { key: 'REPORT.PROFIT', group: 'REPORT', description: 'ดูรายงานกำไร/ต้นทุน' },
+    { key: 'REPORT.INVENTORY', group: 'REPORT', description: 'ดูรายงานสินค้าคงคลัง' },
+    { key: 'REPORT.AUDIT', group: 'REPORT', description: 'ดู audit log' },
+    { key: 'REPORT.ADVANCED', group: 'REPORT', description: 'รายงานขั้นสูง' },
+    { key: 'MEMBER.VIEW', group: 'MEMBER', description: 'ดูข้อมูลสมาชิก' },
+    { key: 'MEMBER.EDIT', group: 'MEMBER', description: 'แก้ข้อมูลสมาชิก' },
+    { key: 'MEMBER.WALLET', group: 'MEMBER', description: 'เติม/ถอนเงินสมาชิก' },
+    { key: 'MEMBER.DELETE', group: 'MEMBER', description: 'ลบสมาชิก' },
+    { key: 'MEMBER.LIMIT_APPROVE', group: 'MEMBER', description: 'พิจารณาคำขอลดวงเงินสมาชิก' },
+    { key: 'SYSTEM.USER_MANAGE', group: 'SYSTEM', description: 'จัดการบัญชีผู้ใช้' },
+    { key: 'SYSTEM.ROLE_MANAGE', group: 'SYSTEM', description: 'จัดการ Role/Permission' },
+    { key: 'SYSTEM.BACKUP', group: 'SYSTEM', description: 'สำรองข้อมูล' },
+    { key: 'SYSTEM.RESTORE', group: 'SYSTEM', description: 'กู้คืนข้อมูล' },
+    { key: 'SYSTEM.SETTING', group: 'SYSTEM', description: 'ตั้งค่าระบบ' },
+    { key: 'SYSTEM.LICENSE', group: 'SYSTEM', description: 'จัดการลิขสิทธิ์' },
+    { key: 'SYSTEM.UPDATE', group: 'SYSTEM', description: 'อัปเดตระบบ' },
+    { key: 'SYSTEM.SESSION_REVOKE', group: 'SYSTEM', description: 'ยกเลิก session' },
+  ]
+
+  for (const p of PERMISSION_CATALOG) {
+    await prisma.permission.upsert({
+      where: { key: p.key },
+      update: { group: p.group, description: p.description },
+      create: p,
+    })
+  }
+
+  for (const role of SYSTEM_ROLES) {
+    await prisma.role.upsert({
+      where: { name: role.name },
+      update: { label: role.label, description: role.description, isSystem: role.isSystem },
+      create: { name: role.name, label: role.label, description: role.description, isSystem: role.isSystem },
+    })
+    for (const permKey of role.permissions) {
+      await prisma.rolePermission.upsert({
+        where: { roleId_permissionKey: { roleId: role.name, permissionKey: permKey } },
+        update: {},
+        create: { roleId: role.name, permissionKey: permKey },
+      })
+    }
+  }
+
+  const existing = await prisma.storeSetting.findUnique({ where: { key: 'app_settings' } })
+  if (!existing) {
+    await prisma.storeSetting.create({
+      data: { key: 'app_settings', value: JSON.stringify({
+        storeName: 'ร้านค้าสวัสดิการ', storeCode: 'PNG', appName: 'PNG Shop',
+        appTheme: 'emerald', appStyle: 'shop',
+        memberNumberMode: 'running', memberNumberPrefix: 'M',
+        memberNumberYearMode: 'none', memberNumberYearDigits: 2,
+        memberNumberSeparator: '-', memberNumberResetMonth: 1, memberNumberSequenceDigits: 6,
+        dailyCutOffMode: 'auto', dailyCutOffTime: '00:00',
+        receiptPaperWidth: '72', showBalanceOnReceipt: true,
+        lowBalanceAlert: true, lowBalanceThreshold: 100,
+        lowStockAlert: true, expiryAlert: true, expiryAlertDays: 30,
+        backupAutoEnabled: false, backupIntervalHours: 24, backupKeepCount: 14,
+        promptpayId: '', helpPhone: '', posRailHidden: '[]', posShortcutKeys: '{}',
+        devAccess: false, fontScale: 'base',
+      }) },
+    })
+  }
+}
+
 async function main() {
   const reports: MigrationReport[] = []
 
   console.log('Phase 1: Ensuring system seed (warehouse, roles, permissions)...')
   if (!dryRun) {
-    const { ensureSystemSeed } = await import('../src/lib/auth')
-    await ensureSystemSeed()
+    await ensureSystemSeedInline()
   }
   console.log()
 
