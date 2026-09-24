@@ -87,3 +87,42 @@ Stage Summary:
 - RBAC seed (6 roles × 29 permissions) runs on first setup-status call.
 - Auth flow: setup → force-change → app-shell → logout → login all pass.
 - Next: dispatch parallel subagents for POS (Task 4) + Stock (Task 6) + Reports (Task 7) once RBAC UI (Task 3) is wired.
+
+---
+Task ID: M1 (Migration Foundation)
+Agent: orchestrator
+Task: Build DB migration framework — dual password verify + migration script
+
+Work Log:
+- Created `src/lib/password-legacy.ts`:
+  - `verifyPasswordDual(plain, hash)` — detects hash format (scrypt$... | $2a$...) and
+    routes to the correct verifier.
+  - `hashPasswordBcrypt(plain)` — bcrypt hash for new passwords.
+  - `needsRehash(hash)` — returns true if hash is still legacy scrypt.
+  - Legacy scrypt params mirror Shop original: N=16384, r=16, p=1, keylen=64, salt=16.
+- Updated `src/lib/auth.ts`:
+  - Switched verify/hash to dual helpers (transparent — same function signatures).
+  - Added auto-rehash on login: if user logs in with scrypt hash and succeeds,
+    transparently rehash password as bcrypt + UPDATE DB row (no user-visible change).
+- Created `scripts/migrate-from-shop.ts`:
+  - Reads source DB via node:sqlite (read-only).
+  - Writes target Prisma DB via PrismaClient.
+  - 10 migrate functions: app_users → User, members → Member, products → Product+
+    StockLot+StockMovement (opening RECEIVE), stock_lots → StockLot, sales+
+    sale_items → Sale+SaleItem+StockMovement(SALE/VOID)+Payment, member_transactions
+    → MemberTransaction, audit_logs → AuditLog, app_sessions → Session (preserve
+    token so customer stays logged in), store_settings → StoreSetting, limit_requests
+    → LimitRequest.
+  - --dry-run mode for testing without writes.
+  - Idempotent (skips existing rows by unique key).
+  - Role mapping: staff → cashier, admin → administrator, dev → administrator.
+  - Timestamp conversion: "YYYY-MM-DD HH:MM:SS" Bangkok → UTC ISO.
+  - Resolves legacy FKs (product_id, user_id) by SKU/displayName lookup.
+
+Stage Summary:
+- Migration framework ready — waiting for user to share actual SQLite file path
+  so we can run `bun run scripts/migrate-from-shop.ts <source> --dry-run` and
+  verify counts.
+- Dual password verify ensures existing customer passwords continue to work
+  after migration. Auto-rehash transparently upgrades them on next login.
+- Session token preservation means customers don't get logged out.

@@ -264,6 +264,16 @@ export async function login(username: string, password: string, ip?: string): Pr
     throw new AuthError('บัญชีนี้ถูกปิดการใช้งาน · ติดต่อผู้ดูแลระบบ', 403)
   }
 
+  // Auto-upgrade legacy scrypt hash → bcrypt on successful login.
+  // This is transparent to the user and ensures all migrated hashes are
+  // eventually converted to bcrypt after their first post-migration login.
+  const rehashPromise = needsRehash(user.passwordHash)
+    ? db.user.update({
+        where: { id: user.id },
+        data: { passwordHash: hashPasswordBcrypt(password) },
+      }).catch(() => null)
+    : Promise.resolve(null)
+
   // Clear failures, create session
   await db.user.update({
     where: { id: user.id },
@@ -273,6 +283,7 @@ export async function login(username: string, password: string, ip?: string): Pr
       lastSignedIn: new Date(),
     },
   })
+  await rehashPromise
 
   const sessionId = randomUUID()
   const expiresAt = new Date(Date.now() + SESSION_ABSOLUTE_MS)
