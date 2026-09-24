@@ -5038,7 +5038,7 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .pos-rail-manage-row.off > div > b { color: #8a9082; }
 .pos-rail-manage-ico { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: #eaf3ee; color: #21654c; flex: 0 0 auto; }
 .pos-rail-manage-row.off .pos-rail-manage-ico { background: #efefec; color: #8a9082; }
-.pos-rail-manage-row > div { grid-column: 2; min-width: 0; }
+.pos-rail-manage-row > div:not(.pos-rail-key-control) { grid-column: 2; min-width: 0; }
 .pos-rail-manage-row > div b { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 700; color: #33422f; }
 .pos-rail-manage-row > div b kbd { font-family: "IBM Plex Mono", monospace; font-size: 10px; font-weight: 500; color: #52604f; background: #f1f4f0; border: 1px solid #d5dcd6; border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; }
 .pos-rail-manage-row > div small { display: block; color: #7d8172; font-size: 10.5px; margin-top: 3px; line-height: 1.45; }
