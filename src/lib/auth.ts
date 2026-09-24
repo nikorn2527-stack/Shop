@@ -17,6 +17,7 @@
 import { cookies } from 'next/headers'
 import { randomUUID } from 'node:crypto'
 import bcrypt from 'bcryptjs'
+import { verifyPasswordDual, hashPasswordBcrypt, needsRehash } from './password-legacy'
 import { db } from './db'
 import {
   AuthError,
