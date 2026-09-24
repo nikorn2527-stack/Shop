@@ -21,6 +21,8 @@ export type ReportDocConfig = {
   rows: string[][];
   /** แถวรวมท้ายตาราง (ตัวหนา เส้นคู่) — ROUND 75: ทุกฟอร์มต้องมีสรุปยอดรวมท้ายตาราง */
   totalsRow?: string[];
+  /** กล่องสรุปย่อยเหนือ/ใต้ตาราง เช่น ยอดเติมเงิน/ถอน/ซื้อ แยกอ่านง่าย */
+  summaryBlocks?: [string, string][];
   brandName: string;
   /** @deprecated ROUND 75 — เอกสารไม่ใส่โลโก้อีกต่อไป (พิมพ์ขาว-ดำ/สีเหมือนกัน) ฟิลด์นี้เหลือไว้เพื่อรองรับผู้เรียกเดิม แต่จะไม่ถูกวาด */
   brandLogo?: string;
@@ -61,6 +63,16 @@ function buildPage(config: ReportDocConfig, rows: string[][], pageIndex: number,
       meta.appendChild(item);
     }
     page.appendChild(meta);
+  }
+  if (config.summaryBlocks?.length) {
+    const summary = document.createElement("div");
+    summary.className = "rd-summary-grid";
+    for (const [label, value] of config.summaryBlocks) {
+      const block = document.createElement("div");
+      block.innerHTML = `<span>${escapeHtml(label)}</span><b>${escapeHtml(value)}</b>`;
+      summary.appendChild(block);
+    }
+    page.appendChild(summary);
   }
   const table = document.createElement("table");
   table.className = "rd-table";
@@ -201,6 +213,7 @@ export async function downloadReportPdf(config: ReportDocConfig) {
 export function printReportDoc(config: ReportDocConfig) {
   const numeric = new Set(config.numericCols ?? []);
   const metaRows = (config.meta ?? []).map(([label, text]) => `<div class="meta-item"><span>${escapeHtml(label)}</span><b>${escapeHtml(text)}</b></div>`).join("");
+  const summaryRows = (config.summaryBlocks ?? []).map(([label, text]) => `<div><span>${escapeHtml(label)}</span><b>${escapeHtml(text)}</b></div>`).join("");
   const bodyRows = config.rows
     .map((row) => `<tr>${row.map((cell, index) => `<td${numeric.has(index) ? ' class="num"' : ""}>${escapeHtml(cell)}</td>`).join("")}</tr>`)
     .join("");
@@ -215,35 +228,50 @@ export function printReportDoc(config: ReportDocConfig) {
   /* ROUND 77 (user) — ฟอนต์ไทยสารบรรณจากไฟล์ในเครื่อง (เหมือนหน้าแอป) + ลดขนาดจาก 16pt
      เหลือ 13pt ตามที่ผู้ใช้สรุปว่า 16 ใหญ่เกิน + หัวคอลัมน์พื้นขาวตัวหนาเส้นดำ + ไม่มีโลโก้ —
      ทั้งฉบับเป็นโทนกลาง พิมพ์ขาว-ดำกับพิมพ์สีเหมือนกันทุกประการ */
-  @font-face { font-family: "Sarabun"; font-weight: 400; font-style: normal; src: url("/fonts/Sarabun-400-thai.woff2") format("woff2"), url("/fonts/Sarabun-400-latin.woff2") format("woff2"); }
-  @font-face { font-family: "Sarabun"; font-weight: 500; font-style: normal; src: url("/fonts/Sarabun-500-thai.woff2") format("woff2"), url("/fonts/Sarabun-500-latin.woff2") format("woff2"); }
-  @font-face { font-family: "Sarabun"; font-weight: 600; font-style: normal; src: url("/fonts/Sarabun-600-thai.woff2") format("woff2"), url("/fonts/Sarabun-600-latin.woff2") format("woff2"); }
-  @font-face { font-family: "Sarabun"; font-weight: 700; font-style: normal; src: url("/fonts/Sarabun-700-thai.woff2") format("woff2"), url("/fonts/Sarabun-700-latin.woff2") format("woff2"); }
-  @font-face { font-family: "Sarabun"; font-weight: 800; font-style: normal; src: url("/fonts/Sarabun-800-thai.woff2") format("woff2"), url("/fonts/Sarabun-800-latin.woff2") format("woff2"); }
-  @page { size: A4; margin: 12mm; }
+  /* Thai and Latin are separate subsets; unicode-range keeps both in one family. */
+  @font-face { font-family: "Sarabun"; font-weight: 300; font-style: normal; font-display: swap; src: url("/fonts/Sarabun-300-thai.woff2") format("woff2"); unicode-range: U+02D7, U+0303, U+0331, U+0E01-0E5B, U+200C-200D, U+25CC; }
+  @font-face { font-family: "Sarabun"; font-weight: 300; font-style: normal; font-display: swap; src: url("/fonts/Sarabun-300-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  @font-face { font-family: "Sarabun"; font-weight: 400; font-style: normal; font-display: swap; src: url("/fonts/Sarabun-400-thai.woff2") format("woff2"); unicode-range: U+02D7, U+0303, U+0331, U+0E01-0E5B, U+200C-200D, U+25CC; }
+  @font-face { font-family: "Sarabun"; font-weight: 400; font-style: normal; font-display: swap; src: url("/fonts/Sarabun-400-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  @font-face { font-family: "Sarabun"; font-weight: 500; font-style: normal; font-display: swap; src: url("/fonts/Sarabun-500-thai.woff2") format("woff2"); unicode-range: U+02D7, U+0303, U+0331, U+0E01-0E5B, U+200C-200D, U+25CC; }
+  @font-face { font-family: "Sarabun"; font-weight: 500; font-style: normal; font-display: swap; src: url("/fonts/Sarabun-500-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  @font-face { font-family: "Sarabun"; font-weight: 600; font-style: normal; font-display: swap; src: url("/fonts/Sarabun-600-thai.woff2") format("woff2"); unicode-range: U+02D7, U+0303, U+0331, U+0E01-0E5B, U+200C-200D, U+25CC; }
+  @font-face { font-family: "Sarabun"; font-weight: 600; font-style: normal; font-display: swap; src: url("/fonts/Sarabun-600-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  @font-face { font-family: "Sarabun"; font-weight: 700; font-style: normal; font-display: swap; src: url("/fonts/Sarabun-700-thai.woff2") format("woff2"); unicode-range: U+02D7, U+0303, U+0331, U+0E01-0E5B, U+200C-200D, U+25CC; }
+  @font-face { font-family: "Sarabun"; font-weight: 700; font-style: normal; font-display: swap; src: url("/fonts/Sarabun-700-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  @font-face { font-family: "Sarabun"; font-weight: 800; font-style: normal; font-display: swap; src: url("/fonts/Sarabun-800-thai.woff2") format("woff2"); unicode-range: U+02D7, U+0303, U+0331, U+0E01-0E5B, U+200C-200D, U+25CC; }
+  @font-face { font-family: "Sarabun"; font-weight: 800; font-style: normal; font-display: swap; src: url("/fonts/Sarabun-800-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+  @page { size: A4 portrait; margin: 12mm; }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: "Sarabun", "TH Sarabun New", "Leelawadee UI", Tahoma, sans-serif; color: #1c1c1a; background: #fff; font-size: ${config.compact ? "12px" : "13pt"}; }
+  body { margin: 0; font-family: "Sarabun", "TH Sarabun New", "Leelawadee UI", Tahoma, sans-serif; color: #1c1c1a; background: #fff; font-size: ${config.compact ? "12px" : "13px"}; }
   .doc { padding: 4px 2px; }
   .rd-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; border-bottom: 2.5px solid #1c1c1a; padding-bottom: 12px; }
   .rd-brand { display: flex; align-items: center; gap: 10px; }
   .rd-brand img { display: none; }
-  .rd-brand b { font-size: 14pt; color: #111; }
-  .rd-brand small { display: block; color: #555; font-size: 10pt; margin-top: 2px; font-weight: 500; }
-  .rd-stamp { font-size: 10pt; color: #444; text-align: right; font-weight: 500; }
-  h1 { font-size: 17pt; font-weight: 800; margin: 16px 0 4px; color: #111; }
-  .rd-title p { margin: 0 0 10px; color: #444; font-size: 11pt; font-weight: 500; }
-  .rd-meta { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 8px 0 12px; padding: 10px 14px; background: #f5f5f4; border: 1px solid #cfcfca; border-radius: 8px; }
-  .meta-item { font-size: 10.5pt; color: #555; }
+  .rd-brand b { font-size: 16px; color: #111; }
+  .rd-brand small { display: block; color: #555; font-size: 11px; margin-top: 2px; font-weight: 500; }
+  .rd-stamp { font-size: 11px; color: #444; text-align: right; font-weight: 500; }
+  h1 { font-size: 20px; font-weight: 800; margin: 14px 0 4px; color: #111; }
+  .rd-title p { margin: 0 0 8px; color: #444; font-size: 12px; font-weight: 500; }
+  .rd-meta { display: flex; flex-wrap: wrap; gap: 5px 16px; margin: 7px 0 9px; padding: 8px 12px; background: #f5f5f4; border: 1px solid #cfcfca; border-radius: 8px; }
+  .meta-item { font-size: 10.5px; color: #555; }
   .meta-item b { color: #1c1c1a; font-weight: 700; margin-left: 5px; }
-  table { width: 100%; border-collapse: collapse; font-size: ${config.compact ? "11pt" : "13pt"}; line-height: 1.38; }
-  th { background: #ffffff; color: #111; font-weight: 700; text-align: left; padding: 8px 9px; border-top: 2px solid #111; border-bottom: 2px solid #111; white-space: nowrap; }
-  th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; }
-  td { padding: 6.5px 9px; font-weight: 500; border-bottom: 1px solid #d8d8d3; }
+  .rd-summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 8px 0 10px; break-inside: avoid; page-break-inside: avoid; }
+  .rd-summary-grid > div { min-width: 0; padding: 6px 8px; border: 1px solid #cfcfca; border-radius: 5px; background: #fafafa; }
+  .rd-summary-grid span, .rd-summary-grid b { display: block; }
+  .rd-summary-grid span { color: #555; font-size: 10px; }
+  .rd-summary-grid b { margin-top: 2px; color: #111; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  table { width: 100%; border-collapse: collapse; font-size: ${config.compact ? "11.5px" : "13px"}; line-height: 1.35; page-break-inside: auto; }
+  thead { display: table-header-group; }
+  tbody tr { break-inside: avoid; page-break-inside: avoid; }
+  th { background: #ffffff; color: #111; font-weight: 700; text-align: left; padding: 5px 7px; border-top: 2px solid #111; border-bottom: 2px solid #111; white-space: nowrap; }
+  th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; overflow-wrap: normal; word-break: keep-all; }
+  td { padding: 5px 7px; font-weight: 500; border-bottom: 1px solid #d8d8d3; }
   th, td { overflow-wrap: anywhere; } /* ป้องกันหัวคอลัมน์ไทยยาวดันตารางกว้างเกินหน้า A4 */
   tbody tr:nth-child(even) { background: #f4f4f2; }
   tfoot td { font-weight: 800; background: #ffffff; border-top: 3.5pt double #111; border-bottom: 2px solid #111; color: #111; }
-  .rd-note { margin-top: 10px; font-size: 10pt; color: #444; font-weight: 500; line-height: 1.5; }
-  .rd-foot { margin-top: 14px; border-top: 1px dashed #bbb; padding-top: 7px; font-size: 9.5pt; color: #666; display: flex; justify-content: space-between; }
+  .rd-note { margin-top: 10px; font-size: 10pt; color: #444; font-weight: 500; line-height: 1.5; break-inside: avoid; page-break-inside: avoid; }
+  .rd-foot { margin-top: 14px; border-top: 1px dashed #bbb; padding-top: 7px; font-size: 9.5pt; color: #666; display: flex; justify-content: space-between; break-inside: avoid; page-break-inside: avoid; }
 </style></head>
 <body><div class="doc">
   <div class="rd-head">
@@ -252,6 +280,7 @@ export function printReportDoc(config: ReportDocConfig) {
   </div>
   <div class="rd-title"><h1>${escapeHtml(config.title)}</h1>${config.periodLabel ? `<p>${escapeHtml(config.periodLabel)}</p>` : ""}</div>
   ${metaRows ? `<div class="rd-meta">${metaRows}</div>` : ""}
+  ${summaryRows ? `<div class="rd-summary-grid">${summaryRows}</div>` : ""}
   <table><thead><tr>${headCells}</tr></thead><tbody>${bodyRows}</tbody>${totalsRow}</table>
   ${config.footnote ? `<div class="rd-note">${escapeHtml(config.footnote)}</div>` : ""}
   <div class="rd-foot"><span>พิมพ์จากระบบร้านค้าสวัสดิการ</span><span>เอกสารรายงาน A4</span></div>

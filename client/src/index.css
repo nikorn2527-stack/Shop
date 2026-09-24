@@ -1260,16 +1260,16 @@ td small { font-size: 11px; }
 /* (2) The paper — A4 proportions on screen (210:297), real A4 in print */
 /* ROUND 77 (user) — ลดขนาดฟอนต์เอกสารลงอีก ~20% ตามที่ผู้ใช้สรุป (16 ใหญ่เกิน)
    (ไม่มีโลโก้ ไม่มีหัวคอลัมน์สี — พิมพ์ขาว-ดำกับพิมพ์สีเหมือนกันทุกประการ) */
-.statement-paper { width: 100%; max-width: 660px; background: #fff; border: 1px solid #c9c9c4; box-shadow: 0 12px 30px rgba(40, 70, 58, .14); padding: 26px 28px 22px; color: #1c1c1a; font-size: 15.5px; font-family: "Sarabun", "TH Sarabun New", "Leelawadee UI", Tahoma, sans-serif; }
+.statement-paper { width: 100%; max-width: 660px; background: #fff; border: 1px solid #c9c9c4; box-shadow: 0 12px 30px rgba(40, 70, 58, .14); padding: 24px 28px 20px; color: #1c1c1a; font-size: 13px; font-family: "Sarabun", "TH Sarabun New", "Leelawadee UI", Tahoma, sans-serif; }
 
 .statement-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding-bottom: 12px; border-bottom: 2px solid #1c1c1a; }
 .statement-brand { display: flex; gap: 9px; align-items: center; }
 .statement-brand img, .statement-brand-mark { display: none; } /* ROUND 75 — เอกสารไม่ใส่โลโก้ */
-.statement-brand b { display: block; font-size: 16.5px; color: #111111; }
-.statement-brand small { display: block; color: #555555; font-size: 11px; margin-top: 1px; font-weight: 500; }
+.statement-brand b { display: block; font-size: 16px; color: #111111; }
+.statement-brand small { display: block; color: #555555; font-size: 10.5px; margin-top: 1px; font-weight: 500; }
 .statement-title { text-align: right; }
-.statement-title b { display: block; font-size: 15.5px; color: #111111; letter-spacing: -.2px; }
-.statement-title small { display: block; color: #555555; font-size: 11px; margin-top: 3px; }
+.statement-title b { display: block; font-size: 16px; color: #111111; letter-spacing: -.2px; }
+.statement-title small { display: block; color: #555555; font-size: 10.5px; margin-top: 3px; }
 
 .statement-member { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 14px; padding: 13px 0 11px; border-bottom: 1px solid #d8d8d3; }
 .statement-member > div > small { display: block; color: #555555; font-size: 11px; }
@@ -1286,11 +1286,11 @@ td small { font-size: 11px; }
 .statement-summary .st-out { font-weight: 700; }
 .statement-summary .st-buy { font-weight: 700; }
 
-.statement-table { width: 100%; border-collapse: collapse; font-size: 14px; table-layout: fixed; min-width: 0; }
-.statement-table th { text-align: left; color: #111111; background: #ffffff; font-weight: 700; font-size: 14px; padding: 7px 9px; border-top: 2px solid #111111; border-bottom: 2px solid #111111; }
+.statement-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; min-width: 0; }
+.statement-table th { text-align: left; color: #111111; background: #ffffff; font-weight: 700; font-size: 13px; padding: 6px 8px; border-top: 2px solid #111111; border-bottom: 2px solid #111111; }
 .statement-table th:first-child { border-radius: 0; }
 .statement-table th:last-child { border-radius: 0; }
-.statement-table td { padding: 7px 9px; border-bottom: 1px solid #d8d8d3; color: #1c1c1a; font-weight: 500; vertical-align: top; }
+.statement-table td { padding: 6px 8px; border-bottom: 1px solid #d8d8d3; color: #1c1c1a; font-weight: 500; vertical-align: top; }
 .statement-table tbody tr:nth-child(even) td { background: #f4f4f2; }
 .statement-table tfoot td { border-top: 3.5px double #111111; border-bottom: 2.5px solid #111111; background: #fff; font-weight: 800; color: #111111; padding: 8px 9px; }
 .statement-table .st-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
@@ -1313,6 +1313,7 @@ td small { font-size: 11px; }
 .statement-sign i { display: block; border-top: 1px dotted #8a8a85; }
 
 .statement-foot { margin-top: 16px; padding-top: 9px; border-top: 1px solid #d8d8d3; color: #555555; font-size: 11px; text-align: center; }
+.statement-end { break-inside: avoid; page-break-inside: avoid; }
 
 /* (3) Phones — the paper stays readable, member grid stacks */
 @media (max-width: 560px) {
@@ -1336,6 +1337,7 @@ td small { font-size: 11px; }
 /* (4) Print — isolate the statement onto a clean A4 page
       (same guard pattern as receipt + wallet card) */
 @media print {
+  @page { size: A4 portrait; margin: 8mm; }
   body:has(#member-statement) .sidebar,
   body:has(#member-statement) .topbar,
   body:has(#member-statement) .app-footer,
@@ -1349,9 +1351,18 @@ td small { font-size: 11px; }
   body:has(#member-statement) .modal-heading,
   body:has(#member-statement) .statement-actions { display: none !important; }
   body:has(#member-statement) .statement-stage { background: none; border: 0; padding: 0; border-radius: 0; }
-  body:has(#member-statement) .statement-paper { width: 100%; max-width: none; border: 0; box-shadow: none; padding: 6mm 4mm; font-size: 16px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body:has(#member-statement) .statement-paper { width: 100%; max-width: none; border: 0; box-shadow: none; padding: 3mm 2mm; font-size: 13px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body:has(#member-statement) .statement-member { grid-template-columns: repeat(3, 1fr); }
   body:has(#member-statement) .statement-summary { grid-template-columns: repeat(4, 1fr); }
+  body:has(#member-statement) .statement-member { padding: 8px 0 7px; gap: 5px 10px; }
+  body:has(#member-statement) .statement-summary { margin: 8px 0; gap: 6px; }
+  body:has(#member-statement) .statement-summary > div { padding: 6px 8px; }
+  body:has(#member-statement) .statement-table { font-size: 12px; }
+  body:has(#member-statement) .statement-table th,
+  body:has(#member-statement) .statement-table td { padding: 4px 6px; }
+  body:has(#member-statement) .statement-sign { margin-top: 14px; gap: 18px; }
+  body:has(#member-statement) .statement-sign span { margin-bottom: 20px; }
+  body:has(#member-statement) .statement-foot { margin-top: 9px; padding-top: 6px; }
 }
 
 /* (5) Round 16 detail polish — on-screen reading affordances */
@@ -3183,6 +3194,14 @@ th { font-weight: 600; }
 .receive-lines-total { border-top: 1px dashed #cfe0d6; padding-top: 8px; color: #5c6a5f; font-size: 11.5px; }
 .receive-lines-total b { color: #2d5c4a; font-family: "IBM Plex Mono", monospace; }
 .receive-lines-hint { color: #7d8a7f; font-size: 10.5px; line-height: 1.45; }
+.receive-cost-entry { border: 1px solid #d8e4dd; background: #fbfdfb; border-radius: 10px; padding: 10px 12px 11px; display: flex; flex-direction: column; gap: 8px; grid-column: 1 / -1; }
+.receive-purchase-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.receive-purchase-grid label { color: #74806f; font-size: 10px; }
+.receive-purchase-grid input { display: block; width: 100%; margin-top: 4px; }
+.receive-cost-summary { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 8px; border-top: 1px dashed #cfe0d6; color: #5c6a5f; font-size: 11px; }
+.receive-cost-summary span { padding: 5px 8px; border-radius: 7px; background: #f0f7f3; }
+.receive-cost-summary b { color: #2d5c4a; font-family: "IBM Plex Mono", monospace; }
+@media (max-width: 560px) { .receive-purchase-grid { grid-template-columns: 1fr; } }
 @media (max-width: 560px) { .receive-line-row { grid-template-columns: 1fr 1fr; } .receive-line-ext { display: none; } }
 
 .bag-helper { border: 1px dashed #cfe0d6; background: #f6faf7; border-radius: 10px; padding: 10px 12px; display: flex; flex-direction: column; gap: 7px; }
@@ -3228,23 +3247,23 @@ th { font-weight: 600; }
    เหลือฐาน 17px ≈ 13pt บนกระดาษ A4 (อ่านสบายแบบเอกสารสำนักงาน) + ไม่ใส่โลโก้
    + หัวคอลัมน์พื้นขาวตัวหนาเส้นดำ (พิมพ์ขาว-ดำกับพิมพ์สีเหมือนกันทุกประการ)
    สีทุกจุดในเอกสารเป็นกลาง (ขาว/เทา/ดำ) เท่านั้น */
-.report-doc { width: 794px; min-height: 1123px; background: #ffffff; color: #1c1c1a; font-family: "Sarabun", "TH Sarabun New", "Leelawadee UI", Tahoma, sans-serif; padding: 38px 44px 34px; display: flex; flex-direction: column; box-sizing: border-box; font-size: 17px; line-height: 1.42; }
+.report-doc { width: 794px; min-height: 1123px; background: #ffffff; color: #1c1c1a; font-family: "Sarabun", "TH Sarabun New", "Leelawadee UI", Tahoma, sans-serif; padding: 34px 44px 30px; display: flex; flex-direction: column; box-sizing: border-box; font-size: 13px; line-height: 1.45; }
 .rd-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; padding-bottom: 12px; border-bottom: 2.5px solid #1c1c1a; }
 .rd-brand { display: flex; align-items: center; gap: 11px; }
 .rd-brand img, .rd-mark { display: none; } /* ROUND 75 — เอกสารไม่ใส่โลโก้ (พิมพ์ขาว-ดำ/สีเหมือนกัน) */
-.rd-brand b { display: block; font-size: 19px; font-weight: 700; color: #111111; line-height: 1.25; }
-.rd-brand small { display: block; color: #555555; font-size: 12.5px; margin-top: 2px; font-weight: 500; }
-.rd-stamp { color: #444444; font-size: 12.5px; text-align: right; font-weight: 500; }
-.rd-title { margin-top: 22px; }
-.rd-title h1 { margin: 0; font-size: 23px; font-weight: 800; color: #111111; letter-spacing: .2px; }
-.rd-title p { margin: 7px 0 0; color: #444444; font-size: 13.5px; font-weight: 500; }
-.rd-meta { display: flex; flex-wrap: wrap; gap: 8px 26px; margin-top: 14px; padding: 11px 15px; background: #f5f5f4; border: 1px solid #cfcfca; border-radius: 8px; }
+.rd-brand b { display: block; font-size: 16px; font-weight: 700; color: #111111; line-height: 1.25; }
+.rd-brand small { display: block; color: #555555; font-size: 11px; margin-top: 2px; font-weight: 500; }
+.rd-stamp { color: #444444; font-size: 11px; text-align: right; font-weight: 500; }
+.rd-title { margin-top: 16px; }
+.rd-title h1 { margin: 0; font-size: 20px; font-weight: 800; color: #111111; letter-spacing: .2px; }
+.rd-title p { margin: 6px 0 0; color: #444444; font-size: 12px; font-weight: 500; }
+.rd-meta { display: flex; flex-wrap: wrap; gap: 6px 20px; margin-top: 10px; padding: 8px 12px; background: #f5f5f4; border: 1px solid #cfcfca; border-radius: 8px; }
 .rd-meta > div { display: flex; gap: 7px; align-items: baseline; }
-.rd-meta span { color: #555555; font-size: 13px; }
-.rd-meta b { color: #1c1c1a; font-size: 13.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.rd-table { width: 100%; border-collapse: collapse; margin-top: 18px; font-size: 17px; line-height: 1.38; }
-.rd-table th { background: #ffffff; color: #111111; font-weight: 700; text-align: left; padding: 8px 9px; font-size: 17px; border-top: 2px solid #111111; border-bottom: 2px solid #111111; }
-.rd-table td { padding: 6.5px 9px; font-weight: 500; border-bottom: 1px solid #d8d8d3; color: #1c1c1a; font-variant-numeric: tabular-nums; }
+.rd-meta span { color: #555555; font-size: 11px; }
+.rd-meta b { color: #1c1c1a; font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rd-table { width: 100%; border-collapse: collapse; margin-top: 13px; font-size: 13px; line-height: 1.35; }
+.rd-table th { background: #ffffff; color: #111111; font-weight: 700; text-align: left; padding: 5px 7px; font-size: 13px; border-top: 2px solid #111111; border-bottom: 2px solid #111111; }
+.rd-table td { padding: 5px 7px; font-weight: 500; border-bottom: 1px solid #d8d8d3; color: #1c1c1a; font-variant-numeric: tabular-nums; }
 /* ROUND 75 — หัวคอลัมน์ไทยยาว ๆ ไม่มีช่องว่าง (เช่น "เจ้าหน้าที่ผู้ทำรายการ") ทำ min-content
    ของตารางกว้างเกินหน้า A4 แล้วขอคอลัมน์สุดท้ายถูกตัด — ให้ตัดคำได้ทุกตำแหน่งเมื่อจำเป็น
    (anywhere = มีผลกับการคำนวณความกว้างขั้นต่ำของตารางด้วย ตารางจึงย่อลงหน้ากระดาษเสมอ) */
@@ -3252,16 +3271,21 @@ th { font-weight: 600; }
 .rd-table tbody tr:nth-child(even) td { background: #f4f4f2; }
 .rd-table td.num, .rd-table th.num { text-align: right; }
 .rd-table tfoot td { background: #ffffff !important; border-top: 3.5px double #111111; border-bottom: 2.5px solid #111111; font-weight: 800; color: #111111; }
-.rd-note { margin-top: 13px; color: #444444; font-size: 12px; line-height: 1.5; font-weight: 500; }
-.rd-foot { margin-top: auto; padding-top: 20px; color: #666666; font-size: 11px; border-top: 1px dashed #bbbbbb; display: flex; justify-content: space-between; }
+.rd-summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 8px 0 10px; break-inside: avoid; page-break-inside: avoid; }
+.rd-summary-grid > div { min-width: 0; padding: 6px 8px; border: 1px solid #cfcfca; border-radius: 5px; background: #fafafa; }
+.rd-summary-grid span, .rd-summary-grid b { display: block; }
+.rd-summary-grid span { color: #555555; font-size: 10px; }
+.rd-summary-grid b { margin-top: 2px; color: #111111; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rd-note { margin-top: 10px; color: #444444; font-size: 10.5px; line-height: 1.5; font-weight: 500; }
+.rd-foot { margin-top: auto; padding-top: 14px; color: #666666; font-size: 10px; border-top: 1px dashed #bbbbbb; display: flex; justify-content: space-between; }
 /* ROUND 77 — ฟอร์มที่ตารางกว้าง 7-10 คอลัมน์: ลดขนาดลงอีกชั้น (~10.5pt) ให้อยู่บรรทัดเดียวได้ */
-.report-doc.compact { font-size: 15px; }
-.report-doc.compact .rd-title h1 { font-size: 21px; }
-.report-doc.compact .rd-meta span { font-size: 12px; }
-.report-doc.compact .rd-meta b { font-size: 12.5px; }
-.report-doc.compact .rd-table { font-size: 14px; }
-.report-doc.compact .rd-table th { font-size: 14px; padding: 6px 7px; }
-.report-doc.compact .rd-table td { padding: 5px 7px; }
+.report-doc.compact { font-size: 12px; }
+.report-doc.compact .rd-title h1 { font-size: 18px; }
+.report-doc.compact .rd-meta span { font-size: 10.5px; }
+.report-doc.compact .rd-meta b { font-size: 11px; }
+.report-doc.compact .rd-table { font-size: 11.5px; }
+.report-doc.compact .rd-table th { font-size: 11.5px; padding: 4px 6px; }
+.report-doc.compact .rd-table td { padding: 4px 6px; }
 
 /* ═══ ROUND 32 — POS พิมพ์จำนวนตรงๆ + ปุ่มลัดครบ F1-F8 + สมาชิกใหม่ที่ POS + รายงาน/สต็อก/ค้นหาฉลาด ═══ */
 
@@ -3328,6 +3352,14 @@ th { font-weight: 600; }
 .export-topic-tabs button.active { background: var(--teal); border-color: var(--teal); color: #fff; box-shadow: 0 4px 10px rgba(45, 138, 108, .24); }
 .export-topic-tabs button.active small { color: rgba(255, 255, 255, .82); }
 .export-topic-body { min-height: 0; }
+.report-quick-guide { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) auto; align-items: center; gap: 10px; margin: 0 0 14px; padding: 10px 12px; border: 1px solid #dfeae5; border-radius: 12px; background: #f8fcfa; }
+.report-quick-guide > div { min-width: 0; padding: 2px 10px; border-right: 1px solid #e4eee9; }
+.report-quick-guide b, .report-quick-guide span { display: block; }
+.report-quick-guide b { color: #2f6f57; font-size: 11.5px; }
+.report-quick-guide span { margin-top: 2px; color: #7a8377; font-size: 10.5px; line-height: 1.4; }
+.report-quick-guide .outline-button { white-space: nowrap; }
+@media (max-width: 900px) { .report-quick-guide { grid-template-columns: repeat(2, minmax(0, 1fr)); } .report-quick-guide > div:nth-child(2) { border-right: 0; } .report-quick-guide .outline-button { grid-column: 1 / -1; justify-self: start; } }
+@media (max-width: 560px) { .report-quick-guide { grid-template-columns: 1fr; } .report-quick-guide > div { border-right: 0; border-bottom: 1px solid #e4eee9; padding: 5px 2px 7px; } .report-quick-guide > div:last-of-type { border-bottom: 0; } }
 .export-row-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .export-row .file-icon.print { background: #e9f6ef; color: var(--teal); border-color: #cbe8d9; }
 .export-row button:hover .file-icon.print { background: var(--teal); color: #fff; }
@@ -5000,7 +5032,7 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 
 /* ═══ ROUND 75 (user) — ตั้งค่าเมนูลัดหน้าร้าน (POS) + หัวสลิปแบบไม่มีโลโก้ ═══ */
 .pos-rail-manage-list { display: flex; flex-direction: column; gap: 8px; }
-.pos-rail-manage-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid #e0e7e2; border-radius: 11px; background: #fbfdfc; transition: border-color .15s ease, background .15s ease; }
+.pos-rail-manage-row { display: grid; grid-template-columns: 38px minmax(0, 1fr); align-items: center; column-gap: 12px; row-gap: 3px; padding: 10px 12px; border: 1px solid #e0e7e2; border-radius: 11px; background: #fbfdfc; transition: border-color .15s ease, background .15s ease; }
 .pos-rail-manage-row:hover { border-color: #bfd8cd; }
 .pos-rail-manage-row.off { background: #fafaf7; border-style: dashed; }
 .pos-rail-manage-row.off > div > b { color: #8a9082; }
@@ -5011,8 +5043,11 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .pos-rail-manage-row > div b kbd { font-family: "IBM Plex Mono", monospace; font-size: 10px; font-weight: 500; color: #52604f; background: #f1f4f0; border: 1px solid #d5dcd6; border-bottom-width: 2px; border-radius: 5px; padding: 1px 6px; }
 .pos-rail-manage-row > div small { display: block; color: #7d8172; font-size: 10.5px; margin-top: 3px; line-height: 1.45; }
 .pos-rail-manage-row .toggle { flex: 0 0 auto; }
+.pos-rail-key-control { display: inline-flex; grid-column: 2; align-items: center; justify-self: start; gap: 8px; margin-top: 2px; }
+.pos-rail-key-input { width: 74px; height: 30px; padding: 4px 7px; border: 1px solid #d5dcd6; border-radius: 6px; background: #fff; color: #33422f; font-family: "IBM Plex Mono", monospace; font-size: 11px; text-transform: uppercase; }
+.pos-rail-manage-row.off .pos-rail-key-input { opacity: .55; background: #f4f4f0; }
 .pos-rail-manage-row.locked { background: #f7f9f8; }
-.pos-rail-locked-pill { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 12px; background: #e7f2ec; color: #1e6b4e; font-size: 10.5px; font-weight: 700; flex: 0 0 auto; }
+.pos-rail-locked-pill { display: inline-flex; grid-column: 2; align-items: center; justify-self: start; height: 24px; padding: 0 10px; border-radius: 12px; background: #e7f2ec; color: #1e6b4e; font-size: 10.5px; font-weight: 700; }
 @media (max-width: 560px) { .pos-rail-manage-row { flex-wrap: wrap; } .pos-rail-manage-row .toggle { order: 3; } }
 .receipt-brand-text { text-align: center; }
 
@@ -5125,6 +5160,42 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .receive-cart-row .receive-cart-qty em { display: block; font-style: normal; font-size: 9px; color: #4b987b; margin-top: 2px; }
 .receive-cart-row .receive-cart-cost { width: 78px; text-align: right; color: #52604f; font-size: 11.5px; font-weight: 600; font-family: "IBM Plex Mono", monospace; }
 .receive-cart-row .receive-cart-actions { display: flex; gap: 4px; }
+.stock-catalog-actions { position: relative; display: inline-flex; }
+.stock-catalog-trigger { display: inline-flex; align-items: center; gap: 6px; }
+.stock-catalog-menu { position: absolute; top: calc(100% + 7px); right: 0; z-index: 60; width: 290px; padding: 6px; border: 1px solid #d7e7df; border-radius: 12px; background: #fff; box-shadow: 0 12px 28px rgba(30, 71, 54, .18); }
+.stock-catalog-menu button { display: flex; width: 100%; align-items: flex-start; gap: 10px; padding: 10px; border: 0; border-radius: 8px; color: #315848; background: transparent; text-align: left; cursor: pointer; }
+.stock-catalog-menu button:hover, .stock-catalog-menu button:focus-visible { background: #eef8f3; outline: none; }
+.stock-catalog-menu button > svg { flex: 0 0 auto; margin-top: 2px; color: #348267; }
+.stock-catalog-menu button span { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
+.stock-catalog-menu button b { font-size: 12px; }
+.stock-catalog-menu button small { color: #7b8b82; font-size: 10px; line-height: 1.35; }
+.member-number-format-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 14px; padding-top: 14px; border-top: 1px dashed #d7e7df; }
+.member-number-format-grid label { color: #677a70; font-size: 11px; }
+.member-number-format-grid input, .member-number-format-grid select { display: block; width: 100%; margin-top: 5px; }
+@media (max-width: 680px) { .member-number-format-grid { grid-template-columns: 1fr; } }
+.pos-header-actions { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.pos-inventory-backdrop { z-index: 120; align-items: flex-start; padding: 24px; overflow: hidden; overscroll-behavior: contain; }
+.pos-inventory-modal { width: min(1180px, 100%); max-height: calc(100vh - 48px); overflow: auto; overscroll-behavior: contain; background: var(--surface, #fff); border: 1px solid #d8e6df; border-radius: 18px; box-shadow: 0 24px 70px rgba(18, 49, 35, .25); }
+.pos-inventory-modal-body { padding: 0 18px 20px; }
+.pos-inventory-modal-body > .section-header { margin-top: 12px; }
+/* Embedded Stock must contribute one form only: its own backdrop becomes transparent content. */
+.pos-inventory-modal-body > .stock-embedded > *:not(.modal-backdrop) { display: none !important; }
+.pos-inventory-modal-body > .stock-embedded > .modal-backdrop { position: static; inset: auto; display: block; padding: 0; overflow: visible; background: transparent; backdrop-filter: none; animation: none; }
+.pos-inventory-modal-body > .stock-embedded > .modal-backdrop > .form-modal { width: 100%; max-width: none; max-height: none; overflow: visible; border: 0; border-radius: 0; box-shadow: none; animation: none; }
+.member-number-presets { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; margin-top: 14px; padding: 10px 12px; border: 1px solid #dce9e2; border-radius: 10px; background: #fbfdfc; }
+.member-number-presets b { font-size: 11px; color: #52695d; }
+.member-number-presets small { color: #718178; font-size: 10.5px; }
+.pos-shortcut-custom { margin-top: 16px; padding: 14px; border: 1px solid #dce9e2; border-radius: 12px; background: #fbfdfc; }
+.pos-shortcut-custom-head b, .pos-shortcut-custom-head small { display: block; }
+.pos-shortcut-custom-head small { margin-top: 4px; color: #708078; font-size: 11px; }
+.pos-shortcut-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 12px; }
+.pos-shortcut-grid label { color: #66786e; font-size: 11px; }
+.pos-shortcut-grid input, .pos-shortcut-grid button { display: block; width: 100%; margin-top: 5px; text-transform: uppercase; }
+.pos-rail-key-input { min-height: 32px; padding: 6px 9px; border: 1px solid #d5e2dc; border-radius: 7px; background: #fff; color: #52665b; font: 600 11px "IBM Plex Mono", monospace; text-align: left; cursor: pointer; }
+.pos-rail-key-input:hover:not(:disabled), .pos-rail-key-input:focus-visible { border-color: #8fc5b0; box-shadow: 0 0 0 3px #eaf6f1; outline: none; }
+.pos-rail-key-input:disabled { cursor: not-allowed; opacity: .55; }
+@media (max-width: 760px) { .pos-shortcut-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 680px) { .pos-inventory-backdrop { padding: 8px; } .pos-inventory-modal { max-height: calc(100vh - 16px); border-radius: 12px; } .pos-inventory-modal-body { padding: 0 10px 14px; } }
 @media (max-width: 560px) {
   .receive-cart-row { flex-wrap: wrap; }
   .receive-cart-row .receive-cart-cost { width: auto; margin-left: auto; }

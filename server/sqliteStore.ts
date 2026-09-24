@@ -198,6 +198,12 @@ export type DashboardStats = {
 
 export type StoreSettings = {
   memberNumberMode: "running" | "year" | "manual";
+  memberNumberPrefix: string;
+  memberNumberYearMode: "none" | "buddhist" | "gregorian";
+  memberNumberYearDigits: 2 | 4;
+  memberNumberSeparator: "-" | "/" | "_" | "";
+  memberNumberResetMonth: number;
+  memberNumberSequenceDigits: number;
   storeName: string;
   storeCode: string;
   storeAddress: string;
@@ -212,6 +218,7 @@ export type StoreSettings = {
    *  ตัวตั้ง autoPrintReceipt เดิมถูกลบออก (พฤติกรรม window.print() อัตโนมัติ)
    *  · เพิ่ม posRailHidden: ปุ่มรางซ้าย POS ที่ปิดใช้งาน (JSON array ของ key) */
   posRailHidden: string;
+  posShortcutKeys: string;
   showBalanceOnReceipt: boolean;
   lowBalanceAlert: boolean;
   lowBalanceThreshold: number;
@@ -529,6 +536,20 @@ export function setMemberNumberMode(db: SqliteDb, mode: "running" | "year" | "ma
 export function getMemberNumberMode(db: SqliteDb) {
   const row = db.prepare(`SELECT value FROM store_settings WHERE key = 'member_number_mode'`).get() as { value: "running" | "year" | "manual" } | undefined;
   return row?.value ?? "running";
+}
+
+function memberNumberSettings(db: SqliteDb) {
+  const settings = getSettings(db);
+  return {
+    // An empty prefix is intentional: it enables formats such as 69-00001
+    // or 6900001 instead of silently restoring the historical "M" prefix.
+    prefix: settings.memberNumberPrefix.trim().replace(/[^A-Za-z0-9ก-๙._-]/g, "").slice(0, 20),
+    yearMode: settings.memberNumberYearMode,
+    yearDigits: settings.memberNumberYearDigits === 4 ? 4 : 2,
+    separator: settings.memberNumberSeparator === "" || settings.memberNumberSeparator === "/" || settings.memberNumberSeparator === "_" ? settings.memberNumberSeparator : "-",
+    resetMonth: Math.min(12, Math.max(1, Math.floor(settings.memberNumberResetMonth || 1))),
+    sequenceDigits: Math.min(10, Math.max(1, Math.floor(settings.memberNumberSequenceDigits || 6))),
+  };
 }
 
 export function suspendMember(db: SqliteDb, memberNumber: string) {
@@ -1663,12 +1684,20 @@ function generateMemberNumber(db: SqliteDb, mode: "running" | "year" | "manual",
     if (!manual) throw new StoreError("โหมดกำหนดหมายเลขเอง: กรุณาระบุหมายเลขสมาชิก");
     return manual;
   }
-  if (mode === "year") {
-    const buddhistYear = String(new Date().getFullYear() + 543).slice(-2);
-    const prefix = `${buddhistYear}-`;
+  const config = memberNumberSettings(db);
+  const legacyYearMode = mode === "year" && config.yearMode === "none";
+  if (legacyYearMode) {
+    const year = String(new Date().getFullYear() + 543).slice(-2);
+    const prefix = `${year}-`;
     return `${prefix}${String(nextMemberSequence(db, prefix)).padStart(5, "0")}`;
   }
-  return `M-${String(nextMemberSequence(db, "M-")).padStart(6, "0")}`;
+  const now = new Date();
+  const cycleYear = now.getMonth() + 1 < config.resetMonth ? now.getFullYear() - 1 : now.getFullYear();
+  const yearValue = config.yearMode === "buddhist" ? cycleYear + 543 : cycleYear;
+  const yearText = config.yearMode === "none" ? "" : String(yearValue).slice(config.yearDigits === 4 ? -4 : -2);
+  const head = [config.prefix, yearText].filter(Boolean).join(config.separator);
+  const separator = head ? `${head}${config.separator}` : "";
+  return `${separator}${String(nextMemberSequence(db, separator)).padStart(config.sequenceDigits, "0")}`;
 }
 
 export type RegisterMemberInput = {
@@ -2623,6 +2652,12 @@ export function installOverview(db: SqliteDb, dbPath: string): InstallOverview {
 
 export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   memberNumberMode: "running",
+  memberNumberPrefix: "M",
+  memberNumberYearMode: "none",
+  memberNumberYearDigits: 2,
+  memberNumberSeparator: "-",
+  memberNumberResetMonth: 1,
+  memberNumberSequenceDigits: 6,
   storeName: "ร้านค้าสวัสดิการ",
   storeCode: "WEL-001",
   storeAddress: "ร้านค้าสวัสดิการ",
@@ -2631,6 +2666,7 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   appTheme: "emerald",
   // ROUND 75 — เมนูลัดหน้าร้าน: "" = เปิดใช้ทุกปุ่มบนรางซ้าย POS
   posRailHidden: "",
+  posShortcutKeys: "",
   showBalanceOnReceipt: true,
   lowBalanceAlert: true,
   lowBalanceThreshold: 100,
