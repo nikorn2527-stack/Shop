@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { ensureSystemSeed, login, SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from '@/lib/auth'
+import { login, SESSION_COOKIE, SESSION_COOKIE_OPTIONS } from '@/lib/auth'
 import { logAction, withHandler, StoreError } from '@/lib/api'
 
 const Body = z.object({
@@ -13,8 +13,8 @@ export const POST = withHandler(async (req: NextRequest, { ip }) => {
   if (!parsed.success) {
     throw new StoreError('ข้อมูลไม่ถูกต้อง · กรุณากรอกชื่อผู้ใช้และรหัสผ่าน')
   }
-  // Ensure system seed (warehouse, roles, permissions, settings) is ready.
-  await ensureSystemSeed()
+  // Note: ensureSystemSeed() is called by /api/auth/setup-status on app boot,
+  // so we don't need to run it again here on every login (it's slow on Windows).
   const { user, sessionId } = await login(parsed.data.username, parsed.data.password, ip)
 
   await logAction({
