@@ -1,0 +1,378 @@
+     1→import { useMemo, useState } from "react";
+     2→import {
+     3→  Activity, BarChart3, CalendarClock, CalendarDays, Check, CircleAlert, Crown, MoreHorizontal, PackageSearch, Printer, ReceiptText, ShieldCheck, ShoppingBag, Terminal, Wallet, X,
+     4→} from "lucide-react";
+     5→import type { BusinessPeriodStatus, DayClosureRow } from "../../../server/sqliteStore";
+     6→import type { Role, View } from "./pageData";
+     7→import { isAdminRole, money, roleThaiLabel } from "./pageData";
+     8→import { ConfirmDialog, SectionHeader } from "./PagePrimitives";
+     9→import { PrintPreviewModal } from "@/components/PrintPreviewModal";
+    10→import { trpc } from "@/lib/trpc";
+    11→import { formatAxisLabel, formatThaiDate, formatTimeShort, parseBahtFromDetail } from "./viewFormat";
+    12→
+    13→const THAI_WEEKDAYS = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."];
+    14→const THAI_SHORT_MONTHS = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
+    15→const RANGE_DAYS: Record<string, number> = { "7 วัน": 7, "30 วัน": 30, "12 เดือน": 365 };
+    16→
+    17→/** Round 34 — compact baht for on-chart chips: 14900 → "฿14.9k", 1200000 → "฿1.2M", 0 → "฿0". */
+    18→function compactBaht(value: number) {
+    19→  if (value <= 0) return "฿0";
+    20→  const trim = (n: number) => (n >= 100 ? String(Math.round(n)) : n.toFixed(1).replace(/\.0$/, ""));
+    21→  if (value >= 1_000_000) return `฿${trim(value / 1_000_000)}M`;
+    22→  if (value >= 1000) return `฿${trim(value / 1000)}k`;
+    23→  return `฿${Math.round(value)}`;
+    24→}
+    25→
+    26→/**
+    27→ * Round 34 — smooth monotone cubic path (Fritsch–Carlson). Returns an SVG "M … C …"
+    28→ * path through every point that never overshoots past its neighbours, so flat
+    29→ * zero-days can't fake a dip below the data the way a jagged polyline does.
+    30→ */
+    31→function buildSmoothPath(points: { x: number; y: number }[]) {
+    32→  const n = points.length;
+    33→  if (n === 0) return "";
+    34→  if (n === 1) return `M ${points[0].x.toFixed(2)},${points[0].y.toFixed(2)}`;
+    35→  const slopes: number[] = [];
+    36→  for (let i = 0; i < n - 1; i += 1) {
+    37→    const dx = points[i + 1].x - points[i].x;
+    38→    slopes.push(dx > 0 ? (points[i + 1].y - points[i].y) / dx : 0);
+    39→  }
+    40→  const tangents: number[] = [slopes[0]];
+    41→  for (let i = 1; i < n - 1; i += 1) {
+    42→    tangents.push(slopes[i - 1] * slopes[i] <= 0 ? 0 : (slopes[i - 1] + slopes[i]) / 2);
+    43→  }
+    44→  tangents.push(slopes[n - 2]);
+    45→  for (let i = 0; i < n - 1; i += 1) {
+    46→    if (slopes[i] === 0) {
+    47→      tangents[i] = 0;
+    48→      tangents[i + 1] = 0;
+    49→      continue;
+    50→    }
+    51→    const alpha = tangents[i] / slopes[i];
+    52→    const beta = tangents[i + 1] / slopes[i];
+    53→    const square = alpha * alpha + beta * beta;
+    54→    if (square > 9) {
+    55→      const tau = 3 / Math.sqrt(square);
+    56→      tangents[i] = tau * alpha * slopes[i];
+    57→      tangents[i + 1] = tau * beta * slopes[i];
+    58→    }
+    59→  }
+    60→  let path = `M ${points[0].x.toFixed(2)},${points[0].y.toFixed(2)}`;
+    61→  for (let i = 0; i < n - 1; i += 1) {
+    62→    const dx = points[i + 1].x - points[i].x;
+    63→    path += ` C ${(points[i].x + dx / 3).toFixed(2)},${(points[i].y + (tangents[i] * dx) / 3).toFixed(2)} ${(points[i + 1].x - dx / 3).toFixed(2)},${(points[i + 1].y + (tangents[i + 1] * dx) / 3).toFixed(2)} ${points[i + 1].x.toFixed(2)},${points[i + 1].y.toFixed(2)}`;
+    64→  }
+    65→  return path;
+    66→}
+    67→
+    68→/** Tooltip delta cell — ↑ green (ดีขึ้น) / ↓ red-ish (ตามธรรมเนียมไทย), หรือข้อความจางถ้าไม่มีจุดเทียบ */
+    69→const deltaChip = (delta: number | null, fallback: string) => (delta === null
+    70→  ? <em className="muted">{fallback}</em>
+    71→  : <em className={delta >= 0 ? "up" : "down"}>{delta >= 0 ? "↑" : "↓"} {Math.abs(delta).toFixed(1)}%</em>);
+    72→
+    73→type ChartPoint = { label: string; date: string; revenue: number; deposit: number };
+    74→type DashTab = "sales" | "best" | "watch" | "activity" | "cutoff";
+    75→
+    76→const DASH_TABS: { id: DashTab; label: string }[] = [
+    77→  { id: "sales", label: "ยอดขาย" },
+    78→  { id: "best", label: "สินค้าขายดี" },
+    79→  { id: "watch", label: "ต้องติดตาม" },
+    80→  { id: "activity", label: "กิจกรรมล่าสุด" },
+    81→  // Round 32-20 — รอบตัดยอดเป็นแท็บของตัวเอง ไม่แทรกเนื้อหาเดิมให้หน้าหลุดเฟรม
+    82→  { id: "cutoff", label: "รอบตัดยอดวันนี้" },
+    83→];
+    84→
+    85→/** Sums "เติมเงินสมาชิก" audit entries per calendar day for the lilac chart line. */
+    86→function buildDepositsByDay(logs: { action: string; detail: string; createdAt: string }[]) {
+    87→  const map = new Map<string, number>();
+    88→  for (const log of logs) {
+    89→    if (log.action !== "เติมเงินสมาชิก") continue;
+    90→    const date = log.createdAt.slice(0, 10);
+    91→    if (!date) continue;
+    92→    map.set(date, (map.get(date) ?? 0) + parseBahtFromDetail(log.detail));
+    93→  }
+    94→  return map;
+    95→}
+    96→
+    97→/**
+    98→ * รอบตัดยอดประจำวัน (round 31-①) — a compact live strip between the KPI row and
+    99→ * the tab workbench. Shows what the CURRENT business period has accumulated
+   100→ * (bills / pieces / revenue / by payment channel / deposits / withdrawals) and
+   101→ * carries the ตัดยอด button: manual cut-off for staff, or the countdown to the
+   102→ * next automatic one. After a cut, the period summary turns into a printable
+   103→ * Z-report slip (สรุปยอดรอบ) the cashier can hand to the admin.
+   104→ */
+   105→function CutoffWidget({ role, userName }: { role: Role; userName: string }) {
+   106→  const utils = trpc.useUtils();
+   107→  const periodQuery = trpc.reports.businessPeriod.useQuery(undefined, { refetchInterval: 60_000 });
+   108→  const [confirmOpen, setConfirmOpen] = useState(false);
+   109→  const [closed, setClosed] = useState<DayClosureRow | null>(null);
+   110→  // ROUND 51 — พิมพ์สรุปรอบผ่านพรีวิวก่อน (เหมือนจุดพิมพ์อื่นทั้งระบบ)
+   111→  const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
+   112→  const closeMutation = trpc.reports.closeDay.useMutation({
+   113→    onSuccess: (closure) => {
+   114→      setClosed(closure);
+   115→      setConfirmOpen(false);
+   116→      void utils.reports.businessPeriod.invalidate();
+   117→      void utils.logs.list.invalidate();
+   118→    },
+   119→  });
+   120→  const period: BusinessPeriodStatus | undefined = periodQuery.data;
+   121→  const actorRole = roleThaiLabel(role);
+   122→  const periodTotals = closed
+   123→    ? { bills: closed.bills, pieces: closed.pieces, revenue: closed.revenue, cashTotal: closed.cashTotal, qrTotal: closed.qrTotal, walletTotal: closed.walletTotal, deposits: closed.deposits, withdrawals: closed.withdrawals }
+   124→    : period?.totals;
+   125→  return <section className="panel cutoff-widget" aria-label="รอบตัดยอดประจำวัน">
+   126→    <div className="cutoff-widget-main">
+   127→      <div className="cutoff-widget-head">
+   128→        <span className="cutoff-widget-icon"><CalendarClock size={17} /></span>
+   129→        <div>
+   130→          <b>รอบตัดยอดวันนี้</b>
+   131→          <small>{period
+   132→            ? period.mode === "auto"
+   133→              ? `ระบบตัดอัตโนมัติ ${period.cutOffTime} น. ทุกวัน · รอบเริ่ม ${formatTimeShort(period.periodStart)}${period.nextCutOffAt ? ` · ตัดรอบถัดไป ${formatTimeShort(period.nextCutOffAt)}` : ""}`
+   134→              : `เจ้าหน้าที่ตัดยอดเองเมื่อพร้อม · รอบเริ่ม ${formatTimeShort(period.periodStart)}`
+   135→            : "กำลังโหลดข้อมูลรอบปัจจุบัน…"}</small>
+   136→        </div>
+   137→        <span className={`cutoff-mode-pill ${period?.mode === "manual" ? "manual" : ""}`}>{period?.mode === "manual" ? "ตัดเอง" : "อัตโนมัติ"}</span>
+   138→      </div>
+   139→      <div className="cutoff-widget-stats">
+   140→        <div><small>บิลในรอบ</small><strong>{periodTotals ? periodTotals.bills.toLocaleString("th-TH") : "—"}</strong></div>
+   141→        <div><small>ชิ้นที่ขาย</small><strong>{periodTotals ? periodTotals.pieces.toLocaleString("th-TH") : "—"}</strong></div>
+   142→        <div><small>ยอดขายรอบนี้</small><strong className="teal">{periodTotals ? money(periodTotals.revenue) : "—"}</strong></div>
+   143→        <div><small>เงินสด / QR</small><strong>{periodTotals ? `${money(periodTotals.cashTotal)} / ${money(periodTotals.qrTotal)}` : "—"}</strong></div>
+   144→        <div><small>หักบัญชีสมาชิก</small><strong>{periodTotals ? money(periodTotals.walletTotal) : "—"}</strong></div>
+   145→        <div><small>เติม / ถอน</small><strong>{periodTotals ? `${money(periodTotals.deposits)} / ${money(periodTotals.withdrawals)}` : "—"}</strong></div>
+   146→      </div>
+   147→    </div>
+   148→    <div className="cutoff-widget-actions">
+   149→      {closed ? <>
+   150→        <div className="cutoff-done-note"><Check size={14} /> ตัดยอดเรียบร้อย {formatTimeShort(closed.closedAt)} · โดย {closed.closedBy ?? "—"}</div>
+   151→        <button type="button" className="outline-button" onClick={() => setPrintPreviewOpen(true)}><Printer size={15} /> พิมพ์สรุปรอบ</button>
+   152→        <button type="button" className="primary-button" onClick={() => setClosed(null)}><CalendarClock size={15} /> เริ่มรอบใหม่</button>
+   153→      </> : <>
+   154→        <button type="button" className="primary-button cutoff-trigger" onClick={() => setConfirmOpen(true)} disabled={closeMutation.isPending}><CalendarClock size={15} /> ตัดยอดรอบนี้</button>
+   155→        {period?.lastClosure && <div className="cutoff-last-note"><CalendarDays size={13} /> ตัดล่าสุด {formatTimeShort(period.lastClosure.closedAt)} · {period.lastClosure.bills} บิล · {money(period.lastClosure.revenue)}</div>}
+   156→      </>}
+   157→    </div>
+   158→    {/* สรุปรอบ (Z-report) — แสดงเฉพาะหลังกดตัดยอด เพื่อพิมพ์เก็บ / ส่งผู้บริหาร */}
+   159→    {closed && periodTotals && <div className="receipt-paper cutoff-report" id="cutoff-report">
+   160→      <div className="receipt-brand"><div className="brand-mark small"><span>ส</span></div><div><b>ร้านค้าสวัสดิการ</b><small>สรุปยอดรอบตัดบัญชี</small></div></div>
+   161→      <div className="receipt-divider" />
+   162→      <div className="receipt-meta"><span>ตัดยอดเมื่อ <b>{formatThaiDate(closed.closedAt)} · {formatTimeShort(closed.closedAt)}</b></span><span>โดย {closed.closedBy ?? "—"}</span></div>
+   163→      <div className="receipt-meta"><span>รอบตั้งแต่ <b>{formatThaiDate(closed.periodStart)} · {formatTimeShort(closed.periodStart)}</b></span><span>ถึงเวลาตัดยอด</span></div>
+   164→      <div className="receipt-divider" />
+   165→      <div className="receipt-line"><span>จำนวนบิล</span><b>{closed.bills.toLocaleString("th-TH")} บิล</b></div>
+   166→      <div className="receipt-line"><span>ชิ้นที่ขาย</span><b>{closed.pieces.toLocaleString("th-TH")} ชิ้น</b></div>
+   167→      <div className="receipt-total"><span>ยอดขายรอบนี้</span><b>{money(closed.revenue)}</b></div>
+   168→      <div className="receipt-line"><span>รับเงินสด</span><b>{money(closed.cashTotal)}</b></div>
+   169→      <div className="receipt-line"><span>QR / สแกน</span><b>{money(closed.qrTotal)}</b></div>
+   170→      <div className="receipt-line"><span>หักบัญชีสมาชิก</span><b>{money(closed.walletTotal)}</b></div>
+   171→      <div className="receipt-divider" />
+   172→      <div className="receipt-line"><span>เติมเงินสมาชิก</span><b>{money(closed.deposits)}</b></div>
+   173→      <div className="receipt-line"><span>ถอนเงินสมาชิก</span><b>{money(closed.withdrawals)}</b></div>
+   174→      {closed.note && <div className="receipt-line"><span>หมายเหตุ</span><b>{closed.note}</b></div>}
+   175→      <div className="receipt-thanks">ตัดยอดโดย {closed.closedBy ?? "—"} · {actorRole} {userName ? `(${userName})` : ""}<br /><small>สรุปรอบนี้บันทึกลงระบบ Log แล้ว · รอบใหม่เริ่มทันทีหลังตัดยอด</small></div>
+   176→    </div>}
+   177→    <ConfirmDialog open={confirmOpen} title="ยืนยันตัดยอดรอบนี้?" description={`สรุปยอดตั้งแต่ ${period ? `${formatThaiDate(period.periodStart)} ${formatTimeShort(period.periodStart)}` : "ต้นรอบ"} จนถึงตอนนี้ แล้วเริ่มรอบใหม่ทันที · ยอดขายรอบนี้ ${period ? money(period.totals.revenue) : "—"} (${period?.totals.bills ?? 0} บิล) · ระบบจะสร้างสรุปรอบให้พิมพ์เก็บไว้ และบันทึกลง Log`} confirmLabel="ตัดยอดรอบนี้" onCancel={() => setConfirmOpen(false)} onConfirm={() => closeMutation.mutate({ actor: userName || "เจ้าหน้าที่ร้านค้า", actorRole: role })} />
+   178→    {printPreviewOpen && closed && <PrintPreviewModal targetId="cutoff-report" title="พรีวิวก่อนพิมพ์สรุปรอบตัดยอด" subtitle={`ตัดยอดเมื่อ ${formatThaiDate(closed.closedAt)} · ${formatTimeShort(closed.closedAt)} · โดย ${closed.closedBy ?? "—"}`} paper="thermal" chips={[`${closed.bills.toLocaleString("th-TH")} บิล`, `ยอดขาย ${money(closed.revenue)}`, `เงินสด ${money(closed.cashTotal)} · QR ${money(closed.qrTotal)}`]} onClose={() => setPrintPreviewOpen(false)} />}
+   179→    {closeMutation.isError && <div className="notice-bar error" role="alert"><CircleAlert size={16} /> {closeMutation.error.message}<button onClick={() => closeMutation.reset()}><X size={14} /></button></div>}
+   180→  </section>;
+   181→}
+   182→
+   183→export function Dashboard({ setView, role, userName }: { setView: (view: View) => void; role: Role; userName: string }) {
+   184→  const [range, setRange] = useState("30 วัน");
+   185→  const [selectedBar, setSelectedBar] = useState(5);
+   186→  const [bestMode, setBestMode] = useState("จำนวนขาย");
+   187→  const [selectedProduct, setSelectedProduct] = useState(0);
+   188→  const [tab, setTab] = useState<DashTab>("sales");
+   189→  const rangeDays = RANGE_DAYS[range] ?? 30;
+   190→  const statsQuery = trpc.dashboard.stats.useQuery({ rangeDays });
+   191→  const logsQuery = trpc.logs.list.useQuery({ limit: 1000 });
+   192→  const productsQuery = trpc.product.list.useQuery(undefined);
+   193→  const stats = statsQuery.data;
+   194→
+   195→  const firstName = (userName || "ผู้ใช้ระบบ").trim().split(/\s+/)[0];
+   196→  const clockHour = new Date().getHours();
+   197→  const greetingWord = clockHour < 12 ? "สวัสดีตอนเช้า" : clockHour < 17 ? "สวัสดีตอนบ่าย" : "สวัสดีตอนเย็น";
+   198→  const emojiByName = useMemo(() => {
+   199→    const map = new Map<string, string>();
+   200→    for (const product of productsQuery.data ?? []) map.set(product.name, product.emoji ?? "🛍️");
+   201→    return map;
+   202→  }, [productsQuery.data]);
+   203→
+   204→  const deposits = useMemo(() => buildDepositsByDay(logsQuery.data ?? []), [logsQuery.data]);
+   205→
+   206→  const chart = useMemo(() => {
+   207→    const base = (stats?.revenueByDay ?? []).map((day) => ({ date: day.date, revenue: day.total, deposit: deposits.get(day.date) ?? 0 }));
+   208→    let points: ChartPoint[];
+   209→    if (rangeDays > 60) {
+   210→      points = [];
+   211→      for (const point of base) {
+   212→        const key = point.date.slice(0, 7);
+   213→        let group = points.find((entry) => entry.date.slice(0, 7) === key);
+   214→        if (!group) {
+   215→          group = { label: THAI_SHORT_MONTHS[Number(key.slice(5, 7)) - 1] ?? key, date: point.date, revenue: 0, deposit: 0 };
+   216→          points.push(group);
+   217→        }
+   218→        group.revenue += point.revenue;
+   219→        group.deposit += point.deposit;
+   220→      }
+   221→    } else {
+   222→      points = base.map((point) => ({
+   223→        label: rangeDays <= 7 ? THAI_WEEKDAYS[new Date(`${point.date}T00:00:00`).getDay()] : String(Number(point.date.slice(8, 10))),
+   224→        ...point,
+   225→      }));
+   226→    }
+   227→    // Round 34 — หนึ่งเส้นฮีโร่: สเกลดูจากยอดขายอย่างเดียว (เติมเงินย้ายไปแถบสรุป+ทูลทิป)
+   228→    // พร้อมคำอธิบาย เฉลี่ย/สูงสุด/วันนี้ แทนเส้นเติมเงินสีม่วงที่แบนราบเหมือนข้อผิดพลาด
+   229→    const maxValue = Math.max(...points.map((point) => point.revenue), 1);
+   230→    const step = Math.max(1000, Math.ceil(maxValue / 4 / 1000) * 1000);
+   231→    const axisMax = step * 4;
+   232→    let maxIndex = 0;
+   233→    points.forEach((point, index) => {
+   234→      if (point.revenue > points[maxIndex].revenue) maxIndex = index;
+   235→    });
+   236→    const lastIndex = points.length - 1;
+   237→    const now = new Date();
+   238→    const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+   239→    return {
+   240→      points,
+   241→      axisMax,
+   242→      maxIndex,
+   243→      lastIndex,
+   244→      isTodayLast: lastIndex >= 0 && points[lastIndex].date === todayKey,
+   245→      avg: points.length > 0 ? points.reduce((sum, point) => sum + point.revenue, 0) / points.length : 0,
+   246→      totalDeposit: points.reduce((sum, point) => sum + point.deposit, 0),
+   247→      // ป้ายบนสุดของแกน y มี ฿ นำหน้า ให้รู้ทันทีว่าหน่วยเป็นเงิน
+   248→      yLabels: [4, 3, 2, 1].map((multiplier) => `${multiplier === 4 ? "฿" : ""}${formatAxisLabel(multiplier * step)}`).concat("0"),
+   249→    };
+   250→  }, [stats, deposits, rangeDays]);
+   251→
+   252→  const chartData = chart.points;
+   253→  const safeSelectedBar = Math.min(selectedBar, Math.max(chartData.length - 1, 0));
+   254→  const selected = chartData[safeSelectedBar];
+   255→  const prevPoint = safeSelectedBar > 0 ? chartData[safeSelectedBar - 1] : null;
+   256→  const vsPrev = selected && prevPoint && prevPoint.revenue > 0 ? ((selected.revenue - prevPoint.revenue) / prevPoint.revenue) * 100 : null;
+   257→  const vsAvg = selected && chart.avg > 0 ? ((selected.revenue - chart.avg) / chart.avg) * 100 : null;
+   258→  // Round 34 — เรขาคณิตเส้นเดียวเรียบลื่น (viewBox 1000×100 + preserveAspectRatio none):
+   259→  // เส้นโค้งเป็น monotone cubic แนบข้อมูลโดยไม่หล่นต่ำกว่าค่าจริง ส่วนจุด/ป้ายเป็น HTML
+   260→  // overlay (วงกลม SVG จะถูกยืดบี้เมื่อภาชน์ไม่รักษาสัดส่วน)
+   261→  const lineGeom = useMemo(() => {
+   262→    const count = chartData.length;
+   263→    if (count === 0) return null;
+   264→    const width = 1000;
+   265→    const height = 100;
+   266→    const clampY = (value: number) => Math.min(Math.max(height - (value / chart.axisMax) * height, 1), height - 1);
+   267→    const xAt = (index: number) => ((index + 0.5) / count) * width;
+   268→    const yPercent = (value: number) => Math.min(Math.max((1 - value / chart.axisMax) * 100, 1.5), 96.5);
+   269→    const revenuePath = buildSmoothPath(chartData.map((point, index) => ({ x: xAt(index), y: clampY(point.revenue) })));
+   270→    return {
+   271→      width, height, xAt, yPercent,
+   272→      revenuePath,
+   273→      areaPath: `${revenuePath} L ${xAt(count - 1).toFixed(2)},${height} L ${xAt(0).toFixed(2)},${height} Z`,
+   274→      avgY: chart.avg > 0 ? clampY(chart.avg) : null,
+   275→      selectedX: xAt(safeSelectedBar),
+   276→      labelStep: count > 14 ? Math.ceil(count / 8) : 1,
+   277→    };
+   278→  }, [chartData, chart.axisMax, chart.avg, safeSelectedBar]);
+   279→  const bestSellers = stats?.bestSellers ?? [];
+   280→  const bestSellersRanked = bestSellers.map((item, index) => ({
+   281→    name: item.name,
+   282→    qtyLabel: bestMode === "จำนวนขาย" ? `${item.qty} ชิ้น` : money(item.revenue),
+   283→    total: money(item.revenue),
+   284→    emoji: emojiByName.get(item.name) ?? "🛍️",
+   285→    width: bestMode === "จำนวนขาย"
+   286→      ? Math.round((item.qty / Math.max(...bestSellers.map((seller) => seller.qty), 1)) * 100)
+   287→      : Math.round((item.revenue / Math.max(...bestSellers.map((seller) => seller.revenue), 1)) * 100),
+   288→    rank: index + 1,
+   289→  }));
+   290→  const lowStock = stats?.lowStock ?? [];
+   291→  const expirySoon = stats?.expirySoon ?? [];
+   292→  const recentActivities = stats?.recentActivities ?? [];
+   293→  const loading = statsQuery.isLoading;
+   294→  return (
+   295→    <>
+   296→      <SectionHeader eyebrow={`ภาพรวมการดำเนินงาน · ${role === "admin" ? "มุมมองผู้บริหาร" : role === "dev" ? "มุมมองผู้พัฒนา" : "มุมมองเจ้าหน้าที่"}`} title={`${greetingWord}, ${firstName}`} description="สรุปตัวเลขสำคัญอยู่บนสุด · เลือกมุมมองข้อมูลจากแถบด้านล่างเพื่อดูรายละเอียดแบบเต็มพื้นที่" action={<><div className={`permission-chip ${role}`}><span>{role === "admin" ? <Crown size={14} /> : role === "dev" ? <Terminal size={14} /> : <ShieldCheck size={14} />}</span>{role === "admin" ? "สิทธิ์ผู้บริหาร · วิเคราะห์เต็มรูปแบบ" : role === "dev" ? "สิทธิ์ผู้พัฒนา · เข้าถึงทุกส่วนของระบบ" : "สิทธิ์เจ้าหน้าที่ · ปฏิบัติงานหน้าร้าน"}</div><div className="permission-chip neutral" title="วันที่ปัจจุบัน"><span><CalendarDays size={14} /></span>วันนี้ · {formatThaiDate(new Date())}</div></>} />
+   297→      <div className="metric-grid">
+   298→        <div className="metric-card highlight"><div className="metric-top"><span>ยอดขายทั้งหมด · {range}</span><span className="metric-icon green"><ShoppingBag size={18} /></span></div><strong>{loading ? "…" : money(stats?.totalSales ?? 0)}</strong><div className="metric-foot"><span>{stats?.totalOrders ?? 0} บิล</span><span>สูงสุด {money(Math.max(...(stats?.revenueByDay ?? []).map((day) => day.total), 0))} ในหนึ่งวัน</span></div></div>
+   299→        <div className="metric-card"><div className="metric-top"><span>ออเดอร์ทั้งหมด</span><span className="metric-icon blue"><ReceiptText size={18} /></span></div><strong>{loading ? "…" : (stats?.totalOrders ?? 0).toLocaleString("th-TH")} <small>บิล</small></strong><div className="metric-foot"><span>เฉลี่ย {((stats?.totalOrders ?? 0) / rangeDays).toFixed(1)} บิล/วัน</span><span>ในช่วง{range}</span></div></div>
+   300→        <div className="metric-card"><div className="metric-top"><span>สินค้าขายดี</span><span className="metric-icon amber"><BarChart3 size={18} /></span></div><strong>{loading ? "…" : (stats?.bestSellerCount ?? 0).toLocaleString("th-TH")} <small>ชิ้น</small></strong><div className="metric-foot warning"><span>{bestSellers[0]?.name ?? "ยังไม่มีข้อมูลการขาย"}</span><span>อันดับ 1 ในช่วง{range}</span></div></div>
+   301→        <div className="metric-card"><div className="metric-top"><span>ยอดขายเฉลี่ยต่อวัน</span><span className="metric-icon purple"><CalendarDays size={18} /></span></div><strong>{loading ? "…" : money(stats?.avgDailySales ?? 0)}</strong><div className="metric-foot"><span>ขายไป {stats?.itemsSold ?? 0} ชิ้น</span><span>ในช่วง{range}</span></div></div>
+   302→      </div>
+   303→      <section className="dash-workbench" aria-label="มุมมองข้อมูลภาพรวม">
+   304→        <div className="dash-tabbar" role="tablist" aria-label="เลือกมุมมองข้อมูล">
+   305→          {DASH_TABS.map((item) => <button type="button" role="tab" aria-selected={tab === item.id} className={`dash-tab${tab === item.id ? " active" : ""}`} key={item.id} onClick={() => setTab(item.id)}>{item.id === "sales" ? <BarChart3 size={15} /> : item.id === "best" ? <Crown size={15} /> : item.id === "watch" ? <PackageSearch size={15} /> : item.id === "activity" ? <Activity size={15} /> : <CalendarClock size={15} />}{item.label}{item.id === "watch" && lowStock.length > 0 && <i className="tab-badge red" title={`สินค้าใกล้หมดสต็อก ${lowStock.length} รายการ`}>{lowStock.length}</i>}{item.id === "watch" && expirySoon.length > 0 && <i className="tab-badge amber" title={`ใกล้หมดอายุ ${expirySoon.length} รายการ`}>{expirySoon.length}</i>}</button>)}
+   306→          <span className="dash-tabbar-spacer" aria-hidden="true" />
+   307→        </div>
+   308→        <div className="dash-tab-body" role="tabpanel">
+   309→          {/* Round 34 — กราฟยอดขายออกแบบใหม่: เส้นเดียวอ่านง่าย + คำอธิบายครบ (จุด/ป้ายค่า/
+   310→              เส้นเฉลี่ย/แถบสุดสัปดาห์/ป้ายวันนี้ยังไม่ครบวัน/การ์ดสรุปจุดที่เลือก) */}
+   311→          {tab === "sales" && <section className="panel chart-panel interactive-chart-panel">
+   312→            <div className="panel-heading">
+   313→              <div>
+   314→                <h2>ยอดขายร้านค้า</h2>
+   315→                <p>{rangeDays > 60 ? "กราฟยอดขายรายเดือน · แตะ/คลิกจุดเพื่อดูรายละเอียด" : "กราฟยอดขายรายวัน · แตะ/คลิกจุดเพื่อดูรายละเอียด · แถบสีอ่อน = สุดสัปดาห์"}</p>
+   316→              </div>
+   317→              <div className="chart-controls">{["7 วัน", "30 วัน", "12 เดือน"].map((item) => <button className={range === item ? "active" : ""} onClick={() => { setRange(item); setSelectedBar(0); }} key={item}>{item}</button>)}</div>
+   318→            </div>
+   319→            <div className="chart-interactive-meta">
+   320→              <span><i className="dot teal" /> ยอดขายสินค้า (บาท/วัน)</span>
+   321→              <span><i className="avg-dash" /> เส้นค่าเฉลี่ย</span>
+   322→              <b>{loading ? "กำลังโหลดข้อมูลจากระบบ…" : selected ? `${selected.label} · ยอดขาย ${money(selected.revenue)}` : "ยังไม่มีข้อมูล"}</b>
+   323→            </div>
+   324→            <div className="chart-wrap chart-wrap-line">
+   325→              {lineGeom ? <>
+   326→                <div className="y-labels">{chart.yLabels.map((label) => <span key={label}>{label}</span>)}</div>
+   327→                <div className="line-chart" role="img" aria-label={`กราฟยอดขาย ${chartData.length} จุด ช่วง${range} สูงสุด ${money(Math.max(...chartData.map((point) => point.revenue), 0))} ค่าเฉลี่ย ${money(chart.avg)}`}>
+   328→                  {rangeDays <= 60 && chartData.map((point, index) => {
+   329→                    const weekday = new Date(`${point.date}T00:00:00`).getDay();
+   330→                    return weekday === 0 || weekday === 6 ? <div key={`weekend-${index}`} className="weekend-band" aria-hidden="true" style={{ left: `${(index / chartData.length) * 100}%`, width: `${100 / chartData.length}%` }} /> : null;
+   331→                  })}
+   332→                  <svg viewBox={`0 0 ${lineGeom.width} ${lineGeom.height}`} preserveAspectRatio="none" aria-hidden="true">
+   333→                    <defs><linearGradient id="revenue-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="rgba(61,140,113,.32)" /><stop offset="100%" stopColor="rgba(61,140,113,0)" /></linearGradient></defs>
+   334→                    {[0.25, 0.5, 0.75, 1].map((ratio) => <line key={ratio} className="line-grid" x1="0" x2={lineGeom.width} y1={lineGeom.height * (1 - ratio)} y2={lineGeom.height * (1 - ratio)} />)}
+   335→                    <path className="line-area" d={lineGeom.areaPath} />
+   336→                    <path className="line-revenue" d={lineGeom.revenuePath} />
+   337→                    {lineGeom.avgY !== null && <line className="line-avg" x1="0" x2={lineGeom.width} y1={lineGeom.avgY} y2={lineGeom.avgY} />}
+   338→                    <line className="line-cursor" x1={lineGeom.selectedX} x2={lineGeom.selectedX} y1="0" y2={lineGeom.height} />
+   339→                  </svg>
+   340→                  {chartData.map((point, index) => {
+   341→                    if (chartData.length > 14 && index !== safeSelectedBar && index !== chart.maxIndex && index !== chart.lastIndex) return null;
+   342→                    const classes = ["chart-dot", chart.maxIndex === index && point.revenue > 0 ? "max" : "", chart.isTodayLast && index === chart.lastIndex ? "today" : "", safeSelectedBar === index ? "selected" : ""].filter(Boolean).join(" ");
+   343→                    return <div key={`dot-${index}`} className={classes} aria-hidden="true" style={{ left: `${((index + 0.5) / chartData.length) * 100}%`, top: `${lineGeom.yPercent(point.revenue)}%` }} />;
+   344→                  })}
+   345→                  {chartData.length <= 14 && chartData.map((point, index) => <div key={`value-${index}`} className="chart-value" aria-hidden="true" style={{ left: `${((index + 0.5) / chartData.length) * 100}%`, top: `${Math.max(lineGeom.yPercent(point.revenue), 16)}%` }}>{compactBaht(point.revenue)}</div>)}
+   346→                  {chartData.length > 14 && (chartData[chart.maxIndex]?.revenue ?? 0) > 0 && <div className="chart-tag max" aria-hidden="true" style={{ left: `clamp(52px, ${((chart.maxIndex + 0.5) / chartData.length) * 100}%, calc(100% - 52px))`, top: `${Math.min(lineGeom.yPercent(chartData[chart.maxIndex].revenue) + 5, 78)}%` }}>สูงสุด {compactBaht(chartData[chart.maxIndex].revenue)}</div>}
+   347→                  {chart.isTodayLast && <div className="chart-today-pill" aria-hidden="true">วันนี้ · ยังไม่ครบวัน</div>}
+   348→                  {chart.avg > 0 && <div className="chart-avg-chip" aria-hidden="true" style={{ top: `${Math.min(Math.max(lineGeom.yPercent(chart.avg), 8), 86)}%` }}>เฉลี่ย {compactBaht(chart.avg)}</div>}
+   349→                  {selected && <div className="chart-tooltip" style={{ left: `clamp(2px, calc(${((safeSelectedBar + 0.5) / chartData.length) * 100}% - 89px), calc(100% - 180px))`, top: ((safeSelectedBar + 0.5) / chartData.length) * 100 >= 80 ? 30 : 8 }}>
+   350→                    <small>{formatThaiDate(selected.date)}</small>
+   351→                    <b>{money(selected.revenue)}</b>
+   352→                    <div className="tt-row"><span>{rangeDays > 60 ? "เทียบเดือนก่อน" : "เทียบเมื่อวาน"}</span>{deltaChip(vsPrev, prevPoint ? "—" : "จุดแรกของช่วง")}</div>
+   353→                    <div className="tt-row"><span>เทียบค่าเฉลี่ย</span>{deltaChip(vsAvg, "—")}</div>
+   354→                    {selected.deposit > 0 && <div className="tt-row deposit"><span>{rangeDays > 60 ? "เติมเงินในเดือนนี้" : "เติมเงินวันนี้"}</span><em>{money(selected.deposit)}</em></div>}
+   355→                    {chart.isTodayLast && safeSelectedBar === chart.lastIndex && <div className="tt-today-note">วันนี้ · ยังไม่ครบวัน — ตัวเลขยังเพิ่มได้ตลอดวัน</div>}
+   356→                  </div>}
+   357→                  <div className="line-hits">{chartData.map((point, index) => <button type="button" key={`${point.label}-${index}`} className={safeSelectedBar === index ? "selected" : ""} style={{ left: `${(index / chartData.length) * 100}%`, width: `${100 / chartData.length}%` }} onClick={() => setSelectedBar(index)} title={`${point.label}: ยอดขาย ${money(point.revenue)}${point.deposit > 0 ? ` (เติมเงิน ${money(point.deposit)})` : ""}`} aria-label={`${point.label} ยอดขาย ${money(point.revenue)}`} />)}</div>
+   358→                </div>
+   359→                <div className="line-x-labels">{chartData.map((point, index) => <span key={`${point.label}-x-${index}`} className={safeSelectedBar === index || lineGeom.labelStep === 1 || index % lineGeom.labelStep === 0 ? `show${safeSelectedBar === index ? " picked" : ""}` : ""}>{point.label}</span>)}</div>
+   360→              </> : <div className="chart-empty-note">ยังไม่มีข้อมูลยอดขายในช่วงนี้</div>}
+   361→            </div>
+   362→            <div className="chart-summary">
+   363→              <div><span>ยอดขายรวมช่วงนี้</span><strong>{money(stats?.totalSales ?? 0)}</strong></div>
+   364→              <div><span>ค่าเฉลี่ยต่อวัน</span><strong>{money(stats?.avgDailySales ?? 0)}</strong></div>
+   365→              <div><span>จำนวนบิล</span><strong>{(stats?.totalOrders ?? 0).toLocaleString("th-TH")} <small>บิล</small></strong></div>
+   366→              <div><span className="summary-with-icon"><Wallet size={12} /> เติมเงินรวมช่วงนี้</span><strong>{money(chart.totalDeposit)}</strong></div>
+   367→            </div>
+   368→          </section>}
+   369→          {tab === "best" && <section className="panel best-seller-panel"><div className="panel-heading"><div><h2>สินค้าขายดี 10 อันดับ</h2><p>สรุปจากรายการขายจริงในช่วง{range} · กดรายการเพื่อเลือกข้อมูล</p></div><div className="chart-controls small">{["จำนวนขาย", "ยอดขาย"].map((item) => <button className={bestMode === item ? "active" : ""} onClick={() => { setBestMode(item); setSelectedProduct(0); }} key={item}>{item}</button>)}</div></div><div className="product-ranking-chart">{loading ? <div className="table-loading"><BarChart3 size={22} /><b>กำลังโหลดอันดับสินค้าขายดี</b><span>สรุปจากรายการขายจริงในช่วง{range}</span></div> : bestSellersRanked.length === 0 ? <div className="table-loading"><BarChart3 size={22} /><b>ยังไม่มีข้อมูลการขาย</b><span>เริ่มขายสินค้าผ่าน POS เพื่อดูอันดับ</span></div> : bestSellersRanked.map(({ name, qtyLabel, total, emoji, width, rank }, index) => <button className={`product-rank-row ${selectedProduct === index ? "selected" : ""}`} key={name} onClick={() => setSelectedProduct(index)}><span className={`rank rank-0${rank}`}>{`0${rank}`}</span><span className="product-thumb">{emoji}</span><span className="seller-name"><b>{name}</b><small>{qtyLabel}</small><i className="rank-progress"><em style={{ width: `${width}%` }} /></i></span><strong>{total}</strong><MoreHorizontal size={17} className="muted-icon" /></button>)}</div><div className="ranking-insight"><BarChart3 size={15} /><span>{bestSellersRanked[selectedProduct]?.name ?? "สินค้าขายดี"} ทำยอดสูงสุดในมุมมอง{bestMode === "ยอดขาย" ? "มูลค่า" : "จำนวน"} · คลิกแถวเพื่อเลือกข้อมูล</span></div></section>}
+   370→          {tab === "watch" && <div className="inventory-alert-grid"><section className="panel alert-panel stock-alert-panel"><div className="alert-heading"><div><span className="eyebrow">ควรติดตามวันนี้</span><h2>สินค้าใกล้หมดสต็อก</h2><p>ช่วยวางแผนสั่งซื้อให้เพียงพอต่อการใช้งาน</p></div><span className="alert-count red">{lowStock.length}</span></div><div className="alert-list">{loading ? <div className="table-loading"><PackageSearch size={22} /><b>กำลังโหลดข้อมูลสต็อก</b><span>ดึงข้อมูลจากฐานข้อมูลสวัสดิการ</span></div> : lowStock.length === 0 ? <div className="table-loading"><PackageSearch size={22} /><b>สต็อกเพียงพอทุกรายการ</b><span>ไม่มีสินค้าที่ต่ำกว่าจุดสั่งซื้อ</span></div> : lowStock.map((row) => <button className="alert-row" key={row.id} onClick={() => setView("stock")}><span className="alert-item-icon red-bg"><PackageSearch size={15} /></span><span><b>{row.name}</b><small>เหลือ {row.stock} {row.unit} · สั่งซื้อแนะนำ {row.reorderPoint * 2} {row.unit}</small></span><span className="alert-arrow">→</span></button>)}</div><button className="alert-footer-action" onClick={() => setView("stock")}>ดูรายการและวางแผนสั่งซื้อ <span>→</span></button></section><section className="panel alert-panel expiry-alert-panel"><div className="alert-heading"><div><span className="eyebrow">ภายใน 30 วัน</span><h2>สินค้าใกล้หมดอายุ</h2><p>ตรวจสอบ Lot เพื่อวางแผนจัดจำหน่าย</p></div><span className="alert-count amber">{expirySoon.length}</span></div><div className="alert-list">{loading ? <div className="table-loading"><CalendarDays size={22} /><b>กำลังโหลดข้อมูลวันหมดอายุ</b><span>ตรวจสอบ Lot ที่ใกล้หมดอายุ</span></div> : expirySoon.length === 0 ? <div className="table-loading"><CalendarDays size={22} /><b>ไม่มีสินค้าใกล้หมดอายุ</b><span>ภายใน 30 วันข้างหน้า</span></div> : expirySoon.map((row) => <button className="alert-row" key={row.id} onClick={() => setView("stock")}><span className="alert-item-icon amber-bg"><CalendarDays size={15} /></span><span><b>{row.name}</b><small>หมดอายุ {formatThaiDate(row.expiry)} · Lot {row.lot} · เหลือ {row.qty} {row.unit}</small></span><span className="alert-arrow">→</span></button>)}</div><button className="alert-footer-action amber-action-text" onClick={() => setView("stock")}>เปิดรายงานวันหมดอายุ <span>→</span></button></section></div>}
+   371→          {tab === "activity" && <section className="panel"><div className="panel-heading"><div><h2>กิจกรรมล่าสุดในระบบ</h2><p>ธุรกรรมและการเปลี่ยนแปลงที่บันทึกอัตโนมัติ</p></div><Activity size={19} className="muted-icon" /></div><div className="dash-activity-scroll">{loading ? <div className="table-loading"><Activity size={22} /><b>กำลังโหลดกิจกรรมล่าสุด</b><span>ดึงข้อมูลจากระบบ Log</span></div> : recentActivities.length === 0 ? <div className="table-loading"><Activity size={22} /><b>ยังไม่มีกิจกรรม</b><span>รายการจะแสดงเมื่อมีการทำธุรกรรม</span></div> : <table className="log-table compact" aria-label="รายการกิจกรรมล่าสุด"><thead><tr><th aria-label="ระดับกิจกรรม" /><th>เวลา</th><th>ผู้ทำรายการ</th><th>กิจกรรม</th><th>รายละเอียด</th></tr></thead><tbody>{recentActivities.map((log) => <tr key={log.id}><td className="log-tone-cell"><i className={`log-dot-mini tone-${log.tone ?? "green"}`} aria-hidden="true" /></td><td><small className="cell-mono">{formatTimeShort(log.createdAt)}</small></td><td><b>{log.actor}</b><small>{log.actorRole ?? ""}</small></td><td><b>{log.action}</b></td><td><span className="log-detail-text">{log.detail}</span></td></tr>)}</tbody></table>}</div>{isAdminRole(role) ? <button className="alert-footer-action" onClick={() => setView("logs")}>ดูกิจกรรมทั้งหมดในระบบ Log <span>→</span></button> : <div className="ranking-insight"><ShieldCheck size={15} /><span>ข้อมูลทุกธุรกรรมถูกบันทึกในระบบ Log อัตโนมัติ · ประวัติฉบับเต็มเปิดได้โดยผู้บริหาร</span></div>}</section>}
+   372→          {tab === "cutoff" && <CutoffWidget role={role} userName={userName} />}
+   373→        </div>
+   374→      </section>
+   375→    </>
+   376→  );
+   377→}
+   378→

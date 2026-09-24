@@ -22,7 +22,7 @@ import { getSession, type SessionUser } from "@/lib/auth";
 import LoginView from "@/components/auth/LoginView";
 import SetupView from "@/components/auth/SetupView";
 import ForceChangeView from "@/components/auth/ForceChangeView";
-import AppShell from "@/components/auth/AppShell";
+import AppShell from "@/components/AppShell";
 
 export const dynamic = "force-dynamic";
 

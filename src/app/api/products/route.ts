@@ -1,4 +1,3 @@
-import { NextRequest } from 'next/server'
 import { z } from 'zod'
 import { db } from '@/lib/db'
 import { withAuth } from '@/lib/api'
@@ -7,18 +6,30 @@ import { StoreError, ConflictError } from '@/lib/errors'
 
 const Query = z.object({
   includeInactive: z.coerce.boolean().optional(),
+  includeLots: z.coerce.boolean().optional(),
 })
 
 export const GET = withAuth(async (req) => {
   const url = new URL(req.url)
   const parsed = Query.safeParse({
     includeInactive: url.searchParams.get('includeInactive') ?? undefined,
+    includeLots: url.searchParams.get('includeLots') ?? undefined,
   })
   const includeInactive = parsed.success ? parsed.data.includeInactive === true : false
+  const includeLots = parsed.success ? parsed.data.includeLots === true : false
 
   const products = await db.product.findMany({
     where: includeInactive ? undefined : { active: true },
-    include: { category: true },
+    include: {
+      category: true,
+      ...(includeLots
+        ? {
+            lots: {
+              orderBy: [{ expiryDate: 'asc' }, { receivedAt: 'asc' }],
+            },
+          }
+        : {}),
+    },
     orderBy: [{ active: 'desc' }, { name: 'asc' }],
   })
   return { products }

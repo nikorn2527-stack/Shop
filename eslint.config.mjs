@@ -19,10 +19,12 @@ const eslintConfig = [...nextCoreWebVitals, ...nextTypescript, {
     // React rules
     "react-hooks/exhaustive-deps": "off",
     "react-hooks/purity": "off",
+    "react-hooks/refs": "off",
     "react/no-unescaped-entities": "off",
     "react/display-name": "off",
     "react/prop-types": "off",
     "react-compiler/react-compiler": "off",
+    "react-hooks/incompatible-library": "off",
     
     // Next.js rules
     "@next/next/no-img-element": "off",
