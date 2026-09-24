@@ -63,6 +63,7 @@ import {
 } from "@/lib/view-data";
 import { money } from "@/lib/format";
 import { GlobalSearch } from "@/components/shell/GlobalSearch";
+import { FloatingVersionBadge } from "@/components/shared/FloatingVersionBadge";
 
 // Lazy-load heavy page components to keep the initial bundle small.
 // This also reduces peak memory during dev compilation.
@@ -538,6 +539,7 @@ export default function AppShell({ user }: AppShellProps) {
             </div>
           </div>
         </footer>
+        <FloatingVersionBadge />
       </div>
 
       <GlobalSearch
@@ -705,13 +707,13 @@ function SidebarContent({
 
       {/* Sidebar footer */}
       <div className="border-t px-3 py-3 space-y-2">
-        <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
-          <span className="inline-flex items-center gap-1">
-            <span className="size-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
-            PNG Shop v1.0
+        <div className="flex items-center justify-between gap-2 text-[11px]">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 text-emerald-700 dark:text-emerald-300 font-medium ring-1 ring-emerald-600/30">
+            <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" aria-hidden="true" />
+            Next.js v1.0
           </span>
           {helpPhone ? (
-            <span className="truncate max-w-28" title={helpPhone}>{helpPhone}</span>
+            <span className="truncate max-w-28 text-muted-foreground" title={helpPhone}>{helpPhone}</span>
           ) : null}
         </div>
         <Button

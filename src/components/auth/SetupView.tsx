@@ -17,6 +17,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useRouter } from "next/navigation";
+import { FloatingVersionBadge } from "@/components/shared/FloatingVersionBadge";
 import { Eye, EyeOff, LogIn, ShoppingBag, Store } from "lucide-react";
 import { toast } from "sonner";
 
@@ -280,6 +281,7 @@ export default function SetupView() {
       <footer className="mt-6 text-center text-xs text-muted-foreground/80">
         PNG Shop · ระบบร้านค้าสวัสดิการ
       </footer>
+          <FloatingVersionBadge />
     </main>
   );
 }
