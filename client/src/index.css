@@ -5032,7 +5032,7 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 
 /* ═══ ROUND 75 (user) — ตั้งค่าเมนูลัดหน้าร้าน (POS) + หัวสลิปแบบไม่มีโลโก้ ═══ */
 .pos-rail-manage-list { display: flex; flex-direction: column; gap: 8px; }
-.pos-rail-manage-row { display: grid; grid-template-columns: 38px minmax(0, 1fr) 82px 40px; align-items: center; column-gap: 12px; padding: 10px 12px; border: 1px solid #e0e7e2; border-radius: 11px; background: #fbfdfc; transition: border-color .15s ease, background .15s ease; }
+.pos-rail-manage-row { display: grid; grid-template-columns: 38px minmax(0, 1fr) 82px 40px; align-items: center; min-height: 62px; column-gap: 12px; padding: 10px 12px; border: 1px solid #e0e7e2; border-radius: 11px; background: #fbfdfc; transition: border-color .15s ease, background .15s ease; }
 .pos-rail-manage-row:hover { border-color: #bfd8cd; }
 .pos-rail-manage-row.off { background: #fafaf7; border-style: dashed; }
 .pos-rail-manage-row.off > div > b { color: #8a9082; }
