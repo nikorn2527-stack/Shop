@@ -1,0 +1,2002 @@
+     1→import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
+     2→import { mkdirSync, statSync } from "node:fs";
+     3→import { createRequire } from "node:module";
+     4→import { dirname, resolve } from "node:path";
+     5→
+     6→// Store all business timestamps as Thai local wall time. The hosting runtime
+     7→// may run in UTC, while the shop UI and reports are intended for Thailand.
+     8→// Setting TZ before any Date helpers are evaluated keeps saved and displayed
+     9→// sales, stock, wallet, and audit-log times in the same timezone.
+    10→const STORE_TIME_ZONE = "Asia/Bangkok";
+    11→process.env.TZ = STORE_TIME_ZONE;
+    12→
+    13→const require = createRequire(import.meta.url);
+    14→const { DatabaseSync } = require("node:sqlite") as typeof import("node:sqlite");
+    15→
+    16→export type SqliteDb = InstanceType<typeof DatabaseSync>;
+    17→
+    18→/** Business-rule error carrying a Thai, user-facing message. tRPC maps it to BAD_REQUEST. */
+    19→export class StoreError extends Error {
+    20→  constructor(message: string) {
+    21→    super(message);
+    22→    this.name = "StoreError";
+    23→  }
+    24→}
+    25→
+    26→export type SqliteMember = {
+    27→  id: number;
+    28→  memberNumber: string;
+    29→  /** คำนำหน้าชื่อ (นาย/นาง/นางสาว/…) — null = ไม่มี */
+    30→  prename?: string | null;
+    31→  firstName: string;
+    32→  lastName: string;
+    33→  idCard: string | null;
+    34→  phone: string | null;
+    35→  type: string;
+    36→  balance: number;
+    37→  status: "active" | "suspended";
+    38→  createdAt: string;
+    39→  photoUrl: string | null;
+    40→  gender: string | null;
+    41→  /** วงเงินซื้อสินค้าต่อวัน (req 23.2) — null = ไม่จำกัด */
+    42→  creditLimit: number | null;
+    43→  /** ROUND 65 (user) — รหัสบัตรเงินสดของสมาชิก (เช่น 2395100201) · null = ยังไม่ผูกบัตร */
+    44→  cardNumber: string | null;
+    45→  /** ROUND 65 (user) — รหัสผู้ป่วย (HN) ที่ผูกกับบัตร · null = ไม่มี */
+    46→  patientCode: string | null;
+    47→};
+    48→
+    49→export type SqliteTransaction = {
+    50→  id: number;
+    51→  memberNumber: string;
+    52→  type: "purchase" | "deposit" | "withdrawal" | "activation" | "refund";
+    53→  detail: string;
+    54→  amount: number;
+    55→  paymentMethod: string | null;
+    56→  balanceAfter: number | null;
+    57→  createdAt: string;
+    58→  /** ROUND 63 — รายการนี้มีรูปหลักฐานแนบไหม (ตัวรูปดึงแยกที่ member.transactionSlip) */
+    59→  hasSlip?: number;
+    60→};
+    61→
+    62→export type SqliteMemberSummary = {
+    63→  id: number;
+    64→  memberNumber: string;
+    65→  /** คำนำหน้าชื่อ — null = ไม่มี */
+    66→  prename?: string | null;
+    67→  firstName: string;
+    68→  lastName: string;
+    69→  type: string;
+    70→  balance: number;
+    71→  status: "active" | "suspended";
+    72→  createdAt: string;
+    73→  lastTransactionAt: string | null;
+    74→  photoUrl: string | null;
+    75→  gender: string | null;
+    76→  /** วงเงินซื้อสินค้าต่อวัน — null = ไม่จำกัด */
+    77→  creditLimit: number | null;
+    78→  /** ROUND 65 — รหัสบัตรเงินสด / รหัสผู้ป่วย (แสดงในรายการและรายงานยอดเงินในบัตร) */
+    79→  cardNumber: string | null;
+    80→  patientCode: string | null;
+    81→};
+    82→
+    83→export type SqliteProduct = {
+    84→  id: number;
+    85→  sku: string;
+    86→  barcode: string | null;
+    87→  name: string;
+    88→  category: string;
+    89→  emoji: string | null;
+    90→  color: string | null;
+    91→  unit: string;
+    92→  price: number;
+    93→  size: string | null;
+    94→  imageUrl: string | null;
+    95→  /** สินค้าลัดหน้าร้าน — 1 = โชว์เป็นปุ่มลัดที่ POS (round 31-12) */
+    96→  quickPick: number;
+    97→  /** "unit" = ขายตามหน่วย · "money" = ขายเป็นเงิน เช่น น้ำแข็ง (ใช้ priceTiers) */
+    98→  sellMode: string | null;
+    99→  /** ตัวเลือกราคาสั้นๆ สำหรับ sellMode "money": JSON [{ label, price, qty }] */
+   100→  priceTiers: string | null;
+   101→  cost: number;
+   102→  stock: number;
+   103→  reorderPoint: number;
+   104→  active: number;
+   105→  createdAt: string;
+   106→};
+   107→
+   108→export type SqliteStockRow = {
+   109→  id: number;
+   110→  productId: number;
+   111→  sku: string;
+   112→  name: string;
+   113→  unit: string;
+   114→  lot: string;
+   115→  expiry: string | null;
+   116→  qty: number;
+   117→  cost: number;
+   118→  price: number;
+   119→  stock: number;
+   120→  reorderPoint: number;
+   121→  receivedAt: string | null;
+   122→  active: number;
+   123→  status: "ปกติ" | "สต็อกต่ำ" | "ใกล้หมดอายุ" | "ปิดการขาย";
+   124→  tone: "green" | "red" | "amber" | "purple";
+   125→};
+   126→
+   127→export type SqliteSale = {
+   128→  id: number;
+   129→  orderNumber: string;
+   130→  paymentMethod: string;
+   131→  memberNumber: string | null;
+   132→  subtotal: number;
+   133→  discount: number;
+   134→  total: number;
+   135→  cashier: string | null;
+   136→  createdAt: string;
+   137→};
+   138→
+   139→export type SqliteSaleItem = {
+   140→  id: number;
+   141→  saleId: number;
+   142→  productId: number | null;
+   143→  name: string;
+   144→  qty: number;
+   145→  price: number;
+   146→  cost: number;
+   147→};
+   148→
+   149→export type SqliteAuditLog = {
+   150→  id: number;
+   151→  action: string;
+   152→  actor: string;
+   153→  actorRole: string | null;
+   154→  detail: string;
+   155→  tone: string;
+   156→  createdAt: string;
+   157→};
+   158→
+   159→export type CheckoutReceipt = {
+   160→  orderNumber: string;
+   161→  createdAt: string;
+   162→  items: { productId: number | null; name: string; unit: string; qty: number; price: number; amount: number }[];
+   163→  subtotal: number;
+   164→  discount: number;
+   165→  total: number;
+   166→  paymentMethod: string;
+   167→  memberNumber: string | null;
+   168→  memberName: string | null;
+   169→  balanceAfter: number | null;
+   170→  cashier: string | null;
+   171→};
+   172→
+   173→/** A past receipt rebuilt from the sales/sale_items tables — balanceAfter is replayed from the member ledger when that bill was a wallet purchase. */
+   174→export type SaleHistoryEntry = CheckoutReceipt & {
+   175→  /** รหัสแถวในตาราง sales — ใช้ดึงหลักฐานแนบ (sales.slip) รอบหลัง */
+   176→  id: number;
+   177→  /** ROUND 63 — บิลนี้มีรูปหลักฐานการชำระแนบอยู่ไหม (ตัวรูปดึงแยกที่ sales.slip เพื่อไม่ให้ลิสต์หนัก) */
+   178→  hasSlip: boolean;
+   179→};
+   180→
+   181→export type DailySalesRow = {
+   182→  date: string;
+   183→  orders: number;
+   184→  items: number;
+   185→  revenue: number;
+   186→  cogs: number;
+   187→  profit: number;
+   188→};
+   189→
+   190→export type DashboardStats = {
+   191→  rangeDays: number;
+   192→  totalSales: number;
+   193→  totalOrders: number;
+   194→  itemsSold: number;
+   195→  bestSellerCount: number;
+   196→  avgDailySales: number;
+   197→  revenueByDay: { date: string; total: number }[];
+   198→  bestSellers: { name: string; qty: number; revenue: number }[];
+   199→  lowStock: { id: number; sku: string; name: string; unit: string; stock: number; reorderPoint: number }[];
+   200→  expirySoon: { id: number; productId: number; sku: string; name: string; unit: string; lot: string; expiry: string; qty: number }[];
+   201→  recentActivities: SqliteAuditLog[];
+   202→  memberWalletTotal: number;
+   203→  memberCount: { total: number; active: number; suspended: number };
+   204→};
+   205→
+   206→export type StoreSettings = {
+   207→  memberNumberMode: "running" | "year" | "manual";
+   208→  memberNumberPrefix: string;
+   209→  memberNumberYearMode: "none" | "buddhist" | "gregorian";
+   210→  memberNumberYearDigits: 2 | 4;
+   211→  memberNumberSeparator: "-" | "/" | "_" | "";
+   212→  memberNumberResetMonth: number;
+   213→  memberNumberSequenceDigits: number;
+   214→  storeName: string;
+   215→  storeCode: string;
+   216→  storeAddress: string;
+   217→  /** Round 25 — ปรับแต่งแอป: ชื่อที่แสดงบน sidebar/login/title */
+   218→  appName: string;
+   219→  /** data-URL รูปโลโก้ (สูงสุด ~512KB) — ว่าง = ใช้อักษรย่อ */
+   220→  appLogo: string;
+   221→  /** สีธีมหลัก: preset id เช่น "emerald" หรือ hex "#007a55" */
+   222→  appTheme: string;
+   223→  /** ROUND 75 (user) — หน้าแจ้งผลหลังชำระเงิน ไม่เด้งไปหน้าสั่งพิมพ์อีกต่อไป:
+   224→   *  แสดงหน้าใบเสร็จพร้อมปุ่ม พิมพ์/บันทึกรูป/ดาวน์โหลด PDF ให้ผู้ใช้กดเอง —
+   225→   *  ตัวตั้ง autoPrintReceipt เดิมถูกลบออก (พฤติกรรม window.print() อัตโนมัติ)
+   226→   *  · เพิ่ม posRailHidden: ปุ่มรางซ้าย POS ที่ปิดใช้งาน (JSON array ของ key) */
+   227→  posRailHidden: string;
+   228→  posShortcutKeys: string;
+   229→  showBalanceOnReceipt: boolean;
+   230→  lowBalanceAlert: boolean;
+   231→  lowBalanceThreshold: number;
+   232→  lowStockAlert: boolean;
+   233→  expiryAlert: boolean;
+   234→  expiryAlertDays: number;
+   235→  /** Round 31 — รอบตัดยอดประจำวัน: auto = ระบบตัดตามเวลาที่กำหนด · manual = เจ้าหน้าที่กดตัดยอดเอง */
+   236→  dailyCutOffMode: "auto" | "manual";
+   237→  /** "HH:MM" เวลาตัดยอดของรอบอัตโนมัติ (เช่น "02:00" = รอบวันวิ่ง 02:00→02:00 ของวันถัดไป) */
+   238→  dailyCutOffTime: string;
+   239→  /** ROUND 36 (ข้อ 31) — ประตูบัญชีผู้พัฒนา (dev): ปิดอยู่ (false) = บัญชี dev เข้าสู่ระบบไม่ได้ทั้งหมด */
+   240→  devAccess: boolean;
+   241→  /** ROUND 38 (ข้อ 39) — สไตล์การแสดงผลของแอป: "shop" (ค่าเริ่มต้น) | "apple" | "microsoft" | "android" */
+   242→  appStyle: string;
+   243→  /** ROUND 38 (ข้อ 39) — สำรองข้อมูลอัตโนมัติ: เปิด/ปิดตัวตรวจตามรอบเวลาของเซิร์ฟเวอร์ */
+   244→  backupAutoEnabled: boolean;
+   245→  /** ROUND 38 (ข้อ 39) — รอบสำรองข้อมูลอัตโนมัติเป็นชั่วโมง (1-168) */
+   246→  backupIntervalHours: number;
+   247→  /** ROUND 38 (ข้อ 39) — จำนวนไฟล์สำรองที่เก็บสูงสุด (3-60) — เกินจากนี้ลบไฟล์เก่าสุด */
+   248→  backupKeepCount: number;
+   249→  /** ROUND 42 (ข้อ 32 ตอนที่ 3 — ข้อ 4) — ความกว้างกระดาษสลิปเครื่องพิมพ์: "58" (สลิปเล็ก) | "72" (มาตรฐานเดิม) | "80" (สลิปใหญ่) */
+   250→  receiptPaperWidth: "58" | "72" | "80";
+   251→  /** ROUND 56 (user) — เช็คลิสต์วันขึ้นระบบ (โซนเครื่องมือติดตั้ง): JSON array ของ id ที่ติ๊กแล้ว
+   252→   *  เก็บฝั่งเซิร์ฟเวอร์ให้ทุกเครื่องเห็นตรงกัน · "" = ยังไม่ได้ติ๊กอะไร */
+   253→  goliveChecks: string;
+   254→  /** ROUND 61 (user) — ระบบเวอร์ชัน 3 แบบ (ทั่วไป/โปร/โปรพลัส): รหัสลิขสิทธิ์ที่ใส่แล้ว ("" = ยังไม่มี) ·
+   255→   *  เปลี่ยนผ่าน edition.applyLicense เท่านั้น (settings.set กลั่น fields เหล่านี้ทิ้งเสมอ) */
+   256→  licenseKey: string;
+   257→  /** ชื่อผู้ถือลิขสิทธิ์ที่พิมพ์ตอนใช้รหัส — แสดงบนหน้าเวอร์ชันและโซนช่าง */
+   258→  licenseName: string;
+   259→  /** วันเริ่มทดลองใช้โปรพลัส 30 วัน "YYYY-MM-DD" · "" = ยังไม่เคยทดลอง · ตั้งผ่าน edition.startTrial เท่านั้น */
+   260→  trialStart: string;
+   261→  /** ROUND 63 (user) — บัญชีพร้อมเพย์ของร้าน (เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก)
+   262→   *  ใช้สร้าง QR ให้ลูกค้าสแกนจ่ายที่หน้ายืนยันการชำระเงิน · "" = ยังไม่ตั้ง (ไม่แสดง QR) */
+   263→  promptpayId: string;
+   264→  /** ROUND 68 (user) — เบอร์โทรศูนย์ช่วยเหลือของร้าน แสดงท้ายหน้าจอทุกหน้า
+   265→   *  (แถบ footer) · "" = ไม่แสดง (เดิมเคยเป็นข้อความล็อก 02-XXX-XXXX แก้ไม่ได้) */
+   266→  helpPhone: string;
+   267→};
+   268→
+   269→/**
+   270→ * Lightweight SQLite adapter for local feature testing.
+   271→ * Uses Node 22's built-in node:sqlite, so a cloned project needs no native binary build.
+   272→ * Production auth/runtime remains on the template's configured database.
+   273→ */
+   274→export function createSqliteStore(filename = ":memory:"): SqliteDb {
+   275→  const db = new DatabaseSync(filename);
+   276→  db.exec(`
+   277→    PRAGMA foreign_keys = ON;
+   278→    CREATE TABLE IF NOT EXISTS members (
+   279→      id INTEGER PRIMARY KEY AUTOINCREMENT,
+   280→      member_number TEXT NOT NULL UNIQUE,
+   281→      first_name TEXT NOT NULL,
+   282→      last_name TEXT NOT NULL,
+   283→      id_card TEXT,
+   284→      phone TEXT,
+   285→      type TEXT NOT NULL DEFAULT 'สมาชิก',
+   286→      balance REAL NOT NULL DEFAULT 0,
+   287→      status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended')),
+   288→      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+   289→    );
+   290→    -- ROUND 65 (user): type เพิ่ม 'activation' (เปิดใช้บัตร = ลงทะเบียนพร้อมเงินเริ่มต้น)
+   291→    -- และ 'refund' (คืนบัตรเงินสด = ผู้ป่วยคืนบัตร ร้านจ่ายเงินคืนตามยอดคงเหลือ)
+   292→    CREATE TABLE IF NOT EXISTS member_transactions (
+   293→      id INTEGER PRIMARY KEY AUTOINCREMENT,
+   294→      member_number TEXT NOT NULL,
+   295→      type TEXT NOT NULL CHECK (type IN ('purchase', 'deposit', 'withdrawal', 'activation', 'refund')),
+   296→      detail TEXT NOT NULL,
+   297→      amount REAL NOT NULL,
+   298→      payment_method TEXT,
+   299→      balance_after REAL,
+   300→      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   301→      FOREIGN KEY (member_number) REFERENCES members(member_number)
+   302→    );
+   303→    CREATE TABLE IF NOT EXISTS store_settings (
+   304→      key TEXT PRIMARY KEY,
+   305→      value TEXT NOT NULL
+   306→    );
+   307→    CREATE TABLE IF NOT EXISTS products (
+   308→      id INTEGER PRIMARY KEY AUTOINCREMENT,
+   309→      sku TEXT NOT NULL UNIQUE,
+   310→      barcode TEXT,
+   311→      name TEXT NOT NULL,
+   312→      category TEXT NOT NULL DEFAULT 'ของใช้',
+   313→      emoji TEXT,
+   314→      color TEXT,
+   315→      unit TEXT NOT NULL DEFAULT 'ชิ้น',
+   316→      price REAL NOT NULL,
+   317→      cost REAL NOT NULL DEFAULT 0,
+   318→      stock INTEGER NOT NULL DEFAULT 0,
+   319→      reorder_point INTEGER NOT NULL DEFAULT 10,
+   320→      active INTEGER NOT NULL DEFAULT 1,
+   321→      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+   322→    );
+   323→    CREATE TABLE IF NOT EXISTS stock_lots (
+   324→      id INTEGER PRIMARY KEY AUTOINCREMENT,
+   325→      product_id INTEGER NOT NULL REFERENCES products(id),
+   326→      lot TEXT NOT NULL,
+   327→      expiry_date TEXT,
+   328→      qty INTEGER NOT NULL,
+   329→      cost REAL NOT NULL DEFAULT 0,
+   330→      received_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+   331→    );
+   332→    CREATE TABLE IF NOT EXISTS sales (
+   333→      id INTEGER PRIMARY KEY AUTOINCREMENT,
+   334→      order_number TEXT NOT NULL UNIQUE,
+   335→      payment_method TEXT NOT NULL,
+   336→      member_number TEXT REFERENCES members(member_number),
+   337→      subtotal REAL NOT NULL,
+   338→      discount REAL NOT NULL DEFAULT 0,
+   339→      total REAL NOT NULL,
+   340→      cashier TEXT,
+   341→      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+   342→    );
+   343→    CREATE TABLE IF NOT EXISTS sale_items (
+   344→      id INTEGER PRIMARY KEY AUTOINCREMENT,
+   345→      sale_id INTEGER NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
+   346→      product_id INTEGER,
+   347→      name TEXT NOT NULL,
+   348→      qty INTEGER NOT NULL,
+   349→      price REAL NOT NULL,
+   350→      cost REAL NOT NULL DEFAULT 0
+   351→    );
+   352→    CREATE TABLE IF NOT EXISTS day_closures (
+   353→      id INTEGER PRIMARY KEY AUTOINCREMENT,
+   354→      period_start TEXT NOT NULL,
+   355→      closed_at TEXT NOT NULL,
+   356→      bills INTEGER NOT NULL DEFAULT 0,
+   357→      pieces INTEGER NOT NULL DEFAULT 0,
+   358→      revenue REAL NOT NULL DEFAULT 0,
+   359→      cash_total REAL NOT NULL DEFAULT 0,
+   360→      qr_total REAL NOT NULL DEFAULT 0,
+   361→      wallet_total REAL NOT NULL DEFAULT 0,
+   362→      deposits REAL NOT NULL DEFAULT 0,
+   363→      withdrawals REAL NOT NULL DEFAULT 0,
+   364→      closed_by TEXT,
+   365→      note TEXT
+   366→    );
+   367→    CREATE TABLE IF NOT EXISTS audit_logs (
+   368→      id INTEGER PRIMARY KEY AUTOINCREMENT,
+   369→      action TEXT NOT NULL,
+   370→      actor TEXT NOT NULL,
+   371→      actor_role TEXT,
+   372→      detail TEXT,
+   373→      tone TEXT NOT NULL DEFAULT 'blue',
+   374→      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+   375→    );
+   376→    CREATE TABLE IF NOT EXISTS app_users (
+   377→      id INTEGER PRIMARY KEY AUTOINCREMENT,
+   378→      username TEXT NOT NULL UNIQUE,
+   379→      password_hash TEXT NOT NULL,
+   380→      display_name TEXT NOT NULL,
+   381→      role TEXT NOT NULL DEFAULT 'staff',
+   382→      active INTEGER NOT NULL DEFAULT 1,
+   383→      created_at TEXT NOT NULL
+   384→    );
+   385→    CREATE TABLE IF NOT EXISTS app_sessions (
+   386→      id TEXT PRIMARY KEY,
+   387→      user_id INTEGER NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+   388→      expires_at TEXT NOT NULL,
+   389→      created_at TEXT NOT NULL
+   390→    );
+   391→    CREATE TABLE IF NOT EXISTS order_list_items (
+   392→      id INTEGER PRIMARY KEY AUTOINCREMENT,
+   393→      product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+   394→      qty REAL NOT NULL DEFAULT 1,
+   395→      note TEXT,
+   396→      created_by TEXT,
+   397→      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+   398→    );
+   399→    CREATE TABLE IF NOT EXISTS limit_requests (
+   400→      id INTEGER PRIMARY KEY AUTOINCREMENT,
+   401→      member_number TEXT NOT NULL,
+   402→      current_limit REAL,
+   403→      requested_limit REAL NOT NULL,
+   404→      reason TEXT,
+   405→      status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
+   406→      requested_by TEXT NOT NULL,
+   407→      decided_by TEXT,
+   408→      decided_at TEXT,
+   409→      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   410→      FOREIGN KEY (member_number) REFERENCES members(member_number)
+   411→    );
+   412→  `);
+   413→  ensureColumn(db, "members", "phone", "TEXT");
+   414→  ensureColumn(db, "members", "type", "TEXT NOT NULL DEFAULT 'สมาชิก'");
+   415→  ensureColumn(db, "member_transactions", "balance_after", "REAL");
+   416→  ensureColumn(db, "audit_logs", "actor_role", "TEXT");
+   417→  ensureColumn(db, "sale_items", "unit", "TEXT");
+   418→  ensureColumn(db, "app_users", "failed_attempts", "INTEGER NOT NULL DEFAULT 0");
+   419→  // ROUND 36 (ข้อ 31) — บังคับเปลี่ยนรหัสผ่านครั้งแรก: 1 = บัญชีใหม่/รหัสที่ผู้บริหารตั้งให้ ต้องเปลี่ยนก่อนใช้งาน
+   420→  ensureColumn(db, "app_users", "must_change_password", "INTEGER NOT NULL DEFAULT 0");
+   421→  ensureColumn(db, "products", "size", "TEXT");
+   422→  ensureColumn(db, "products", "image_url", "TEXT");
+   423→  ensureColumn(db, "products", "quick_pick", "INTEGER NOT NULL DEFAULT 0");
+   424→  ensureColumn(db, "products", "sell_mode", "TEXT");
+   425→  ensureColumn(db, "products", "price_tiers", "TEXT");
+   426→  ensureColumn(db, "members", "photo_url", "TEXT");
+   427→  ensureColumn(db, "members", "gender", "TEXT");
+   428→  // Round 43 — คำนำหน้าชื่อสมาชิก (นาย/นาง/นางสาว/ด.ช./... ) NULL = ไม่มี
+   429→  ensureColumn(db, "members", "prename", "TEXT");
+   430→  // Req 23.2 — วงเงินซื้อสินค้าต่อวันของสมาชิก (NULL = ไม่จำกัด)
+   431→  ensureColumn(db, "members", "credit_limit", "REAL");
+   432→  ensureColumn(db, "member_transactions", "actor", "TEXT");
+   433→  // Backfill the new actor column from audit_logs (round 30): every wallet /
+   434→  // purchase transaction was logged with the same timestamp as its
+   435→  // member_transactions row, so an exact created_at match recovers the staff
+   436→  // member who did it. Idempotent — only rows still missing actor are touched.
+   437→  db.prepare(`UPDATE member_transactions SET actor = (
+   438→    SELECT a.actor FROM audit_logs a
+   439→    WHERE a.action = 'ขายสินค้า' AND a.created_at = member_transactions.created_at
+   440→      AND a.detail LIKE 'บิล #' || substr(member_transactions.detail, 6, instr(member_transactions.detail || ' ·', ' ·') - 6) || ' ·%'
+   441→    ORDER BY a.id DESC LIMIT 1
+   442→  ) WHERE actor IS NULL AND type = 'purchase' AND detail LIKE 'บิล #%'`).run();
+   443→  db.prepare(`UPDATE member_transactions SET actor = (
+   444→    SELECT a.actor FROM audit_logs a
+   445→    WHERE a.action IN ('เติมเงินสมาชิก', 'ถอนเงินสมาชิก')
+   446→      AND a.created_at = member_transactions.created_at
+   447→      AND a.detail LIKE member_transactions.member_number || ' ·%'
+   448→    ORDER BY a.id DESC LIMIT 1
+   449→  ) WHERE actor IS NULL AND type IN ('deposit', 'withdrawal')`).run();
+   450→  ensureColumn(db, "app_users", "locked_until", "TEXT");
+   451→  // ROUND 63 (user) — หลักฐานการชำระเงิน: รูปสลิปที่แนบมากับบิลขาย (QR/สแกน) และ
+   452→  // รายการเติม/ถอนเงินสมาชิก เก็บเป็น data-URL JPEG (ย่อ ~800px ฝั่ง client ก่อนส่ง)
+   453→  ensureColumn(db, "sales", "slip_url", "TEXT");
+   454→  ensureColumn(db, "member_transactions", "slip_url", "TEXT");
+   455→  // ROUND 65 (user) — รหัสบัตรเงินสด (23951…) และรหัสผู้ป่วย (HN) ของสมาชิกร้านค้าสวัสดิการ
+   456→  ensureColumn(db, "members", "card_number", "TEXT");
+   457→  ensureColumn(db, "members", "patient_code", "TEXT");
+   458→  // ROUND 65 (user) — DB เดิมสร้าง member_transactions ด้วย CHECK 3 ชนิดเดิม →
+   459→  // ขยายเป็น 5 ชนิด (เพิ่ม activation/refund) ด้วยการสร้างตารางใหม่แล้วคัดลอกข้อมูล
+   460→  upgradeMemberTransactionsTypes(db);
+   461→  // ROUND 65 (user) — จำนวนที่ "รับเข้าจริง" ของแต่ละ Lot (qty ปัจจุบันโดนหักตอนขาย
+   462→  // ไปแล้ว) ใช้คำนวณยอดยกมาของรายงานสินค้าคงคลังให้ตรงชีทโรงพยาบาล
+   463→  ensureColumn(db, "stock_lots", "received_qty", "INTEGER");
+   464→  db.prepare("UPDATE stock_lots SET received_qty = qty WHERE received_qty IS NULL").run();
+   465→  // Backfill units for sale_items rows written before the column existed (idempotent).
+   466→  db.prepare("UPDATE sale_items SET unit = (SELECT p.unit FROM products p WHERE p.id = sale_items.product_id) WHERE unit IS NULL").run();
+   467→  return db;
+   468→}
+   469→
+   470→/** Migration-safe column add for databases created before a column existed. */
+   471→function ensureColumn(db: SqliteDb, table: string, column: string, definition: string) {
+   472→  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as unknown as { name: string }[];
+   473→  if (!columns.some((entry) => entry.name === column)) {
+   474→    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+   475→  }
+   476→}
+   477→
+   478→/**
+   479→ * ROUND 65 (user) — ขยายชนิดธุรกรรมสมาชิกจาก 3 เป็น 5 ชนิด (เพิ่ม 'activation' เปิดใช้บัตร
+   480→ * และ 'refund' คืนบัตรเงินสด) ให้กับฐานข้อมูลที่สร้างตารางไว้ก่อนหน้า — SQLite
+   481→ * แก้ CHECK ไม่ได้โดยตรง จึงสร้างตารางใหม่→คัดลอก→สลับชื่อ (idempotent: ถ้าเจอ
+   482→ * 'activation' ในคำนิยามเดิมแล้วถือว่าย้ายเสร็จ ข้ามทันที)
+   483→ */
+   484→function upgradeMemberTransactionsTypes(db: SqliteDb) {
+   485→  const row = db.prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'member_transactions'`).get() as { sql: string } | undefined;
+   486→  if (!row?.sql || row.sql.includes("'activation'")) return;
+   487→  db.exec(`
+   488→    CREATE TABLE member_transactions_new (
+   489→      id INTEGER PRIMARY KEY AUTOINCREMENT,
+   490→      member_number TEXT NOT NULL,
+   491→      type TEXT NOT NULL CHECK (type IN ('purchase', 'deposit', 'withdrawal', 'activation', 'refund')),
+   492→      detail TEXT NOT NULL,
+   493→      amount REAL NOT NULL,
+   494→      payment_method TEXT,
+   495→      balance_after REAL,
+   496→      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   497→      FOREIGN KEY (member_number) REFERENCES members(member_number)
+   498→    );
+   499→  `);
+   500→  db.exec(`
+   501→    INSERT INTO member_transactions_new (id, member_number, type, detail, amount, payment_method, balance_after, created_at)
+   502→      SELECT id, member_number, type, detail, amount, payment_method, balance_after, created_at FROM member_transactions;
+   503→    DROP TABLE member_transactions;
+   504→    ALTER TABLE member_transactions_new RENAME TO member_transactions;
+   505→  `);
+   506→  // คอลัมน์เสริมที่เคยเพิ่มด้วย ensureColumn ในรอบก่อนต้องกลับมาให้ครบหลังสลับตาราง
+   507→  ensureColumn(db, "member_transactions", "balance_after", "REAL");
+   508→  ensureColumn(db, "member_transactions", "actor", "TEXT");
+   509→  ensureColumn(db, "member_transactions", "slip_url", "TEXT");
+   510→}
+   511→
+   512→export function seedSqliteDemoData(db: SqliteDb) {
+   513→  // ROUND 36 (ข้อ 31) — ไม่ seed บัญชีผู้ใช้แล้ว: ฐานข้อมูลใหม่ต้องลงทะเบียน
+   514→  // ผู้บริหารหลักผ่าน SetupView ก่อน (setupInitialAdmin) เพื่อบังคับเปลี่ยนรหัสผ่าน
+   515→  const insertMember = db.prepare(`INSERT OR IGNORE INTO members (member_number, first_name, last_name, id_card, balance, status) VALUES (?, ?, ?, ?, ?, ?)`);
+   516→  insertMember.run("M-000218", "อรทัย", "ส.", null, 1240, "active");
+   517→  insertMember.run("M-000092", "พิมพ์ชนก", "ร.", null, 0, "suspended");
+   518→  const insertTransaction = db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, created_at) VALUES (?, ?, ?, ?, ?, ?)`);
+   519→  insertTransaction.run("M-000218", "purchase", "บิล #INV-260917-038 · น้ำดื่ม 2 ขวด, ข้าวกล่อง 1 กล่อง", -59, "member_balance", "2026-09-17 14:38:00");
+   520→  insertTransaction.run("M-000218", "deposit", "ผู้ฝาก: น.ส.กัญญาณัฐ พ.", 500, "cash", "2026-09-17 14:32:00");
+   521→  insertTransaction.run("M-000218", "withdrawal", "ถอนเพื่อถอนฟัน", -200, "cash", "2026-09-12 10:16:00");
+   522→  insertTransaction.run("M-000092", "withdrawal", "ถอนเพื่อถอนฟัน · แนบหลักฐานแล้ว", -200, "cash", "2026-09-16 09:12:00");
+   523→}
+   524→
+   525→export function getMemberDetail(db: SqliteDb, memberNumber: string, transactionLimit = 50) {
+   526→  const member = db.prepare(`SELECT id, member_number as memberNumber, prename, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, credit_limit as creditLimit, card_number as cardNumber, patient_code as patientCode FROM members WHERE member_number = ?`).get(memberNumber) as SqliteMember | undefined;
+   527→  if (!member) return undefined;
+   528→  const transactions = db.prepare(`SELECT id, member_number as memberNumber, type, detail, amount, payment_method as paymentMethod, balance_after as balanceAfter, created_at as createdAt, slip_url IS NOT NULL AS hasSlip FROM member_transactions WHERE member_number = ? ORDER BY created_at DESC, id DESC LIMIT ?`).all(memberNumber, transactionLimit) as unknown as SqliteTransaction[];
+   529→  return { member, transactions };
+   530→}
+   531→
+   532→/** ROUND 63 (user) — ดึงรูปหลักฐานของรายการเติม/ถอนเงินสมาชิก ตามรหัสแถว member_transactions */
+   533→export function getTransactionSlip(db: SqliteDb, id: number): { slipUrl: string | null } {
+   534→  const row = db.prepare(`SELECT slip_url AS slipUrl FROM member_transactions WHERE id = ?`).get(id) as { slipUrl: string | null } | undefined;
+   535→  if (!row) throw new StoreError("ไม่พบรายการธุรกรรมนี้ในระบบ");
+   536→  return { slipUrl: row.slipUrl };
+   537→}
+   538→
+   539→export function setMemberNumberMode(db: SqliteDb, mode: "running" | "year" | "manual") {
+   540→  db.prepare(`INSERT INTO store_settings (key, value) VALUES ('member_number_mode', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(mode);
+   541→}
+   542→
+   543→export function getMemberNumberMode(db: SqliteDb) {
+   544→  const row = db.prepare(`SELECT value FROM store_settings WHERE key = 'member_number_mode'`).get() as { value: "running" | "year" | "manual" } | undefined;
+   545→  return row?.value ?? "running";
+   546→}
+   547→
+   548→function memberNumberSettings(db: SqliteDb) {
+   549→  const settings = getSettings(db);
+   550→  return {
+   551→    // An empty prefix is intentional: it enables formats such as 69-00001
+   552→    // or 6900001 instead of silently restoring the historical "M" prefix.
+   553→    prefix: settings.memberNumberPrefix.trim().replace(/[^A-Za-z0-9ก-๙._-]/g, "").slice(0, 20),
+   554→    yearMode: settings.memberNumberYearMode,
+   555→    yearDigits: settings.memberNumberYearDigits === 4 ? 4 : 2,
+   556→    separator: settings.memberNumberSeparator === "" || settings.memberNumberSeparator === "/" || settings.memberNumberSeparator === "_" ? settings.memberNumberSeparator : "-",
+   557→    resetMonth: Math.min(12, Math.max(1, Math.floor(settings.memberNumberResetMonth || 1))),
+   558→    sequenceDigits: Math.min(10, Math.max(1, Math.floor(settings.memberNumberSequenceDigits || 6))),
+   559→  };
+   560→}
+   561→
+   562→export function suspendMember(db: SqliteDb, memberNumber: string) {
+   563→  const result = db.prepare(`UPDATE members SET status = 'suspended' WHERE member_number = ?`).run(memberNumber);
+   564→  return result.changes > 0;
+   565→}
+   566→
+   567→// ---------------------------------------------------------------------------
+   568→// Welfare store domain: products, stock, POS checkout, members, wallet,
+   569→// reports, settings and audit logs. All user-facing errors are Thai.
+   570→// ---------------------------------------------------------------------------
+   571→
+   572→const PAYMENT_METHODS = ["เงินสด", "QR / สแกน", "หักบัญชีสมาชิก"] as const;
+   573→const WALLET_PAYMENT = "หักบัญชีสมาชิก";
+   574→
+   575→const pad2 = (value: number) => String(value).padStart(2, "0");
+   576→
+   577→// ROUND 40 (ข้อ 32) — export ให้ importTool.ts ใช้ร่วมกัน (ตัวเล็ก ไร้ผลข้างเนียง)
+   578→export function round2(value: number) {
+   579→  return Math.round((value + Number.EPSILON) * 100) / 100;
+   580→}
+   581→
+   582→export function formatDateTime(date = new Date()) {
+   583→  return `${formatDate(date)} ${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
+   584→}
+   585→
+   586→function formatDate(date = new Date()) {
+   587→  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+   588→}
+   589→
+   590→function addDays(date: Date, days: number) {
+   591→  const next = new Date(date);
+   592→  next.setDate(next.getDate() + days);
+   593→  return next;
+   594→}
+   595→
+   596→function startOfToday() {
+   597→  const today = new Date();
+   598→  today.setHours(0, 0, 0, 0);
+   599→  return today;
+   600→}
+   601→
+   602→/** ฿-formatted money for log details, e.g. "฿1,240.00" */
+   603→export function money(value: number) {
+   604→  return `฿${value.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+   605→}
+   606→
+   607→export function runInTransaction<T>(db: SqliteDb, fn: () => T): T {
+   608→  db.exec("BEGIN");
+   609→  try {
+   610→    const result = fn();
+   611→    db.exec("COMMIT");
+   612→    return result;
+   613→  } catch (error) {
+   614→    db.exec("ROLLBACK");
+   615→    throw error;
+   616→  }
+   617→}
+   618→
+   619→function countRows(db: SqliteDb, table: string) {
+   620→  const row = db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number };
+   621→  return row.count;
+   622→}
+   623→
+   624→/** Audit trail entry. Called from every mutation. */
+   625→export function logAction(
+   626→  db: SqliteDb,
+   627→  action: string,
+   628→  actor: string,
+   629→  detail: string,
+   630→  tone = "blue",
+   631→  actorRole: string | null = null,
+   632→  createdAt: string = formatDateTime(),
+   633→): SqliteAuditLog {
+   634→  const result = db.prepare(`INSERT INTO audit_logs (action, actor, actor_role, detail, tone, created_at) VALUES (?, ?, ?, ?, ?, ?)`).run(action, actor, actorRole, detail, tone, createdAt);
+   635→  return { id: Number(result.lastInsertRowid), action, actor, actorRole, detail, tone, createdAt };
+   636→}
+   637→
+   638→export function listAuditLogs(db: SqliteDb, limit = 200): SqliteAuditLog[] {
+   639→  const capped = Math.max(1, Math.min(1000, Math.floor(limit)));
+   640→  return db.prepare(`SELECT id, action, actor, actor_role AS actorRole, detail, tone, created_at AS createdAt FROM audit_logs ORDER BY created_at DESC, id DESC LIMIT ?`).all(capped) as unknown as SqliteAuditLog[];
+   641→}
+   642→
+   643→// --- products & stock -------------------------------------------------------
+   644→
+   645→export function listProducts(db: SqliteDb, includeInactive = false): SqliteProduct[] {
+   646→  if (includeInactive) {
+   647→    return db.prepare(`SELECT id, sku, barcode, name, category, emoji, color, size, image_url AS imageUrl, quick_pick AS quickPick, sell_mode AS sellMode, price_tiers AS priceTiers, unit, price, cost, stock, reorder_point AS reorderPoint, active, created_at AS createdAt FROM products ORDER BY active DESC, id`).all() as unknown as SqliteProduct[];
+   648→  }
+   649→  return db.prepare(`SELECT id, sku, barcode, name, category, emoji, color, size, image_url AS imageUrl, quick_pick AS quickPick, sell_mode AS sellMode, price_tiers AS priceTiers, unit, price, cost, stock, reorder_point AS reorderPoint, active, created_at AS createdAt FROM products WHERE active = 1 ORDER BY id`).all() as unknown as SqliteProduct[];
+   650→}
+   651→
+   652→function getProductById(db: SqliteDb, productId: number): SqliteProduct | undefined {
+   653→  return db.prepare(`SELECT id, sku, barcode, name, category, emoji, color, size, image_url AS imageUrl, quick_pick AS quickPick, sell_mode AS sellMode, price_tiers AS priceTiers, unit, price, cost, stock, reorder_point AS reorderPoint, active, created_at AS createdAt FROM products WHERE id = ?`).get(productId) as SqliteProduct | undefined;
+   654→}
+   655→
+   656→export type CreateProductInput = {
+   657→  name: string;
+   658→  sku?: string;
+   659→  barcode?: string;
+   660→  size?: string;
+   661→  imageUrl?: string | null;
+   662→  /** 1 = สินค้าลัดหน้าร้าน (boolean ก็รับแล้วแปลงเป็น 0/1) */
+   663→  quickPick?: number | boolean | null;
+   664→  /** "unit" (default) | "money" — ขายเป็นเงินใช้ priceTiers */
+   665→  sellMode?: "unit" | "money" | null;
+   666→  /** JSON [{ label, price, qty }] สำหรับ sellMode "money" */
+   667→  priceTiers?: string | null;
+   668→  unit?: string;
+   669→  price: number;
+   670→  cost?: number;
+   671→  stock?: number;
+   672→  reorderPoint?: number;
+   673→  category?: string;
+   674→  emoji?: string;
+   675→  color?: string;
+   676→  actor?: string;
+   677→  actorRole?: string;
+   678→};
+   679→
+   680→// ROUND 71 — รหัสสินค้าอัตโนมัติแยกตามหมวด (ตามชุดข้อมูลจริง 120 รายการ):
+   681→// เครื่องดื่ม=DRK · ของใช้ส่วนตัว=HYG · ขนม=SNK · อาหาร=FD · ของใช้ในครัวเรือน=HH · เครื่องเขียน=ST
+   682→// ("ของใช้" คือหมวดเดโมรุ่นเก่า — ให้ HYG เหมือนเดิม) — ชุดเดียวกันใช้ที่ scripts/seed-data-products.ts
+   683→// และ IMPORT_SKU_PREFIXES ใน server/importTool.ts เพื่อให้ import XLSX ออกรหัสชุดเดียวกัน
+   684→const CATEGORY_SKU_PREFIXES: Record<string, string> = {
+   685→  "เครื่องดื่ม": "DRK",
+   686→  "อาหาร": "FD",
+   687→  "ของใช้": "HYG",
+   688→  "ของใช้ส่วนตัว": "HYG",
+   689→  "ของใช้ในครัวเรือน": "HH",
+   690→  "ขนม": "SNK",
+   691→  "เครื่องเขียน": "ST",
+   692→};
+   693→
+   694→function generateSku(db: SqliteDb, category: string) {
+   695→  const prefix = CATEGORY_SKU_PREFIXES[category] ?? "GEN";
+   696→  const rows = db.prepare(`SELECT sku FROM products WHERE sku LIKE ?`).all(`${prefix}-%`) as unknown as { sku: string }[];
+   697→  const used = new Set(rows.map((row) => row.sku));
+   698→  let sequence = rows.length + 1;
+   699→  while (used.has(`${prefix}-${String(sequence).padStart(3, "0")}`)) sequence += 1;
+   700→  return `${prefix}-${String(sequence).padStart(3, "0")}`;
+   701→}
+   702→
+   703→/** Error thrown when a sell-by-money product carries bad price-tiers JSON. */
+   704→const PRICE_TIERS_ERROR = "รูปแบบราคาสั้นๆ (price tiers) ไม่ถูกต้อง";
+   705→
+   706→/** 0/1 coercion for quickPick — accepts boolean or 0/1 from any caller. */
+   707→const toQuickPickFlag = (value: number | boolean | null | undefined) => (value === 1 || value === true ? 1 : 0);
+   708→
+   709→/**
+   710→ * Guard for sell-by-money products (round 31-12): priceTiers must be valid
+   711→ * JSON — a non-empty array of { label: string, price: number > 0, qty: number > 0 }.
+   712→ */
+   713→function assertValidPriceTiers(raw: string | null): void {
+   714→  let parsed: unknown;
+   715→  try {
+   716→    parsed = JSON.parse(raw ?? "");
+   717→  } catch {
+   718→    throw new StoreError(PRICE_TIERS_ERROR);
+   719→  }
+   720→  if (!Array.isArray(parsed) || parsed.length === 0) throw new StoreError(PRICE_TIERS_ERROR);
+   721→  for (const tier of parsed) {
+   722→    if (typeof tier !== "object" || tier === null || Array.isArray(tier)) throw new StoreError(PRICE_TIERS_ERROR);
+   723→    const { label, price, qty } = tier as { label?: unknown; price?: unknown; qty?: unknown };
+   724→    if (
+   725→      typeof label !== "string" ||
+   726→      !label.trim() ||
+   727→      typeof price !== "number" ||
+   728→      !Number.isFinite(price) ||
+   729→      price <= 0 ||
+   730→      typeof qty !== "number" ||
+   731→      !Number.isFinite(qty) ||
+   732→      qty <= 0
+   733→    ) {
+   734→      throw new StoreError(PRICE_TIERS_ERROR);
+   735→    }
+   736→  }
+   737→}
+   738→
+   739→export function createProduct(db: SqliteDb, input: CreateProductInput): SqliteProduct {
+   740→  const name = input.name?.trim();
+   741→  if (!name) throw new StoreError("กรุณาระบุชื่อสินค้า");
+   742→  // ROUND 54 (user) — อนุญาตราคา ฿0 = "ยังไม่ได้ตั้งราคา" (สินค้านำเข้า 120 รายการยังไม่มีราคา
+   743→  // ต้องแก้ชื่อ/ขนาด/หน่วยได้ก่อน โดยยังไม่ต้องใส่ราคา) — ห้ามติดลบเท่านั้น
+   744→  if (!(input.price >= 0)) throw new StoreError("ราคาขายต้องเป็นตัวเลข 0 ขึ้นไป");
+   745→  if (input.stock !== undefined && (!Number.isInteger(input.stock) || input.stock < 0)) throw new StoreError("จำนวนสต็อกเริ่มต้นไม่ถูกต้อง");
+   746→  const sellMode = input.sellMode ?? "unit";
+   747→  const quickPick = toQuickPickFlag(input.quickPick);
+   748→  const priceTiers = input.priceTiers?.trim() || null;
+   749→  if (sellMode === "money") assertValidPriceTiers(priceTiers);
+   750→  const sku = input.sku?.trim() || generateSku(db, input.category ?? "ของใช้");
+   751→  if (db.prepare(`SELECT id FROM products WHERE sku = ?`).get(sku)) {
+   752→    throw new StoreError(`รหัสสินค้า ${sku} ถูกใช้แล้ว กรุณาระบุรหัสอื่น`);
+   753→  }
+   754→  const result = db.prepare(`INSERT INTO products (sku, barcode, name, category, emoji, color, size, image_url, unit, price, cost, stock, reorder_point, quick_pick, sell_mode, price_tiers, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`).run(
+   755→    sku,
+   756→    input.barcode?.trim() || null,
+   757→    name,
+   758→    input.category?.trim() || "ของใช้",
+   759→    input.emoji ?? null,
+   760→    input.color ?? null,
+   761→    input.size?.trim() || null,
+   762→    input.imageUrl || null,
+   763→    input.unit?.trim() || "ชิ้น",
+   764→    round2(input.price),
+   765→    round2(input.cost ?? 0),
+   766→    input.stock ?? 0,
+   767→    input.reorderPoint ?? 10,
+   768→    quickPick,
+   769→    sellMode,
+   770→    priceTiers,
+   771→  );
+   772→  logAction(db, "เพิ่มสินค้า", input.actor?.trim() || "ระบบ", `${name} (${sku})`, "green", input.actorRole ?? null);
+   773→  return getProductById(db, Number(result.lastInsertRowid))!;
+   774→}
+   775→
+   776→/**
+   777→ * ROUND 77 (user) — รับเข้าสินค้า "ต้นทุนต่างกันแต่ละรอบ" ได้:
+   778→ * สินค้าชนิดเดียวกัน รอบละราคาไม่เท่ากัน (เช่น รอบนี้ 10 ห่อ @฿200 แถมอีก 2 ห่อ)
+   779→ * ต้นทุนที่ fix คงที่ใช้ไม่ได้ → ระบบเก็บเป็น "ต้นทุนถัวเฉลี่ย" (weighted average):
+   780→ * ผสมมูลค่าของเดิมในคลังกับทุกบรรทัดที่รับเข้ารอบนี้ บรรทัดแถม (ต้นทุน ฿0) จะดึง
+   781→ * ค่าเฉลี่ยลงให้เอง — รายงานกำไรจึงถูกต้องตามของจริงเสมอ
+   782→ */
+   783→export type ReceiveStockLine = { qty: number; cost?: number };
+   784→
+   785→export type ReceiveStockLotRow = { id: number; productId: number; lot: string; expiry: string | null; qty: number; cost: number; receivedAt: string };
+   786→
+   787→export type ReceiveStockResult = {
+   788→  /** ทุกบรรทัดที่รับเข้ารอบนี้ (แต่ละบรรทัด = 1 stock_lot ใช้ Lot เดียวกัน) */
+   789→  lots: ReceiveStockLotRow[];
+   790→  /** บรรทัดแรก — ผู้เรียกแบบเดิม (บรรทัดเดียว) ยังอ่านได้ตามรูปเก่า */
+   791→  lot: ReceiveStockLotRow;
+   792→  product: SqliteProduct;
+   793→  /** ต้นทุนถัวเฉลี่ยใหม่ที่เก็บในสินค้า (ของเดิมในคลัง + ทุกบรรทัดรอบนี้) */
+   794→  averageCost: number;
+   795→  /** ต้นทุนเฉลี่ยก่อนรับเข้ารอบนี้ */
+   796→  previousCost: number;
+   797→};
+   798→
+   799→export function receiveStockLines(
+   800→  db: SqliteDb,
+   801→  input: { productId: number; lot?: string; expiryDate?: string | null; lines: (ReceiveStockLine | null | undefined)[] | null | undefined; actor?: string; actorRole?: string },
+   802→): ReceiveStockResult {
+   803→  const lines = (input.lines ?? []).filter((line): line is ReceiveStockLine => line != null);
+   804→  if (lines.length === 0) throw new StoreError("กรุณาระบุจำนวนที่รับเข้าอย่างน้อย 1 บรรทัด");
+   805→  for (const line of lines) {
+   806→    if (!Number.isInteger(line.qty) || line.qty <= 0) throw new StoreError("จำนวนต้องมากกว่า 0");
+   807→    if (line.cost !== undefined && !(line.cost >= 0)) throw new StoreError("ต้นทุนต่อหน่วยต้องเป็นตัวเลข 0 ขึ้นไป");
+   808→  }
+   809→  const product = getProductById(db, input.productId);
+   810→  if (!product || !product.active) throw new StoreError(`ไม่พบสินค้ารหัส ${input.productId} ในระบบ`);
+   811→  const parsed = lines.map((line) => ({ qty: line.qty, cost: line.cost === undefined ? undefined : round2(line.cost) }));
+   812→  const totalQty = parsed.reduce((sum, line) => sum + line.qty, 0);
+   813→  const previousCost = product.cost;
+   814→  // บรรทัดที่ไม่ใส่ต้นทุน = ใช้ต้นทุนเฉลี่ยปัจจุบันของสินค้า (พฤติกรรมเดิม)
+   815→  const lineValue = parsed.reduce((sum, line) => sum + line.qty * (line.cost ?? previousCost), 0);
+   816→  const oldQty = Math.max(0, Math.trunc(product.stock));
+   817→  const averageCost = round2((oldQty * previousCost + lineValue) / (oldQty + totalQty));
+   818→  const lotLabel = input.lot?.trim() || `LOT-${formatDate()}`;
+   819→  const createdAt = formatDateTime();
+   820→  return runInTransaction(db, () => {
+   821→    const insert = db.prepare(`INSERT INTO stock_lots (product_id, lot, expiry_date, qty, cost, received_at, received_qty) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+   822→    const lots = parsed.map((line) => {
+   823→      const result = insert.run(input.productId, lotLabel, input.expiryDate || null, line.qty, line.cost ?? previousCost, createdAt, line.qty);
+   824→      return { id: Number(result.lastInsertRowid), productId: input.productId, lot: lotLabel, expiry: input.expiryDate || null, qty: line.qty, cost: line.cost ?? previousCost, receivedAt: createdAt };
+   825→    });
+   826→    db.prepare(`UPDATE products SET stock = stock + ?, cost = ? WHERE id = ?`).run(totalQty, averageCost, input.productId);
+   827→    // Log: บรรทัดเดียวไม่ใส่ต้นทุน = ข้อความเดิม · มีต้นทุน/หลายบรรทัด = สรุปทุกบรรทัด + ต้นทุนเฉลี่ยใหม่
+   828→    const anyCost = parsed.some((line) => line.cost !== undefined);
+   829→    const lineSummary = anyCost ? ` · ${parsed.map((line) => `${line.qty}×${money(line.cost ?? previousCost)}${line.cost === 0 ? " แถม" : ""}`).join(" + ")}` : "";
+   830→    const avgSummary = anyCost ? ` · ต้นทุนเฉลี่ย ${money(averageCost)} (เดิม ${money(previousCost)})` : "";
+   831→    logAction(db, "รับเข้าสินค้า", input.actor?.trim() || "ระบบ", `${product.name} · Lot ${lotLabel} · +${totalQty} ${product.unit}${lineSummary}${avgSummary}`, "green", input.actorRole ?? null, createdAt);
+   832→    return { lots, lot: lots[0], product: getProductById(db, input.productId)!, averageCost, previousCost };
+   833→  });
+   834→}
+   835→
+   836→export function receiveStock(
+   837→  db: SqliteDb,
+   838→  productId: number,
+   839→  lot: string,
+   840→  expiryDate: string | null,
+   841→  qty: number,
+   842→  cost?: number,
+   843→  actor?: string,
+   844→  actorRole?: string,
+   845→) {
+   846→  const result = receiveStockLines(db, { productId, lot, expiryDate, lines: [{ qty, cost }], actor, actorRole });
+   847→  // รูปเอาต์พุตเดิม { lot, product } + เผื่อ averageCost ไว้ให้ผู้เรียกรุ่นใหม่
+   848→  return { lot: result.lot, product: result.product, averageCost: result.averageCost };
+   849→}
+   850→
+   851→export function listStockRows(db: SqliteDb): SqliteStockRow[] {
+   852→  const rows = db.prepare(`SELECT l.id, p.id AS productId, p.sku, p.name, p.unit, l.lot, l.expiry_date AS expiry, l.qty, l.cost, p.price, p.stock, p.reorder_point AS reorderPoint, l.received_at AS receivedAt, p.active AS active FROM stock_lots l JOIN products p ON p.id = l.product_id ORDER BY p.sku, l.id`).all() as unknown as (Omit<SqliteStockRow, "status" | "tone">)[];
+   853→  const today = startOfToday();
+   854→  return rows.map((row) => {
+   855→    let status: SqliteStockRow["status"] = "ปกติ";
+   856→    let tone: SqliteStockRow["tone"] = "green";
+   857→    if (!row.active) {
+   858→      status = "ปิดการขาย";
+   859→      tone = "purple";
+   860→    } else if (row.stock <= row.reorderPoint) {
+   861→      status = "สต็อกต่ำ";
+   862→      tone = "red";
+   863→    } else if (row.expiry) {
+   864→      const daysLeft = Math.floor((Date.parse(`${row.expiry}T00:00:00`) - today.getTime()) / 86400000);
+   865→      if (daysLeft <= 30) {
+   866→        status = "ใกล้หมดอายุ";
+   867→        tone = "amber";
+   868→      }
+   869→    }
+   870→    return { ...row, status, tone };
+   871→  });
+   872→}
+   873→
+   874→export type StockCountInput = {
+   875→  productId: number;
+   876→  countedQty: number;
+   877→  note?: string;
+   878→  actor?: string;
+   879→  actorRole?: string;
+   880→};
+   881→
+   882→/** Reconciles the authoritative products.stock with a physical count. */
+   883→export function stockCount(db: SqliteDb, input: StockCountInput) {
+   884→  if (!Number.isInteger(input.countedQty) || input.countedQty < 0) throw new StoreError("จำนวนที่นับได้ต้องเป็น 0 ขึ้นไป");
+   885→  const product = getProductById(db, input.productId);
+   886→  if (!product || !product.active) throw new StoreError(`ไม่พบสินค้ารหัส ${input.productId} ในระบบ`);
+   887→  const diff = input.countedQty - product.stock;
+   888→  const note = input.note?.trim();
+   889→  const detail =
+   890→    (diff === 0
+   891→      ? `${product.name} · ตรงตามระบบ ${input.countedQty} ${product.unit}`
+   892→      : `${product.name} · ระบบ ${product.stock} → นับได้ ${input.countedQty} ${product.unit} (${diff})`) + (note ? ` · ${note}` : "");
+   893→  const tone = diff < 0 ? "red" : diff > 0 ? "green" : "blue";
+   894→  runInTransaction(db, () => {
+   895→    db.prepare(`UPDATE products SET stock = ? WHERE id = ?`).run(input.countedQty, input.productId);
+   896→    logAction(db, "นับสต็อก", input.actor?.trim() || "เจ้าหน้าที่ร้านค้า", detail, tone, input.actorRole ?? null, formatDateTime());
+   897→  });
+   898→  return {
+   899→    productId: product.id,
+   900→    sku: product.sku,
+   901→    name: product.name,
+   902→    unit: product.unit,
+   903→    systemQty: product.stock,
+   904→    countedQty: input.countedQty,
+   905→    diff,
+   906→    product: getProductById(db, input.productId)!,
+   907→  };
+   908→}
+   909→
+   910→export type LotCountEntry = { lotId: number; countedQty: number };
+   911→
+   912→export type StockCountLotsInput = {
+   913→  counts: LotCountEntry[];
+   914→  note?: string;
+   915→  actor?: string;
+   916→  actorRole?: string;
+   917→};
+   918→
+   919→export type StockCountLotResult = {
+   920→  lotId: number;
+   921→  lot: string;
+   922→  expiry: string | null;
+   923→  systemQty: number;
+   924→  countedQty: number;
+   925→  diff: number;
+   926→};
+   927→
+   928→export type StockCountLotsResult = {
+   929→  productId: number;
+   930→  sku: string;
+   931→  name: string;
+   932→  unit: string;
+   933→  systemQty: number;
+   934→  countedQty: number;
+   935→  diff: number;
+   936→  lots: StockCountLotResult[];
+   937→};
+   938→
+   939→/**
+   940→ * Reconciles physical counts PER LOT: each listed lot's qty is set to its
+   941→ * counted value, then the product's sellable stock is recomputed as the SUM
+   942→ * of all its lots (lots not listed keep their current qty). One audit entry
+   943→ * per product records every lot old→new plus the product total.
+   944→ */
+   945→export function stockCountLots(db: SqliteDb, input: StockCountLotsInput): StockCountLotsResult {
+   946→  if (!Array.isArray(input.counts) || input.counts.length === 0) {
+   947→    throw new StoreError("กรุณาระบุจำนวนที่นับได้อย่างน้อย 1 Lot");
+   948→  }
+   949→  const seen = new Set<number>();
+   950→  for (const entry of input.counts) {
+   951→    if (!Number.isInteger(entry.lotId)) throw new StoreError("รหัส Lot ไม่ถูกต้อง");
+   952→    if (!Number.isInteger(entry.countedQty) || entry.countedQty < 0) {
+   953→      throw new StoreError("จำนวนที่นับได้ต้องเป็น 0 ขึ้นไป");
+   954→    }
+   955→    if (seen.has(entry.lotId)) throw new StoreError("พบ Lot ซ้ำในรายการนับ กรุณาตรวจสอบอีกครั้ง");
+   956→    seen.add(entry.lotId);
+   957→  }
+   958→
+   959→  const lotSelect = `SELECT l.id, l.lot, l.expiry_date AS expiry, l.qty, p.id AS productId, p.sku, p.name, p.unit, p.stock, p.active FROM stock_lots l JOIN products p ON p.id = l.product_id`;
+   960→  const lots = input.counts.map((entry) => {
+   961→    const lot = db.prepare(`${lotSelect} WHERE l.id = ?`).get(entry.lotId) as
+   962→      | { id: number; lot: string; expiry: string | null; qty: number; productId: number; sku: string; name: string; unit: string; stock: number; active: number }
+   963→      | undefined;
+   964→    if (!lot) throw new StoreError(`ไม่พบ Lot รหัส ${entry.lotId} ในระบบ`);
+   965→    return { lot, countedQty: entry.countedQty };
+   966→  });
+   967→
+   968→  // A single count session covers exactly one product (the UI enforces it;
+   969→  // the server double-checks so mixed submissions can never corrupt stock).
+   970→  const productIds = new Set(lots.map((item) => item.lot.productId));
+   971→  if (productIds.size !== 1) {
+   972→    throw new StoreError("การนับแยกตาม Lot ทำได้ครั้งละ 1 สินค้า");
+   973→  }
+   974→  const head = lots[0]!.lot;
+   975→  if (!head.active) throw new StoreError(`ไม่พบสินค้ารหัส ${head.productId} ในระบบ`);
+   976→
+   977→  const note = input.note?.trim();
+   978→  return runInTransaction(db, () => {
+   979→    const results: StockCountLotResult[] = [];
+   980→    for (const { lot, countedQty } of lots) {
+   981→      db.prepare(`UPDATE stock_lots SET qty = ? WHERE id = ?`).run(countedQty, lot.id);
+   982→      results.push({ lotId: lot.id, lot: lot.lot, expiry: lot.expiry, systemQty: lot.qty, countedQty, diff: countedQty - lot.qty });
+   983→    }
+   984→    // Recompute sellable stock from every lot of this product.
+   985→    const { total } = db.prepare(`SELECT COALESCE(SUM(qty), 0) AS total FROM stock_lots WHERE product_id = ?`).get(head.productId) as { total: number };
+   986→    db.prepare(`UPDATE products SET stock = ? WHERE id = ?`).run(total, head.productId);
+   987→
+   988→    const lotBreakdown = results
+   989→      .map((result) => `${result.lot}: ${result.systemQty} → ${result.countedQty}${result.diff !== 0 ? ` (${result.diff > 0 ? "+" : ""}${result.diff})` : ""}`)
+   990→      .join(" · ");
+   991→    const detail = `${head.name} · รวม ${head.stock} → ${total} ${head.unit} (${total - head.stock}) · ${lotBreakdown}` + (note ? ` · ${note}` : "");
+   992→    const tone = total < head.stock ? "red" : total > head.stock ? "green" : "blue";
+   993→    logAction(db, "นับสต็อก (แยกล็อต)", input.actor?.trim() || "เจ้าหน้าที่ร้านค้า", detail, tone, input.actorRole ?? null, formatDateTime());
+   994→
+   995→    return {
+   996→      productId: head.productId,
+   997→      sku: head.sku,
+   998→      name: head.name,
+   999→      unit: head.unit,
+  1000→      systemQty: head.stock,
+  1001→      countedQty: total,
+  1002→      diff: total - head.stock,
+  1003→      lots: results,
+  1004→    };
+  1005→  });
+  1006→}
+  1007→
+  1008→// --- order list (รายการสั่งซื้อ — round 32-15) --------------------------------
+  1009→
+  1010→export type SqliteOrderItem = {
+  1011→  id: number;
+  1012→  productId: number;
+  1013→  sku: string;
+  1014→  name: string;
+  1015→  unit: string;
+  1016→  category: string;
+  1017→  cost: number;
+  1018→  stock: number;
+  1019→  reorderPoint: number;
+  1020→  qty: number;
+  1021→  note: string | null;
+  1022→  createdBy: string | null;
+  1023→  createdAt: string;
+  1024→};
+  1025→
+  1026→const ORDER_ITEM_SELECT = `SELECT o.id, o.qty, o.note, o.created_by AS createdBy, o.created_at AS createdAt, p.id AS productId, p.sku, p.name, p.unit, p.category, p.cost, p.stock, p.reorder_point AS reorderPoint FROM order_list_items o JOIN products p ON p.id = o.product_id`;
+  1027→
+  1028→export function listOrderItems(db: SqliteDb): SqliteOrderItem[] {
+  1029→  return db.prepare(`${ORDER_ITEM_SELECT} ORDER BY o.id ASC`).all() as SqliteOrderItem[];
+  1030→}
+  1031→
+  1032→export type OrderAddInput = {
+  1033→  productId: number;
+  1034→  qty?: number;
+  1035→  note?: string;
+  1036→  actor?: string;
+  1037→  actorRole?: string;
+  1038→};
+  1039→
+  1040→/** Adds (or merges +qty when the product is already on the list) an order row. */
+  1041→export function addOrderItem(db: SqliteDb, input: OrderAddInput): SqliteOrderItem[] {
+  1042→  const qty = input.qty === undefined ? 1 : input.qty;
+  1043→  if (!Number.isFinite(qty) || qty <= 0) throw new StoreError("จำนวนที่จะสั่งซื้อต้องมากกว่า 0");
+  1044→  const product = getProductById(db, input.productId);
+  1045→  if (!product) throw new StoreError(`ไม่พบสินค้ารหัส ${input.productId} ในระบบ`);
+  1046→  const actor = input.actor?.trim() || "เจ้าหน้าที่ร้านค้า";
+  1047→  runInTransaction(db, () => {
+  1048→    const existing = db.prepare(`SELECT id, qty FROM order_list_items WHERE product_id = ?`).get(input.productId) as { id: number; qty: number } | undefined;
+  1049→    const note = input.note?.trim() || null;
+  1050→    if (existing) {
+  1051→      db.prepare(`UPDATE order_list_items SET qty = ?, note = COALESCE(?, note) WHERE id = ?`).run(existing.qty + qty, note, existing.id);
+  1052→    } else {
+  1053→      db.prepare(`INSERT INTO order_list_items (product_id, qty, note, created_by) VALUES (?, ?, ?, ?)`).run(input.productId, qty, note, actor);
+  1054→    }
+  1055→    logAction(db, "ขอสั่งซื้อสินค้า", actor, `${product.name} · ${qty} ${product.unit} · คงเหลือ ${product.stock} ${product.unit}`, "amber", input.actorRole ?? null, formatDateTime());
+  1056→  });
+  1057→  return listOrderItems(db);
+  1058→}
+  1059→
+  1060→export type OrderUpdateInput = {
+  1061→  id: number;
+  1062→  qty?: number;
+  1063→  note?: string | null;
+  1064→  actor?: string;
+  1065→  actorRole?: string;
+  1066→};
+  1067→
+  1068→export function updateOrderItem(db: SqliteDb, input: OrderUpdateInput): SqliteOrderItem[] {
+  1069→  const existing = db.prepare(`${ORDER_ITEM_SELECT} WHERE o.id = ?`).get(input.id) as SqliteOrderItem | undefined;
+  1070→  if (!existing) throw new StoreError("ไม่พบรายการสั่งซื้อนี้ในระบบ (อาจถูกลบไปแล้ว)");
+  1071→  if (input.qty !== undefined && (!Number.isFinite(input.qty) || input.qty <= 0)) throw new StoreError("จำนวนที่จะสั่งซื้อต้องมากกว่า 0");
+  1072→  const actor = input.actor?.trim() || "เจ้าหน้าที่ร้านค้า";
+  1073→  runInTransaction(db, () => {
+  1074→    db.prepare(`UPDATE order_list_items SET qty = ?, note = ? WHERE id = ?`).run(
+  1075→      input.qty ?? existing.qty,
+  1076→      input.note === undefined ? existing.note : input.note,
+  1077→      input.id,
+  1078→    );
+  1079→    logAction(db, "แก้ไขรายการสั่งซื้อ", actor, `${existing.name} · ${input.qty ?? existing.qty} ${existing.unit}`, "blue", input.actorRole ?? null, formatDateTime());
+  1080→  });
+  1081→  return listOrderItems(db);
+  1082→}
+  1083→
+  1084→export function removeOrderItem(db: SqliteDb, input: { id: number; actor?: string; actorRole?: string }): SqliteOrderItem[] {
+  1085→  const existing = db.prepare(`${ORDER_ITEM_SELECT} WHERE o.id = ?`).get(input.id) as SqliteOrderItem | undefined;
+  1086→  if (!existing) return listOrderItems(db);
+  1087→  const actor = input.actor?.trim() || "เจ้าหน้าที่ร้านค้า";
+  1088→  runInTransaction(db, () => {
+  1089→    db.prepare(`DELETE FROM order_list_items WHERE id = ?`).run(input.id);
+  1090→    logAction(db, "ถอดออกจากรายการสั่งซื้อ", actor, `${existing.name} · ${existing.qty} ${existing.unit}`, "purple", input.actorRole ?? null, formatDateTime());
+  1091→  });
+  1092→  return listOrderItems(db);
+  1093→}
+  1094→
+  1095→/** Clears the whole list — used after the order has been placed/received. */
+  1096→export function clearOrderList(db: SqliteDb, input: { actor?: string; actorRole?: string }): SqliteOrderItem[] {
+  1097→  const items = listOrderItems(db);
+  1098→  if (items.length === 0) return items;
+  1099→  const actor = input.actor?.trim() || "เจ้าหน้าที่ร้านค้า";
+  1100→  runInTransaction(db, () => {
+  1101→    db.prepare(`DELETE FROM order_list_items`).run();
+  1102→    logAction(db, "ล้างรายการสั่งซื้อ", actor, `ล้าง ${items.length} รายการ (สั่งซื้อ/ตรวจสอบแล้ว)`, "green", input.actorRole ?? null, formatDateTime());
+  1103→  });
+  1104→  return listOrderItems(db);
+  1105→}
+  1106→
+  1107→export type UpdateProductInput = {
+  1108→  productId: number;
+  1109→  name?: string;
+  1110→  barcode?: string | null;
+  1111→  size?: string | null;
+  1112→  imageUrl?: string | null;
+  1113→  /** 1 = สินค้าลัดหน้าร้าน (boolean ก็รับแล้วแปลงเป็น 0/1) */
+  1114→  quickPick?: number | boolean | null;
+  1115→  /** "unit" (default) | "money" — ขายเป็นเงินใช้ priceTiers */
+  1116→  sellMode?: "unit" | "money" | null;
+  1117→  /** JSON [{ label, price, qty }] สำหรับ sellMode "money" */
+  1118→  priceTiers?: string | null;
+  1119→  unit?: string;
+  1120→  price?: number;
+  1121→  cost?: number;
+  1122→  reorderPoint?: number;
+  1123→  category?: string;
+  1124→  emoji?: string;
+  1125→  actor?: string;
+  1126→  actorRole?: string;
+  1127→};
+  1128→
+  1129→/** Updates only the provided product fields. Undefined keeps the current value; only fields whose value actually changed are written/logged. */
+  1130→export function updateProduct(db: SqliteDb, input: UpdateProductInput): SqliteProduct {
+  1131→  const product = getProductById(db, input.productId);
+  1132→  if (!product) throw new StoreError(`ไม่พบสินค้ารหัส ${input.productId} ในระบบ`);
+  1133→  if (input.name !== undefined && !input.name.trim()) throw new StoreError("กรุณาระบุชื่อสินค้า");
+  1134→  if (input.unit !== undefined && !input.unit.trim()) throw new StoreError("กรุณาระบุหน่วยสินค้า");
+  1135→  if (input.price !== undefined && !(input.price >= 0)) throw new StoreError("ราคาขายต้องเป็นตัวเลข 0 ขึ้นไป");
+  1136→  if (input.cost !== undefined && input.cost < 0) throw new StoreError("ต้นทุนต้องเป็น 0 ขึ้นไป");
+  1137→  if (input.reorderPoint !== undefined && (!Number.isInteger(input.reorderPoint) || input.reorderPoint < 0)) throw new StoreError("จุดสั่งซื้อต้องเป็นจำนวนเต็ม 0 ขึ้นไป");
+  1138→
+  1139→  // Resolved values for the new round-31-12 fields: undefined keeps the stored
+  1140→  // value; null sellMode falls back to the "unit" default. Money-mode
+  1141→  // products must carry a valid price-tiers payload (new or already stored).
+  1142→  const nextQuickPick = toQuickPickFlag(input.quickPick);
+  1143→  const nextSellMode = input.sellMode !== undefined ? (input.sellMode ?? "unit") : (product.sellMode ?? "unit");
+  1144→  const nextPriceTiers = input.priceTiers !== undefined ? (input.priceTiers?.trim() || null) : product.priceTiers;
+  1145→  if (nextSellMode === "money") assertValidPriceTiers(nextPriceTiers);
+  1146→
+  1147→  const assignments: string[] = [];
+  1148→  const values: (string | number | null)[] = [];
+  1149→  const changedLabels: string[] = [];
+  1150→  const normalizeEmoji = (value: string | undefined) => value?.trim() || null;
+  1151→
+  1152→  if (input.name !== undefined && input.name.trim() !== product.name) {
+  1153→    assignments.push("name = ?");
+  1154→    values.push(input.name.trim());
+  1155→    changedLabels.push("ชื่อ");
+  1156→  }
+  1157→  if (input.unit !== undefined && input.unit.trim() !== product.unit) {
+  1158→    assignments.push("unit = ?");
+  1159→    values.push(input.unit.trim());
+  1160→    changedLabels.push("หน่วย");
+  1161→  }
+  1162→  if (input.price !== undefined && round2(input.price) !== product.price) {
+  1163→    assignments.push("price = ?");
+  1164→    values.push(round2(input.price));
+  1165→    changedLabels.push("ราคาขาย");
+  1166→  }
+  1167→  if (input.cost !== undefined && round2(input.cost) !== product.cost) {
+  1168→    assignments.push("cost = ?");
+  1169→    values.push(round2(input.cost));
+  1170→    changedLabels.push("ต้นทุน");
+  1171→  }
+  1172→  if (input.reorderPoint !== undefined && input.reorderPoint !== product.reorderPoint) {
+  1173→    assignments.push("reorder_point = ?");
+  1174→    values.push(input.reorderPoint);
+  1175→    changedLabels.push("จุดสั่งซื้อ");
+  1176→  }
+  1177→  if (input.category !== undefined && input.category.trim() !== product.category) {
+  1178→    assignments.push("category = ?");
+  1179→    values.push(input.category.trim());
+  1180→    changedLabels.push("หมวดหมู่");
+  1181→  }
+  1182→  if (input.emoji !== undefined && normalizeEmoji(input.emoji) !== product.emoji) {
+  1183→    assignments.push("emoji = ?");
+  1184→    values.push(normalizeEmoji(input.emoji));
+  1185→    changedLabels.push("สัญลักษณ์");
+  1186→  }
+  1187→  if (input.barcode !== undefined && (input.barcode?.trim() || null) !== product.barcode) {
+  1188→    assignments.push("barcode = ?");
+  1189→    values.push(input.barcode?.trim() || null);
+  1190→    changedLabels.push("บาร์โค้ด");
+  1191→  }
+  1192→  if (input.size !== undefined && (input.size?.trim() || null) !== product.size) {
+  1193→    assignments.push("size = ?");
+  1194→    values.push(input.size?.trim() || null);
+  1195→    changedLabels.push("ขนาด");
+  1196→  }
+  1197→  if (input.imageUrl !== undefined && (input.imageUrl || null) !== product.imageUrl) {
+  1198→    assignments.push("image_url = ?");
+  1199→    values.push(input.imageUrl || null);
+  1200→    changedLabels.push("รูปสินค้า");
+  1201→  }
+  1202→  if (input.quickPick !== undefined && nextQuickPick !== product.quickPick) {
+  1203→    assignments.push("quick_pick = ?");
+  1204→    values.push(nextQuickPick);
+  1205→    changedLabels.push("สินค้าลัดหน้าร้าน");
+  1206→  }
+  1207→  if (input.sellMode !== undefined && nextSellMode !== (product.sellMode ?? "unit")) {
+  1208→    assignments.push("sell_mode = ?");
+  1209→    values.push(nextSellMode);
+  1210→    changedLabels.push("วิธีขาย");
+  1211→  }
+  1212→  if (input.priceTiers !== undefined && nextPriceTiers !== product.priceTiers) {
+  1213→    assignments.push("price_tiers = ?");
+  1214→    values.push(nextPriceTiers);
+  1215→    changedLabels.push("ราคาสั้นๆ");
+  1216→  }
+  1217→
+  1218→  const displayName = input.name?.trim() || product.name;
+  1219→  const changeSummary = changedLabels.length > 0 ? `แก้ไข: ${changedLabels.join(", ")}` : "ตรวจสอบข้อมูลแล้ว · ไม่มีการเปลี่ยนแปลง";
+  1220→  const detail = `${product.sku} · ${displayName} · ${changeSummary}`;
+  1221→
+  1222→  runInTransaction(db, () => {
+  1223→    if (assignments.length > 0) {
+  1224→      db.prepare(`UPDATE products SET ${assignments.join(", ")} WHERE id = ?`).run(...values, input.productId);
+  1225→    }
+  1226→    logAction(db, "แก้ไขสินค้า", input.actor?.trim() || "เจ้าหน้าที่ร้านค้า", detail, "blue", input.actorRole ?? null, formatDateTime());
+  1227→  });
+  1228→  return getProductById(db, input.productId)!;
+  1229→}
+  1230→
+  1231→export type BulkPriceItemInput = {
+  1232→  productId: number;
+  1233→  price?: number;
+  1234→  cost?: number;
+  1235→};
+  1236→
+  1237→export type BulkUpdatePricesInput = {
+  1238→  items: BulkPriceItemInput[];
+  1239→  actor?: string;
+  1240→  actorRole?: string;
+  1241→};
+  1242→
+  1243→export type BulkUpdatePricesResult = {
+  1244→  updated: number;
+  1245→  priceChanges: number;
+  1246→  costChanges: number;
+  1247→  skipped: number;
+  1248→  /** ตัวอย่างชื่อสินค้าที่แก้ (ใช้ทำ toast สรุป) */
+  1249→  sampleNames: string[];
+  1250→};
+  1251→
+  1252→/**
+  1253→ * Round 64 — ปรับราคาขาย/ต้นทุนหลายรายการพร้อมกันใน transaction เดียว
+  1254→ * (use case จริง: ร้านใหม่มีสินค้า 100+ รายการที่ยังไม่มีราคา)
+  1255→ * - validate ทุกรายการก่อนแตะ DB (fail fast — ไม่มีการแก้ครึ่งชุด)
+  1256→ * - รายการที่ค่าเท่าเดิมถูกนับเป็น skipped (ไม่เขียน DB ไม่ลง log ต่อชิ้น)
+  1257→ * - ลง log สรุปก้อนเดียว กันปนคอมไพล์ log หลายร้อยแถว
+  1258→ */
+  1259→export function bulkUpdateProductPrices(db: SqliteDb, input: BulkUpdatePricesInput): BulkUpdatePricesResult {
+  1260→  if (input.items.length === 0) throw new StoreError("กรุณาเลือกรายการที่ต้องการปรับราคาอย่างน้อย 1 รายการ");
+  1261→  if (input.items.length > 500) throw new StoreError("ปรับราคาได้ครั้งละไม่เกิน 500 รายการ");
+  1262→
+  1263→  // 1) ตรวจทุกรายการก่อน — ผิดสักชิ้นเดียวโยนทิ้งทั้งชุด (ไม่มี partial write)
+  1264→  const seen = new Set<number>();
+  1265→  const prepared: Array<{ product: SqliteProduct; price: number | null; cost: number | null }> = [];
+  1266→  for (const item of input.items) {
+  1267→    if (seen.has(item.productId)) continue; // ซ้ำ (เช่น client ส่งมาสองแถว) — เอาแถวแรก
+  1268→    seen.add(item.productId);
+  1269→    const product = getProductById(db, item.productId);
+  1270→    if (!product) throw new StoreError(`ไม่พบสินค้ารหัส ${item.productId} ในระบบ`);
+  1271→    if (item.price !== undefined && !(item.price >= 0)) throw new StoreError(`ราคาขายของ "${product.name}" ต้องเป็นตัวเลข 0 ขึ้นไป`);
+  1272→    if (item.cost !== undefined && item.cost < 0) throw new StoreError(`ต้นทุนของ "${product.name}" ต้องเป็นตัวเลข 0 ขึ้นไป`);
+  1273→    const nextPrice = item.price !== undefined ? round2(item.price) : null;
+  1274→    const nextCost = item.cost !== undefined ? round2(item.cost) : null;
+  1275→    if (nextPrice !== null && nextPrice === product.price && nextCost !== null && nextCost === product.cost) continue;
+  1276→    prepared.push({ product, price: nextPrice, cost: nextCost });
+  1277→  }
+  1278→  const willChange = (row: { product: SqliteProduct; price: number | null; cost: number | null }) =>
+  1279→    (row.price !== null && row.price !== row.product.price) || (row.cost !== null && row.cost !== row.product.cost);
+  1280→  const changing = prepared.filter(willChange);
+  1281→  if (changing.length === 0) {
+  1282→    return { updated: 0, priceChanges: 0, costChanges: 0, skipped: input.items.length, sampleNames: [] };
+  1283→  }
+  1284→
+  1285→  // 2) เขียนทั้งชุดใน transaction เดียว
+  1286→  let priceChanges = 0;
+  1287→  let costChanges = 0;
+  1288→  const sampleNames: string[] = [];
+  1289→  runInTransaction(db, () => {
+  1290→    for (const row of changing) {
+  1291→      const assignments: string[] = [];
+  1292→      const values: (string | number | null)[] = [];
+  1293→      if (row.price !== null && row.price !== row.product.price) {
+  1294→        assignments.push("price = ?");
+  1295→        values.push(row.price);
+  1296→        priceChanges += 1;
+  1297→        if (sampleNames.length < 3) sampleNames.push(row.product.name);
+  1298→      }
+  1299→      if (row.cost !== null && row.cost !== row.product.cost) {
+  1300→        assignments.push("cost = ?");
+  1301→        values.push(row.cost);
+  1302→        costChanges += 1;
+  1303→        if (sampleNames.length < 3 && !sampleNames.includes(row.product.name)) sampleNames.push(row.product.name);
+  1304→      }
+  1305→      if (assignments.length > 0) {
+  1306→        db.prepare(`UPDATE products SET ${assignments.join(", ")} WHERE id = ?`).run(...values, row.product.id);
+  1307→      }
+  1308→    }
+  1309→    const actor = input.actor?.trim() || "เจ้าหน้าที่ร้านค้า";
+  1310→    const detail = `${changing.length} รายการ · แก้ราคาขาย ${priceChanges} · แก้ต้นทุน ${costChanges}${sampleNames.length > 0 ? ` · เช่น ${sampleNames.join(", ")}${changing.length > sampleNames.length ? " และอื่นๆ" : ""}` : ""}`;
+  1311→    logAction(db, "ปรับราคาหลายรายการ", actor, detail, "blue", input.actorRole ?? null, formatDateTime());
+  1312→  });
+  1313→
+  1314→  return { updated: changing.length, priceChanges, costChanges, skipped: input.items.length - changing.length, sampleNames };
+  1315→}
+  1316→
+  1317→export type DeleteProductInput = {
+  1318→  productId: number;
+  1319→  actor?: string;
+  1320→  actorRole?: string;
+  1321→};
+  1322→
+  1323→/**
+  1324→ * Permanently removes a product and its remaining lots from the catalog.
+  1325→ * Sale history keeps its own name/price snapshot, so old bills stay intact.
+  1326→ */
+  1327→export function deleteProduct(db: SqliteDb, input: DeleteProductInput): { deleted: true; name: string; sku: string } {
+  1328→  const product = getProductById(db, input.productId);
+  1329→  if (!product) throw new StoreError(`ไม่พบสินค้ารหัส ${input.productId} ในระบบ`);
+  1330→  const saleRefs = db.prepare(`SELECT COUNT(*) AS n FROM sale_items WHERE product_id = ?`).get(input.productId) as { n: number };
+  1331→  runInTransaction(db, () => {
+  1332→    db.prepare(`DELETE FROM stock_lots WHERE product_id = ?`).run(input.productId);
+  1333→    db.prepare(`DELETE FROM products WHERE id = ?`).run(input.productId);
+  1334→    logAction(
+  1335→      db,
+  1336→      "ลบสินค้า",
+  1337→      input.actor?.trim() || "ระบบ",
+  1338→      `${product.name} (${product.sku}) · เหลือ ${product.stock} ${product.unit} ในคลัง · ปรากฏในประวัติขาย ${saleRefs.n} รายการ`,
+  1339→      "red",
+  1340→      input.actorRole ?? null,
+  1341→    );
+  1342→  });
+  1343→  return { deleted: true, name: product.name, sku: product.sku };
+  1344→}
+  1345→
+  1346→export type SetProductActiveInput = {
+  1347→  productId: number;
+  1348→  active: boolean;
+  1349→  actor?: string;
+  1350→  actorRole?: string;
+  1351→};
+  1352→
+  1353→/** Archives (active = 0) or restores (active = 1) a product. Archived products keep their stock, lots and history. */
+  1354→export function setProductActive(db: SqliteDb, input: SetProductActiveInput): SqliteProduct {
+  1355→  const product = getProductById(db, input.productId);
+  1356→  if (!product) throw new StoreError(`ไม่พบสินค้ารหัส ${input.productId} ในระบบ`);
+  1357→  const nextActive = input.active ? 1 : 0;
+  1358→  if (product.active === nextActive) return product;
+  1359→  runInTransaction(db, () => {
+  1360→    db.prepare(`UPDATE products SET active = ? WHERE id = ?`).run(nextActive, input.productId);
+  1361→    logAction(
+  1362→      db,
+  1363→      input.active ? "เปิดขายสินค้า" : "ปิดการขายสินค้า",
+  1364→      input.actor?.trim() || "เจ้าหน้าที่ร้านค้า",
+  1365→      `${product.sku} · ${product.name} · คงเหลือ ${product.stock} ${product.unit}`,
+  1366→      input.active ? "green" : "purple",
+  1367→      input.actorRole ?? null,
+  1368→      formatDateTime(),
+  1369→    );
+  1370→  });
+  1371→  return getProductById(db, input.productId)!;
+  1372→}
+  1373→
+  1374→// --- POS checkout -----------------------------------------------------------
+  1375→
+  1376→function yyMMdd(date: Date) {
+  1377→  return `${String(date.getFullYear()).slice(-2)}${pad2(date.getMonth() + 1)}${pad2(date.getDate())}`;
+  1378→}
+  1379→
+  1380→function nextOrderNumber(db: SqliteDb, date = new Date()) {
+  1381→  const prefix = `RC-${yyMMdd(date)}-`;
+  1382→  const row = db.prepare(`SELECT MAX(CAST(SUBSTR(order_number, 11) AS INTEGER)) AS maxSeq FROM sales WHERE order_number LIKE ?`).get(`${prefix}%`) as { maxSeq: number | null };
+  1383→  return `${prefix}${String((row?.maxSeq ?? 0) + 1).padStart(3, "0")}`;
+  1384→}
+  1385→
+  1386→function summarizeItems(items: { name: string; qty: number; unit: string }[]) {
+  1387→  const head = items.slice(0, 3).map((item) => `${item.name} ${item.qty} ${item.unit}`).join(", ");
+  1388→  return items.length > 3 ? `${head} และอีก ${items.length - 3} รายการ` : head;
+  1389→}
+  1390→
+  1391→/** A catalog line references a product; a "รายการพิเศษ" line is a priced ad-hoc item with no product/stock behind it. */
+  1392→export type CheckoutItemInput =
+  1393→  | { productId: number; qty: number; price?: number; unit?: string; label?: string }
+  1394→  | { name: string; price: number; qty: number; unit?: string };
+  1395→
+  1396→/**
+  1397→ * Deducts sold qty from the product's lots FEFO-style (first-expiry-first-out:
+  1398→ * earliest expiry first, undated lots last, then oldest received, then lot id).
+  1399→ * Best-effort by design: when the lots cannot cover the whole qty — drift
+  1400→ * between products.stock and the lot sums — they are zeroed instead and the
+  1401→ * shortfall is returned so checkout can flag it in the audit trail.
+  1402→ * products.stock stays the authoritative sellable figure at all times.
+  1403→ * Returns the unmet qty (0 when the lots covered the sale).
+  1404→ */
+  1405→function deductLotsFifo(db: SqliteDb, productId: number, qty: number): number {
+  1406→  const tracked = db.prepare(`SELECT COUNT(*) AS count FROM stock_lots WHERE product_id = ?`).get(productId) as { count: number };
+  1407→  if (tracked.count === 0) return 0; // product is not lot-tracked — nothing to deduct
+  1408→  const lots = db.prepare(
+  1409→    `SELECT id, qty FROM stock_lots WHERE product_id = ? AND qty > 0 ORDER BY (expiry_date IS NULL), expiry_date, received_at, id`,
+  1410→  ).all(productId) as unknown as { id: number; qty: number }[];
+  1411→  let remaining = qty;
+  1412→  const updateLot = db.prepare(`UPDATE stock_lots SET qty = qty - ? WHERE id = ?`);
+  1413→  for (const lot of lots) {
+  1414→    if (remaining <= 0) break;
+  1415→    const take = Math.min(lot.qty, remaining);
+  1416→    updateLot.run(take, lot.id);
+  1417→    remaining -= take;
+  1418→  }
+  1419→  return remaining;
+  1420→}
+  1421→
+  1422→export type CheckoutInput = {
+  1423→  items: CheckoutItemInput[];
+  1424→  paymentMethod: (typeof PAYMENT_METHODS)[number];
+  1425→  memberNumber?: string | null;
+  1426→  discount?: number;
+  1427→  cashier?: string;
+  1428→  actorRole?: string;
+  1429→  /** ROUND 63 (user) — รูปหลักฐานการชำระ (สลิปโอน/สแกนจ่าย) data-URL · ไม่แนบ = ไม่ส่ง */
+  1430→  slipImage?: string | null;
+  1431→};
+  1432→
+  1433→export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
+  1434→  if (!input.items?.length) throw new StoreError("ยังไม่มีสินค้าในบิล");
+  1435→  if (!PAYMENT_METHODS.includes(input.paymentMethod)) throw new StoreError("วิธีชำระเงินไม่ถูกต้อง");
+  1436→  // Catalog lines merge by productId+price+label (round 31-12: money-mode
+  1437→  // tiers of the same product stay separate lines — น้ำแข็ง ฿1 / ฿5 / ฿10);
+  1438→  // special ("รายการพิเศษ") lines merge by lowercased name+price+unit.
+  1439→  type MergedLine = { productId: number; qty: number; price?: number; unit?: string; label?: string };
+  1440→  const merged = new Map<string, MergedLine>();
+  1441→  const specials = new Map<string, { name: string; price: number; qty: number; unit: string }>();
+  1442→  for (const item of input.items) {
+  1443→    if (!Number.isInteger(item.qty) || item.qty <= 0) throw new StoreError("จำนวนต้องมากกว่า 0");
+  1444→    if ("productId" in item) {
+  1445→      if (!Number.isInteger(item.productId) || item.productId <= 0) throw new StoreError("รหัสสินค้าไม่ถูกต้อง");
+  1446→      const unitPrice = item.price !== undefined ? Math.round(item.price * 10000) / 10000 : undefined;
+  1447→      const key = `${item.productId}|${unitPrice ?? ""}|${item.label ?? ""}`;
+  1448→      const existing = merged.get(key);
+  1449→      merged.set(key, { productId: item.productId, qty: (existing?.qty ?? 0) + item.qty, price: unitPrice, unit: item.unit, label: item.label });
+  1450→    } else {
+  1451→      const name = item.name.trim();
+  1452→      if (!name) throw new StoreError("กรุณาระบุชื่อรายการพิเศษ");
+  1453→      if (!(item.price > 0)) throw new StoreError("ราคารายการพิเศษต้องมากกว่า 0");
+  1454→      const unit = item.unit?.trim() || "รายการ";
+  1455→      const key = `${name.toLowerCase()}|${item.price}|${unit}`;
+  1456→      const existing = specials.get(key);
+  1457→      specials.set(key, { name, price: item.price, qty: (existing?.qty ?? 0) + item.qty, unit });
+  1458→    }
+  1459→  }
+  1460→  const isWallet = input.paymentMethod === WALLET_PAYMENT;
+  1461→  if (isWallet && !input.memberNumber?.trim()) throw new StoreError("กรุณาเลือกสมาชิกก่อนชำระแบบหักบัญชีสมาชิก");
+  1462→
+  1463→  const products = new Map<number, SqliteProduct>();
+  1464→  const qtyByProduct = new Map<number, number>();
+  1465→  for (const line of Array.from(merged.values())) {
+  1466→    qtyByProduct.set(line.productId, (qtyByProduct.get(line.productId) ?? 0) + line.qty);
+  1467→  }
+  1468→  for (const [productId, totalQty] of Array.from(qtyByProduct.entries())) {
+  1469→    const product = getProductById(db, productId);
+  1470→    if (!product || !product.active) throw new StoreError(`ไม่พบสินค้ารหัส ${productId} ในระบบ`);
+  1471→    if (product.stock < totalQty) throw new StoreError(`สต็อกไม่พอ · ${product.name} เหลือ ${product.stock} ${product.unit}`);
+  1472→    products.set(productId, product);
+  1473→  }
+  1474→
+  1475→  const items: { productId: number | null; name: string; unit: string; qty: number; price: number; cost: number; amount: number }[] = [
+  1476→    ...Array.from(merged.values()).map((line) => {
+  1477→      const product = products.get(line.productId)!;
+  1478→      const unitPrice = line.price ?? product.price;
+  1479→      return { productId: line.productId, name: line.label ? `${product.name} · ${line.label}` : product.name, unit: line.unit ?? product.unit, qty: line.qty, price: unitPrice, cost: product.cost, amount: round2(unitPrice * line.qty) };
+  1480→    }),
+  1481→    ...Array.from(specials.values()).map((special) => ({ ...special, productId: null, cost: 0, amount: round2(special.price * special.qty) })),
+  1482→  ];
+  1483→  const subtotal = round2(items.reduce((sum, item) => sum + item.amount, 0));
+  1484→  const discount = round2(Math.max(0, input.discount ?? 0));
+  1485→  if (discount > subtotal) throw new StoreError("ส่วนลดมากกว่ายอดรวมสินค้า");
+  1486→  const total = round2(subtotal - discount);
+  1487→
+  1488→  let member: SqliteMember | undefined;
+  1489→  if (isWallet) {
+  1490→    member = db.prepare(`SELECT id, member_number as memberNumber, prename, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, photo_url as photoUrl, gender, credit_limit as creditLimit FROM members WHERE member_number = ?`).get(input.memberNumber!.trim()) as SqliteMember | undefined;
+  1491→    if (!member) throw new StoreError(`ไม่พบสมาชิก ${input.memberNumber} ในระบบ`);
+  1492→    if (member.status !== "active") throw new StoreError(`สมาชิกถูกระงับการใช้งาน · ${member.memberNumber}`);
+  1493→    if (member.balance < total) throw new StoreError(`ยอดเงินคงเหลือไม่พอ · ยอดชำระ ${money(total)} คงเหลือ ${money(member.balance)}`);
+  1494→    // Req 23.2 — วงเงินซื้อสินค้าต่อวัน: wallet bills of TODAY plus this bill
+  1495→    // must stay within the member's credit limit (null = ไม่จำกัด).
+  1496→    if (member.creditLimit != null) {
+  1497→      const todayStart = `${formatDate(new Date())} 00:00:00`;
+  1498→      const usedRow = db.prepare(`SELECT ROUND(COALESCE(SUM(total), 0), 2) AS usedToday FROM sales WHERE member_number = ? AND payment_method = ? AND created_at >= ?`).get(member.memberNumber, WALLET_PAYMENT, todayStart) as { usedToday: number };
+  1499→      const usedToday = round2(usedRow.usedToday ?? 0);
+  1500→      if (round2(usedToday + total) > member.creditLimit) {
+  1501→        throw new StoreError(`เกินวงเงินซื้อสินค้าต่อวัน · วงเงิน ${money(member.creditLimit)} · ใช้ไปแล้ววันนี้ ${money(usedToday)} · บิลนี้ ${money(total)}`);
+  1502→      }
+  1503→    }
+  1504→  } else if (input.memberNumber?.trim()) {
+  1505→    // Cash / QR bills can still be tied to a member — the receipt then shows
+  1506→    // ผู้ทำรายการ + ยอดคงเหลือล่าสุด of that member (no deduction happens).
+  1507→    member = db.prepare(`SELECT id, member_number as memberNumber, prename, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, photo_url as photoUrl, gender, credit_limit as creditLimit FROM members WHERE member_number = ?`).get(input.memberNumber.trim()) as SqliteMember | undefined;
+  1508→  }
+  1509→
+  1510→  const now = new Date();
+  1511→  const createdAt = formatDateTime(now);
+  1512→  const orderNumber = nextOrderNumber(db, now);
+  1513→  const cashier = input.cashier?.trim() || "เจ้าหน้าที่ร้านค้า";
+  1514→  // ROUND 63 — แนบหลักฐานการชำระไปกับบิล (ส่วนใหญ่คือสลิป QR / สแกน) · จำกัดความยาวกัน URL ผิดปกติ
+  1515→  const slipImage = typeof input.slipImage === "string" && input.slipImage.startsWith("data:image/") ? input.slipImage.slice(0, 600_000) : null;
+  1516→
+  1517→  return runInTransaction(db, () => {
+  1518→    const saleResult = db.prepare(`INSERT INTO sales (order_number, payment_method, member_number, subtotal, discount, total, cashier, created_at, slip_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+  1519→      orderNumber,
+  1520→      input.paymentMethod,
+  1521→      member?.memberNumber ?? (input.memberNumber?.trim() || null),
+  1522→      subtotal,
+  1523→      discount,
+  1524→      total,
+  1525→      cashier,
+  1526→      createdAt,
+  1527→      slipImage,
+  1528→    );
+  1529→    const saleId = Number(saleResult.lastInsertRowid);
+  1530→    const insertItem = db.prepare(`INSERT INTO sale_items (sale_id, product_id, name, qty, price, cost, unit) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+  1531→    const updateStock = db.prepare(`UPDATE products SET stock = stock - ? WHERE id = ?`);
+  1532→    const lotShortfalls: { name: string; unit: string; qty: number }[] = [];
+  1533→    for (const item of items) {
+  1534→      insertItem.run(saleId, item.productId, item.name, item.qty, item.price, item.cost, item.unit);
+  1535→      if (item.productId == null) continue; // รายการพิเศษ — no product/stock row behind it
+  1536→      updateStock.run(item.qty, item.productId);
+  1537→      const shortfall = deductLotsFifo(db, item.productId, item.qty);
+  1538→      if (shortfall > 0) lotShortfalls.push({ name: item.name, unit: item.unit, qty: shortfall });
+  1539→    }
+  1540→
+  1541→    let balanceAfter: number | null = null;
+  1542→    if (isWallet && member) {
+  1543→      balanceAfter = round2(member.balance - total);
+  1544→      db.prepare(`UPDATE members SET balance = ? WHERE member_number = ?`).run(balanceAfter, member.memberNumber);
+  1545→      db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, actor, created_at) VALUES (?, 'purchase', ?, ?, ?, ?, ?, ?)`).run(
+  1546→        member.memberNumber,
+  1547→        `บิล #${orderNumber} · ${summarizeItems(items)}`,
+  1548→        -total,
+  1549→        input.paymentMethod,
+  1550→        balanceAfter,
+  1551→        cashier,
+  1552→        createdAt,
+  1553→      );
+  1554→    } else if (member) {
+  1555→      // Cash / QR member bill — snapshot the untouched balance for the slip.
+  1556→      balanceAfter = round2(member.balance);
+  1557→    }
+  1558→
+  1559→    const lotNote = lotShortfalls.length
+  1560→      ? ` · ตัดยอด Lot ไม่ครบ: ${lotShortfalls.map((row) => `${row.name} ${row.qty} ${row.unit}`).join(", ")} (แนะนำนับสต็อกแยกล็อต)`
+  1561→      : "";
+  1562→    logAction(db, "ขายสินค้า", cashier, `บิล #${orderNumber} · ${money(total)}${member ? ` · หักบัญชี ${member.memberNumber}` : ""}${slipImage ? " · แนบหลักฐานการชำระแล้ว" : ""}${lotNote}`, "blue", input.actorRole ?? null, createdAt);
+  1563→
+  1564→    return {
+  1565→      orderNumber,
+  1566→      createdAt,
+  1567→      items: items.map(({ productId, name, unit, qty, price, amount }) => ({ productId, name, unit, qty, price, amount })),
+  1568→      subtotal,
+  1569→      discount,
+  1570→      total,
+  1571→      paymentMethod: input.paymentMethod,
+  1572→      memberNumber: member?.memberNumber ?? null,
+  1573→      memberName: member ? [member.prename, member.firstName, member.lastName].filter(Boolean).join(" ") : null,
+  1574→      balanceAfter,
+  1575→      cashier,
+  1576→    };
+  1577→  });
+  1578→}
+  1579→
+  1580→// --- sales history (receipt reprint) ---------------------------------------
+  1581→
+  1582→export type SalesListInput = {
+  1583→  search?: string;
+  1584→  limit?: number;
+  1585→};
+  1586→
+  1587→/** Lists past receipts, newest first. Search matches order number or member number (case-insensitive contains). */
+  1588→export function salesList(db: SqliteDb, input: SalesListInput = {}): SaleHistoryEntry[] {
+  1589→  const search = input.search?.trim();
+  1590→  const limit = Math.max(1, Math.min(500, Math.floor(input.limit ?? 50)));
+  1591→  const conditions: string[] = [];
+  1592→  const params: string[] = [];
+  1593→  if (search) {
+  1594→    conditions.push("(s.order_number LIKE ? OR s.member_number LIKE ?)");
+  1595→    params.push(`%${search}%`, `%${search}%`);
+  1596→  }
+  1597→  const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
+  1598→  const sales = db.prepare(`SELECT s.id, s.order_number AS orderNumber, s.payment_method AS paymentMethod, s.member_number AS memberNumber, s.subtotal, s.discount, s.total, s.cashier, s.created_at AS createdAt, s.slip_url IS NOT NULL AS hasSlip, CASE WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sales s LEFT JOIN members m ON m.member_number = s.member_number${where} ORDER BY s.created_at DESC, s.id DESC LIMIT ?`).all(...params, limit) as unknown as {
+  1599→    id: number;
+  1600→    orderNumber: string;
+  1601→    paymentMethod: string;
+  1602→    memberNumber: string | null;
+  1603→    subtotal: number;
+  1604→    discount: number;
+  1605→    total: number;
+  1606→    cashier: string | null;
+  1607→    createdAt: string;
+  1608→    hasSlip: number;
+  1609→    memberName: string | null;
+  1610→  }[];
+  1611→  if (sales.length === 0) return [];
+  1612→
+  1613→  const placeholders = sales.map(() => "?").join(", ");
+  1614→  const itemRows = db.prepare(`SELECT si.sale_id AS saleId, si.product_id AS productId, si.name, COALESCE(si.unit, p.unit, 'ชิ้น') AS unit, si.qty, si.price, ROUND(si.qty * si.price, 2) AS amount FROM sale_items si LEFT JOIN products p ON p.id = si.product_id WHERE si.sale_id IN (${placeholders})`).all(...sales.map((sale) => sale.id)) as unknown as { saleId: number; productId: number; name: string; unit: string; qty: number; price: number; amount: number }[];
+  1615→  const itemsBySale = new Map<number, SaleHistoryEntry["items"]>();
+  1616→  for (const row of itemRows) {
+  1617→    const bucket = itemsBySale.get(row.saleId) ?? [];
+  1618→    bucket.push({ productId: row.productId, name: row.name, unit: row.unit, qty: row.qty, price: row.price, amount: row.amount });
+  1619→    itemsBySale.set(row.saleId, bucket);
+  1620→  }
+  1621→
+  1622→  // Wallet purchases wrote the post-sale balance into member_transactions
+  1623→  // (`บิล #<orderNumber> · …` + balance_after). Replaying that row lets
+  1624→  // reprinted member receipts show the same ยอดคงเหลือหลังรายการ line the
+  1625→  // original slip had — historical sales before this table stay null.
+  1626→  const balanceLookup = db.prepare(`SELECT balance_after AS balanceAfter FROM member_transactions WHERE member_number = ? AND detail LIKE ? ORDER BY id DESC LIMIT 1`);
+  1627→
+  1628→  return sales.map((sale) => ({
+  1629→    id: sale.id,
+  1630→    orderNumber: sale.orderNumber,
+  1631→    createdAt: sale.createdAt,
+  1632→    items: itemsBySale.get(sale.id) ?? [],
+  1633→    subtotal: sale.subtotal,
+  1634→    discount: sale.discount,
+  1635→    total: sale.total,
+  1636→    paymentMethod: sale.paymentMethod,
+  1637→    memberNumber: sale.memberNumber,
+  1638→    memberName: sale.memberName?.trim() || null,
+  1639→    balanceAfter: sale.memberNumber
+  1640→      ? ((balanceLookup.get(sale.memberNumber, `บิล #${sale.orderNumber} ·%`) as { balanceAfter: number | null } | undefined)?.balanceAfter ?? null)
+  1641→      : null,
+  1642→    cashier: sale.cashier,
+  1643→    hasSlip: sale.hasSlip === 1,
+  1644→  }));
+  1645→}
+  1646→
+  1647→/** ROUND 63 (user) — ดึงรูปหลักฐานการชำระของบิล (สลิป QR / สแกน) ตามรหัสแถว sales */
+  1648→export function getSaleSlip(db: SqliteDb, id: number): { slipUrl: string | null } {
+  1649→  const row = db.prepare(`SELECT slip_url AS slipUrl FROM sales WHERE id = ?`).get(id) as { slipUrl: string | null } | undefined;
+  1650→  if (!row) throw new StoreError("ไม่พบบิลนี้ในระบบ");
+  1651→  return { slipUrl: row.slipUrl };
+  1652→}
+  1653→
+  1654→// --- members & wallet -------------------------------------------------------
+  1655→
+  1656→const MEMBER_SELECT = `SELECT id, member_number as memberNumber, prename, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, photo_url as photoUrl, gender, credit_limit as creditLimit, card_number as cardNumber, patient_code as patientCode FROM members WHERE member_number = ?`;
+  1657→
+  1658→function getMemberByNumber(db: SqliteDb, memberNumber: string): SqliteMember | undefined {
+  1659→  return db.prepare(MEMBER_SELECT).get(memberNumber) as SqliteMember | undefined;
+  1660→}
+  1661→
+  1662→export function listMembers(db: SqliteDb, search?: string, status?: "active" | "suspended"): SqliteMemberSummary[] {
+  1663→  const conditions: string[] = [];
+  1664→  const params: string[] = [];
+  1665→  if (search?.trim()) {
+  1666→    // ROUND 65 — ค้นหาเจอจากรหัสบัตรและรหัสผู้ป่วยด้วย (นอกจากชื่อ/เลขสมาชิก)
+  1667→    conditions.push(`(first_name || ' ' || last_name || ' ' || member_number || ' ' || COALESCE(card_number, '') || ' ' || COALESCE(patient_code, '')) LIKE ?`);
+  1668→    params.push(`%${search.trim()}%`);
+  1669→  }
+  1670→  if (status) {
+  1671→    conditions.push("status = ?");
+  1672→    params.push(status);
+  1673→  }
+  1674→  const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
+  1675→  return db.prepare(`SELECT m.id, m.member_number AS memberNumber, m.prename AS prename, m.first_name AS firstName, m.last_name AS lastName, m.type, m.balance, m.status, m.created_at AS createdAt, m.photo_url AS photoUrl, m.gender, m.credit_limit AS creditLimit, m.card_number AS cardNumber, m.patient_code AS patientCode, (SELECT MAX(t.created_at) FROM member_transactions t WHERE t.member_number = m.member_number) AS lastTransactionAt FROM members m${where} ORDER BY m.member_number`).all(...params) as unknown as SqliteMemberSummary[];
+  1676→}
+  1677→
+  1678→function nextMemberSequence(db: SqliteDb, prefix: string) {
+  1679→  const rows = db.prepare(`SELECT member_number AS memberNumber FROM members WHERE member_number LIKE ?`).all(`${prefix}%`) as unknown as { memberNumber: string }[];
+  1680→  let max = 0;
+  1681→  for (const row of rows) {
+  1682→    const suffix = row.memberNumber.slice(prefix.length);
+  1683→    if (/^\d+$/.test(suffix)) max = Math.max(max, Number(suffix));
+  1684→  }
+  1685→  return max + 1;
+  1686→}
+  1687→
+  1688→function generateMemberNumber(db: SqliteDb, mode: "running" | "year" | "manual", provided?: string) {
+  1689→  if (mode === "manual") {
+  1690→    const manual = provided?.trim();
+  1691→    if (!manual) throw new StoreError("โหมดกำหนดหมายเลขเอง: กรุณาระบุหมายเลขสมาชิก");
+  1692→    return manual;
+  1693→  }
+  1694→  const config = memberNumberSettings(db);
+  1695→  const legacyYearMode = mode === "year" && config.yearMode === "none";
+  1696→  if (legacyYearMode) {
+  1697→    const year = String(new Date().getFullYear() + 543).slice(-2);
+  1698→    const prefix = `${year}-`;
+  1699→    return `${prefix}${String(nextMemberSequence(db, prefix)).padStart(5, "0")}`;
+  1700→  }
+  1701→  const now = new Date();
+  1702→  const cycleYear = now.getMonth() + 1 < config.resetMonth ? now.getFullYear() - 1 : now.getFullYear();
+  1703→  const yearValue = config.yearMode === "buddhist" ? cycleYear + 543 : cycleYear;
+  1704→  const yearText = config.yearMode === "none" ? "" : String(yearValue).slice(config.yearDigits === 4 ? -4 : -2);
+  1705→  const head = [config.prefix, yearText].filter(Boolean).join(config.separator);
+  1706→  const separator = head ? `${head}${config.separator}` : "";
+  1707→  return `${separator}${String(nextMemberSequence(db, separator)).padStart(config.sequenceDigits, "0")}`;
+  1708→}
+  1709→
+  1710→export type RegisterMemberInput = {
+  1711→  prename?: string;
+  1712→  firstName: string;
+  1713→  lastName: string;
+  1714→  citizenId?: string;
+  1715→  phone?: string;
+  1716→  type?: string;
+  1717→  gender?: string;
+  1718→  photoUrl?: string;
+  1719→  initialDeposit?: number;
+  1720→  memberNumber?: string;
+  1721→  /** ROUND 65 — รหัสบัตรเงินสดที่ออกให้สมาชิก (เช่น 2395100201) */
+  1722→  cardNumber?: string;
+  1723→  /** ROUND 65 — รหัสผู้ป่วย (HN) ที่ผูกกับบัตร */
+  1724→  patientCode?: string;
+  1725→  actor?: string;
+  1726→  actorRole?: string;
+  1727→};
+  1728→
+  1729→export function registerMember(db: SqliteDb, input: RegisterMemberInput) {
+  1730→  const firstName = input.firstName?.trim();
+  1731→  const lastName = input.lastName?.trim();
+  1732→  if (!firstName || !lastName) throw new StoreError("กรุณาระบุชื่อและนามสกุลสมาชิก");
+  1733→  if (input.initialDeposit !== undefined && !(input.initialDeposit > 0)) throw new StoreError("จำนวนเงินต้องมากกว่า 0");
+  1734→  const memberNumber = generateMemberNumber(db, getMemberNumberMode(db), input.memberNumber);
+  1735→  if (db.prepare(`SELECT id FROM members WHERE member_number = ?`).get(memberNumber)) {
+  1736→    throw new StoreError(`หมายเลขสมาชิก ${memberNumber} ถูกใช้แล้ว`);
+  1737→  }
+  1738→  // ROUND 65 — รหัสบัตร/รหัสผู้ป่วย: ห้ามซ้ำกับสมาชิกคนอื่น (ว่างได้ = ยังไม่ผูก)
+  1739→  const cardNumber = input.cardNumber?.trim() || null;
+  1740→  const patientCode = input.patientCode?.trim() || null;
+  1741→  if (cardNumber && db.prepare(`SELECT id FROM members WHERE card_number = ?`).get(cardNumber)) {
+  1742→    throw new StoreError(`รหัสบัตร ${cardNumber} ถูกใช้กับสมาชิกอื่นแล้ว`);
+  1743→  }
+  1744→  if (patientCode && db.prepare(`SELECT id FROM members WHERE patient_code = ?`).get(patientCode)) {
+  1745→    throw new StoreError(`รหัสผู้ป่วย ${patientCode} ถูกใช้กับสมาชิกอื่นแล้ว`);
+  1746→  }
+  1747→  const initialDeposit = input.initialDeposit ? round2(input.initialDeposit) : 0;
+  1748→  const createdAt = formatDateTime();
+  1749→  runInTransaction(db, () => {
+  1750→    db.prepare(`INSERT INTO members (member_number, prename, first_name, last_name, id_card, phone, type, balance, status, created_at, photo_url, gender, card_number, patient_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)`).run(
+  1751→      memberNumber,
+  1752→      input.prename?.trim() || null,
+  1753→      firstName,
+  1754→      lastName,
+  1755→      input.citizenId?.trim() || null,
+  1756→      input.phone?.trim() || null,
+  1757→      input.type?.trim() || "สมาชิก",
+  1758→      initialDeposit,
+  1759→      createdAt,
+  1760→      input.photoUrl?.trim() || null,
+  1761→      input.gender?.trim() || null,
+  1762→      cardNumber,
+  1763→      patientCode,
+  1764→    );
+  1765→    if (initialDeposit > 0) {
+  1766→      // ROUND 65 — เงินเริ่มต้นตอนลงทะเบียน = "เปิดใช้บัตร" (ตรงกับรายงานโรงพยาบาล)
+  1767→      db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, created_at) VALUES (?, 'activation', ?, ?, 'เงินสด', ?, ?)`).run(
+  1768→        memberNumber,
+  1769→        `เปิดใช้บัตร · เงินเริ่มต้นตอนลงทะเบียน · เงินสด`,
+  1770→        initialDeposit,
+  1771→        initialDeposit,
+  1772→        createdAt,
+  1773→      );
+  1774→    }
+  1775→    logAction(db, "ลงทะเบียนสมาชิก", input.actor?.trim() || "ระบบ", `${memberNumber} · ${firstName} ${lastName}${initialDeposit > 0 ? ` · เปิดใช้บัตรพร้อมเงิน ${money(initialDeposit)}` : ""}`, "green", input.actorRole ?? null, createdAt);
+  1776→  });
+  1777→  return getMemberDetail(db, memberNumber)!;
+  1778→}
+  1779→
+  1780→export function setMemberStatus(db: SqliteDb, memberNumber: string, suspended: boolean, actor?: string, actorRole?: string) {
+  1781→  const member = db.prepare(`SELECT member_number AS memberNumber, first_name AS firstName, last_name AS lastName, status FROM members WHERE member_number = ?`).get(memberNumber) as { memberNumber: string; firstName: string; lastName: string; status: "active" | "suspended" } | undefined;
+  1782→  if (!member) throw new StoreError(`ไม่พบสมาชิก ${memberNumber} ในระบบ`);
+  1783→  const nextStatus = suspended ? "suspended" : "active";
+  1784→  if (member.status !== nextStatus) {
+  1785→    const createdAt = formatDateTime();
+  1786→    runInTransaction(db, () => {
+  1787→      db.prepare(`UPDATE members SET status = ? WHERE member_number = ?`).run(nextStatus, memberNumber);
+  1788→      logAction(
+  1789→        db,
+  1790→        suspended ? "ระงับสมาชิก" : "เปิดใช้งานสมาชิก",
+  1791→        actor?.trim() || "ระบบ",
+  1792→        `${memberNumber} · ${member.firstName} ${member.lastName}`,
+  1793→        suspended ? "red" : "green",
+  1794→        actorRole ?? null,
+  1795→        createdAt,
+  1796→      );
+  1797→    });
+  1798→  }
+  1799→  return getMemberDetail(db, memberNumber);
+  1800→}
+  1801→
+  1802→export type WalletTxInput = {
+  1803→  memberNumber: string;
+  1804→  /** ROUND 65 — 'refund' = คืนบัตรเงินสด (ผู้ป่วยคืนบัตร ร้านจ่ายเงินคืน) คิดเหมือนถอน */
+  1805→  type: "deposit" | "withdrawal" | "refund";
+  1806→  amount: number;
+  1807→  note?: string;
+  1808→  actor?: string;
+  1809→  actorRole?: string;
+  1810→  /** ROUND 63 (user) — รูปหลักฐาน (สลิปโอน/ถอน) data-URL · ไม่แนบ = ไม่ส่ง */
+  1811→  slipImage?: string | null;
+  1812→};
+  1813→
+  1814→export function walletTx(db: SqliteDb, input: WalletTxInput) {
+  1815→  if (!(input.amount > 0)) throw new StoreError("จำนวนเงินต้องมากกว่า 0");
+  1816→  const amount = round2(input.amount);
+  1817→  const member = db.prepare(`SELECT id, member_number as memberNumber, prename, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, credit_limit as creditLimit, card_number as cardNumber, patient_code as patientCode FROM members WHERE member_number = ?`).get(input.memberNumber?.trim()) as SqliteMember | undefined;
+  1818→  if (!member) throw new StoreError(`ไม่พบสมาชิก ${input.memberNumber} ในระบบ`);
+  1819→  if (member.status !== "active") throw new StoreError(`สมาชิกถูกระงับการใช้งาน · ${member.memberNumber}`);
+  1820→  if (input.type !== "deposit" && member.balance < amount) {
+  1821→    throw new StoreError(`ยอดเงินคงเหลือไม่พอ · ${input.type === "refund" ? "คืนบัตร" : "ถอน"} ${money(amount)} คงเหลือ ${money(member.balance)}`);
+  1822→  }
+  1823→  const signedAmount = input.type === "deposit" ? amount : -amount;
+  1824→  const balanceAfter = round2(member.balance + signedAmount);
+  1825→  const note = input.note?.trim();
+  1826→  const fallbackDetail = input.type === "deposit"
+  1827→    ? "เติมเงินเข้าบัญชีสมาชิก · เงินสด"
+  1828→    : input.type === "refund"
+  1829→      ? "คืนบัตรเงินสด · จ่ายเงินคืนตามยอดคงเหลือ"
+  1830→      : "ถอนเงินจากบัญชีสมาชิก · เงินสด";
+  1831→  const detail = note || fallbackDetail;
+  1832→  const actor = input.actor?.trim() || "เจ้าหน้าที่ร้านค้า";
+  1833→  const createdAt = formatDateTime();
+  1834→  // ROUND 63 — รูปหลักฐานที่แนบมากับการเติม/ถอน (เช่น สลิปโอนเข้า) เก็บไปกับรายการ
+  1835→  const slipImage = typeof input.slipImage === "string" && input.slipImage.startsWith("data:image/") ? input.slipImage.slice(0, 600_000) : null;
+  1836→  runInTransaction(db, () => {
+  1837→    db.prepare(`UPDATE members SET balance = ? WHERE member_number = ?`).run(balanceAfter, member.memberNumber);
+  1838→    db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, actor, created_at, slip_url) VALUES (?, ?, ?, ?, 'เงินสด', ?, ?, ?, ?)`).run(
+  1839→      member.memberNumber,
+  1840→      input.type,
+  1841→      detail,
+  1842→      signedAmount,
+  1843→      balanceAfter,
+  1844→      actor,
+  1845→      createdAt,
+  1846→      slipImage,
+  1847→    );
+  1848→    logAction(
+  1849→      db,
+  1850→      input.type === "deposit" ? "เติมเงินสมาชิก" : input.type === "refund" ? "คืนบัตรเงินสด" : "ถอนเงินสมาชิก",
+  1851→      actor,
+  1852→      `${member.memberNumber} · ${money(amount)} · ${note || "เงินสด"}${slipImage ? " · แนบหลักฐานแล้ว" : ""}`,
+  1853→      input.type === "deposit" ? "green" : input.type === "refund" ? "amber" : "purple",
+  1854→      input.actorRole ?? null,
+  1855→      createdAt,
+  1856→    );
+  1857→  });
+  1858→  return {
+  1859→    memberNumber: member.memberNumber,
+  1860→    memberName: [member.prename, member.firstName, member.lastName].filter(Boolean).join(" "),
+  1861→    type: input.type,
+  1862→    amount,
+  1863→    balanceBefore: member.balance,
+  1864→    balanceAfter,
+  1865→    detail,
+  1866→  };
+  1867→}
+  1868→
+  1869→export type UpdateMemberInput = {
+  1870→  memberNumber: string;
+  1871→  prename?: string | null;
+  1872→  firstName?: string;
+  1873→  lastName?: string;
+  1874→  idCard?: string | null;
+  1875→  phone?: string | null;
+  1876→  type?: string;
+  1877→  gender?: string | null;
+  1878→  photoUrl?: string | null;
+  1879→  /** วงเงินซื้อสินค้าต่อวัน — null = ไม่จำกัด (req 23.2) */
+  1880→  creditLimit?: number | null;
+  1881→  /** ROUND 65 — รหัสบัตรเงินสด · "" = ล้าง */
+  1882→  cardNumber?: string | null;
+  1883→  /** ROUND 65 — รหัสผู้ป่วย (HN) · "" = ล้าง */
+  1884→  patientCode?: string | null;
+  1885→  actor?: string;
+  1886→  actorRole?: string;
+  1887→};
+  1888→
+  1889→/** Updates only the provided member profile fields. Undefined keeps the current value; empty idCard/phone clears them. */
+  1890→export function updateMember(db: SqliteDb, input: UpdateMemberInput): SqliteMember {
+  1891→  const member = getMemberByNumber(db, input.memberNumber?.trim() ?? "");
+  1892→  if (!member) throw new StoreError(`ไม่พบสมาชิก ${input.memberNumber} ในระบบ`);
+  1893→  if (typeof input.firstName === "string" && !input.firstName.trim()) throw new StoreError("กรุณาระบุชื่อสมาชิก");
+  1894→  if (typeof input.lastName === "string" && !input.lastName.trim()) throw new StoreError("กรุณาระบุนามสกุลสมาชิก");
+  1895→  if (typeof input.type === "string" && !input.type.trim()) throw new StoreError("กรุณาระบุประเภทสมาชิก");
+  1896→  if (input.creditLimit !== undefined && input.creditLimit !== null && !(input.creditLimit > 0)) {
+  1897→    throw new StoreError("วงเงินซื้อสินค้าต่อวันต้องมากกว่า 0");
+  1898→  }
+  1899→
+  1900→  const assignments: string[] = [];
+  1901→  const values: (string | number | null)[] = [];
+  1902→  const changedLabels: string[] = [];
+  1903→  const normalizeOptional = (value: string | null | undefined) => value?.trim() || null;
+  1904→  if (input.prename !== undefined && normalizeOptional(input.prename) !== (member.prename ?? null)) {
+  1905→    assignments.push("prename = ?");
+  1906→    values.push(normalizeOptional(input.prename));
+  1907→    changedLabels.push("คำนำหน้า");
+  1908→  }
+  1909→  if (input.firstName != null && input.firstName.trim() !== member.firstName) {
+  1910→    assignments.push("first_name = ?");
+  1911→    values.push(input.firstName.trim());
+  1912→    changedLabels.push("ชื่อ");
+  1913→  }
+  1914→  if (input.lastName != null && input.lastName.trim() !== member.lastName) {
+  1915→    assignments.push("last_name = ?");
+  1916→    values.push(input.lastName.trim());
+  1917→    changedLabels.push("นามสกุล");
+  1918→  }
+  1919→  if (input.idCard !== undefined && normalizeOptional(input.idCard) !== member.idCard) {
+  1920→    assignments.push("id_card = ?");
+  1921→    values.push(normalizeOptional(input.idCard));
+  1922→    changedLabels.push("เลขบัตรประชาชน");
+  1923→  }
+  1924→  if (input.phone !== undefined && normalizeOptional(input.phone) !== member.phone) {
+  1925→    assignments.push("phone = ?");
+  1926→    values.push(normalizeOptional(input.phone));
+  1927→    changedLabels.push("เบอร์โทร");
+  1928→  }
+  1929→  if (input.type != null && input.type.trim() !== member.type) {
+  1930→    assignments.push("type = ?");
+  1931→    values.push(input.type.trim());
+  1932→    changedLabels.push("ประเภท");
+  1933→  }
+  1934→  if (input.gender !== undefined && normalizeOptional(input.gender) !== member.gender) {
+  1935→    assignments.push("gender = ?");
+  1936→    values.push(normalizeOptional(input.gender));
+  1937→    changedLabels.push("เพศ");
+  1938→  }
+  1939→  if (input.photoUrl !== undefined && (input.photoUrl?.trim() || null) !== member.photoUrl) {
+  1940→    assignments.push("photo_url = ?");
+  1941→    values.push(input.photoUrl?.trim() || null);
+  1942→    changedLabels.push("รูปสมาชิก");
+  1943→  }
+  1944→  if (input.creditLimit !== undefined && input.creditLimit !== member.creditLimit) {
+  1945→    assignments.push("credit_limit = ?");
+  1946→    values.push(input.creditLimit === null ? null : round2(input.creditLimit));
+  1947→    changedLabels.push("วงเงินซื้อสินค้าต่อวัน");
+  1948→  }
+  1949→  // ROUND 65 — รหัสบัตร/รหัสผู้ป่วย: ตรวจซ้ำกับสมาชิกคนอื่นก่อนบันทึก
+  1950→  if (input.cardNumber !== undefined) {
+  1951→    const nextCard = normalizeOptional(input.cardNumber);
+  1952→    if (nextCard && nextCard !== member.cardNumber) {
+  1953→      const clash = db.prepare(`SELECT member_number FROM members WHERE card_number = ? AND member_number != ?`).get(nextCard, member.memberNumber) as { member_number: string } | undefined;
+  1954→      if (clash) throw new StoreError(`รหัสบัตร ${nextCard} ถูกใช้กับสมาชิก ${clash.member_number} อยู่แล้ว`);
+  1955→    }
+  1956→    if (nextCard !== member.cardNumber) {
+  1957→      assignments.push("card_number = ?");
+  1958→      values.push(nextCard);
+  1959→      changedLabels.push("รหัสบัตร");
+  1960→    }
+  1961→  }
+  1962→  if (input.patientCode !== undefined) {
+  1963→    const nextPatient = normalizeOptional(input.patientCode);
+  1964→    if (nextPatient && nextPatient !== member.patientCode) {
+  1965→      const clash = db.prepare(`SELECT member_number FROM members WHERE patient_code = ? AND member_number != ?`).get(nextPatient, member.memberNumber) as { member_number: string } | undefined;
+  1966→      if (clash) throw new StoreError(`รหัสผู้ป่วย ${nextPatient} ถูกใช้กับสมาชิก ${clash.member_number} อยู่แล้ว`);
+  1967→    }
+  1968→    if (nextPatient !== member.patientCode) {
+  1969→      assignments.push("patient_code = ?");
+  1970→      values.push(nextPatient);
+  1971→      changedLabels.push("รหัสผู้ป่วย");
+  1972→    }
+  1973→  }
+  1974→
+  1975→  const displayName = `${input.firstName?.trim() || member.firstName} ${input.lastName?.trim() || member.lastName}`.trim();
+  1976→  const changeSummary = changedLabels.length > 0 ? `แก้ไข: ${changedLabels.join(", ")}` : "ตรวจสอบข้อมูลแล้ว · ไม่มีการเปลี่ยนแปลง";
+  1977→  const detail = `${member.memberNumber} · ${displayName} · ${changeSummary}`;
+  1978→
+  1979→  runInTransaction(db, () => {
+  1980→    if (assignments.length > 0) {
+  1981→      db.prepare(`UPDATE members SET ${assignments.join(", ")} WHERE member_number = ?`).run(...values, member.memberNumber);
+  1982→    }
+  1983→    logAction(db, "แก้ไขข้อมูลสมาชิก", input.actor?.trim() || "เจ้าหน้าที่ร้านค้า", detail, "blue", input.actorRole ?? null, formatDateTime());
+  1984→  });
+  1985→  return getMemberByNumber(db, member.memberNumber)!;
+  1986→}
+  1987→
+  1988→export type DeleteMemberInput = {
+  1989→  memberNumber: string;
+  1990→  actor?: string;
+  1991→  actorRole?: string;
+  1992→};
+  1993→
+  1994→/** Hard-deletes a member. Blocked while a balance remains or any transaction history exists. */
+  1995→export function deleteMember(db: SqliteDb, input: DeleteMemberInput): { memberNumber: string; memberName: string } {
+  1996→  const member = getMemberByNumber(db, input.memberNumber?.trim() ?? "");
+  1997→  if (!member) throw new StoreError(`ไม่พบสมาชิก ${input.memberNumber} ในระบบ`);
+  1998→  if (member.balance > 0) throw new StoreError(`ยอดเงินคงเหลือไม่เป็น 0 · ถอนเงิน ${money(member.balance)} ออกก่อนลบสมาชิก`);
+  1999→  const history = db.prepare(`SELECT COUNT(*) AS count FROM member_transactions WHERE member_number = ?`).get(member.memberNumber) as { count: number };
+  2000→  if (history.count > 0) throw new StoreError("สมาชิกมีประวัติธุรกรรมในระบบ · ใช้การระงับการใช้งานแทนการลบ");
+
+[showing lines 1-2000 of 3723; use offset=2001 with limit to continue reading]

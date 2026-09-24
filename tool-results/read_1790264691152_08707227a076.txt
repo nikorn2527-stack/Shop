@@ -1,0 +1,2002 @@
+     1→/* ROUND 75 (user) — ฟอนต์ไทยสารบรรณ (Sarabun) เป็นไฟล์ในเครื่อง (client/public/fonts)
+     2→   เดิมดึงจาก Google Fonts CDN — เครื่องร้านที่ออฟไลน์/บล็อกเว็บจะได้ฟอนต์ fallback ตัวบาง
+     3→   ทำให้เอกสารที่ Export ออกมาผิดจากที่ออกแบบ · ตอนนี้ฝังในโปรเจกต์ ใช้ได้แม้ไม่มีเน็ต
+     4→   และเป็นฟอนต์เดียวกันทุกเครื่อง (มาตรฐานราชการ: สารบรรณ 16pt ในเอกสาร A4) */
+     5→@font-face { font-family: "Sarabun"; font-style: normal; font-weight: 300; font-display: swap; src: url("/fonts/Sarabun-300-thai.woff2") format("woff2"); unicode-range: U+02D7, U+0303, U+0331, U+0E01-0E5B, U+200C-200D, U+25CC; }
+     6→@font-face { font-family: "Sarabun"; font-style: normal; font-weight: 300; font-display: swap; src: url("/fonts/Sarabun-300-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+     7→@font-face { font-family: "Sarabun"; font-style: normal; font-weight: 400; font-display: swap; src: url("/fonts/Sarabun-400-thai.woff2") format("woff2"); unicode-range: U+02D7, U+0303, U+0331, U+0E01-0E5B, U+200C-200D, U+25CC; }
+     8→@font-face { font-family: "Sarabun"; font-style: normal; font-weight: 400; font-display: swap; src: url("/fonts/Sarabun-400-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+     9→@font-face { font-family: "Sarabun"; font-style: normal; font-weight: 500; font-display: swap; src: url("/fonts/Sarabun-500-thai.woff2") format("woff2"); unicode-range: U+02D7, U+0303, U+0331, U+0E01-0E5B, U+200C-200D, U+25CC; }
+    10→@font-face { font-family: "Sarabun"; font-style: normal; font-weight: 500; font-display: swap; src: url("/fonts/Sarabun-500-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+    11→@font-face { font-family: "Sarabun"; font-style: normal; font-weight: 600; font-display: swap; src: url("/fonts/Sarabun-600-thai.woff2") format("woff2"); unicode-range: U+02D7, U+0303, U+0331, U+0E01-0E5B, U+200C-200D, U+25CC; }
+    12→@font-face { font-family: "Sarabun"; font-style: normal; font-weight: 600; font-display: swap; src: url("/fonts/Sarabun-600-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+    13→@font-face { font-family: "Sarabun"; font-style: normal; font-weight: 700; font-display: swap; src: url("/fonts/Sarabun-700-thai.woff2") format("woff2"); unicode-range: U+02D7, U+0303, U+0331, U+0E01-0E5B, U+200C-200D, U+25CC; }
+    14→@font-face { font-family: "Sarabun"; font-style: normal; font-weight: 700; font-display: swap; src: url("/fonts/Sarabun-700-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+    15→@font-face { font-family: "Sarabun"; font-style: normal; font-weight: 800; font-display: swap; src: url("/fonts/Sarabun-800-thai.woff2") format("woff2"); unicode-range: U+02D7, U+0303, U+0331, U+0E01-0E5B, U+200C-200D, U+25CC; }
+    16→@font-face { font-family: "Sarabun"; font-style: normal; font-weight: 800; font-display: swap; src: url("/fonts/Sarabun-800-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+    17→@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 400; font-display: swap; src: url("/fonts/IBMPlexMono-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+    18→@font-face { font-family: "IBM Plex Mono"; font-style: normal; font-weight: 500; font-display: swap; src: url("/fonts/IBMPlexMono-Medium-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+    19→@import "tailwindcss";
+    20→
+    21→:root {
+    22→  font-family: "Sarabun", "TH Sarabun New", "TH SarabunPSK", "Leelawadee UI", Tahoma, system-ui, sans-serif;
+    23→  color: #29241b;
+    24→  background: #fcfbf7;
+    25→  font-synthesis: none;
+    26→  text-rendering: optimizeLegibility;
+    27→  --ink: #29241b;
+    28→  --muted: #6d6157;
+    29→  --line: #e5e2d8;
+    30→  --surface: #ffffff;
+    31→  --canvas: #fcfbf7;
+    32→  --teal: #007a55;
+    33→  --teal-dark: #006b47;
+    34→  --teal-soft: #e0f4d6;
+    35→  --teal-mist: #eaf5f1;
+    36→  --rail-a: #0c4b34;
+    37→  --rail-b: #07392a;
+    38→  --rail-solid: #03543b;
+    39→  --rail-edge: #013223;
+    40→  --teal-glow: rgba(35, 124, 97, .2);
+    41→  --purple: #8267b5;
+    42→  --amber: #c98a32;
+    43→  --red: #c26162;
+    44→  --shadow: 0 10px 30px rgba(64, 51, 24, .05), 0 2px 7px rgba(64, 51, 24, .04);
+    45→}
+    46→* { box-sizing: border-box; }
+    47→body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--canvas); }
+    48→button, input { font: inherit; }
+    49→button { cursor: pointer; }
+    50→button:active { transform: scale(.985); }
+    51→.app-shell { min-height: 100vh; display: flex; }
+    52→.sidebar { width: 266px; flex: 0 0 266px; min-height: 100vh; background: #fbfdfc; border-right: 1px solid var(--line); padding: 25px 16px 17px; display: flex; flex-direction: column; }
+    53→.brand { display: flex; align-items: center; gap: 11px; padding: 0 10px 25px; }
+    54→.brand-mark { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 12px; background: var(--teal); color: #fff; box-shadow: 0 5px 12px var(--teal-glow); }
+    55→.brand-mark span { font-weight: 700; font-size: 20px; }
+    56→.brand b { display: block; font-size: 16px; line-height: 1.1; letter-spacing: -.2px; }
+    57→.brand small { display: block; color: #757869; font-size: 11px; letter-spacing: .2px; margin-top: 4px; }
+    58→.mobile-close { display: none; }
+    59→.role-card { background: #f1f7f4; border: 1px solid #e2eee9; border-radius: 12px; padding: 10px; display: flex; align-items: center; gap: 9px; margin: 0 5px 22px; }
+    60→.role-avatar, .profile-avatar { width: 31px; height: 31px; display: grid; place-items: center; background: #e2c9be; color: #6d4739; border-radius: 50%; font-weight: 700; }
+    61→.role-card > div:nth-child(2), .profile-pill > div { flex: 1; min-width: 0; }
+    62→.role-card b, .profile-pill b { display: block; font-size: 12px; }
+    63→.role-card span, .profile-pill small { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+    64→nav { display: flex; flex-direction: column; gap: 3px; }
+    65→nav button { border: 0; background: transparent; color: #747868; text-align: left; border-radius: 11px; padding: 10px 10px; display: flex; align-items: center; gap: 11px; transition: all .18s ease; }
+    66→nav button:hover { background: #f1f6f4; color: var(--teal); }
+    67→nav button.active { color: var(--teal); background: var(--teal-mist); box-shadow: inset 3px 0 0 var(--teal); }
+    68→nav button > span { flex: 1; min-width: 0; }
+    69→nav button b { display: block; font-size: 13px; font-weight: 600; }
+    70→nav button small { display: block; font-size: 11px; color: #797c6d; margin-top: 1px; }
+    71→nav button.active small { color: #70a392; }
+    72→.nav-badge { font-style: normal; background: #fff0df; color: #b87827; border-radius: 20px; min-width: 21px; height: 21px; display: grid; place-items: center; font-size: 11px; font-weight: 600; }
+    73→.nav-separator { height: 1px; background: var(--line); margin: 19px 9px 14px; }
+    74→.secondary-nav { gap: 2px; }
+    75→.sidebar-footer { margin-top: auto; padding: 17px 5px 0; }
+    76→.secure-badge { display: flex; gap: 9px; align-items: flex-start; border-top: 1px solid var(--line); padding: 16px 6px 16px; color: #848b6e; }
+    77→.secure-badge b, .secure-badge small { display: block; }
+    78→.secure-badge b { color: #557469; font-size: 11px; }
+    79→.secure-badge small { color: #7d826f; font-size: 11px; margin-top: 3px; }
+    80→.sidebar-version { color: #848876; font-family: "IBM Plex Mono", monospace; font-size: 10px; padding: 0 6px; }
+    81→.main-shell { flex: 1; min-width: 0; }
+    82→.topbar { height: 72px; background: rgba(255,255,255,.82); border-bottom: 1px solid var(--line); padding: 0 38px; display: flex; align-items: center; justify-content: space-between; gap: 20px; position: sticky; top: 0; z-index: 5; backdrop-filter: blur(12px); }
+    83→.breadcrumb { display: flex; align-items: center; gap: 10px; font-size: 12px; color: #838776; }
+    84→.breadcrumb b { font-weight: 400; color: #d6d8d0; }
+    85→.breadcrumb strong { font-weight: 600; color: #5f6352; }
+    86→.topbar-actions { display: flex; align-items: center; gap: 18px; }
+    87→.global-search { width: 220px; height: 35px; border: 1px solid #e5ece9; border-radius: 8px; display: flex; align-items: center; gap: 8px; padding: 0 9px; color: #7d8171; font-size: 11px; background: #fbfdfc; }
+    88→.global-search span { flex: 1; }
+    89→kbd { font-family: "IBM Plex Mono", monospace; font-size: 10px; color: #868b7c; background: #f3f4f1; border: 1px solid #e9eae5; border-radius: 4px; padding: 2px 4px; white-space: nowrap; }
+    90→.top-icon { width: 32px; height: 32px; border: 0; color: #808475; background: transparent; position: relative; display: grid; place-items: center; border-radius: 8px; }
+    91→.top-icon:hover { background: #f2f7f5; }
+    92→/* ROUND 44 (user) — กระดิ่งแจ้งเตือนเด่นชัด: ตัวเลขจำนวนแดง + จุดกระเพื่อม
+    93→   แทนจุด 6px สีพีชเดิมที่มองแทบไม่เห็น — ผู้ใช้ขอให้เห็นจำนวนทันทีที่มองหน้าจอ */
+    94→.notif-bell.has-alert { color: #b3484a; }
+    95→.notif-bell.has-alert:hover { background: #fbeceb; color: #99393b; }
+    96→.notif-badge { position: absolute; top: -5px; right: -6px; min-width: 18px; height: 18px; padding: 0 4px; display: grid; place-items: center; border-radius: 999px; background: #d1524f; color: #fff; font-size: 10.5px; font-weight: 700; line-height: 1; letter-spacing: -.2px; border: 2px solid #fff; box-shadow: 0 2px 8px rgba(209, 82, 79, .5); pointer-events: none; z-index: 1; }
+    97→.notif-badge::before { content: ""; position: absolute; inset: -2px; border-radius: 999px; background: rgba(209, 82, 79, .55); animation: notif-ping 1.9s cubic-bezier(0, 0, .2, 1) infinite; z-index: -1; }
+    98→@keyframes notif-ping { 0% { transform: scale(1); opacity: .7; } 75%, 100% { transform: scale(2.05); opacity: 0; } }
+    99→.profile-pill { display: flex; align-items: center; gap: 8px; padding-left: 3px; min-width: 145px; }
+   100→.profile-avatar { width: 32px; height: 32px; }
+   101→.mobile-menu { display: none; border: 0; background: transparent; color: #547066; }
+   102→.page-content { max-width: 1540px; margin: 0 auto; padding: 26px 36px 20px; }
+   103→.section-header { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; margin-bottom: 16px; }
+   104→.eyebrow { color: #6d7161; font-family: "IBM Plex Mono", monospace; text-transform: uppercase; letter-spacing: .5px; font-size: 10px; margin-bottom: 7px; }
+   105→.section-header h1 { margin: 0; color: #243530; font-size: 24px; letter-spacing: -.7px; line-height: 1.15; }
+   106→.section-header p { margin: 4px 0 0; color: #696c61; font-size: 11.5px; }
+   107→.section-actions { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+   108→.outline-button, .primary-button, .scan-button { height: 36px; border-radius: 8px; padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid #dfe8e4; color: #6b705d; background: #fff; font-size: 11px; transition: .18s ease; }
+   109→.outline-button:hover { border-color: #abd0c2; color: var(--teal); background: #fbfffd; }
+   110→.primary-button, .scan-button { border-color: var(--teal); color: #fff; background: var(--teal); box-shadow: 0 4px 10px rgba(35, 124, 97, .15); }
+   111→.primary-button:hover, .scan-button:hover { background: var(--teal-dark); }
+   112→.metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 13px; }
+   113→.metric-card, .panel, .stock-stat, .report-card { background: var(--surface); border: 1px solid #e7eeeb; border-radius: 13px; box-shadow: var(--shadow); }
+   114→.metric-card { padding: 12px 14px 10px; min-height: 98px; }
+   115→.metric-card.highlight { background: #f1faf6; border-color: #dcefe7; }
+   116→.metric-top { display: flex; justify-content: space-between; align-items: center; color: #686a5f; font-size: 11px; }
+   117→.metric-icon, .stat-icon { width: 26px; height: 26px; border-radius: 8px; display: grid; place-items: center; }
+   118→.metric-icon.green, .stat-icon.green { background: #e2f4ed; color: #3e9375; }
+   119→.metric-icon.blue, .stat-icon.blue { background: #e5f0fb; color: #5a91be; }
+   120→.metric-icon.amber, .stat-icon.amber { background: #fff3e0; color: #ce963e; }
+   121→.metric-icon.purple, .stat-icon.purple { background: #efe8fa; color: #8b6dba; }
+   122→.metric-card strong { display: block; color: #274138; font-size: 20px; letter-spacing: -.8px; margin-top: 5px; }
+   123→.metric-card strong small { font-size: 12px; color: #7e8173; font-weight: 500; letter-spacing: 0; }
+   124→.metric-foot { display: flex; gap: 6px; color: #7f8375; font-size: 11px; margin-top: 5px; }
+   125→.metric-foot.positive, .positive, .green-text { color: #4b997c; }
+   126→.metric-foot.warning { color: #bd8a42; }
+   127→.red-text { color: #c46d6e !important; }
+   128→.dashboard-grid { display: grid; grid-template-columns: minmax(0, 1.57fr) minmax(310px, .83fr); gap: 17px; margin-bottom: 17px; }
+   129→.dashboard-grid.lower { grid-template-columns: 1.15fr .85fr; }
+   130→.panel { padding: 16px 18px; }
+   131→.panel-heading, .table-toolbar, .settings-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 15px; }
+   132→.panel-heading h2, .table-toolbar h2, .settings-heading h2 { font-size: 15px; margin: 0; color: #2e463e; letter-spacing: -.2px; }
+   133→.panel-heading p, .table-toolbar p, .settings-heading p { color: #7a7e6f; font-size: 11px; margin: 4px 0 0; }
+   134→.muted-icon { color: #858977; }
+   135→.legend { display: flex; align-items: center; gap: 12px; font-size: 10px; color: #797c6d; }
+   136→.legend span { display: flex; align-items: center; gap: 4px; }
+   137→.dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+   138→.dot.teal { background: #56b294; }.dot.lilac { background: #b3a4d6; }
+   139→.chart-wrap { height: 202px; display: flex; gap: 10px; margin-top: 17px; padding-top: 3px; background-image: linear-gradient(to bottom, transparent 24%, #edf2f0 25%, transparent 26%, transparent 49%, #edf2f0 50%, transparent 51%, transparent 74%, #edf2f0 75%, transparent 76%); }
+   140→.y-labels { width: 25px; display: flex; flex-direction: column; justify-content: space-between; color: #949787; font: 10px "IBM Plex Mono", monospace; padding: 0 0 20px; }
+   141→.bar-chart { display: flex; align-items: flex-end; flex: 1; justify-content: space-around; gap: 4px; padding: 0 2px; }
+   142→.bar-column { height: 100%; flex: 1; max-width: 36px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 7px; color: #8b8e7f; font: 10px "IBM Plex Mono", monospace; }
+   143→.bar-stack { width: 17px; height: calc(100% - 20px); display: flex; flex-direction: column; justify-content: flex-end; gap: 2px; }
+   144→.bar { width: 100%; border-radius: 4px 4px 2px 2px; min-height: 4px; transition: height .3s ease; }.bar.teal { background: linear-gradient(#79caaf, #5bb295); }.bar.lilac { background: #c7bde0; }
+   145→.chart-summary { display: flex; border-top: 1px solid #f0f1ed; margin-top: 3px; padding-top: 13px; gap: 25px; }
+   146→.chart-summary div { display: flex; flex-direction: column; gap: 3px; }.chart-summary span { font-size: 11px; color: #7b7f71; }.chart-summary strong { color: #3d564d; font-size: 14px; }.chart-summary small { color: #747868; font-size: 11px; font-weight: 400; }
+   147→.quick-panel { padding: 20px 18px; }.quick-action { width: 100%; border: 0; padding: 11px 3px; background: transparent; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #eff3f1; text-align: left; transition: .18s ease; }.quick-action:hover { padding-left: 4px; }.shortcut-icon { width: 31px; height: 31px; border-radius: 8px; display: grid; place-items: center; }.teal-action .shortcut-icon { color: #3b9979; background: #e4f5ee; }.purple-action .shortcut-icon { color: #896fb7; background: #f0eafb; }.amber-action .shortcut-icon { color: #c38d3e; background: #fff3df; }.quick-action span:nth-child(2) { flex: 1; }.quick-action b { display: block; color: #486158; font-size: 11px; font-weight: 600; }.quick-action small { display: block; color: #84897a; font-size: 10px; margin-top: 2px; }.shortcut-arrow { color: #8a8e7c; font-size: 17px; }.divider { height: 1px; background: #f0f1ed; margin: 13px 0; }.mini-note { display: flex; align-items: flex-start; gap: 8px; color: #9ca387; font-size: 11px; line-height: 1.45; }
+   148→.text-button, .row-action { border: 0; background: transparent; color: #4d9b7f; font-size: 11px; padding: 2px; }.text-button:hover, .row-action:hover { color: #24795e; }.best-sellers { margin-top: 13px; }.seller-row { display: flex; align-items: center; gap: 10px; border-top: 1px solid #f2f3f0; padding: 10px 0; }.seller-row:first-child { border-top: 0; }.rank { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 6px; color: #76796a; background: #f3f4f1; font: 11px "IBM Plex Mono", monospace; }.rank-01 { color: #bf933b; background: #fff4d9; }.rank-02 { color: #969e7f; background: #edf5f3; }.rank-03 { color: #ba7e63; background: #fff0e9; }.product-thumb { width: 31px; height: 31px; background: #f3f7f5; display: grid; place-items: center; border-radius: 8px; font-size: 17px; }.seller-name { flex: 1; min-width: 0; }.seller-name b { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: #636853; font-size: 11px; font-weight: 600; }.seller-name small { color: #818676; font-size: 10px; }.seller-row > strong { color: #697055; font-size: 11px; }.activity-list { margin-top: 13px; }.activity-row { display: flex; align-items: flex-start; gap: 9px; padding: 9px 0; border-top: 1px solid #f2f3f0; }.activity-row:first-child { border-top: 0; }.activity-dot { width: 7px; height: 7px; border-radius: 50%; margin: 5px 2px 0; flex: 0 0 7px; }.activity-dot.blue { background: #75a6ca; }.activity-dot.green { background: #6db496; }.activity-dot.amber { background: #d5a154; }.activity-dot.purple { background: #a487cf; }.activity-row div { flex: 1; }.activity-row b { color: #696e5b; font-size: 11px; }.activity-row p { color: #7f8375; font-size: 10px; margin: 2px 0 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }.activity-row time { color: #949787; font: 10px "IBM Plex Mono", monospace; }
+   149→.pos-status { font-size: 11px; color: #64877b; background: #eff9f5; border: 1px solid #ddf0e8; padding: 7px 10px; border-radius: 7px; }.live-dot { width: 6px; height: 6px; background: #55af8b; display: inline-block; border-radius: 50%; margin-right: 5px; }
+   150→.pos-layout { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 18px; align-items: start; }.product-panel { padding: 18px; }.pos-search-row { display: flex; gap: 9px; }.search-field { height: 34px; border: 1px solid #e2eae7; border-radius: 7px; display: flex; align-items: center; gap: 7px; color: #848876; padding: 0 9px; background: #fff; }.search-field.large { height: 40px; flex: 1; border-radius: 8px; }.search-field input { border: 0; outline: 0; min-width: 0; flex: 1; background: transparent; color: #5f6352; font-size: 11px; }.search-field input::placeholder { color: #898e7d; }.search-field kbd { padding: 2px 5px; }.scan-button { height: 40px; padding: 0 15px; }.category-tabs, .report-tabs { display: flex; gap: 5px; border-bottom: 1px solid #f0f1ed; margin-top: 17px; }.category-tabs button, .report-tabs button { border: 0; background: transparent; color: #7c806f; font-size: 11px; padding: 9px 12px 10px; position: relative; }.category-tabs button.active, .report-tabs button.active { color: var(--teal); font-weight: 600; }.category-tabs button.active::after, .report-tabs button.active::after { content: ""; position: absolute; bottom: -1px; left: 10px; right: 10px; height: 2px; background: var(--teal); border-radius: 5px; }.product-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-top: 15px; }.product-card { position: relative; border: 1px solid #e8efec; border-radius: 10px; overflow: hidden; padding: 0; background: #fff; text-align: left; transition: .18s ease; }.product-card:hover { border-color: #a9d4c5; box-shadow: 0 6px 14px rgba(57, 110, 91, .08); transform: translateY(-1px); }.product-art { height: 91px; display: grid; place-items: center; position: relative; font-size: 35px; }.product-art.blue { background: #ecf6fb; }.product-art.amber { background: #fff5df; }.product-art.orange { background: #fff1e8; }.product-art.sky { background: #ebf6fb; }.product-art.rose { background: #fff0f1; }.product-art.mint { background: #eaf7f1; }.product-art.violet { background: #f1edfb; }.product-art.cyan { background: #eafaf6; }.product-art i { position: absolute; right: 6px; top: 6px; color: #bd7f37; background: #fff; border-radius: 20px; padding: 2px 5px; font-style: normal; font-size: 9px; }.product-card-info { padding: 9px 10px 11px; }.product-card-info b { display: block; color: #60664f; font-size: 11px; line-height: 1.35; min-height: 27px; }.product-card-info small { display: block; color: #7f8375; font-size: 10px; margin-top: 4px; }.product-card-info strong { display: block; color: #3d8c71; font-size: 13px; margin-top: 7px; }.add-product { position: absolute; right: 8px; bottom: 8px; background: #eff8f4; color: var(--teal); width: 22px; height: 22px; display: grid; place-items: center; border-radius: 6px; }.pos-help { display: flex; gap: 6px; align-items: center; color: #7e8371; font-size: 11px; margin-top: 16px; }.cart-panel { padding: 18px 16px 15px; position: sticky; top: 92px; }.cart-heading { display: flex; justify-content: space-between; align-items: flex-start; }.cart-heading h2 { margin: 0; font-size: 15px; color: #2e463e; }.cart-heading p { margin: 4px 0 0; font-size: 11px; color: #7b7f6f; }.icon-button, .table-more { width: 29px; height: 29px; display: grid; place-items: center; border-radius: 7px; border: 1px solid #e7eeeb; background: #fff; color: #858975; }.icon-button:hover, .table-more:hover { color: #c26568; background: #fff8f8; }.shortcut-banner { display: flex; align-items: center; gap: 8px; background: #f8f3ff; border: 1px solid #e9def8; border-radius: 8px; padding: 8px; margin-top: 13px; }.shortcut-banner-icon { width: 27px; height: 27px; display: grid; place-items: center; color: #896db6; background: #eee4fa; border-radius: 7px; }.shortcut-banner div { flex: 1; }.shortcut-banner b, .shortcut-banner small { display: block; }.shortcut-banner b { color: #6d5791; font-size: 11px; }.shortcut-banner small { color: #a594bc; font-size: 10px; margin-top: 2px; }.shortcut-banner button { border: 0; background: transparent; color: #ad9ac3; padding: 3px; }.cart-items { min-height: 145px; max-height: 242px; overflow-y: auto; margin-top: 12px; }.cart-item { display: flex; align-items: flex-start; gap: 8px; padding: 10px 0; border-bottom: 1px solid #f2f3f0; }.cart-item-icon { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 7px; background: #f2f7f5; font-size: 15px; }.cart-item-main { flex: 1; min-width: 0; }.cart-item-main b { display: block; color: #686d57; font-size: 11px; line-height: 1.3; }.cart-item-main > span { display: block; color: #84897a; font-size: 9px; margin-top: 3px; }.cart-item > strong { color: #527066; font-size: 11px; padding-top: 2px; }.remove-item { border: 0; background: transparent; padding: 2px; color: #9b9e8f; }.remove-item:hover { color: #cb696c; }.qty-control { display: flex; align-items: center; gap: 7px; margin-top: 6px; }.qty-control button { width: 19px; height: 19px; padding: 0; display: grid; place-items: center; border: 1px solid #e4ece9; border-radius: 5px; color: #8a9078; background: #fff; }.qty-control span { color: #747866; font: 11px "IBM Plex Mono", monospace; }.empty-cart { height: 155px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #959988; gap: 6px; }.empty-cart b { color: #7e8270; font-size: 11px; }.empty-cart span { font-size: 11px; }.member-select { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-top: 1px solid #f0f1ed; border-bottom: 1px solid #f0f1ed; cursor: pointer; }.member-select:hover b { color: var(--teal); }.member-avatar { width: 29px; height: 29px; border-radius: 7px; display: grid; place-items: center; background: #e9f5f0; color: #4b9d7f; }.member-select div:nth-child(2) { flex: 1; }.member-select b, .member-select small { display: block; }.member-select b { color: #6a7057; font-size: 11px; }.member-select small { color: #71775d; font-size: 10px; margin-top: 2px; }.cart-totals { padding: 11px 0 8px; }.cart-totals > div { display: flex; justify-content: space-between; color: #7a7e6e; font-size: 11px; padding: 4px 0; }.cart-totals strong { color: #6b705b; font-size: 11px; }.cart-totals .discount { color: #65a28a; }.cart-totals .total-line { border-top: 1px dashed #dfe8e4; margin-top: 5px; padding-top: 11px; align-items: center; }.cart-totals .total-line span { color: #636952; font-weight: 600; }.cart-totals .total-line strong { color: var(--teal); font-size: 20px; letter-spacing: -.5px; }.payment-actions { border-top: 1px solid #f0f1ed; padding-top: 12px; }.pay-button { width: 100%; border: 0; height: 37px; display: flex; justify-content: center; align-items: center; gap: 7px; border-radius: 7px; font-size: 11px; font-weight: 600; }.member-pay { color: #fff; background: var(--teal); }.member-pay:hover { background: var(--teal-dark); }.pay-split { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 7px; }.pay-split button { height: 35px; border-radius: 7px; background: #fff; border: 1px solid #e3ebe8; color: #757a65; font-size: 11px; display: flex; align-items: center; justify-content: center; gap: 5px; }.pay-icon { width: 20px; height: 20px; display: grid; place-items: center; border-radius: 5px; }.pay-icon.cash { color: #ba8538; background: #fff3dd; }.pay-icon.qr { color: #7a69af; background: #f0eafb; }.inline-message, .notice-bar { display: flex; align-items: center; gap: 6px; color: #528c76; background: #eff9f4; border: 1px solid #d8eee5; border-radius: 7px; font-size: 11px; padding: 8px 10px; margin-top: 9px; }.inline-message { font-size: 10px; }.notice-bar button { margin-left: auto; border: 0; background: transparent; color: #7ea395; padding: 0; }.shortcut-strip { margin-top: 17px; display: grid; grid-template-columns: minmax(180px, 1.4fr) repeat(3, 1fr); align-items: center; gap: 8px; background: #fff; border: 1px solid #e6eeeb; border-radius: 12px; padding: 13px 16px; box-shadow: var(--shadow); }.shortcut-strip > div { padding-right: 10px; }.shortcut-strip .eyebrow { margin-bottom: 3px; }.shortcut-strip b, .shortcut-strip small { display: block; }.shortcut-strip b { color: #547066; font-size: 11px; }.shortcut-strip small { color: #7e8274; font-size: 10px; margin-top: 3px; }.shortcut-strip > button { border: 1px solid #e9efed; background: #fff; border-radius: 8px; min-height: 40px; color: #7a8166; display: flex; align-items: center; gap: 7px; justify-content: flex-start; padding: 0 10px; font-size: 11px; }.shortcut-strip > button:hover { border-color: #acd2c4; color: var(--teal); }.shortcut-strip > button kbd { margin-left: auto; }
+   151→.stock-overview { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 12px; }.stock-stat { padding: 10px 12px; display: flex; align-items: center; gap: 9px; }.stock-stat > div { min-width: 0; }.stock-stat small, .stock-stat strong { display: block; }.stock-stat small { color: #7a7e6e; font-size: 11px; }.stock-stat strong { color: #466057; font-size: 16px; margin-top: 2px; }.stock-stat strong em { font-size: 11px; color: #767969; font-style: normal; font-weight: 400; }.table-panel { padding: 15px 16px 12px; }.toolbar-actions { display: flex; align-items: center; gap: 8px; }.table-wrap { overflow-x: auto; margin-top: 10px; }table { width: 100%; border-collapse: collapse; font-size: 11px; min-width: 680px; }th { text-align: left; color: #7f8373; background: #fafcfb; font-size: 10px; font-weight: 500; padding: 10px 9px; border-top: 1px solid #f1f2ee; border-bottom: 1px solid #f1f2ee; }td { color: #727764; padding: 12px 9px; border-bottom: 1px solid #f2f3f0; vertical-align: middle; }td b, td small { display: block; }td b { color: #646953; font-weight: 600; }td small { color: #898c7d; font-size: 10px; margin-top: 3px; font-family: "IBM Plex Mono", monospace; }tbody tr:hover { background: #fbfdfc; }.status-pill { display: inline-flex; align-items: center; gap: 5px; padding: 4px 7px; border-radius: 20px; font-size: 10px; white-space: nowrap; }.status-pill::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }.status-pill.green { color: #4b987b; background: #edf8f3; }.status-pill.amber { color: #b8863d; background: #fff5e6; }.status-pill.red { color: #c16b6e; background: #fff0f0; }.status-pill.blue { color: #5d91b5; background: #edf6fb; }.status-pill.purple { color: #8870af; background: #f3edfb; }.table-more { border: 0; background: transparent; }.member-top-grid { display: grid; grid-template-columns: 1.45fr .85fr .85fr; gap: 10px; margin-bottom: 12px; }.member-balance-card { background: linear-gradient(115deg, #2d8a6c, #5aa98c); border-radius: 13px; padding: 11px 16px; color: #fff; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 10px 24px rgba(38, 121, 93, .16); }.member-balance-card .eyebrow { color: #c1e4d6; }.member-balance-card strong, .member-balance-card small { display: block; }.member-balance-card strong { font-size: 19px; letter-spacing: -.5px; }.member-balance-card small { color: #d6eee4; font-size: 11px; margin-top: 4px; }.balance-orb { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; color: #ccefe1; background: rgba(255,255,255,.15); }.member-mini-card { display: flex; align-items: flex-start; gap: 9px; padding: 11px 13px; background: #fff; border: 1px solid #e7eeeb; border-radius: 13px; box-shadow: var(--shadow); }.member-mini-card > div { min-width: 0; }.member-mini-card small, .member-mini-card strong, .member-mini-card p { display: block; }.member-mini-card small { color: #7a7e6e; font-size: 11px; }.member-mini-card strong { color: #486158; font-size: 15.5px; margin-top: 3px; }.member-mini-card strong em { font-size: 11px; color: #787b6b; font-style: normal; font-weight: 400; }.member-mini-card p { color: #808376; font-size: 10px; margin: 4px 0 0; }.member-cell { display: flex; align-items: center; gap: 8px; }.member-table-avatar { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: #e7f3ef; color: #4b8d77; font-size: 11px; font-weight: 600; }.row-action { white-space: nowrap; }.row-action span { margin-left: 4px; }.report-tabs { margin-top: -6px; margin-bottom: 13px; }.report-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 13px; margin-bottom: 17px; }.report-card { padding: 16px; position: relative; overflow: hidden; }.report-card > span, .report-card > small { display: block; color: #6a6d61; font-size: 11px; }.report-card strong { display: block; color: #466057; font-size: 20px; margin-top: 7px; }.report-card small { margin-top: 4px; }.sparkline { height: 30px; display: flex; align-items: flex-end; gap: 4px; margin-top: 10px; opacity: .75; }.sparkline i { width: 13%; border-radius: 3px 3px 0 0; display: block; }.teal-spark i { background: #8bcbb4; }.purple-spark i { background: #c5b5df; }.amber-spark i { background: #e0bc79; }.green-spark i { background: #93c7ad; }.sparkline i:nth-child(1) { height: 38%; }.sparkline i:nth-child(2) { height: 54%; }.sparkline i:nth-child(3) { height: 41%; }.sparkline i:nth-child(4) { height: 73%; }.sparkline i:nth-child(5) { height: 57%; }.sparkline i:nth-child(6) { height: 85%; }.sparkline i:nth-child(7) { height: 72%; }.report-lower { grid-template-columns: 1.2fr .8fr; }.category-report { margin-top: 15px; }.category-row { display: grid; grid-template-columns: 115px 1fr 100px; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid #f2f3f0; }.category-row > div:first-child b, .category-row > div:first-child span { display: block; }.category-row b { color: #6e735e; font-size: 11px; }.category-row span { color: #878a7d; font-size: 10px; margin-top: 2px; }.category-row > strong { text-align: right; color: #6b7158; font-size: 11px; }.progress { height: 6px; border-radius: 10px; background: #eef4f1; overflow: hidden; }.progress i { display: block; height: 100%; background: #66b99c; border-radius: inherit; }.progress.blue i { background: #80b3d5; }.progress.purple i { background: #ae96d3; }.progress.amber i { background: #d8ae64; }.compact { height: 30px; font-size: 11px; }.export-list { margin-top: 12px; }.export-list button { width: 100%; border: 0; border-top: 1px solid #f2f3f0; background: transparent; display: flex; align-items: center; gap: 8px; text-align: left; padding: 11px 0; color: #858976; }.export-list button:hover b { color: var(--teal); }.export-list button > span:nth-child(2) { flex: 1; }.export-list b, .export-list small { display: block; }.export-list b { color: #6d725d; font-size: 11px; }.export-list small { color: #878a7d; font-size: 10px; margin-top: 2px; }.file-icon { width: 28px; height: 31px; border-radius: 6px; display: grid; place-items: center; font: 9px "IBM Plex Mono", monospace; }.file-icon.xls { color: #4a9c7c; background: #e5f5ee; }.file-icon.pdf { color: #c36e71; background: #fff0f0; }.file-icon.csv { color: #6a8fbd; background: #edf5ff; }.floating-notice { margin-top: 16px; }.settings-layout { display: grid; grid-template-columns: 220px minmax(0, 730px); gap: 17px; align-items: start; }.settings-nav { display: flex; flex-direction: column; gap: 3px; }.settings-nav button { border: 0; background: transparent; color: #65675b; text-align: left; border-radius: 8px; display: flex; gap: 8px; align-items: center; padding: 10px; font-size: 11px; }.settings-nav button.active { background: #eaf5f1; color: var(--teal); font-weight: 600; }.settings-nav button:hover { color: var(--teal); }.settings-content { display: flex; flex-direction: column; gap: 15px; }.settings-card { padding: 16px 18px; }.settings-heading { padding-bottom: 15px; border-bottom: 1px solid #eff3f1; }.form-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 13px; padding-top: 15px; }.form-grid label { display: block; color: #7f8373; font-size: 11px; }.form-grid label.wide { grid-column: 1 / -1; }.form-grid input { width: 100%; height: 34px; margin-top: 6px; border: 1px solid #e2eae7; border-radius: 7px; padding: 0 9px; outline: none; color: #6b715a; font-size: 11px; background: #fcfefd; }.form-grid input:focus { border-color: #9bcdba; box-shadow: 0 0 0 3px #eaf6f1; }.toggle-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 13px 0; border-bottom: 1px solid #f2f3f0; }.toggle-row:last-child { border-bottom: 0; padding-bottom: 0; }.toggle-row b, .toggle-row small { display: block; }.toggle-row b { color: #707560; font-size: 11px; }.toggle-row small { color: #828777; font-size: 10px; margin-top: 3px; }.toggle { width: 37px; height: 21px; padding: 2px; border: 0; border-radius: 20px; background: #dce5e1; transition: .2s ease; }.toggle span { display: block; width: 17px; height: 17px; background: #fff; border-radius: 50%; transition: .2s ease; box-shadow: 0 1px 3px rgba(0,0,0,.08); }.toggle.on { background: #64af93; }.toggle.on span { transform: translateX(16px); }.log-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 13px; margin-bottom: 17px; }.log-summary > div { background: #fff; border: 1px solid #e7eeeb; border-radius: 11px; padding: 14px 17px; display: flex; align-items: center; gap: 10px; color: #6e9e8d; box-shadow: var(--shadow); }.log-summary span { color: #6d7161; font-size: 11px; }.log-summary strong { display: block; color: #4b665c; font-size: 17px; margin-top: 2px; }.app-footer { max-width: 1540px; padding: 15px 42px 19px; margin: 0 auto; display: flex; justify-content: space-between; color: #848979; font-size: 10px; }.app-footer span:last-child { display: flex; align-items: center; gap: 4px; }
+   152→@media (max-width: 1120px) { .sidebar { width: 224px; flex-basis: 224px; }.page-content { padding: 30px 24px 20px; }.topbar { padding: 0 24px; }.metric-grid, .report-cards, .stock-overview { grid-template-columns: repeat(2, 1fr); }.pos-layout { grid-template-columns: minmax(0, 1fr) 340px; }.product-grid { grid-template-columns: repeat(3, 1fr); }.dashboard-grid.lower, .report-lower { grid-template-columns: 1fr; } }
+   153→@media (max-width: 820px) { .dashboard-grid { grid-template-columns: 1fr; } .sidebar { position: fixed; left: -280px; top: 0; z-index: 20; transition: left .2s ease; box-shadow: 12px 0 30px rgba(30, 60, 48, .12); }.sidebar.open { left: 0; }.mobile-close { display: block; margin-left: auto; border: 0; background: transparent; color: #787d6a; }.mobile-menu { display: grid; place-items: center; }.topbar { height: 62px; padding: 0 16px; }.breadcrumb { flex: 1; }.global-search { display: none; }.profile-pill { min-width: auto; }.profile-pill > div, .profile-pill > svg { display: none; }.page-content { padding: 25px 16px 16px; }.section-header { align-items: flex-start; flex-direction: column; }.section-actions { justify-content: flex-start; }.pos-layout { grid-template-columns: 1fr; }.cart-panel { position: static; }.shortcut-strip { grid-template-columns: 1fr; }.shortcut-strip > div { padding-bottom: 4px; }.member-top-grid, .settings-layout { grid-template-columns: 1fr; }.settings-nav { flex-direction: row; overflow-x: auto; }.settings-nav button { white-space: nowrap; }.app-footer { padding: 12px 16px; flex-direction: column; gap: 5px; } }
+   154→@media (max-width: 560px) { .section-header h1 { font-size: 24px; }.metric-grid, .report-cards, .stock-overview, .log-summary { grid-template-columns: 1fr 1fr; gap: 9px; }.metric-card { padding: 13px; }.metric-card strong { font-size: 19px; }.metric-top { font-size: 11px; }.metric-icon { width: 27px; height: 27px; }.product-grid { grid-template-columns: repeat(2, 1fr); }.product-art { height: 78px; }.chart-summary { gap: 12px; }.chart-summary strong { font-size: 12px; }.chart-summary span { font-size: 9px; }.category-tabs button { padding-left: 8px; padding-right: 8px; }.pos-search-row { flex-direction: column; }.scan-button { width: 100%; }.toolbar-actions { flex-wrap: wrap; justify-content: flex-end; }.table-toolbar { flex-direction: column; }.member-balance-card { grid-column: 1 / -1; }.member-mini-card { padding: 13px; }.report-card { padding: 13px; }.report-card strong { font-size: 16px; }.topbar-actions { gap: 8px; }.top-icon { display: none; } }
+   155→
+   156→/* Enhancement layer: role-aware controls, interactive analytics, scanner simulation and slip upload */
+   157→.role-switcher { display: flex; align-items: center; gap: 3px; padding: 3px; border: 1px solid #dfeae5; border-radius: 9px; background: #f7fbf9; white-space: nowrap; }
+   158→.role-switch-label { display: inline-flex; align-items: center; gap: 4px; color: #747868; font-size: 10px; padding: 0 4px 0 5px; }
+   159→.role-switcher button { display: inline-flex; align-items: center; gap: 4px; height: 26px; border: 0; border-radius: 6px; background: transparent; color: #6c7062; padding: 0 8px; font-size: 10px; transition: .18s ease; }
+   160→.role-switcher button:hover { color: var(--teal); }
+   161→.role-switcher button.active { color: #fff; background: var(--teal); box-shadow: 0 2px 5px rgba(35, 124, 97, .18); }
+   162→.role-switcher button.active.admin { background: #8267b5; }
+   163→.role-card .role-avatar.admin, .profile-avatar.admin { background: #e8ddf6; color: #7459a5; }
+   164→.permission-chip { display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 9px; border-radius: 7px; font-size: 11px; border: 1px solid #dfeae5; background: #f4faf7; color: #558976; }
+   165→.permission-chip.admin { color: #72589f; border-color: #e9def7; background: #f8f3fd; }
+   166→.permission-chip span { display: grid; place-items: center; }
+   167→.chart-controls { display: flex; align-items: center; gap: 3px; padding: 3px; background: #f6faf8; border: 1px solid #e6eeea; border-radius: 7px; }
+   168→.chart-controls button { border: 0; background: transparent; color: #7d8270; border-radius: 5px; padding: 5px 8px; font-size: 10px; }
+   169→.chart-controls button:hover { color: var(--teal); }
+   170→.chart-controls button.active { color: var(--teal); background: #fff; box-shadow: 0 1px 4px rgba(52, 101, 83, .1); font-weight: 600; }
+   171→.chart-controls.small button { padding: 4px 7px; }
+   172→.chart-interactive-meta { min-height: 25px; display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #edf2f0; margin-top: 12px; padding-bottom: 7px; color: #7c8071; font-size: 10px; }
+   173→.chart-interactive-meta span { display: inline-flex; align-items: center; gap: 4px; }
+   174→.chart-interactive-meta b { margin-left: auto; color: #4f7064; font-weight: 600; }
+   175→.interactive-chart-panel .chart-wrap { margin-top: 8px; }
+   176→.bar-column { border: 0; background: transparent; padding: 0; cursor: pointer; position: relative; }
+   177→.bar-column::after { content: ""; position: absolute; inset: 0 -3px 17px; border-radius: 7px; background: transparent; transition: .18s ease; z-index: -1; }
+   178→.bar-column:hover::after, .bar-column.selected::after { background: #eef8f4; }
+   179→.bar-column.selected > span { color: var(--teal); font-weight: 600; }
+   180→.bar-column.selected .bar.teal { background: linear-gradient(#4ea789, #277d62); }
+   181→.bar-column.selected .bar.lilac { background: #9b83c7; }
+   182→.bar { transition: height .25s ease, background .18s ease; }
+   183→.product-rank-row { width: 100%; display: flex; align-items: center; gap: 10px; border: 0; border-top: 1px solid #f2f3f0; padding: 9px 0; background: transparent; text-align: left; border-radius: 6px; }
+   184→.product-rank-row:first-child { border-top: 0; }
+   185→.product-rank-row:hover, .product-rank-row.selected { background: #fbfdfc; }
+   186→.product-rank-row:hover .seller-name b, .product-rank-row.selected .seller-name b { color: var(--teal); }
+   187→.product-rank-row > strong { color: #697055; font-size: 11px; min-width: 78px; text-align: right; }
+   188→.seller-name { position: relative; }
+   189→.rank-progress { display: block; height: 4px; max-width: 148px; margin-top: 5px; border-radius: 5px; background: #edf3f0; overflow: hidden; }
+   190→.rank-progress em { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #76c5aa, #3e9779); transition: width .25s ease; }
+   191→.ranking-insight { display: flex; align-items: center; gap: 6px; color: #77a493; background: #f1faf6; border: 1px solid #e0f0e9; border-radius: 7px; padding: 8px 9px; margin-top: 8px; font-size: 10px; }
+   192→.scan-status-strip { display: flex; align-items: center; gap: 8px; border: 1px solid #e0eee8; background: #f5fbf8; border-radius: 8px; margin-top: 10px; padding: 8px 9px; }
+   193→.scan-status-icon { width: 27px; height: 27px; display: grid; place-items: center; color: #3f9779; background: #e1f3ec; border-radius: 6px; }
+   194→.scan-status-strip > div:nth-child(2) { flex: 1; }
+   195→.scan-status-strip b, .scan-status-strip small { display: block; }
+   196→.scan-status-strip b { color: #6e755a; font-size: 11px; }
+   197→.scan-status-strip small { color: #80856f; font-size: 9px; margin-top: 2px; }
+   198→.slip-uploader { border-bottom: 1px solid #f0f1ed; padding: 10px 0; }
+   199→.slip-heading { display: flex; align-items: center; justify-content: space-between; color: #7c816c; font-size: 11px; margin-bottom: 7px; }
+   200→.slip-heading span { display: inline-flex; align-items: center; gap: 5px; }
+   201→.slip-heading small { color: #888c7a; font-size: 9px; }
+   202→.upload-drop { min-height: 51px; display: flex; align-items: center; gap: 8px; border: 1px dashed #b8d8cb; border-radius: 7px; background: #f8fcfa; padding: 7px 9px; color: #6da38e; cursor: pointer; transition: .18s ease; }
+   203→.upload-drop:hover { background: #eff9f4; border-color: #73b39a; }
+   204→.upload-drop > span { display: block; }
+   205→.upload-drop b, .upload-drop small { display: block; }
+   206→.upload-drop b { color: #5d8777; font-size: 10px; }
+   207→.upload-drop small { color: #7e8371; font-size: 9px; margin-top: 2px; }
+   208→.upload-drop input { display: none; }
+   209→.slip-preview { display: flex; align-items: center; gap: 8px; min-height: 55px; border: 1px solid #dcece5; border-radius: 7px; padding: 6px; background: #f8fcfa; }
+   210→.slip-preview img { width: 42px; height: 42px; object-fit: cover; border-radius: 5px; border: 1px solid #dbe9e3; }
+   211→.slip-preview div { flex: 1; min-width: 0; }
+   212→.slip-preview b, .slip-preview small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+   213→.slip-preview b { color: #5a786d; font-size: 10px; }
+   214→.slip-preview small { color: #7f8373; font-size: 9px; margin-top: 2px; }
+   215→.slip-preview button { border: 0; background: transparent; color: #898e7d; padding: 4px; }
+   216→.admin-pos-note { display: flex; align-items: center; gap: 6px; color: #7a62a7; background: #f8f3fd; border: 1px solid #e9def7; border-radius: 6px; padding: 7px 8px; margin-top: 9px; font-size: 10px; }
+   217→.locked-nav { display: flex; align-items: center; gap: 7px; color: #919584; font-size: 10px; padding: 10px; background: #f7faf8; border-radius: 8px; }
+   218→.modal-backdrop { position: fixed; inset: 0; z-index: 50; display: grid; place-items: center; padding: 20px; background: rgba(30, 50, 43, .38); backdrop-filter: blur(3px); }
+   219→.scanner-modal { width: min(430px, 100%); background: #fff; border: 1px solid #e4ede9; border-radius: 15px; box-shadow: 0 20px 60px rgba(24, 61, 48, .2); padding: 20px; animation: modal-in .18s ease-out; }
+   220→@keyframes modal-in { from { opacity: 0; transform: translateY(8px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+   221→.modal-heading { display: flex; justify-content: space-between; gap: 12px; }
+   222→.modal-heading h2 { margin: 0; color: #2e463e; font-size: 17px; }
+   223→.modal-heading p { color: #7b7f70; font-size: 11px; margin: 5px 0 0; }
+   224→.scanner-viewport { height: 185px; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 9px; overflow: hidden; color: #8bcab4; background: linear-gradient(145deg, #143f32, #215e4b); border-radius: 11px; margin: 16px 0 14px; }
+   225→.scanner-viewport::before { content: ""; position: absolute; inset: 20px 53px; border: 1px solid rgba(185, 239, 218, .35); border-radius: 7px; }
+   226→.scanner-viewport > span { color: #bce8d7; font-size: 10px; }
+   227→.scanner-corner { position: absolute; width: 23px; height: 23px; border-color: #9de5ca; border-style: solid; }
+   228→.scanner-corner.tl { top: 27px; left: 60px; border-width: 2px 0 0 2px; }.scanner-corner.tr { top: 27px; right: 60px; border-width: 2px 2px 0 0; }.scanner-corner.bl { bottom: 27px; left: 60px; border-width: 0 0 2px 2px; }.scanner-corner.br { bottom: 27px; right: 60px; border-width: 0 2px 2px 0; }
+   229→.scanner-line { position: absolute; left: 58px; right: 58px; top: 50%; height: 2px; background: #84e2bf; box-shadow: 0 0 12px #72e0b7; animation: scan-line 2s ease-in-out infinite; }
+   230→@keyframes scan-line { 0%, 100% { transform: translateY(-38px); opacity: .5; } 50% { transform: translateY(38px); opacity: 1; } }
+   231→.scanner-input label { display: block; color: #7f8372; font-size: 10px; margin-bottom: 5px; }
+   232→.scanner-input .search-field { height: 36px; }
+   233→.scanner-input .search-field button { border: 0; background: var(--teal); color: #fff; width: 28px; height: 26px; display: grid; place-items: center; border-radius: 5px; }
+   234→.sample-codes { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 10px; color: #838776; font-size: 10px; }
+   235→.sample-codes button { border: 1px solid #e1ebe7; border-radius: 5px; background: #fbfdfc; color: #618175; padding: 4px 6px; font-size: 9px; }
+   236→.sample-codes button:hover { border-color: #9fcbba; color: var(--teal); }
+   237→.scanner-footer { display: flex; align-items: center; justify-content: space-between; border-top: 1px solid #f0f1ed; margin-top: 15px; padding-top: 12px; color: #717761; font-size: 10px; }
+   238→.scanner-footer > span { display: inline-flex; align-items: center; gap: 4px; }
+   239→@media (max-width: 1120px) { .topbar-actions .role-switcher { display: none; } }
+   240→@media (max-width: 820px) { .permission-chip { align-self: flex-start; }.role-switcher { margin: 0 5px 14px; }.topbar-actions { gap: 8px; }.chart-interactive-meta { flex-wrap: wrap; }.chart-interactive-meta b { width: 100%; margin-left: 0; }.product-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+   241→@media (max-width: 560px) { .chart-controls button { padding: 4px 5px; }.chart-interactive-meta { gap: 7px; }.scanner-modal { padding: 15px; }.scanner-viewport { height: 160px; }.product-grid { grid-template-columns: repeat(2, 1fr); }.role-switcher { width: 100%; }.role-switcher button { flex: 1; justify-content: center; } }
+   242→
+   243→/* Requirement update: readable Thai typography, inventory alerts, member management and receipt preview */
+   244→:root { --font-body: "Sarabun", system-ui, sans-serif; }
+   245→body, button, input, select, textarea { font-family: var(--font-body); }
+   246→.inventory-alert-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin: 16px 0; }
+   247→.alert-panel { padding: 17px 19px 12px; }
+   248→.alert-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; }
+   249→.alert-heading h2 { margin: 3px 0 2px; color: #456358; font-size: 14px; }
+   250→.alert-heading p { margin: 0; color: #7d826f; font-size: 10px; }
+   251→.alert-count { min-width: 31px; height: 31px; display: grid; place-items: center; border-radius: 9px; font-weight: 700; font-size: 14px; }
+   252→.alert-count.red { color: #bc7069; background: #fff0ee; }.alert-count.amber { color: #b18a4d; background: #fff8e8; }
+   253→.alert-list { margin-top: 12px; }.alert-row { width: 100%; display: flex; align-items: center; gap: 9px; padding: 9px 0; border: 0; border-top: 1px solid #f2f3f0; background: transparent; text-align: left; cursor: pointer; }.alert-row:hover b { color: var(--teal); }.alert-row > span:nth-child(2) { flex: 1; min-width: 0; }.alert-row b, .alert-row small { display: block; }.alert-row b { overflow: hidden; color: #717660; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }.alert-row small { margin-top: 3px; color: #828673; font-size: 9px; }.alert-item-icon { width: 27px; height: 27px; display: grid; place-items: center; border-radius: 7px; }.red-bg { color: #c8756e; background: #fff0ed; }.amber-bg { color: #b68b4c; background: #fff5dc; }.alert-arrow { color: #878d78; font-size: 14px; }.alert-footer-action { width: 100%; display: flex; justify-content: space-between; align-items: center; border: 0; border-top: 1px solid #edf2f0; background: transparent; color: #6b9b89; padding: 10px 0 1px; font-size: 10px; text-align: left; cursor: pointer; }.alert-footer-action span { font-size: 14px; }.amber-action-text { color: #b38b51; }
+   254→.member-number-preview, .number-preview { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: #899170; border: 1px solid #e0eee8; background: #f4fbf8; border-radius: 8px; padding: 9px 10px; font-size: 10px; }.member-number-preview span, .number-preview span { display: inline-flex; align-items: center; gap: 5px; }.member-number-preview b, .number-preview b { color: var(--teal); font-family: "IBM Plex Mono", monospace; font-size: 11px; }.initial-balance-note { display: flex; align-items: center; gap: 6px; color: #676c5a; background: #fafcfb; border: 1px solid #edf2f0; border-radius: 7px; margin-top: 12px; padding: 8px 9px; font-size: 10px; }
+   255→.filter-pills { display: flex; align-items: center; gap: 3px; border: 1px solid #e6edea; background: #f8fbfa; padding: 3px; border-radius: 7px; }.filter-pills button { border: 0; background: transparent; border-radius: 5px; color: #7b806c; padding: 5px 8px; font-size: 10px; }.filter-pills button.active { color: var(--teal); background: #fff; box-shadow: 0 1px 4px rgba(45, 105, 84, .1); font-weight: 600; }.filter-pills button span { margin-left: 3px; color: #959a84; }.table-filter-summary { display: flex; justify-content: space-between; align-items: center; margin: 0 0 8px; color: #838774; font-size: 10px; }.table-filter-summary span { display: inline-flex; align-items: center; gap: 4px; }.empty-filter { display: flex; flex-direction: column; align-items: center; gap: 4px; color: #747866; padding: 35px 10px; }.empty-filter svg { color: #a7c7ba; margin-bottom: 3px; }.empty-filter b { font-size: 12px; }.empty-filter span { font-size: 10px; }.member-cell { display: flex; align-items: center; gap: 8px; }.member-table-avatar { width: 27px; height: 27px; display: grid; place-items: center; border-radius: 50%; color: #5f8e7d; background: #e4f3ed; font-size: 11px; font-weight: 600; }
+   256→.form-modal { width: min(560px, 100%); max-height: min(720px, calc(100vh - 40px)); overflow-y: auto; background: #fff; border: 1px solid #e1ebe7; border-radius: 15px; padding: 20px; box-shadow: 0 20px 60px rgba(24, 61, 48, .2); animation: modal-in .18s ease-out; }.compact-form { margin-top: 15px; }.compact-form label { display: block; color: #7f8471; font-size: 11px; }.compact-form input, .compact-form select { width: 100%; height: 35px; margin-top: 5px; border: 1px solid #e1eae6; border-radius: 7px; padding: 0 9px; outline: none; background: #fff; color: #666d53; font-size: 11px; }.compact-form input:focus, .compact-form select:focus { border-color: #8fc5b0; box-shadow: 0 0 0 3px #eaf6f1; }.form-grid label.wide { grid-column: 1 / -1; }.modal-actions { display: flex; justify-content: flex-end; gap: 7px; margin-top: 16px; border-top: 1px solid #edf2f0; padding-top: 13px; }.number-mode-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 7px; margin: 15px 0 12px; }.number-mode-grid button { display: flex; align-items: flex-start; gap: 7px; border: 1px solid #e4ece9; background: #fff; border-radius: 8px; padding: 10px 8px; color: #65695b; text-align: left; }.number-mode-grid button:hover, .number-mode-grid button.selected { border-color: #8fc5b0; background: #f4fbf8; }.number-mode-grid button b, .number-mode-grid button small { display: block; }.number-mode-grid button b { color: #70765e; font-size: 10px; }.number-mode-grid button small { color: #838776; font-size: 9px; line-height: 1.35; margin-top: 3px; }.number-radio { width: 13px; height: 13px; flex: 0 0 13px; display: grid; place-items: center; border: 1px solid #b8cbc3; border-radius: 50%; margin-top: 1px; }.number-radio i { width: 7px; height: 7px; display: block; border-radius: 50%; background: var(--teal); }
+   257→.receipt-modal { width: min(430px, 100%); max-height: calc(100vh - 32px); overflow-y: auto; background: #f7faf8; border: 1px solid #dfeae5; border-radius: 15px; padding: 15px; box-shadow: 0 20px 60px rgba(24, 61, 48, .24); animation: modal-in .18s ease-out; }.receipt-success { display: flex; align-items: center; gap: 9px; padding: 4px 2px 12px; }.receipt-success > span { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%; color: #fff; background: #62b395; }.receipt-success > div { flex: 1; }.receipt-success b, .receipt-success small { display: block; }.receipt-success b { color: #4e7667; font-size: 12px; }.receipt-success small { color: #7d846d; font-size: 9px; margin-top: 3px; }.receipt-paper { background: #fff; border: 1px solid #e5ece9; padding: 17px 18px; box-shadow: 0 4px 14px rgba(33, 74, 58, .06); font-family: "Sarabun", "TH Sarabun New", "Leelawadee UI", Tahoma, sans-serif; color: #1c1c1a; }.receipt-brand { display: flex; align-items: center; justify-content: center; gap: 8px; text-align: center; }.brand-mark.small { width: 27px; height: 27px; font-size: 15px; }.receipt-brand b, .receipt-brand small { display: block; }.receipt-brand .brand-mark { display: none; } /* ROUND 75 — สลิปไม่ใส่โลโก้ ชื่อร้านกลางบรรทัดแบบสลิปจริง */ .receipt-brand b { color: #111111; font-size: 14.5px; font-weight: 800; letter-spacing: .2px; }.receipt-brand small { color: #555555; font-size: 10.5px; margin-top: 2px; font-weight: 500; }.receipt-divider { border-top: 1px dashed #9a9a94; margin: 12px 0 9px; }.receipt-meta, .receipt-customer, .receipt-payment, .receipt-balance { display: flex; justify-content: space-between; gap: 10px; color: #444444; font-size: 10.5px; font-weight: 500; }.receipt-meta b, .receipt-customer b, .receipt-payment b, .receipt-balance b { color: #111111; font-weight: 700; }.receipt-customer { border-bottom: 1px solid #edf2f0; padding: 8px 0; }.receipt-line { display: flex; justify-content: space-between; gap: 10px; padding: 8px 0; color: #1c1c1a; font-size: 11.5px; font-weight: 500; }.receipt-line span { flex: 1; }.receipt-line small { display: block; color: #555555; font-size: 10.5px; margin-top: 3px; }.receipt-line b { color: #111111; font-family: "IBM Plex Mono", monospace; font-size: 11.5px; }.receipt-total { display: flex; justify-content: space-between; border-top: 1px dashed #9a9a94; margin-top: 3px; padding: 11px 0 7px; color: #111111; font-size: 12.5px; font-weight: 700; }.receipt-total b { color: #111111; font-family: "IBM Plex Mono", monospace; font-size: 17px; }.receipt-payment { border-top: 1px solid #d8d8d3; padding-top: 8px; }.receipt-balance { margin-top: 7px; border-radius: 5px; background: #f5f5f4; border: 1px solid #d8d8d3; padding: 6px 7px; }.receipt-thanks { color: #333333; font-size: 12px; text-align: center; line-height: 1.6; margin-top: 16px; font-weight: 500; }.receipt-thanks small { color: #555555; font-size: 10.5px; }.receipt-actions { display: flex; justify-content: flex-end; gap: 7px; padding-top: 12px; }.receipt-actions .outline-button, .receipt-actions .primary-button { display: inline-flex; align-items: center; gap: 5px; }
+   258→@media (max-width: 820px) { .inventory-alert-grid { grid-template-columns: 1fr; }.number-mode-grid { grid-template-columns: 1fr; }.table-filter-summary { flex-direction: column; align-items: flex-start; gap: 4px; }.toolbar-actions { width: 100%; }.filter-pills { overflow-x: auto; }.receipt-modal { padding: 12px; } }
+   259→@media (max-width: 560px) { .alert-panel { padding: 14px; }.member-number-preview { align-items: flex-start; flex-direction: column; gap: 4px; }.receipt-actions { flex-direction: column-reverse; }.receipt-actions button { width: 100%; justify-content: center; }.form-modal { padding: 15px; }.compact-form { grid-template-columns: 1fr; }.form-grid label.wide { grid-column: auto; } }
+   260→
+   261→/* Member detail, destructive-action confirmations, receipt export and team credit */
+   262→.member-detail-head { display: flex; justify-content: space-between; align-items: center; gap: 16px; background: #fff; border: 1px solid #e5eeea; border-radius: 12px; box-shadow: var(--shadow); padding: 12px 16px; margin-bottom: 10px; }.member-detail-profile { display: flex; align-items: center; gap: 11px; }.member-detail-avatar { width: 36px; height: 36px; display: grid; place-items: center; border-radius: 50%; color: #548e79; background: #e4f3ed; font-size: 15px; font-weight: 700; }.member-detail-profile h2 { margin: 1px 0 3px; color: #3e5d51; font-size: 15px; }.member-detail-profile p { margin: 0; color: #777b6a; font-size: 10px; }.member-detail-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }.member-detail-actions .outline-button, .member-detail-actions .primary-button, .member-detail-actions .danger-outline-button { height: 28px; padding: 0 9px; font-size: 9.5px; gap: 5px; }.danger-outline-button, .danger-button { display: inline-flex; align-items: center; gap: 5px; border-radius: 7px; cursor: pointer; font-size: 10px; transition: .16s ease; }.danger-outline-button { border: 1px solid #efc4bf; background: #fffafa; color: #ba6b65; padding: 8px 10px; }.danger-outline-button:hover { background: #fff0ee; }.danger-button { border: 0; background: #bd6c65; color: #fff; padding: 9px 12px; }.danger-button:hover { background: #a95d57; }.member-detail-stats { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 8px; margin-bottom: 10px; }.member-detail-stats > div { display: flex; align-items: center; gap: 8px; min-width: 0; background: #fff; border: 1px solid #e5eeea; border-radius: 10px; box-shadow: var(--shadow); padding: 8px 11px; }.member-detail-stats small, .member-detail-stats strong { display: block; }.member-detail-stats small { color: #7b806c; font-size: 9px; }.member-detail-stats strong { margin-top: 3px; color: #547166; font-size: 12px; white-space: nowrap; }.history-tabs { align-self: center; }.member-history-list { border-top: 1px solid #edf2f0; }.history-row { display: flex; align-items: center; gap: 10px; padding: 10px 4px; border-bottom: 1px solid #f2f3f0; }.history-icon { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; }.history-icon.blue { color: #5d9bc2; background: #eaf5fb; }.history-icon.green { color: #63a78b; background: #e8f7f0; }.history-icon.purple { color: #8e78bb; background: #f3eefb; }.history-main { flex: 1; min-width: 0; }.history-main > div { display: flex; align-items: center; gap: 7px; }.history-main b { color: #71775f; font-size: 11px; }.history-main span { color: #888c7a; font-family: "IBM Plex Mono", monospace; font-size: 9px; }.history-main small, .history-main time { display: block; overflow: hidden; color: #7c816e; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }.history-main small { margin-top: 3px; }.history-main time { margin-top: 4px; color: #919584; }.history-row > strong { font-family: "IBM Plex Mono", monospace; font-size: 11px; }.history-row > strong.positive { color: #5b9c81; }.history-row > strong.negative { color: #bc7770; }.confirm-modal { width: min(420px, 100%); background: #fff; border: 1px solid #ebece6; border-radius: 14px; padding: 18px; box-shadow: 0 20px 60px rgba(24, 61, 48, .23); animation: modal-in .18s ease-out; }.confirm-icon { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 11px; color: #bb7068; background: #fff0ee; margin-bottom: 12px; }.confirm-modal h2 { margin: 0; color: #5e634d; font-size: 16px; }.confirm-modal p { max-width: 330px; color: #7c816e; font-size: 11px; line-height: 1.55; margin: 5px 0 0; }.confirm-actions { display: flex; justify-content: flex-end; gap: 7px; border-top: 1px solid #edf2f0; margin-top: 15px; padding-top: 13px; }.receipt-actions { flex-wrap: wrap; }.receipt-actions button:disabled { opacity: .6; cursor: wait; }.powered-by { color: #7e9e92; font-weight: 600; letter-spacing: .15px; }
+   263→@media (max-width: 900px) { .member-detail-stats { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+   264→@media (max-width: 820px) { .member-detail-head { align-items: flex-start; flex-direction: column; }.member-detail-actions { width: 100%; }.member-detail-actions button { flex: 1; justify-content: center; }.history-tabs { width: 100%; overflow-x: auto; }.history-tabs button { white-space: nowrap; } }
+   265→@media (max-width: 560px) { .member-detail-stats { grid-template-columns: 1fr 1fr; gap: 8px; }.member-detail-stats > div { padding: 10px; }.member-detail-stats strong { font-size: 11px; }.history-row { align-items: flex-start; }.history-row > strong { margin-left: auto; }.receipt-actions button { flex: 1 1 46%; justify-content: center; } }
+   266→
+   267→/* Daily sales export actions */
+   268→.report-export-actions { display: flex; gap: 6px; align-items: center; }
+   269→.report-export-actions .compact { display: inline-flex; align-items: center; gap: 5px; }
+   270→@media (max-width: 640px) { .report-export-actions { width: 100%; } .report-export-actions .compact { flex: 1; justify-content: center; } }
+   271→
+   272→/* --- real-data POS/Stock additions (OLD-2-b) -------------------------------- */
+   273→.member-select-wrap { position: relative; }
+   274→/* ROUND 77 (user) — ปุ่ม "ลูกค้าทั่วไป": ขายโดยไม่ต้องเป็นสมาชิก (เงินสด/QR) ใบเสร็จขึ้น "บุคคลทั่วไป" */
+   275→.member-select-wrap { display: flex; gap: 7px; align-items: center; }
+   276→.member-select-wrap > .member-scan-wrap { flex: 1 1 220px; min-width: 0; }
+   277→.walkin-chip { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; height: 38px; padding: 0 11px; border-radius: 9px; border: 1px solid #cfdad3; background: #fff; color: #5b6a5f; font-size: 11.5px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: background .15s ease, border-color .15s ease, color .15s ease; }
+   278→.walkin-chip:hover { border-color: #9dbdaf; background: #f4faf7; }
+   279→.walkin-chip.on { background: #eaf6f0; border-color: #62b395; color: #2d6a50; }
+   280→.member-dropdown { position: absolute; left: 0; right: 0; top: calc(100% + 4px); background: #fff; border: 1px solid #e1ebe7; border-radius: 9px; box-shadow: 0 14px 34px rgba(24, 61, 48, .16); z-index: 40; max-height: 224px; overflow-y: auto; padding: 4px; }
+   281→.member-option { display: flex; align-items: center; gap: 7px; width: 100%; border: 0; background: transparent; border-radius: 7px; padding: 8px 9px; text-align: left; cursor: pointer; }
+   282→.member-option:hover:not(:disabled) { background: #f2faf7; }
+   283→.member-option div { flex: 1; min-width: 0; }
+   284→.member-option b { display: block; color: #6a7057; font-size: 11px; }
+   285→.member-option small { display: block; color: #757b61; font-size: 10px; margin-top: 2px; }
+   286→.member-option:disabled, .member-option.disabled { opacity: .55; cursor: not-allowed; }
+   287→.option-check { color: var(--teal); flex: 0 0 auto; }
+   288→.suspended-tag { flex: 0 0 auto; color: #c16b6e; background: #fff0f0; border-radius: 20px; padding: 3px 7px; font-size: 9px; white-space: nowrap; }
+   289→.wallet-form { border: 1px solid #e4eee9; background: #f7fbf9; border-radius: 8px; padding: 10px; margin-top: 11px; }
+   290→.wallet-heading { display: flex; align-items: center; gap: 8px; }
+   291→.wallet-heading span { width: 27px; height: 27px; display: grid; place-items: center; color: #3e9375; background: #e2f4ed; border-radius: 7px; }
+   292→.wallet-heading b, .wallet-heading small { display: block; }
+   293→.wallet-heading b { color: #4c6c60; font-size: 11px; }
+   294→.wallet-heading small { color: #7b8168; font-size: 10px; margin-top: 2px; }
+   295→.wallet-form label { display: block; color: #7f8471; font-size: 11px; margin-top: 9px; }
+   296→.wallet-form input, .wallet-form select { width: 100%; height: 33px; margin-top: 5px; border: 1px solid #e1eae6; border-radius: 7px; padding: 0 9px; outline: none; background: #fff; color: #666d53; font-size: 11px; }
+   297→.wallet-form input:focus, .wallet-form select:focus { border-color: #8fc5b0; box-shadow: 0 0 0 3px #eaf6f1; }
+   298→.wallet-form .primary-button { width: 100%; margin-top: 12px; }
+   299→.discount-edit input { width: 52px; height: 21px; border: 1px solid #d9e7e1; border-radius: 5px; padding: 0 5px; outline: none; background: #fff; color: #6b705b; font: 11px "IBM Plex Mono", monospace; text-align: right; }
+   300→.discount-edit input:focus { border-color: #8fc5b0; box-shadow: 0 0 0 3px #eaf6f1; }
+   301→.inline-message.error, .notice-bar.error { color: #b05457; background: #fdf3f3; border-color: #f3dcdc; }
+   302→.inline-message.error { color: #ad5053; }
+   303→.inline-message.error button, .notice-bar.error button { color: #bd7a7c; }
+   304→.pos-loading { grid-column: 1 / -1; min-height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #959988; gap: 6px; border: 1px dashed #e3ede8; border-radius: 10px; margin-top: 15px; }
+   305→.pos-loading b { color: #7e8270; font-size: 11px; }
+   306→.pos-loading span { font-size: 11px; }
+   307→.table-loading { min-height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #959988; gap: 6px; padding: 20px 0; }
+   308→.table-loading b { color: #7e8270; font-size: 11px; }
+   309→.table-loading span { font-size: 11px; }
+   310→.pay-button:disabled, .pay-split button:disabled { opacity: .55; cursor: not-allowed; filter: saturate(.6); }
+   311→.pay-button:disabled:hover, .pay-split button:disabled:hover { background: var(--teal); }
+   312→.pay-split button:disabled:hover { background: #fff; }
+   313→
+   314→.activity-dot.red { background: #c97f7c; }
+   315→
+   316→/* ===== Global ⌘K command palette (Task 4-b) ===== */
+   317→.global-search { cursor: pointer; transition: border-color .18s ease, background .18s ease, box-shadow .18s ease; }
+   318→.global-search:hover, .global-search:focus-visible { border-color: #b9d8cc; background: #f4faf7; color: #666a58; box-shadow: 0 3px 9px rgba(41, 69, 59, .06); outline: none; }
+   319→.global-search:focus-visible { border-color: #8fc5b0; box-shadow: 0 0 0 3px #eaf6f1; }
+   320→
+   321→.command-palette-backdrop { position: fixed; inset: 0; z-index: 1200; display: flex; justify-content: center; align-items: flex-start; padding: 12vh 16px 16px; background: rgba(15, 23, 42, .45); backdrop-filter: blur(6px); animation: command-fade-in .15s ease-out; }
+   322→.command-palette { width: min(580px, calc(100vw - 32px)); max-height: 68vh; display: flex; flex-direction: column; overflow: hidden; background: #fff; border: 1px solid #dfeae5; border-radius: 16px; box-shadow: 0 24px 70px rgba(24, 61, 48, .28), 0 4px 14px rgba(24, 61, 48, .12); animation: command-pop-in .18s cubic-bezier(.2, .9, .3, 1); }
+   323→.command-input-row { display: flex; align-items: center; gap: 10px; padding: 15px 18px; border-bottom: 1px solid #eef3f1; color: #848876; flex: 0 0 auto; }
+   324→.command-input-row input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 15px; color: #3d544c; }
+   325→.command-input-row input::placeholder { color: #898e7d; }
+   326→.command-results { overflow-y: auto; padding: 8px 0 10px; flex: 1; min-height: 60px; }
+   327→.command-results::-webkit-scrollbar { width: 6px; }
+   328→.command-results::-webkit-scrollbar-thumb { background: #d3e0da; border-radius: 6px; }
+   329→.command-results::-webkit-scrollbar-thumb:hover { background: #bcd1c8; }
+   330→.command-results::-webkit-scrollbar-track { background: transparent; }
+   331→.command-section-label { padding: 9px 18px 5px; color: #7a7e6e; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+   332→.command-item { width: calc(100% - 16px); margin: 0 8px; display: flex; align-items: center; gap: 11px; padding: 10px 14px; border: 0; border-radius: 10px; background: transparent; text-align: left; cursor: pointer; transition: background .12s ease; }
+   333→.command-item-icon { width: 34px; height: 34px; flex: 0 0 34px; display: grid; place-items: center; border-radius: 50%; color: var(--teal); background: var(--teal-soft); }
+   334→.command-item-main { flex: 1; min-width: 0; }
+   335→.command-item-main b { display: block; color: #5e644c; font-size: 12px; line-height: 1.35; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+   336→.command-item-sub { display: block; color: #7f8375; font-size: 12px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+   337→.command-item.highlighted { background: #eef8f3; box-shadow: inset 3px 0 0 var(--teal); }
+   338→.command-item.highlighted .command-item-main b { color: #2f4a40; font-weight: 600; }
+   339→.command-loading-row { padding: 14px 18px; color: #7f8375; font-size: 11px; }
+   340→.command-empty { padding: 34px 20px; text-align: center; color: #7d8171; font-size: 11px; }
+   341→.command-footer { display: flex; align-items: center; gap: 14px; padding: 10px 18px; border-top: 1px solid #eef3f1; color: #7e8371; font-size: 11px; flex: 0 0 auto; }
+   342→.command-footer kbd { display: inline-block; min-width: 17px; text-align: center; padding: 1px 5px; margin-right: 3px; border: 1px solid #dfe8e4; border-bottom-width: 2px; border-radius: 5px; background: #f8fbf9; color: #848974; font-size: 11px; font-family: "IBM Plex Mono", monospace; }
+   343→@keyframes command-fade-in { from { opacity: 0; } to { opacity: 1; } }
+   344→@keyframes command-pop-in { from { opacity: 0; transform: scale(.97); } to { opacity: 1; transform: scale(1); } }
+   345→
+   346→@media (max-width: 560px) { .command-palette-backdrop { padding: 8vh 10px 10px; } .command-palette { width: calc(100vw - 20px); max-height: 74vh; } .command-footer { flex-wrap: wrap; gap: 8px 12px; } }
+   347→@media (prefers-reduced-motion: reduce) { .command-palette-backdrop, .command-palette, .command-item { animation: none !important; transition: none !important; } }
+   348→
+   349→/* ── Task 4-c: interaction & detail polish ── */
+   350→
+   351→/* 1) Keyboard focus rings (emerald) on primary interactive elements */
+   352→.primary-button:focus-visible,
+   353→.outline-button:focus-visible,
+   354→.danger-outline-button:focus-visible,
+   355→.pay-button:focus-visible,
+   356→.row-action:focus-visible,
+   357→.icon-button:focus-visible,
+   358→.filter-pills button:focus-visible,
+   359→.command-item:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+   360→
+   361→/* 1b) Inputs & selects: stronger border + soft emerald ring on focus */
+   362→.form-grid input:focus-visible,
+   363→.form-grid select:focus-visible { border-color: #8fc5b0; box-shadow: 0 0 0 3px #eaf6f1; }
+   364→.search-field input:focus-visible { outline: none; }
+   365→.search-field:focus-within { border-color: #8fc5b0; box-shadow: 0 0 0 3px #eaf6f1; }
+   366→.command-input-row input:focus-visible { outline: none; }
+   367→.command-input-row:focus-within { border-bottom-color: #b9d8cc; }
+   368→
+   369→/* 2) Table row hover — subtle warm tint */
+   370→.table-wrap tbody tr { transition: background .12s ease; }
+   371→.table-wrap tbody tr:not(.table-state-row):hover { background: #f2f8f5; }
+   372→
+   373→/* 3) Modal entrance animations (command palette keeps its own 4-b animations) */
+   374→@keyframes modal-fade-in { from { opacity: 0; } to { opacity: 1; } }
+   375→@keyframes modal-pop-in { from { opacity: 0; transform: scale(.96) translateY(8px); } to { opacity: 1; transform: scale(1) translateY(0); } }
+   376→.modal-backdrop { animation: modal-fade-in .16s ease-out; }
+   377→.form-modal { animation: modal-pop-in .2s cubic-bezier(.16, 1, .3, 1); }
+   378→
+   379→/* 4) Notice bars slide in gently */
+   380→@keyframes notice-slide-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+   381→.notice-bar { animation: notice-slide-in .18s ease-out; }
+   382→
+   383→/* 5) Custom scrollbars globally (webkit) + thin variant for dense areas */
+   384→*::-webkit-scrollbar { width: 8px; height: 8px; }
+   385→*::-webkit-scrollbar-thumb { background: #cfded8; border-radius: 8px; }
+   386→*::-webkit-scrollbar-thumb:hover { background: #b9cec5; }
+   387→*::-webkit-scrollbar-track { background: transparent; }
+   388→.table-wrap::-webkit-scrollbar, .command-results::-webkit-scrollbar, .member-history-list::-webkit-scrollbar { width: 5px; height: 5px; }
+   389→.table-wrap::-webkit-scrollbar-thumb, .command-results::-webkit-scrollbar-thumb, .member-history-list::-webkit-scrollbar-thumb { background: #d3e0da; border-radius: 5px; }
+   390→html { scrollbar-width: thin; scrollbar-color: #cfded8 transparent; }
+   391→
+   392→/* 6) Row action arrow slide (color shift to deeper teal already in base styles) */
+   393→.row-action span { display: inline-block; margin-left: 4px; transition: transform .14s ease; }
+   394→.row-action:hover span { transform: translateX(3px); }
+   395→
+   396→/* 7) Stat icon micro-interaction on parent card hover */
+   397→.stat-icon, .metric-icon { transition: transform .18s cubic-bezier(.2, .9, .3, 1); }
+   398→.stock-stat, .member-mini-card, .member-detail-stats > div, .metric-card { transition: border-color .18s ease; }
+   399→.stock-stat:hover .stat-icon, .member-mini-card:hover .stat-icon, .member-detail-stats > div:hover .stat-icon, .metric-card:hover .metric-icon { transform: scale(1.08); }
+   400→.stock-stat:hover, .member-mini-card:hover, .member-detail-stats > div:hover { border-color: #d9e9e2; }
+   401→
+   402→/* 8) Selection color — emerald tint */
+   403→::selection { background: rgba(35, 124, 97, .22); }
+   404→
+   405→/* 9) Stock count diff preview (Stock page นับสต็อก modal) */
+   406→.stock-count-preview b { font-size: 14px; font-weight: 700; letter-spacing: -.3px; }
+   407→.stock-count-preview b.green-text { color: #4b997c; }
+   408→
+   409→/* 10) Extra micro-details: kbd consistency, nav badge soft pulse, smooth pills, icon press */
+   410→kbd { border-bottom-width: 2px; background: #f8fbf9; color: #848974; }
+   411→@keyframes nav-badge-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(184, 120, 39, 0); } 50% { box-shadow: 0 0 0 4px rgba(184, 120, 39, .16); } }
+   412→.nav-badge { animation: nav-badge-pulse 2.6s ease-in-out infinite; }
+   413→.filter-pills button { transition: color .15s ease, background .15s ease, box-shadow .15s ease; }
+   414→.table-more { transition: color .15s ease, background .15s ease, transform .15s ease; }
+   415→.table-more:active { transform: scale(.9); }
+   416→
+   417→/* Reduced motion — switch off everything added above */
+   418→@media (prefers-reduced-motion: reduce) {
+   419→  .modal-backdrop, .form-modal, .notice-bar, .nav-badge, .row-action span, .stat-icon, .metric-icon,
+   420→  .table-wrap tbody tr, .stock-stat, .member-mini-card, .member-detail-stats > div, .metric-card,
+   421→  .filter-pills button, .table-more { animation: none !important; transition: none !important; }
+   422→}
+   423→
+   424→
+   425→/* ── Task 7-b: product management ── */
+   426→
+   427→/* Compact action buttons in the จัดการสินค้า table */
+   428→.product-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+   429→.mini-button { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; font-size: 12px; border-radius: 8px; border: 1px solid #d7e5df; background: #fff; color: #6d735b; transition: border-color .15s ease, background .15s ease, color .15s ease, transform .15s ease; }
+   430→.mini-button:hover { border-color: #a9d4c5; color: var(--teal); background: #f4faf8; transform: translateY(-1px); }
+   431→.mini-button:active { transform: translateY(0); }
+   432→.mini-button:disabled { opacity: .55; cursor: wait; transform: none; }
+   433→.mini-button.danger { border-color: #eec7c1; color: #b56b64; background: #fffaf9; }
+   434→.mini-button.danger:hover { border-color: #dfa59e; color: #a4524b; background: #fdf1ef; }
+   435→.mini-button.success { border-color: #b7ddcc; color: #3f8d70; background: #f2faf6; }
+   436→.mini-button.success:hover { border-color: #8fcdb3; color: var(--teal); background: #eaf6f1; }
+   437→.mini-button:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+   438→
+   439→/* Archived product rows — muted but readable; status pill keeps full opacity */
+   440→.archived-row td:not(.status-cell) { opacity: .62; filter: saturate(.82); }
+   441→.table-wrap tbody tr.archived-row:not(.table-state-row):hover { background: #f6f9f7; }
+   442→
+   443→/* Product two-line cell (emoji bubble + name/sku) */
+   444→.product-cell { display: flex; align-items: center; gap: 8px; }
+   445→.product-cell > div { min-width: 0; }
+   446→.product-cell-icon { width: 28px; height: 28px; flex: 0 0 28px; display: grid; place-items: center; border-radius: 8px; background: #eaf4f0; font-size: 13px; line-height: 1; }
+   447→
+   448→/* Status pill inline in edit-modal heading text */
+   449→.form-modal .modal-heading p .status-pill { margin-left: 8px; }
+   450→
+   451→@media (prefers-reduced-motion: reduce) {
+   452→  .mini-button { transition: none !important; }
+   453→}
+   454→
+   455→/* ── Task 7-c: receipt history & reprint ── */
+   456→
+   457→/* Reprint-mode receipt header — soft purple accent instead of success green (same sizes) */
+   458→.receipt-success.reprint > span { background: #8e78bb; }
+   459→.receipt-success.reprint b { color: #6d5791; }
+   460→
+   461→/* Clickable bill rows in ประวัติบิล (warm hover tint already global from 4-c) */
+   462→.table-wrap tbody tr.sales-history-row { cursor: pointer; }
+   463→
+   464→/* ── Task 10-b: authentication ── */
+   465→
+   466→/* Full-screen login — warm canvas + two soft blurred glows (first impression) */
+   467→.login-screen { min-height: 100dvh; display: grid; place-items: center; position: relative; overflow: hidden; background: var(--canvas); padding: 24px 16px; }
+   468→.login-blob { position: absolute; width: 380px; height: 380px; border-radius: 50%; filter: blur(90px); opacity: .5; pointer-events: none; }
+   469→.login-blob.teal { background: #9ed8c3; top: -120px; left: -110px; }
+   470→.login-blob.amber { background: #ecc9a0; bottom: -130px; right: -120px; }
+   471→
+   472→/* Card — layered shadow + gentle entrance */
+   473→.login-card { width: min(420px, calc(100vw - 32px)); background: var(--surface); border: 1px solid var(--line); border-radius: 20px; padding: 36px 32px; box-shadow: 0 24px 60px rgba(24, 61, 48, .14), 0 4px 14px rgba(24, 61, 48, .06); position: relative; z-index: 1; animation: login-card-in 380ms cubic-bezier(.16, 1, .3, 1); }
+   474→@keyframes login-card-in { from { opacity: 0; transform: translateY(14px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+   475→
+   476→/* Brand header — larger brand-mark (52px emerald tile) */
+   477→.login-brand { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; margin-bottom: 24px; }
+   478→.login-brand .brand-mark { width: 52px; height: 52px; border-radius: 16px; box-shadow: 0 8px 18px var(--teal-glow); }
+   479→.login-brand .brand-mark span { font-size: 24px; }
+   480→.login-brand b { font-size: 16px; color: #274138; line-height: 1.35; letter-spacing: -.2px; }
+   481→.login-brand small { color: #757869; font-size: 11.5px; letter-spacing: .3px; margin-top: 2px; }
+   482→
+   483→/* Login form — larger type than the in-app forms (13px labels / 15px inputs) */
+   484→.login-form { display: flex; flex-direction: column; gap: 13px; }
+   485→.login-form label { display: block; font-size: 13px; font-weight: 600; color: #3d564d; }
+   486→.login-form input { display: block; width: 100%; margin-top: 6px; padding: 12px 14px; border: 1px solid #dce6e2; border-radius: 10px; font-size: 15px; color: #2c463d; background: #fcfefd; outline: none; transition: border-color .15s ease, box-shadow .15s ease; }
+   487→.login-form input::placeholder { color: #8b8f7d; font-weight: 400; }
+   488→.login-form input:focus { border-color: #8fc5b0; box-shadow: 0 0 0 3px #eaf6f1; }
+   489→
+   490→/* Password field with show/hide toggle inside the input */
+   491→.login-password { position: relative; display: block; }
+   492→.login-password input { padding-right: 40px; }
+   493→.login-password button { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); width: 26px; height: 26px; display: grid; place-items: center; border: 0; border-radius: 6px; background: transparent; color: #858977; }
+   494→.login-password button:hover { color: var(--teal); background: #eff7f3; }
+   495→
+   496→/* Error bar — same red family as .notice-bar.error */
+   497→.login-error { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid #f3dcdc; background: #fdf3f3; color: #b05457; border-radius: 10px; font-size: 13px; animation: login-error-in .22s ease-out; }
+   498→@keyframes login-error-in { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: translateY(0); } }
+   499→
+   500→/* Submit — full-width, taller than the in-app primary buttons */
+   501→.login-form .primary-button { width: 100%; height: 46px; margin-top: 4px; border-radius: 10px; font-size: 14px; font-weight: 600; }
+   502→.login-form .primary-button:disabled { opacity: .6; cursor: not-allowed; box-shadow: none; }
+   503→
+   504→.login-footer { margin: 20px 0 0; text-align: center; font-size: 11px; color: #848876; }
+   505→
+   506→/* Session-check splash (auth.me in flight) */
+   507→.auth-splash { min-height: 100dvh; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; background: var(--canvas); }
+   508→.auth-splash .brand-mark { width: 56px; height: 56px; border-radius: 17px; animation: auth-pulse 1.6s ease-in-out infinite; }
+   509→.auth-splash .brand-mark span { font-size: 26px; }
+   510→.auth-splash p { margin: 0; font-size: 14px; color: var(--muted); }
+   511→@keyframes auth-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.04); } }
+   512→
+   513→/* Sidebar logout row (above the version line) + topbar logout icon state */
+   514→.sidebar-logout { width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 10px 12px; border: none; border-radius: 10px; background: transparent; color: #707464; font-size: 13.5px; margin-top: 8px; cursor: pointer; transition: color .15s ease, background .15s ease; }
+   515→.sidebar-logout:hover { color: #b56b64; background: #fdf1ef; }
+   516→.sidebar-logout:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+   517→.sidebar-logout:disabled, .top-icon:disabled { opacity: .55; cursor: wait; }
+   518→
+   519→/* Reduced motion — kill every animation added in this block */
+   520→@media (prefers-reduced-motion: reduce) {
+   521→  .login-card, .login-error, .login-demo-btn, .sidebar-logout, .auth-splash .brand-mark, .login-form input, .login-password button { animation: none !important; transition: none !important; }
+   522→}
+   523→
+   524→/* Responsive — slimmer card on small phones */
+   525→@media (max-width: 480px) {
+   526→  .login-card { padding: 28px 22px; border-radius: 16px; }
+   527→  .login-screen { padding: 16px 12px; }
+   528→}
+   529→
+   530→/* ── Task 11-s: styling detail pass ── */
+   531→
+   532→/* 1) Tabular numbers for amounts — digits align in money columns/totals */
+   533→table td b,
+   534→.cart-totals strong,
+   535→.cart-item > strong,
+   536→.total-line strong,
+   537→.member-detail-stats strong,
+   538→.receipt-line b,
+   539→.receipt-total b,
+   540→.sales-history-row td b,
+   541→.metric-card strong,
+   542→.stock-stat strong,
+   543→.report-card strong,
+   544→.member-mini-card strong,
+   545→.member-balance-card strong,
+   546→.chart-summary strong,
+   547→.seller-row > strong,
+   548→.history-row > strong {
+   549→  font-variant-numeric: tabular-nums;
+   550→  font-feature-settings: "tnum";
+   551→}
+   552→
+   553→/* 2) Skeleton shimmer — first-load placeholders (queries keep .table-loading for empty/error/search states) */
+   554→@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+   555→.skeleton-row { min-height: 46px; display: flex; align-items: center; gap: 11px; padding: 0 16px; border-radius: 11px; background: linear-gradient(90deg, #edf2f0 25%, #f8faf8 50%, #edf2f0 75%); background-size: 200% 100%; animation: shimmer 1.3s infinite linear; }
+   556→tr.skeleton-row { display: table-row; min-height: 0; padding: 0; border-radius: 0; }
+   557→tr.skeleton-row > td { height: 46px; padding-top: 9px; padding-bottom: 9px; }
+   558→.skeleton-avatar, .skeleton-cell-w, .skeleton-cell-n, .skeleton-price { display: inline-block; border-radius: 6px; background: linear-gradient(90deg, #e6edea 25%, #f4f8f6 50%, #e6edea 75%); background-size: 200% 100%; animation: shimmer 1.3s infinite linear; }
+   559→.skeleton-avatar { width: 34px; height: 34px; flex: 0 0 34px; border-radius: 50%; }
+   560→.skeleton-cell-w { width: 38%; height: 13px; }
+   561→.skeleton-cell-n { width: 18%; height: 13px; }
+   562→.skeleton-price { width: 36%; height: 15px; }
+   563→.skeleton-row .skeleton-cell-n:last-child { margin-left: auto; } /* right-hand bar */
+   564→/* POS product-card shaped skeleton (emoji circle + 2 text bars + price bar) */
+   565→.skeleton-card { pointer-events: none; }
+   566→.skeleton-card .product-art { display: grid; place-items: center; background: #f7faf8; }
+   567→.skeleton-card .product-card-info { display: flex; flex-direction: column; align-items: flex-start; gap: 7px; }
+   568→.skeleton-card .skeleton-cell-w { width: 84%; margin-top: 3px; }
+   569→.skeleton-card .skeleton-cell-n { width: 46%; }
+   570→
+   571→/* 3) View transition — page-content re-animates on every view switch (key={safeView} in Home.tsx) */
+   572→/* Round 14: fill-mode dropped — `both` kept the interpolated IDENTITY
+   573→   matrix(1,0,0,1,0,0) as the computed transform forever, and any non-none
+   574→   transform (even identity) turns .page-content into the containing block
+   575→   for position:fixed descendants (pos-mobile-bar, modal backdrops),
+   576→   anchoring them to the page box instead of the viewport. Without fill,
+   577→   the animation still plays once and then reverts to transform:none. */
+   578→.page-content { animation: viewIn 240ms ease-out; }
+   579→@keyframes viewIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+   580→
+   581→/* 4) Button micro-interactions — quick press feedback (row-action keeps its arrow-slide transform; excluded) */
+   582→.primary-button:active:not(:disabled),
+   583→.outline-button:active:not(:disabled),
+   584→.scan-button:active:not(:disabled),
+   585→.danger-outline-button:active:not(:disabled),
+   586→.danger-button:active:not(:disabled),
+   587→.pay-button:active:not(:disabled),
+   588→.pay-split button:active:not(:disabled),
+   589→.filter-pills button:active:not(:disabled) { transform: scale(.98); transition: transform 80ms ease; }
+   590→.mini-button:active:not(:disabled) { transform: translateY(0) scale(.98); transition: transform 80ms ease; }
+   591→.login-demo-btn:active:not(:disabled) { transform: translateY(-1px) scale(.98); transition: transform 80ms ease; }
+   592→nav button:active:not(:disabled),
+   593→.settings-nav button:active:not(:disabled),
+   594→.sidebar-logout:active:not(:disabled) { transform: scale(.99); transition: transform 80ms ease; }
+   595→
+   596→/* 5) kbd keycap polish — consistent ⌘K hints (topbar global search + command palette footer) */
+   597→.command-footer kbd,
+   598→.global-search kbd {
+   599→  min-width: 20px;
+   600→  padding: 2px 5px;
+   601→  font-size: 11px;
+   602→  line-height: 1;
+   603→  text-align: center;
+   604→  background: #f8fbf9;
+   605→  border: 1px solid var(--line);
+   606→  border-radius: 6px;
+   607→  box-shadow: inset 0 -1px 0 rgba(128, 132, 115, .22);
+   608→  font-family: inherit;
+   609→}
+   610→
+   611→/* 6) Small a11y/detail wins */
+   612→/* .table-loading blocks breathe gently while fetching */
+   613→@keyframes softPulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+   614→.table-loading { animation: softPulse 1.6s ease-in-out infinite; }
+   615→/* .member-select is a div[role=button] in Pos.tsx — same emerald focus ring as the 4-c pattern */
+   616→.member-select { border-radius: 8px; }
+   617→.member-select:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }
+   618→/* .nav-badge — stays static (no pulse added), 18px circle, centered, safe with 2 digits */
+   619→.nav-badge { height: 18px; min-width: 18px; padding: 0 4px; border-radius: 999px; font-size: 11px; }
+   620→
+   621→/* Reduced motion — switch off everything added in this block */
+   622→@media (prefers-reduced-motion: reduce) {
+   623→  .page-content, .table-loading, .skeleton-row, .skeleton-avatar, .skeleton-cell-w, .skeleton-cell-n, .skeleton-price { animation: none !important; }
+   624→  .skeleton-row, .skeleton-avatar, .skeleton-cell-w, .skeleton-cell-n, .skeleton-price { background: #f1f2ee; }
+   625→  .primary-button, .outline-button, .scan-button, .danger-outline-button, .danger-button, .pay-button, .pay-split button,
+   626→  .filter-pills button, .mini-button, .login-demo-btn, nav button, .settings-nav button, .sidebar-logout { transition: none !important; }
+   627→}
+   628→
+   629→/* ── Task 11-b: users view ── */
+   630→.user-avatar { width: 28px; height: 28px; flex: 0 0 28px; display: grid; place-items: center; border-radius: 50%; font-size: 11px; font-weight: 600; }
+   631→.user-avatar.admin { background: #fff3e0; color: #b8863d; }
+   632→.user-avatar.staff { background: #e7f3ef; color: #4b8d77; }
+   633→.user-role-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 8px; border-radius: 20px; font-size: 10px; white-space: nowrap; }
+   634→.user-role-badge.admin { color: #b8863d; background: #fff5e6; }
+   635→.user-role-badge.staff { color: #7a7f6b; background: #f0f4f2; }
+   636→.user-self-tag { display: inline-flex; align-items: center; margin-left: 6px; padding: 1px 6px; border-radius: 20px; font-size: 9px; font-weight: 500; color: #3e8d72; background: #e2f4ec; vertical-align: 1px; }
+   637→.stat-icon.red { background: #fdeeec; color: #c26162; }
+   638→.field-hint { display: block; margin-top: 4px; color: #b8863d; font-size: 10px; }
+   639→.form-grid select:disabled { background: #f4f7f5; color: #7c816f; cursor: not-allowed; }
+   640→
+   641→/* ── Task 11-c: notifications + member stats + palette bills ── */
+   642→
+   643→/* 1) Bell dropdown (topbar) — panel styling mirrors .member-dropdown */
+   644→.notif-wrap { position: relative; display: inline-flex; }
+   645→.notif-dropdown { position: absolute; right: 0; top: calc(100% + 8px); width: 320px; max-width: calc(100vw - 24px); background: #fff; border: 1px solid #e1ebe7; border-radius: 9px; box-shadow: 0 14px 34px rgba(24, 61, 48, .16); z-index: 40; overflow: hidden; animation: command-fade-in .15s ease-out; }
+   646→.notif-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; border-bottom: 1px solid #eef3f1; }
+   647→.notif-header b { font-size: 12px; color: #5e644c; }
+   648→.notif-count { min-width: 20px; height: 20px; padding: 0 6px; display: grid; place-items: center; border-radius: 999px; background: #fff0df; color: #b87827; font-size: 11px; font-weight: 600; }
+   649→.notif-scroll { max-height: 300px; overflow-y: auto; }
+   650→.notif-section-label { display: flex; align-items: center; gap: 6px; padding: 9px 14px 5px; color: #7a7e6e; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+   651→.notif-row { width: 100%; display: flex; align-items: center; gap: 9px; padding: 8px 14px; border: 0; background: transparent; text-align: left; transition: background .12s ease; }
+   652→.notif-row:hover { background: #f4f9f7; }
+   653→.notif-row > div { flex: 1; min-width: 0; }
+   654→.notif-row b { display: block; color: #5e644c; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+   655→.notif-row small { display: block; margin-top: 2px; color: #7f8375; font-size: 11px; font-variant-numeric: tabular-nums; }
+   656→.notif-dot { width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; }
+   657→.notif-dot.red { background: #c26162; }
+   658→.notif-dot.amber { background: #ce963e; }
+   659→.notif-empty { padding: 20px 16px; display: flex; flex-direction: column; align-items: center; gap: 4px; color: #7a7e6e; }
+   660→.notif-empty b { font-size: 12px; color: #64675b; }
+   661→.notif-empty small { font-size: 11px; }
+   662→.notif-footer { width: 100%; padding: 10px; border-top: 1px solid #eef3f1; background: #fbfdfc; color: var(--teal); font-size: 11px; }
+   663→.notif-footer:hover { background: #f2f8f5; }
+   664→@media (max-width: 560px) { .notif-wrap { display: none; } } /* follows the .top-icon phone rule */
+   665→
+   666→/* 2) Member spending stats — second .member-detail-stats row (member.stats) */
+   667→.member-purchase-stats > div > .member-top-products { min-width: 0; }
+   668→.member-top-products small { display: block; color: #7b806c; font-size: 9px; }
+   669→.top-products-list { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+   670→.top-product-chip { display: inline-flex; align-items: baseline; gap: 4px; max-width: 100%; padding: 3px 9px; border-radius: 999px; background: var(--teal-soft); color: #3e7d68; font-size: 11px; white-space: nowrap; }
+   671→.top-product-chip b { font-weight: 600; color: var(--teal); font-variant-numeric: tabular-nums; }
+   672→.top-products-empty { display: block; margin-top: 5px; color: #7f8375; font-size: 11px; }
+   673→.member-stat-skeleton span { display: block; }
+   674→.member-stat-skeleton .skeleton-cell-n { width: 46%; }
+   675→.member-stat-skeleton .skeleton-cell-w { width: 84%; margin-top: 5px; }
+   676→
+   677→/* 3) Palette bills — purple receipt tint (reprint accent family), like history-icon.purple */
+   678→.command-item[data-section="บิลขาย"] .command-item-icon { color: #8b6dba; background: #f3eefb; }
+   679→
+   680→@media (prefers-reduced-motion: reduce) {
+   681→  .notif-dropdown { animation: none !important; }
+   682→}
+   683→
+   684→/* ── Round 8: active sessions panel (Users view) + toolbar inline icons ── */
+   685→.session-panel { margin-top: 17px; }
+   686→.table-toolbar h2 .toolbar-icon { display: inline-block; vertical-align: -3px; margin-right: 6px; color: var(--teal); }
+   687→.session-list { display: flex; flex-direction: column; gap: 9px; margin-top: 14px; }
+   688→.session-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid #e7eeeb; border-radius: 11px; background: #fdfefe; transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease; }
+   689→.session-row:hover { border-color: #d3e4dd; box-shadow: 0 4px 14px rgba(30, 82, 63, .07); transform: translateY(-1px); }
+   690→.session-row.current { border-color: #bfe3d4; background: #f4fbf8; box-shadow: inset 3px 0 0 #57b391; }
+   691→.session-row.current:hover { border-color: #a9d9c6; }
+   692→.session-avatar { width: 34px; height: 34px; flex: 0 0 34px; display: grid; place-items: center; border-radius: 50%; font-size: 12px; font-weight: 600; }
+   693→.session-avatar.admin { background: #fff3e0; color: #b8863d; }
+   694→.session-avatar.staff { background: #e7f3ef; color: #4b8d77; }
+   695→.session-main { flex: 1; min-width: 0; }
+   696→.session-main b { display: block; color: #5e644c; font-size: 12px; }
+   697→.session-main small { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 3px; color: #7f8375; font-size: 11px; }
+   698→.session-main .user-role-badge { padding: 2px 7px; font-size: 9px; }
+   699→.session-current-tag { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; padding: 1px 7px; border-radius: 20px; font-size: 9px; font-weight: 500; color: #3e8d72; background: #e2f4ec; vertical-align: 1px; }
+   700→.session-current-tag i { width: 5px; height: 5px; border-radius: 50%; background: #46a37f; animation: sessionPulse 2s ease-out infinite; }
+   701→.session-suspended-tag { padding: 1px 6px; border-radius: 20px; font-size: 9px; color: #c16b6e; background: #fff0f0; }
+   702→.session-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; text-align: right; }
+   703→.session-meta small { color: #787b6d; font-size: 10px; font-variant-numeric: tabular-nums; }
+   704→.session-meta small b { color: #64675b; font-weight: 600; }
+   705→.session-id { font-family: "IBM Plex Mono", monospace; font-size: 9px; color: #939688; background: #f4f7f5; padding: 1px 6px; border-radius: 5px; letter-spacing: .3px; }
+   706→.session-current-badge { display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 20px; background: #e2f4ec; color: #3e8d72; font-size: 10px; font-weight: 600; white-space: nowrap; }
+   707→.session-skeleton { border-color: transparent; background: transparent; box-shadow: none !important; transform: none !important; }
+   708→.session-skeleton .skeleton-cell-w { width: 130px; }
+   709→.session-skeleton .skeleton-cell-n { width: 170px; height: 11px; }
+   710→@keyframes sessionPulse { 0% { box-shadow: 0 0 0 0 rgba(70, 163, 127, .45); } 70% { box-shadow: 0 0 0 6px rgba(70, 163, 127, 0); } 100% { box-shadow: 0 0 0 0 rgba(70, 163, 127, 0); } }
+   711→@media (max-width: 720px) { .session-row { flex-wrap: wrap; } .session-meta { flex-basis: 100%; flex-direction: row; justify-content: space-between; align-items: center; } .session-row > .mini-button, .session-row > .session-current-badge { margin-left: auto; } }
+   712→@media (prefers-reduced-motion: reduce) { .session-current-tag i { animation: none !important; } .session-row { transition: none; transform: none; } .session-row:hover { transform: none; } }
+   713→
+   714→/* ── Round 9: lot-level stock count — mode toggle + lot rows ── */
+   715→.count-mode-toggle { display: flex; gap: 6px; padding: 4px; margin-top: 13px; background: #f0f4f2; border-radius: 9px; }
+   716→.count-mode-toggle button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 10px; border: 0; border-radius: 7px; background: transparent; color: #65675b; font-size: 11px; font-weight: 500; transition: background .15s ease, color .15s ease, box-shadow .15s ease; }
+   717→.count-mode-toggle button:hover { color: var(--teal); }
+   718→.count-mode-toggle button.active { background: #fff; color: var(--teal); box-shadow: 0 1px 4px rgba(30, 82, 63, .12); font-weight: 600; }
+   719→.lot-count-list { display: flex; flex-direction: column; gap: 7px; margin-top: 13px; max-height: 264px; overflow-y: auto; padding-right: 4px; }
+   720→.lot-count-row { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border: 1px solid #e7eeeb; border-radius: 9px; background: #fdfefe; transition: border-color .15s ease; }
+   721→.lot-count-row:focus-within { border-color: #9bcdba; box-shadow: 0 0 0 3px #eaf6f1; }
+   722→.lot-count-label { flex: 1; min-width: 0; }
+   723→.lot-count-label b { display: block; color: #5e644c; font-size: 11px; font-family: "IBM Plex Mono", monospace; letter-spacing: .2px; }
+   724→.lot-count-label small { display: block; margin-top: 2px; color: #7f8375; font-size: 10px; font-variant-numeric: tabular-nums; }
+   725→.lot-count-row input { width: 86px; height: 32px; flex: 0 0 86px; border: 1px solid #e2eae7; border-radius: 7px; padding: 0 9px; outline: none; color: #6b715a; font-size: 12px; font-variant-numeric: tabular-nums; background: #fcfefd; text-align: right; }
+   726→.lot-count-row input:focus { border-color: #9bcdba; box-shadow: 0 0 0 3px #eaf6f1; }
+   727→.lot-count-diff { flex: 0 0 58px; text-align: right; color: #7a7e6e; font-size: 11px; font-variant-numeric: tabular-nums; }
+   728→.lot-count-diff.negative { color: #c16b6e; }
+   729→.lot-count-diff.positive { color: #4b987b; }
+   730→.lot-count-total { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 4px; padding: 10px 12px; border-radius: 9px; background: #f4fbf8; border: 1px dashed #bfe3d4; }
+   731→.lot-count-total span { color: #64675b; font-size: 11px; font-variant-numeric: tabular-nums; }
+   732→.lot-count-total b { color: #3e7d68; font-size: 11px; font-variant-numeric: tabular-nums; }
+   733→.lot-count-empty { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 22px 14px; margin-top: 13px; border: 1px dashed #e0e8e4; border-radius: 9px; color: #7a7e6e; }
+   734→.lot-count-empty b { font-size: 12px; color: #64675b; }
+   735→.lot-count-empty span { font-size: 11px; }
+   736→@media (max-width: 560px) { .lot-count-row input { flex-basis: 72px; width: 72px; } .lot-count-diff { flex-basis: 44px; } }
+   737→@media (prefers-reduced-motion: reduce) { .count-mode-toggle button, .lot-count-row { transition: none; } }
+   738→
+   739→/* ── Round 10 (Task 14-a): bell member low-balance alerts + receipt thermal print + detail polish ── */
+   740→
+   741→/* 1) Thermal-style receipt print — when a ReceiptModal is open (POS success or
+   742→      Reports reprint), ONLY the receipt paper prints on a clean 8mm-margin page.
+   743→      Guarded with :has() so a plain Ctrl+P without an open modal keeps the
+   744→      default browser output instead of a blank sheet. */
+   745→@media print {
+   746→  @page { margin: 8mm; }
+   747→  html, body { background: #fff !important; }
+   748→  body:has(#receipt-paper) .sidebar,
+   749→  body:has(#receipt-paper) .topbar,
+   750→  body:has(#receipt-paper) .app-footer,
+   751→  body:has(#receipt-paper) .page-content > *:not(.modal-backdrop) { display: none !important; }
+   752→  body:has(#receipt-paper) .app-shell { display: block; min-height: 0; }
+   753→  body:has(#receipt-paper) .main-shell { min-width: 0; }
+   754→  body:has(#receipt-paper) .page-content { max-width: none; margin: 0; padding: 0; animation: none; }
+   755→  body:has(#receipt-paper) .modal-backdrop { position: static; display: block; padding: 0; background: none; backdrop-filter: none; }
+   756→  body:has(#receipt-paper) .receipt-modal { width: 72mm; max-height: none; overflow: visible; background: #fff; border: 0; border-radius: 0; box-shadow: none; padding: 0; animation: none; }
+   757→  body:has(#receipt-paper) .receipt-success,
+   758→  body:has(#receipt-paper) .receipt-actions { display: none !important; }
+   759→  body:has(#receipt-paper) .receipt-paper { border: 0; box-shadow: none; padding: 0 1.5mm; background: #fff; font-family: "Sarabun", system-ui, sans-serif; }
+   760→  body:has(#receipt-paper) .receipt-brand .brand-mark { display: none; } /* white-on-emerald mark would print blank */
+   761→  body:has(#receipt-paper) .receipt-balance { background: none; }
+   762→  body:has(#receipt-paper) .receipt-line b,
+   763→  body:has(#receipt-paper) .receipt-total b,
+   764→  body:has(#receipt-paper) .receipt-meta b,
+   765→  body:has(#receipt-paper) .receipt-customer b,
+   766→  body:has(#receipt-paper) .receipt-payment b,
+   767→  body:has(#receipt-paper) .receipt-balance b { font-variant-numeric: tabular-nums; }
+   768→  body:has(#receipt-paper) .receipt-thanks { border-top: 1px dashed #7a7f6d; margin-top: 12px; padding-top: 10px; }
+   769→}
+   770→
+   771→/* 2) Bell dropdown — member alert rows, keyboard focus, press feedback, cap hint. */
+   772→.notif-row:focus-visible, .notif-footer:focus-visible { outline: 2px solid #57b391; outline-offset: -2px; }
+   773→.notif-row:active { background: #eaf4ef; }
+   774→.notif-row.member-row small { font-variant-numeric: tabular-nums; }
+   775→.notif-row .amount-low { color: #b8863d; font-weight: 700; font-variant-numeric: tabular-nums; }
+   776→.notif-row .amount-negative { color: #c16b6e; font-weight: 700; font-variant-numeric: tabular-nums; }
+   777→.notif-more { padding: 7px 14px 9px; border-top: 1px dashed #edf2f0; color: #7f8375; font-size: 11px; font-variant-numeric: tabular-nums; }
+   778→/* Slightly taller scroll area now that a third section (members) can appear. */
+   779→.notif-scroll { max-height: 340px; }
+   780→.notif-scroll::-webkit-scrollbar { width: 8px; }
+   781→.notif-scroll::-webkit-scrollbar-thumb { background: #d7e5df; border-radius: 8px; }
+   782→.notif-scroll::-webkit-scrollbar-thumb:hover { background: #c2d8cf; }
+   783→
+   784→/* 3) Settings — threshold number input (การแจ้งเตือน row) + toggle focus ring. */
+   785→.toggle:focus-visible { outline: 2px solid #57b391; outline-offset: 2px; }
+   786→.toggle-row-controls { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
+   787→.threshold-input { display: inline-flex; align-items: center; border: 1px solid #e2eae7; border-radius: 7px; background: #fcfefd; overflow: hidden; transition: border-color .15s ease, box-shadow .15s ease; }
+   788→.threshold-input:focus-within { border-color: #9bcdba; box-shadow: 0 0 0 3px #eaf6f1; }
+   789→.threshold-input span { padding-left: 9px; color: #777b69; font-size: 11px; font-weight: 600; }
+   790→.threshold-input input { width: 78px; height: 30px; border: 0; outline: none; background: transparent; color: #6b715a; font-size: 11px; font-variant-numeric: tabular-nums; text-align: right; padding: 0 9px 0 4px; -moz-appearance: textfield; appearance: textfield; }
+   791→.threshold-input input::-webkit-outer-spin-button,
+   792→.threshold-input input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+   793→
+   794→/* 4) Receipt modal — dashed separator before the thank-you footer (screen; print adds its own). */
+   795→.receipt-thanks { border-top: 1px dashed #d5e2dc; margin-top: 14px; padding-top: 12px; }
+   796→
+   797→/* 5) Phones — keep the bell reachable (unlike the logout icon it has no sidebar
+   798→      twin; the sidebar badge covers stock only). The dropdown already caps to
+   799→      the viewport, so the member rows stay readable at ~480px. */
+   800→@media (max-width: 560px) {
+   801→  .notif-wrap { display: inline-flex; }
+   802→  .notif-wrap .top-icon { display: grid; }
+   803→  .notif-dropdown { width: min(320px, calc(100vw - 24px)); }
+   804→  .toggle-row { flex-wrap: wrap; }
+   805→  .toggle-row-controls { flex-basis: 100%; justify-content: space-between; }
+   806→}
+   807→
+   808→@media (prefers-reduced-motion: reduce) { .threshold-input { transition: none; } .notif-badge::before { animation: none; } }
+   809→
+   810→/* --- Round 10 (main) — login lockout UI -------------------------------- */
+   811→.notice-bar.warn { color: #8a6d2f; background: #fff8ec; border-color: #f3e4c6; }
+   812→.notice-bar.warn svg { color: #c99a45; flex-shrink: 0; }
+   813→tr.locked-row { background: #fffdf4; }
+   814→tr.locked-row:hover { background: #fdf7e7; }
+   815→tr.locked-row td b { color: #7c6229; }
+   816→tr.locked-row .user-avatar { background: #f6ecd4; color: #a97f2e; }
+   817→.lock-countdown { display: block; color: #b8863d; font-size: 10px; margin-top: 4px; font-family: "Sarabun", sans-serif; }
+   818→.lock-countdown b { font-weight: 600; }
+   819→@media (prefers-reduced-motion: reduce) { tr.locked-row { transition: none; } }
+   820→
+   821→/* --- Round 11 — member ≠ app-user separation + member wallet card -------- */
+   822→
+   823→/* 1) Login screen — scope note (system is staff/admin only; members never log in). */
+   824→.login-scope-note { display: flex; align-items: flex-start; gap: 7px; margin-top: 13px; padding: 9px 11px; border: 1px dashed #cfe4db; border-radius: 8px; background: #f6fbf9; color: #6f755d; font-size: 10.5px; line-height: 1.55; }
+   825→.login-scope-note svg { color: #4b9d7f; flex-shrink: 0; margin-top: 1px; }
+   826→.login-scope-note b { color: #3d7d65; }
+   827→
+   828→/* 2) Members view — separation banner above the stat grid. */
+   829→.member-scope-note { display: flex; align-items: flex-start; gap: 10px; padding: 8px 11px; margin-top: 12px; border: 1px dashed #cfe4db; border-radius: 10px; background: linear-gradient(135deg, #f4faf7, #eef7f3); }
+   830→.member-scope-icon { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; background: #e3f2ec; color: #3d8c71; flex-shrink: 0; }
+   831→.member-scope-note b { display: block; color: #2e6a54; font-size: 11px; }
+   832→.member-scope-note small { display: block; color: #7e8568; font-size: 11px; line-height: 1.6; margin-top: 3px; }
+   833→
+   834→/* 3) Registration modal — second scope note under the balance note. */
+   835→.initial-balance-note.scope { margin-top: 7px; color: #7e846d; background: #f4faf7; }
+   836→.initial-balance-note.scope svg { color: #4b9d7f; }
+   837→
+   838→/* 4) Users view — separation hint under the filter summary. */
+   839→.user-scope-note { display: flex; align-items: center; gap: 8px; margin-bottom: 11px; padding: 8px 11px; border: 1px dashed #cfe4db; border-radius: 8px; background: #f6fbf9; color: #6f755d; font-size: 11px; line-height: 1.5; }
+   840→.user-scope-note svg { color: #4b9d7f; flex-shrink: 0; }
+   841→.user-scope-note b { color: #3d7d65; }
+   842→
+   843→/* 5) Member wallet card modal — CR80 proportions (85.6 × 54 mm ≈ 323 × 204 px on screen). */
+   844→.member-card-modal { width: min(430px, calc(100vw - 32px)); background: #fff; border: 1px solid #e4ede9; border-radius: 14px; box-shadow: 0 22px 55px rgba(35, 62, 52, .22); padding: 20px; }
+   845→.member-card-stage { display: grid; place-items: center; padding: 18px 0 4px; background:
+   846→  radial-gradient(circle at 12px 12px, #d9e9e2 2.5px, transparent 3px) 0 0 / 24px 24px,
+   847→  #f2f8f5; border: 1px solid #e3ede9; border-radius: 11px; margin-top: 4px; position: relative; }
+   848→.member-card { width: 323px; max-width: 100%; aspect-ratio: 85.6 / 54; border-radius: 13px; background: linear-gradient(150deg, #f8fbf9 0%, #eef6f2 55%, #e2efe9 100%); border: 1px solid #d3e5dd; box-shadow: 0 10px 22px rgba(40, 70, 58, .16); padding: 13px 15px 11px; display: flex; flex-direction: column; color: #42584f; position: relative; overflow: hidden; }
+   849→.member-card::after { content: ""; position: absolute; inset: 5px; border: 1px solid rgba(72, 128, 107, .16); border-radius: 9px; pointer-events: none; }
+   850→.member-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+   851→.member-card-brand { display: flex; gap: 7px; align-items: center; }
+   852→.member-card-brand span { width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; background: var(--teal); color: #fff; font-size: 11px; font-weight: 700; }
+   853→.member-card-brand b { display: block; font-size: 11px; color: #375147; line-height: 1.25; }
+   854→.member-card-brand small { display: block; font-size: 7.5px; color: #757b61; margin-top: 1px; }
+   855→.member-card-type { font-size: 7.5px; font-weight: 600; color: #3d8c71; background: #ffffff; border: 1px solid #cfe4db; border-radius: 20px; padding: 3px 8px; white-space: nowrap; }
+   856→.member-card-body { flex: 1; display: flex; flex-direction: column; justify-content: center; min-width: 0; padding: 4px 0 2px; }
+   857→.member-card-name { font-size: 14.5px; font-weight: 700; color: #2e463d; line-height: 1.32; white-space: normal; word-break: break-word; overflow-wrap: anywhere; max-height: 2.7em; overflow: hidden; }
+   858→.member-card-name.fit-sm { font-size: 12.5px; }
+   859→.member-card-name.fit-xs { font-size: 11px; }
+   860→.member-card-number { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 21px; font-weight: 600; letter-spacing: 1.5px; color: var(--teal); margin-top: 2px; font-variant-numeric: tabular-nums; }
+   861→.member-card-meta { display: flex; justify-content: space-between; gap: 8px; margin-top: 5px; font-size: 9px; color: #666b57; }
+   862→.member-card-meta .ok { color: #4b9d7f; font-weight: 600; }
+   863→.member-card-meta .suspended { color: #c26568; font-weight: 600; }
+   864→.member-card-foot { border-top: 1px dashed #cfe4db; padding-top: 6px; display: flex; justify-content: space-between; gap: 10px; }
+   865→.member-card-foot small { font-size: 7.3px; color: #71775d; line-height: 1.5; }
+   866→.member-card-foot b { color: #3d8c71; font-variant-numeric: tabular-nums; }
+   867→.member-card-note { display: flex; align-items: flex-start; gap: 7px; margin-top: 12px; color: #7e846d; background: #f4faf7; border: 1px dashed #cfe4db; border-radius: 8px; padding: 9px 11px; font-size: 11px; line-height: 1.55; }
+   868→.member-card-note svg { color: #4b9d7f; flex-shrink: 0; margin-top: 1px; }
+   869→
+   870→/* 6) Print — isolate the wallet card onto its own cut-ready page.
+   871→      Same guard pattern as the receipt slip: only takes effect when the
+   872→      card modal (#member-card) is mounted, so a plain Ctrl+P stays untouched. */
+   873→@media print {
+   874→  body:has(#member-card) .sidebar,
+   875→  body:has(#member-card) .topbar,
+   876→  body:has(#member-card) .app-footer,
+   877→  body:has(#member-card) .page-content > *:not(.modal-backdrop) { display: none !important; }
+   878→  body:has(#member-card) .app-shell { display: block; min-height: 0; }
+   879→  body:has(#member-card) .main-shell { min-width: 0; }
+   880→  body:has(#member-card) .page-content { max-width: none; margin: 0; padding: 0; animation: none; }
+   881→  body:has(#member-card) .modal-backdrop { position: static; display: block; padding: 0; background: none; backdrop-filter: none; animation: none; }
+   882→  body:has(#member-card) { min-height: 0 !important; height: auto !important; }
+   883→  body:has(#member-card) .member-card-modal { width: auto; border: 0; border-radius: 0; box-shadow: none; padding: 0; background: #fff; }
+   884→  body:has(#member-card) .modal-heading,
+   885→  body:has(#member-card) .modal-actions,
+   886→  body:has(#member-card) .member-card-note { display: none !important; }
+   887→  body:has(#member-card) .member-card-stage { background: none; border: 0; padding: 0; }
+   888→  body:has(#member-card) .member-card { width: 85.6mm; aspect-ratio: auto; height: 54mm; box-shadow: none; border: 1px dashed #aeb49d; border-radius: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+   889→  body:has(#member-card) .member-card::after { display: none; }
+   890→}
+   891→
+   892→/* 7a) Member detail actions — six buttons no longer fit one row on phones.
+   893→       Two per row keeps tap targets large and stops the row overflowing. */
+   894→@media (max-width: 820px) {
+   895→  .member-detail-actions { flex-wrap: wrap; }
+   896→  .member-detail-actions button { flex: 1 1 calc(50% - 7px); }
+   897→}
+   898→
+   899→/* 7) Phones — shrink the on-screen card preview with the viewport. */
+   900→@media (max-width: 560px) {
+   901→  .login-scope-note { font-size: 10px; }
+   902→  .member-scope-note { flex-direction: column; gap: 7px; }
+   903→  .member-card { width: 100%; }
+   904→  .member-card-name { font-size: 13px; }
+   905→  .member-card-number { font-size: 18px; }
+   906→  .member-card-meta { flex-direction: column; gap: 2px; }
+   907→  .member-card-foot { flex-direction: column; gap: 3px; }
+   908→}
+   909→
+   910→@media (prefers-reduced-motion: reduce) {
+   911→  .member-card-modal { animation: none; }
+   912→}
+   913→
+   914→/* ─────────────────────────────────────────────────────────────
+   915→   Round 12 — readable text sizes + live settings tabs
+   916→   (1) Global font bump: the original 9–11px body text was too small
+   917→       for daily counter use. These overrides raise the most-read
+   918→       surfaces by 1–2.5px each (appended later in the cascade so
+   919→       equal-specificity rules resolve to these values).
+   920→   (2) New settings-tab components: payment methods, role matrix,
+   921→       log stats, font-scale picker.
+   922→   (3) Print guard: html-level font zoom must never leak into the
+   923→       72mm thermal slip or the CR80 member card.
+   924→   ───────────────────────────────────────────────────────────── */
+   925→
+   926→/* (1) Global font bump — sidebar & topbar */
+   927→.brand b { font-size: 17.5px; }
+   928→.brand small { font-size: 11px; }
+   929→.role-card b, .profile-pill b { font-size: 13.5px; }
+   930→.role-card span, .profile-pill small { font-size: 11px; }
+   931→nav button b { font-size: 14px; }
+   932→nav button small { font-size: 11px; }
+   933→.secure-badge b { font-size: 12px; }
+   934→.secure-badge small { font-size: 11px; }
+   935→.breadcrumb { font-size: 13px; }
+   936→.global-search { font-size: 12px; }
+   937→
+   938→/* (1) Global font bump — page headers, buttons, cards */
+   939→.eyebrow { font-size: 11px; }
+   940→.section-header h1 { font-size: 24px; }
+   941→.section-header p { font-size: 11.5px; }
+   942→.outline-button, .primary-button, .scan-button { font-size: 12.5px; }
+   943→.metric-top { font-size: 11px; }
+   944→.metric-card strong { font-size: 20px; }
+   945→.metric-card strong small { font-size: 12px; }
+   946→.metric-foot { font-size: 11px; }
+   947→.panel-heading h2, .table-toolbar h2, .settings-heading h2 { font-size: 15px; }
+   948→.panel-heading p, .table-toolbar p, .settings-heading p { font-size: 11px; }
+   949→.legend { font-size: 11px; }
+   950→.chart-summary span { font-size: 11px; }
+   951→.chart-summary strong { font-size: 15px; }
+   952→.chart-summary small { font-size: 11px; }
+   953→.quick-action b { font-size: 12.5px; }
+   954→.quick-action small { font-size: 11px; }
+   955→.text-button, .row-action { font-size: 11.5px; }
+   956→
+   957→/* (1) Global font bump — dashboard lists, tables, pills */
+   958→.seller-name b { font-size: 12px; }
+   959→.seller-name small { font-size: 11px; }
+   960→.seller-row > strong { font-size: 12px; }
+   961→.activity-row b { font-size: 11px; }
+   962→.activity-row p { font-size: 11px; }
+   963→table { font-size: 11px; }
+   964→th { font-size: 11px; }
+   965→td small { font-size: 11px; }
+   966→.status-pill { font-size: 11px; }
+   967→.stock-stat small { font-size: 11px; }
+   968→.stock-stat strong { font-size: 16px; }
+   969→.report-card > span, .report-card > small { font-size: 11px; }
+   970→.report-card strong { font-size: 22px; }
+   971→.category-row b { font-size: 11px; }
+   972→.category-row span { font-size: 11px; }
+   973→.category-row > strong { font-size: 11px; }
+   974→.export-list b { font-size: 11px; }
+   975→.export-list small { font-size: 11px; }
+   976→.log-summary span { font-size: 11px; }
+   977→.log-summary strong { font-size: 18px; }
+   978→
+   979→/* (1) Global font bump — forms, settings, POS */
+   980→.settings-nav button { font-size: 12.5px; }
+   981→.form-grid label { font-size: 11px; }
+   982→.form-grid input { font-size: 12.5px; }
+   983→.compact-form label { font-size: 11px; }
+   984→.compact-form input, .compact-form select { font-size: 12.5px; }
+   985→.toggle-row b { font-size: 12.5px; }
+   986→.toggle-row small { font-size: 11.5px; }
+   987→.number-mode-grid button b { font-size: 11px; }
+   988→.number-mode-grid button small { font-size: 10.5px; }
+   989→.number-preview { font-size: 11px; }
+   990→.number-preview b { font-size: 12.5px; }
+   991→.search-field input { font-size: 12.5px; }
+   992→.category-tabs button, .report-tabs button { font-size: 12.5px; }
+   993→.product-card-info b { font-size: 11.5px; }
+   994→.product-card-info small { font-size: 11px; }
+   995→.product-card-info strong { font-size: 14.5px; }
+   996→.cart-heading h2 { font-size: 16.5px; }
+   997→.cart-heading p { font-size: 11px; }
+   998→.cart-item-main b { font-size: 11.5px; }
+   999→.cart-item-main > span { font-size: 10.5px; }
+  1000→.cart-item > strong { font-size: 11.5px; }
+  1001→.member-select b { font-size: 11.5px; }
+  1002→.member-select small { font-size: 11px; }
+  1003→.cart-totals > div { font-size: 11px; }
+  1004→.cart-totals strong { font-size: 12px; }
+  1005→.cart-totals .total-line strong { font-size: 21px; }
+  1006→.pay-button { font-size: 11.5px; }
+  1007→.pay-split button { font-size: 11.5px; }
+  1008→.inline-message { font-size: 11.5px; }
+  1009→.notice-bar { font-size: 11px; }
+  1010→.shortcut-strip b { font-size: 12px; }
+  1011→.shortcut-strip small { font-size: 11px; }
+  1012→.shortcut-strip > button { font-size: 11px; }
+  1013→.member-balance-card strong { font-size: 19px; }
+  1014→.member-balance-card small { font-size: 11px; }
+  1015→.member-mini-card small { font-size: 11px; }
+  1016→.member-mini-card strong { font-size: 15.5px; }
+  1017→.member-mini-card p { font-size: 11px; }
+  1018→.app-footer { font-size: 11px; }
+  1019→
+  1020→/* (2) Settings tabs — payment methods */
+  1021→.payment-method-list { display: flex; flex-direction: column; gap: 9px; padding-top: 15px; }
+  1022→.payment-method-row { display: flex; align-items: center; gap: 12px; border: 1px solid #e6eeeb; border-radius: 10px; background: #fdfefe; padding: 12px 13px; transition: .16s ease; }
+  1023→.payment-method-row:hover { border-color: #b3d8ca; background: #f6fbf9; }
+  1024→.payment-method-row .pay-icon { width: 34px; height: 34px; border-radius: 8px; flex: 0 0 34px; }
+  1025→.payment-method-row .pay-icon.member { color: #2d8166; background: #e4f4ee; }
+  1026→.payment-method-row > div { flex: 1; min-width: 0; }
+  1027→.payment-method-row b { display: block; color: #426056; font-size: 12.5px; }
+  1028→.payment-method-row small { display: block; color: #767a69; font-size: 11.5px; line-height: 1.45; margin-top: 2px; }
+  1029→.payment-method-row .status-pill { flex: 0 0 auto; }
+  1030→
+  1031→/* (2) Settings tabs — shared note + jump rows */
+  1032→.settings-inline-note { display: flex; align-items: flex-start; gap: 8px; color: #5c7a6f; background: #f3faf7; border: 1px dashed #bfded2; border-radius: 9px; padding: 10px 12px; font-size: 11.5px; line-height: 1.55; margin-top: 13px; }
+  1033→.settings-inline-note svg { flex: 0 0 auto; margin-top: 1px; color: #3f8d72; }
+  1034→.settings-jump { display: flex; justify-content: flex-end; padding-top: 13px; }
+  1035→
+  1036→/* (2) Settings tabs — role matrix */
+  1037→.role-matrix { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; padding-top: 15px; }
+  1038→.role-matrix-card { border: 1px solid #e4ece9; border-radius: 11px; padding: 14px; background: #fdfefe; }
+  1039→.role-matrix-card.admin { border-color: #ded1f0; background: #fdfcff; }
+  1040→.role-matrix-head { display: flex; align-items: center; gap: 10px; padding-bottom: 11px; border-bottom: 1px solid #eef3f1; margin-bottom: 11px; }
+  1041→.role-matrix-head b { display: block; color: #3f5a50; font-size: 13px; }
+  1042→.role-matrix-head small { display: block; color: #767a68; font-size: 11px; margin-top: 2px; }
+  1043→.role-matrix-card .role-avatar { width: 30px; height: 30px; }
+  1044→.role-matrix-card.staff .role-avatar { background: #dff1ea; color: #2f8167; }
+  1045→.role-matrix-card ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+  1046→.role-matrix-card li { display: flex; align-items: flex-start; gap: 8px; color: #6e735d; font-size: 11px; line-height: 1.5; }
+  1047→.role-matrix-card li svg { flex: 0 0 auto; color: #439275; margin-top: 2px; }
+  1048→
+  1049→/* (2) Settings tabs — log stats */
+  1050→.log-settings-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 11px; padding-top: 15px; }
+  1051→.log-settings-stat { border: 1px solid #e6eeeb; border-radius: 10px; padding: 13px 14px; background: #fdfefe; }
+  1052→.log-settings-stat span { display: block; color: #767a69; font-size: 11.5px; }
+  1053→.log-settings-stat strong { display: block; color: #3f5a50; font-size: 17px; margin-top: 5px; letter-spacing: -.3px; }
+  1054→.log-settings-stat small { display: block; color: #818675; font-size: 11px; margin-top: 4px; }
+  1055→
+  1056→/* (2) Settings tabs — font-scale sample preview */
+  1057→.font-scale-sample { display: flex; flex-direction: column; gap: 3px; border: 1px solid #e0eee8; background: #f4fbf8; border-radius: 9px; padding: 13px 14px; margin-top: 13px; }
+  1058→.font-scale-sample span { color: #939a7d; font-size: 11.5px; }
+  1059→.font-scale-sample b { color: #2d6a56; font-size: 15px; margin-top: 2px; }
+  1060→.font-scale-sample small { color: #757b61; font-size: 11.5px; }
+  1061→
+  1062→/* (2) Settings tabs — tab focus ring (keyboard nav) */
+  1063→.settings-nav button:focus-visible { outline: 2px solid #7cc4aa; outline-offset: 2px; }
+  1064→
+  1065→/* (3) Print guard — thermal slip & member card always use paper sizes */
+  1066→@media print {
+  1067→  html { zoom: 1 !important; }
+  1068→}
+  1069→
+  1070→/* (2) Responsive — settings tab additions */
+  1071→@media (max-width: 820px) {
+  1072→  .role-matrix { grid-template-columns: 1fr; }
+  1073→  .log-settings-grid { grid-template-columns: 1fr; }
+  1074→  .payment-method-row .status-pill { display: none; }
+  1075→  .settings-jump { justify-content: flex-start; }
+  1076→}
+  1077→
+  1078→/* ══════════ Round 14 (Task 18): POS single-viewport terminal ══════════
+  1079→   User request: the POS must work entirely within ONE screen — the page
+  1080→   never grows, no scrolling to reach the confirm buttons. On ≥821px the
+  1081→   whole app locks to the viewport height: product grid + cart list scroll
+  1082→   INSIDE their panels; member picker, totals, payment buttons and a
+  1083→   permanent status line stay pinned. On phones (≤820px) a sticky
+  1084→   "ชำระเงิน" bar rides above the footer so the cashier never scrolls
+  1085→   hunting for the confirm buttons. --fs-zoom mirrors the font-scale zoom
+  1086→   so the locked height stays the real on-screen height at 112/125%. */
+  1087→:root { --fs-zoom: 1; }
+  1088→
+  1089→@media (min-width: 561px) {
+  1090→  /* locked terminal (Round 19: extended down from 821px so tablets and
+  1091→     small windows get the same zero-page-scroll guarantee): frame locks
+  1092→     to the viewport, panes scroll inside themselves */
+  1093→  body:has(.app-shell.pos-terminal) { overflow: hidden; min-height: 0; }
+  1094→  .app-shell.pos-terminal { height: calc(100dvh / var(--fs-zoom)); min-height: 0; overflow: hidden; }
+  1095→  .app-shell.pos-terminal .sidebar { min-height: 0; }
+  1096→  .app-shell.pos-terminal .main-shell { display: flex; flex-direction: column; min-height: 0; }
+  1097→  .app-shell.pos-terminal .page-content { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; padding: 20px 42px 16px; }
+  1098→  .app-shell.pos-terminal .section-header { margin-bottom: 12px; }
+  1099→  .app-shell.pos-terminal .section-header p { margin-top: 5px; }
+  1100→  .app-shell.pos-terminal .app-footer { flex-shrink: 0; }
+  1101→  /* product side: fixed controls, grid scrolls in its own pane */
+  1102→  .pos-terminal .pos-layout { flex: 1 1 auto; min-height: 0; align-items: stretch; grid-template-rows: minmax(0, 1fr); }
+  1103→  .pos-terminal .product-panel { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  1104→  .pos-terminal .category-tabs { margin-top: 12px; }
+  1105→  .pos-terminal .product-scroll { flex: 1; min-height: 120px; overflow-y: auto; margin-top: 13px; padding-right: 5px; overscroll-behavior: contain; }
+  1106→  .pos-terminal .product-scroll .product-grid, .pos-terminal .product-scroll .pos-loading { margin-top: 0; }
+  1107→  .pos-terminal .pos-help { flex-shrink: 0; margin-top: 9px; }
+  1108→  /* cart side: member picker pinned on top, list+wallet scroll in the middle,
+  1109→     totals + pay buttons + status pinned at the bottom */
+  1110→  .pos-terminal .cart-panel { position: static; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  1111→  .pos-terminal .cart-heading, .pos-terminal .shortcut-banner, .pos-terminal .member-select-wrap,
+  1112→  .pos-terminal .cart-totals, .pos-terminal .payment-actions, .pos-terminal .admin-pos-note,
+  1113→  .pos-terminal .cart-status-line { flex-shrink: 0; }
+  1114→  .pos-terminal .cart-mid { flex: 1 1 0; min-height: 56px; overflow-y: auto; display: flex; flex-direction: column; padding-right: 5px; overscroll-behavior: contain; }
+  1115→  .pos-terminal .cart-mid .cart-items { flex: 1 0 auto; min-height: 0; max-height: none; overflow: visible; margin-top: 9px; }
+  1116→  .pos-terminal .cart-totals { padding-top: 9px; }
+  1117→  /* compact shortcut strip so it fits the terminal without stealing height */
+  1118→  .pos-terminal .shortcut-strip { flex-shrink: 0; margin-top: 12px; padding: 9px 14px; }
+  1119→  .pos-terminal .shortcut-strip small { display: none; }
+  1120→  .pos-terminal .shortcut-strip > button { min-height: 36px; }
+  1121→  /* slim scrollbars for the two internal panes */
+  1122→  .pos-terminal .product-scroll::-webkit-scrollbar, .pos-terminal .cart-mid::-webkit-scrollbar { width: 6px; }
+  1123→  .pos-terminal .product-scroll::-webkit-scrollbar-thumb, .pos-terminal .cart-mid::-webkit-scrollbar-thumb { background: #cfe0d9; border-radius: 6px; }
+  1124→}
+  1125→/* short screens: reclaim vertical space by dropping decorative rows */
+  1126→@media (min-width: 561px) and (max-height: 730px) {
+  1127→  .pos-terminal .scan-status-strip, .pos-terminal .pos-help, .pos-terminal .admin-pos-note,
+  1128→  .pos-terminal .section-header p { display: none; }
+  1129→  .pos-terminal .product-art { height: 74px; font-size: 28px; }
+  1130→}
+  1131→@media (min-width: 561px) and (max-height: 600px) {
+  1132→  .pos-terminal .shortcut-strip { display: none; }
+  1133→  .pos-terminal .category-tabs { margin-top: 8px; }
+  1134→}
+  1135→
+  1136→/* (2) Permanent cart status line — replaces floating message/error blocks so
+  1137→      notices never shift the payment buttons (zero layout jump) */
+  1138→.cart-status-line { display: flex; align-items: center; gap: 7px; min-height: 36px; margin-top: 9px; padding: 6px 10px; border: 1px dashed #dbe6e1; border-radius: 8px; background: #f8fbfa; color: #656959; font-size: 10.5px; }
+  1139→.cart-status-line .live-dot { flex: 0 0 auto; }
+  1140→.cart-status-line .cart-status-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  1141→.cart-status-line button { border: 0; background: transparent; color: #b98284; padding: 2px; display: grid; place-items: center; }
+  1142→.cart-status-line button:hover { color: #a56567; }
+  1143→.cart-status-line.ok { border-style: solid; border-color: #d5ece2; background: #eff9f4; color: #3f8d70; }
+  1144→.cart-status-line.error { border-style: solid; border-color: #f2d8d9; background: #fff5f5; color: #b95f62; }
+  1145→
+  1146→/* (3) Mobile sticky checkout bar — appears only on phones with items in the bill */
+  1147→.pos-mobile-bar { display: none; }
+  1148→@media (max-width: 560px) {
+  1149→  .app-shell.pos-terminal .page-content { padding-bottom: calc(130px + env(safe-area-inset-bottom, 0px)); }
+  1150→  .pos-mobile-bar { position: fixed; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); z-index: 18; display: flex; align-items: center; gap: 10px; background: #fff; border: 1px solid #d9e6e1; border-radius: 13px; box-shadow: 0 12px 28px rgba(30, 60, 48, .18); padding: 9px 9px 9px 14px; animation: pos-bar-in .22s ease-out both; }
+  1151→  .pos-mobile-count { display: inline-flex; align-items: center; gap: 6px; color: #656959; font-size: 11px; white-space: nowrap; }
+  1152→  .pos-mobile-bar strong { margin-left: auto; color: var(--teal); font-size: 17px; letter-spacing: -.3px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  1153→  .pos-mobile-bar > button { height: 40px; border: 0; border-radius: 9px; background: var(--teal); color: #fff; font-size: 12px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; padding: 0 15px; box-shadow: 0 5px 12px rgba(35, 124, 97, .22); }
+  1154→  .pos-mobile-bar > button:active { transform: scale(.97); }
+  1155→}
+  1156→@keyframes pos-bar-in { from { transform: translateY(14px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+  1157→@media (prefers-reduced-motion: reduce) { .pos-mobile-bar { animation: none; } }
+  1158→
+  1159→/* (4) Print guards — the locked terminal must never clamp printed output */
+  1160→@media print {
+  1161→  .app-shell.pos-terminal, body:has(.app-shell.pos-terminal) .page-content { height: auto; min-height: 0; overflow: visible; }
+  1162→  body:has(.app-shell.pos-terminal) { overflow: visible; }
+  1163→  .pos-mobile-bar { display: none !important; }
+  1164→  body:has(#receipt-paper) .app-shell.pos-terminal,
+  1165→  body:has(#member-card) .app-shell.pos-terminal { height: auto; min-height: 0; overflow: visible; }
+  1166→  body:has(#receipt-paper) .app-shell.pos-terminal .page-content,
+  1167→  body:has(#member-card) .app-shell.pos-terminal .page-content { display: block; overflow: visible; }
+  1168→}
+  1169→
+  1170→/* ============================================================
+  1171→   ROUND 15 — Page-structure & layout-quality pass ("การจัดหน้าต่างๆยังไม่ดีเท่าที่ควร")
+  1172→   Verified issues (DOM-measured): Logs 5498px / Reports 4162px /
+  1173→   Users sessions 1822px unbounded lists; dead "ช่วงเวลา" button;
+  1174→   members view 2px viewport overflow; mobile form grids stay 2-col;
+  1175→   POS product-name cards diverge on 2-line names; KPI emphasis.
+  1176→   ============================================================ */
+  1177→
+  1178→/* (1) Show-more affordance — shared by Logs / Reports / Users session lists */
+  1179→.table-show-more { width: 100%; margin-top: 10px; display: flex; align-items: center; justify-content: center; gap: 7px; border: 1px dashed #cfe0d9; background: #fbfdfc; color: #5d8174; border-radius: 9px; padding: 10px 12px; font-size: 11px; font-weight: 600; transition: .16s ease; }
+  1180→.table-show-more:hover { border-color: #9bcdba; background: #f4faf7; color: var(--teal); }
+  1181→.table-show-more:active { transform: scale(.99); }
+  1182→.table-show-more b { font-variant-numeric: tabular-nums; }
+  1183→.table-show-more svg { flex: 0 0 auto; }
+  1184→.table-show-more.done { border-style: solid; color: #7c816f; background: #fafcfb; cursor: default; }
+  1185→.table-show-more.done:hover { border-color: #cfe0d9; background: #fafcfb; color: #7c816f; }
+  1186→
+  1187→/* (2) Date-range filter — replaces the dead "ช่วงเวลา" button in Logs */
+  1188→.date-range-filter { display: flex; align-items: center; gap: 6px; }
+  1189→.date-range-filter .search-field { width: 128px; padding: 0 7px; }
+  1190→.date-range-filter .search-field:focus-within { border-color: #9bcdba; box-shadow: 0 0 0 3px #eaf6f1; }
+  1191→.date-range-filter .search-field input { font-size: 11px; }
+  1192→.date-range-filter input[type="date"] { min-width: 0; }
+  1193→.date-range-filter input[type="date"]::-webkit-calendar-picker-indicator { margin-left: auto; padding: 0; opacity: .55; cursor: pointer; }
+  1194→.date-range-sep { color: #848876; font-size: 11px; user-select: none; }
+  1195→.date-range-clear { border: 0; background: transparent; color: #848876; width: 26px; height: 26px; display: grid; place-items: center; border-radius: 6px; }
+  1196→.date-range-clear:hover { color: #c26568; background: #fff8f8; }
+  1197→@media (max-width: 820px) { .date-range-filter { width: 100%; } .date-range-filter .search-field { flex: 1; width: auto; } }
+  1198→
+  1199→/* (3) Result-count summary row — Logs gains the same pattern members/users have
+  1200→       (overrides base at line ~226: larger text, tabular numbers, wrap-friendly) */
+  1201→.table-filter-summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: #6c7062; font-size: 11px; padding: 0 2px; flex-wrap: wrap; }
+  1202→.table-filter-summary span { display: inline-flex; align-items: center; gap: 5px; }
+  1203→.table-filter-summary b { color: #6d725d; font-variant-numeric: tabular-nums; }
+  1204→
+  1205→/* (4) Mobile: every form grid collapses to ONE column (settings + all modals) */
+  1206→@media (max-width: 560px) {
+  1207→  .form-grid, .form-grid.compact-form { grid-template-columns: 1fr; }
+  1208→  .form-grid label.wide { grid-column: auto; }
+  1209→}
+  1210→
+  1211→/* (5) POS product names: hard 2-line clamp so every card stays identical height
+  1212→       (Round-13 font bump made 2-line names 31px > old 27px min-height) */
+  1213→.product-card-info b { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-height: 31px; }
+  1214→
+  1215→/* (6) Members overview: reclaim the px that spilled past the fold (962 → 960) */
+  1216→.member-top-grid { margin-bottom: 12px; }
+  1217→.member-scope-note { margin-top: 12px; }
+  1218→.app-footer { padding-bottom: 18px; }
+  1219→
+  1220→/* (7) KPI emphasis: bigger, bolder headline numbers; feet align to card bottom */
+  1221→.metric-card { display: flex; flex-direction: column; }
+  1222→.metric-card strong { font-size: 20px; font-weight: 700; letter-spacing: -.5px; }
+  1223→.metric-foot { margin-top: auto; padding-top: 8px; }
+  1224→
+  1225→/* (8) Section rhythm: no trailing margin pushing the footer away;
+  1226→       footer text gets a slightly darker tone for legibility */
+  1227→.page-content > *:last-child { margin-bottom: 0; }
+  1228→.app-footer { padding-bottom: 18px; color: #6e7264; }
+  1229→
+  1230→/* (9) Touch comfort: slightly larger switches on coarse pointers */
+  1231→@media (pointer: coarse) { .toggle { transform: scale(1.18); transform-origin: right center; } }
+  1232→
+  1233→/* (10) Session list: compact density so the panel reads as one block */
+  1234→.session-list { margin-top: 4px; }
+  1235→
+  1236→/* ============================================================
+  1237→   ROUND 15b — TSX structure (Task 19-c)
+  1238→   Companion styles for the round-15 markup changes only;
+  1239→   the ROUND 15 block above stays untouched.
+  1240→   ============================================================ */
+  1241→
+  1242→/* Dashboard "วันนี้" chip — replaces the dead calendar button.
+  1243→   Mirrors .permission-chip base (line ~135) with a neutral gray-green tint. */
+  1244→.permission-chip.neutral { background: #f1f5f3; color: #737a5f; border-color: #dfe9e5; }
+  1245→
+  1246→/* Browser printing / thermal output never contains list-expansion controls. */
+  1247→@media print { .table-show-more { display: none; } }
+  1248→
+  1249→/* ============================================================
+  1250→   ROUND 16 — Member statement (รายงานยอดเงินคงเหลือสมาชิก)
+  1251→   A4 printable/downloadable document from member detail.
+  1252→   ============================================================ */
+  1253→
+  1254→/* (1) Modal shell — wider than form modals because the paper is A4-ish */
+  1255→.statement-modal { width: min(760px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); overflow-y: auto; background: #fff; border: 1px solid #e4ede9; border-radius: 14px; box-shadow: 0 22px 55px rgba(35, 62, 52, .22); padding: 20px; }
+  1256→.statement-stage { background: repeating-linear-gradient(-45deg, #f2f6f4 0 14px, #eef3f1 14px 28px); border: 1px solid #dfe9e5; border-radius: 11px; padding: 16px; display: grid; place-items: start center; margin-top: 6px; }
+  1257→.statement-actions { align-items: center; }
+  1258→.statement-hint { display: inline-flex; align-items: center; gap: 5px; margin-right: auto; color: #747965; font-size: 11px; }
+  1259→
+  1260→/* (2) The paper — A4 proportions on screen (210:297), real A4 in print */
+  1261→/* ROUND 77 (user) — ลดขนาดฟอนต์เอกสารลงอีก ~20% ตามที่ผู้ใช้สรุป (16 ใหญ่เกิน)
+  1262→   (ไม่มีโลโก้ ไม่มีหัวคอลัมน์สี — พิมพ์ขาว-ดำกับพิมพ์สีเหมือนกันทุกประการ) */
+  1263→.statement-paper { width: 100%; max-width: 660px; background: #fff; border: 1px solid #c9c9c4; box-shadow: 0 12px 30px rgba(40, 70, 58, .14); padding: 24px 28px 20px; color: #1c1c1a; font-size: 13px; font-family: "Sarabun", "TH Sarabun New", "Leelawadee UI", Tahoma, sans-serif; }
+  1264→
+  1265→.statement-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding-bottom: 12px; border-bottom: 2px solid #1c1c1a; }
+  1266→.statement-brand { display: flex; gap: 9px; align-items: center; }
+  1267→.statement-brand img, .statement-brand-mark { display: none; } /* ROUND 75 — เอกสารไม่ใส่โลโก้ */
+  1268→.statement-brand b { display: block; font-size: 16px; color: #111111; }
+  1269→.statement-brand small { display: block; color: #555555; font-size: 10.5px; margin-top: 1px; font-weight: 500; }
+  1270→.statement-title { text-align: right; }
+  1271→.statement-title b { display: block; font-size: 16px; color: #111111; letter-spacing: -.2px; }
+  1272→.statement-title small { display: block; color: #555555; font-size: 10.5px; margin-top: 3px; }
+  1273→
+  1274→.statement-member { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px 14px; padding: 13px 0 11px; border-bottom: 1px solid #d8d8d3; }
+  1275→.statement-member > div > small { display: block; color: #555555; font-size: 11px; }
+  1276→.statement-member > div > b { display: block; color: #1c1c1a; font-size: 13px; margin-top: 2px; font-weight: 700; }
+  1277→.statement-member .st-ok { color: #111111; font-weight: 700; }
+  1278→.statement-member .st-suspended { color: #111111; font-weight: 700; }
+  1279→
+  1280→.statement-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0; }
+  1281→.statement-summary > div { border: 1px solid #bdbdb8; border-radius: 9px; padding: 9px 11px; background: #f5f5f4; }
+  1282→.statement-summary small { display: block; color: #555555; font-size: 10.5px; line-height: 1.35; }
+  1283→.statement-summary b { display: block; font-size: 14px; margin-top: 4px; letter-spacing: -.3px; color: #111111; }
+  1284→.statement-summary .st-balance { font-weight: 800; }
+  1285→.statement-summary .st-in { font-weight: 700; }
+  1286→.statement-summary .st-out { font-weight: 700; }
+  1287→.statement-summary .st-buy { font-weight: 700; }
+  1288→
+  1289→.statement-table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; min-width: 0; }
+  1290→.statement-table th { text-align: left; color: #111111; background: #ffffff; font-weight: 700; font-size: 13px; padding: 6px 8px; border-top: 2px solid #111111; border-bottom: 2px solid #111111; }
+  1291→.statement-table th:first-child { border-radius: 0; }
+  1292→.statement-table th:last-child { border-radius: 0; }
+  1293→.statement-table td { padding: 6px 8px; border-bottom: 1px solid #d8d8d3; color: #1c1c1a; font-weight: 500; vertical-align: top; }
+  1294→.statement-table tbody tr:nth-child(even) td { background: #f4f4f2; }
+  1295→.statement-table tfoot td { border-top: 3.5px double #111111; border-bottom: 2.5px solid #111111; background: #fff; font-weight: 800; color: #111111; padding: 8px 9px; }
+  1296→.statement-table .st-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  1297→.statement-table .st-strong { color: #111111; font-weight: 700; }
+  1298→.statement-table .st-time { white-space: nowrap; color: #444444; font-size: 12.5px; }
+  1299→.statement-table .st-detail { color: #333333; }
+  1300→.statement-table .st-in { color: #111111; font-weight: 700; }
+  1301→.statement-table .st-out { color: #111111; font-weight: 700; }
+  1302→.statement-table .st-type { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 12.5px; white-space: nowrap; border: 1px solid #555555; background: #ffffff; color: #111111; font-weight: 700; }
+  1303→.statement-table .st-type.green { color: #111111; background: #ffffff; }
+  1304→.statement-table .st-type.blue { color: #111111; background: #ffffff; }
+  1305→.statement-table .st-type.purple { color: #111111; background: #ffffff; }
+  1306→.statement-table .st-empty { text-align: center; color: #555555; padding: 22px 0; }
+  1307→
+  1308→.statement-note { margin-top: 10px; color: #444444; font-size: 11.5px; font-weight: 500; }
+  1309→
+  1310→.statement-sign { display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px; margin-top: 26px; }
+  1311→.statement-sign > div { text-align: center; }
+  1312→.statement-sign span { display: block; color: #444444; font-size: 11.5px; margin-bottom: 34px; }
+  1313→.statement-sign i { display: block; border-top: 1px dotted #8a8a85; }
+  1314→
+  1315→.statement-foot { margin-top: 16px; padding-top: 9px; border-top: 1px solid #d8d8d3; color: #555555; font-size: 11px; text-align: center; }
+  1316→.statement-end { break-inside: avoid; page-break-inside: avoid; }
+  1317→
+  1318→/* (3) Phones — the paper stays readable, member grid stacks */
+  1319→@media (max-width: 560px) {
+  1320→  .statement-modal { padding: 14px; }
+  1321→  .statement-stage { padding: 10px; }
+  1322→  .statement-paper { padding: 16px 14px 14px; }
+  1323→  .statement-member { grid-template-columns: 1fr 1fr; }
+  1324→  .statement-summary { grid-template-columns: 1fr 1fr; }
+  1325→  .statement-head { flex-direction: column; }
+  1326→  .statement-title { text-align: left; }
+  1327→  .statement-hint { display: none; }
+  1328→  .statement-table { font-size: 10px; }
+  1329→  .statement-table th { padding: 6px 5px; font-size: 9.5px; }
+  1330→  .statement-table td { padding: 5.5px 5px; }
+  1331→  .statement-table th:nth-child(1), .statement-table td.st-time { width: 92px; }
+  1332→  .statement-table th:nth-child(2) { width: 62px; }
+  1333→  .statement-table th:nth-child(4), .statement-table th:nth-child(5) { width: 68px; }
+  1334→  .statement-table td.st-time { white-space: normal; }
+  1335→}
+  1336→
+  1337→/* (4) Print — isolate the statement onto a clean A4 page
+  1338→      (same guard pattern as receipt + wallet card) */
+  1339→@media print {
+  1340→  @page { size: A4 portrait; margin: 8mm; }
+  1341→  body:has(#member-statement) .sidebar,
+  1342→  body:has(#member-statement) .topbar,
+  1343→  body:has(#member-statement) .app-footer,
+  1344→  body:has(#member-statement) .page-content > *:not(.modal-backdrop) { display: none !important; }
+  1345→  body:has(#member-statement) .app-shell { display: block; min-height: 0; }
+  1346→  body:has(#member-statement) .main-shell { min-width: 0; }
+  1347→  body:has(#member-statement) .page-content { max-width: none; margin: 0; padding: 0; animation: none; }
+  1348→  body:has(#member-statement) .modal-backdrop { position: static; display: block; padding: 0; background: none; backdrop-filter: none; animation: none; }
+  1349→  body:has(#member-statement) { min-height: 0 !important; height: auto !important; }
+  1350→  body:has(#member-statement) .statement-modal { width: auto; max-height: none; overflow: visible; border: 0; border-radius: 0; box-shadow: none; padding: 0; background: #fff; }
+  1351→  body:has(#member-statement) .modal-heading,
+  1352→  body:has(#member-statement) .statement-actions { display: none !important; }
+  1353→  body:has(#member-statement) .statement-stage { background: none; border: 0; padding: 0; border-radius: 0; }
+  1354→  body:has(#member-statement) .statement-paper { width: 100%; max-width: none; border: 0; box-shadow: none; padding: 3mm 2mm; font-size: 13px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  1355→  body:has(#member-statement) .statement-member { grid-template-columns: repeat(3, 1fr); }
+  1356→  body:has(#member-statement) .statement-summary { grid-template-columns: repeat(4, 1fr); }
+  1357→  body:has(#member-statement) .statement-member { padding: 8px 0 7px; gap: 5px 10px; }
+  1358→  body:has(#member-statement) .statement-summary { margin: 8px 0; gap: 6px; }
+  1359→  body:has(#member-statement) .statement-summary > div { padding: 6px 8px; }
+  1360→  body:has(#member-statement) .statement-table { font-size: 12px; }
+  1361→  body:has(#member-statement) .statement-table th,
+  1362→  body:has(#member-statement) .statement-table td { padding: 4px 6px; }
+  1363→  body:has(#member-statement) .statement-sign { margin-top: 14px; gap: 18px; }
+  1364→  body:has(#member-statement) .statement-sign span { margin-bottom: 20px; }
+  1365→  body:has(#member-statement) .statement-foot { margin-top: 9px; padding-top: 6px; }
+  1366→}
+  1367→
+  1368→/* (5) Round 16 detail polish — on-screen reading affordances */
+  1369→.statement-table tbody tr:hover td { background: #f2f8f5; }
+  1370→.statement-paper { user-select: text; }
+  1371→.statement-actions .outline-button:disabled { opacity: .6; }
+  1372→
+  1373→/* ============================================================
+  1374→   ROUND 17 — App-wide usability & layout overhaul
+  1375→   User feedback: "ทั้งหน้าแอป การจัดวางไม่สะดวกคนใช้งาน
+  1376→   sidebar เลือนตา ไม่มีการจัดหน้าให้เหมาะสม"
+  1377→   Fixes: (1) sidebar rebuilt for contrast + calm hierarchy
+  1378→   (2) global font pass — nothing under 11px anywhere
+  1379→   (3) sticky footer + consistent page rhythm
+  1380→   (4) settings unsaved-changes save bar
+  1381→   ============================================================ */
+  1382→
+  1383→/* (1) SIDEBAR — one line per item, dark readable text, strong
+  1384→       active pill, quiet group labels; no more gray-on-gray noise */
+  1385→.sidebar { width: 276px; flex: 0 0 276px; padding: 20px 14px 16px; background: linear-gradient(180deg, #f7faf8, #f1f6f4); }
+  1386→.brand { padding: 0 10px 16px; gap: 12px; }
+  1387→.brand-mark { width: 42px; height: 42px; border-radius: 13px; }
+  1388→.brand b { font-size: 16px; }
+  1389→.brand small { font-size: 11.5px; }
+  1390→.role-card { background: #fff; border-color: #e0eae5; margin: 0 2px 14px; border-radius: 11px; padding: 10px 11px; }
+  1391→.role-card b { font-size: 13px; }
+  1392→.role-card span { font-size: 11px; }
+  1393→.nav-group-label { font-family: "IBM Plex Mono", monospace; font-size: 10.5px; font-weight: 500; letter-spacing: 1.1px; text-transform: uppercase; color: #7d846c; padding: 0 12px; margin: 4px 0 6px; }
+  1394→nav { gap: 3px; }
+  1395→nav button { color: #505443; font-size: 14px; font-weight: 600; padding: 11px 12px; border-radius: 10px; gap: 12px; border: 1px solid transparent; }
+  1396→nav button b { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  1397→nav button svg { color: #7d836b; flex: 0 0 auto; }
+  1398→nav button:hover { background: #e8f0ec; color: #2d6a57; }
+  1399→nav button:hover svg { color: var(--teal); }
+  1400→nav button.active { background: var(--teal); border-color: var(--teal-dark); color: #fff; box-shadow: 0 6px 14px rgba(35, 124, 97, .25); }
+  1401→nav button.active b { color: #fff; }
+  1402→nav button.active svg { color: #fff; }
+  1403→.nav-badge { background: #e8913d; color: #fff; height: 20px; min-width: 20px; padding: 0 6px; border-radius: 999px; font-size: 11px; font-weight: 700; display: grid; place-items: center; font-style: normal; animation: none; box-shadow: 0 0 0 2px rgba(255, 255, 255, .4); }
+  1404→nav button.active .nav-badge { background: #fff; color: var(--teal-dark); box-shadow: none; }
+  1405→.locked-nav { margin: 2px 2px 0; font-size: 11.5px; padding: 11px; }
+  1406→.sidebar-footer { border-top: 1px solid #e3ece8; margin-top: 14px; padding: 12px 2px 0; }
+  1407→.sidebar-logout { border: 1px solid #dbe7e2; background: #fff; color: #686d5a; font-size: 12.5px; font-weight: 600; border-radius: 10px; padding: 11px 12px; margin-top: 0; }
+  1408→.sidebar-logout:hover { border-color: #e6bcb8; background: #fdf7f6; color: #b95f62; }
+  1409→.sidebar-version { font-size: 10.5px; margin-top: 9px; }
+  1410→
+  1411→/* (2) TOPBAR — taller targets, clearer search, grouped pill */
+  1412→.topbar { height: 68px; padding: 0 30px; gap: 16px; }
+  1413→.breadcrumb { font-size: 13.5px; }
+  1414→.breadcrumb strong { font-weight: 700; }
+  1415→.global-search { width: 290px; height: 40px; font-size: 12.5px; border-radius: 9px; background: #f2f6f4; border-color: #e3ebe8; }
+  1416→.global-search:hover { border-color: #a9d4c5; background: #fff; color: #6c715c; }
+  1417→.top-icon { width: 38px; height: 38px; border-radius: 9px; }
+  1418→.top-icon:hover { background: #e9f1ed; color: #3f5a50; }
+  1419→.profile-pill { border: 1px solid #e4ede9; background: #fff; border-radius: 10px; padding: 4px 12px 4px 5px; min-width: 0; }
+  1420→.profile-avatar { width: 34px; height: 34px; font-size: 15px; }
+  1421→.profile-pill b { font-size: 12.5px; }
+  1422→.profile-pill small { font-size: 11.5px; }
+  1423→
+  1424→/* (3) STICKY FOOTER + page rhythm — short pages pin the footer,
+  1425→       long pages push it down naturally (never overlaps) */
+  1426→.main-shell { display: flex; flex-direction: column; min-height: 100vh; }
+  1427→.page-content { flex: 1 0 auto; padding: 26px 34px 20px; }
+  1428→.app-footer { margin-top: auto; }
+  1429→
+  1430→/* (4) SECTION HEADERS — one compact line, less dead space */
+  1431→.section-header { margin-bottom: 16px; gap: 16px; }
+  1432→.section-header h1 { font-size: 24px; }
+  1433→.section-header p { font-size: 11.5px; margin: 4px 0 0; }
+  1434→.eyebrow { font-size: 11px; margin-bottom: 5px; }
+  1435→
+  1436→/* (5) GLOBAL TYPOGRAPHY PASS 2 — readable everywhere */
+  1437→body { font-size: 13px; }
+  1438→table { font-size: 12px; }
+  1439→th { font-size: 11px; padding: 11px 10px; letter-spacing: .2px; }
+  1440→td { padding: 12px 10px; }
+  1441→td small { font-size: 11.5px; }
+  1442→.status-pill { font-size: 11.5px; padding: 4px 9px; }
+  1443→.outline-button, .primary-button, .scan-button { height: 40px; font-size: 12.5px; padding: 0 14px; border-radius: 9px; }
+  1444→.text-button, .row-action { font-size: 12px; }
+  1445→.form-grid label { font-size: 11.5px; }
+  1446→.form-grid input { height: 38px; font-size: 13px; }
+  1447→.toggle-row b { font-size: 13px; }
+  1448→.toggle-row small { font-size: 11px; line-height: 1.5; }
+  1449→.toggle { width: 44px; height: 24px; }
+  1450→.toggle span { width: 20px; height: 20px; }
+  1451→.toggle.on span { transform: translateX(20px); }
+  1452→.search-field { height: 40px; }
+  1453→.search-field input { font-size: 13px; }
+  1454→.category-tabs button, .report-tabs button { font-size: 13px; }
+  1455→.settings-nav button { font-size: 13px; padding: 11px 12px; border-radius: 9px; }
+  1456→.number-mode-grid button b { font-size: 12.5px; }
+  1457→.number-mode-grid button small { font-size: 11px; }
+  1458→.settings-inline-note { font-size: 11.5px; }
+  1459→.payment-method-row b { font-size: 13px; }
+  1460→.payment-method-row small { font-size: 11px; }
+  1461→.role-matrix-head b { font-size: 13.5px; }
+  1462→.role-matrix-card li { font-size: 11.5px; }
+  1463→.role-matrix-card small { font-size: 11.5px; }
+  1464→.log-settings-stat strong { font-size: 18px; }
+  1465→.panel-heading h2, .table-toolbar h2, .settings-heading h2 { font-size: 17px; }
+  1466→.panel-heading p, .table-toolbar p, .settings-heading p { font-size: 11.5px; }
+  1467→.metric-top { font-size: 13px; }
+  1468→.metric-foot { font-size: 11.5px; }
+  1469→.quick-action b { font-size: 13px; }
+  1470→.quick-action small { font-size: 11px; }
+  1471→.seller-name b { font-size: 12.5px; }
+  1472→.seller-name small { font-size: 11px; }
+  1473→.activity-row b { font-size: 12px; }
+  1474→.activity-row p { font-size: 11.5px; }
+  1475→.legend { font-size: 11.5px; }
+  1476→.y-labels, .bar-column { font: 11px "IBM Plex Mono", monospace; }
+  1477→.chart-summary span { font-size: 11px; }
+  1478→.stock-stat small { font-size: 11px; }
+  1479→.stock-stat strong { font-size: 16px; }
+  1480→.member-mini-card small { font-size: 11px; }
+  1481→.member-mini-card p { font-size: 11.5px; }
+  1482→.report-card > span, .report-card > small { font-size: 11px; }
+  1483→.category-row b { font-size: 11.5px; }
+  1484→.category-row span { font-size: 11.5px; }
+  1485→.category-row > strong { font-size: 11.5px; }
+  1486→.export-list b { font-size: 11.5px; }
+  1487→.export-list small { font-size: 11.5px; }
+  1488→.log-summary span { font-size: 11px; }
+  1489→.member-option b { font-size: 11.5px; }
+  1490→.member-option small { font-size: 11.5px; }
+  1491→.inline-message, .notice-bar { font-size: 11px; }
+  1492→.pos-status { font-size: 11px; }
+  1493→.app-footer { font-size: 11.5px; }
+  1494→.kbd, kbd { font-size: 11px; }
+  1495→
+  1496→/* (6) POS — bigger cart/product text, same one-screen terminal */
+  1497→.product-card-info b { font-size: 12.5px; min-height: 34px; }
+  1498→.product-card-info small { font-size: 11px; }
+  1499→.product-card-info strong { font-size: 15.5px; }
+  1500→.cart-heading h2 { font-size: 17px; }
+  1501→.cart-heading p { font-size: 11.5px; }
+  1502→.cart-item-main b { font-size: 12.5px; }
+  1503→.cart-item-main > span { font-size: 11px; }
+  1504→.cart-item > strong { font-size: 12.5px; }
+  1505→.qty-control button { width: 22px; height: 22px; }
+  1506→.member-select b { font-size: 12.5px; }
+  1507→.member-select small { font-size: 11px; }
+  1508→.cart-totals > div { font-size: 12px; }
+  1509→.cart-totals strong { font-size: 13px; }
+  1510→.cart-totals .total-line strong { font-size: 22px; }
+  1511→.pay-button { height: 42px; font-size: 12.5px; }
+  1512→.pay-split button { height: 40px; font-size: 12.5px; }
+  1513→.cart-status-line { font-size: 11px; }
+  1514→.shortcut-strip b { font-size: 12.5px; }
+  1515→.shortcut-strip small { font-size: 11.5px; }
+  1516→.shortcut-strip > button { font-size: 11.5px; }
+  1517→.scan-status-strip b { font-size: 12px; }
+  1518→.scan-status-strip small { font-size: 11px; }
+  1519→.pos-help { font-size: 11px; }
+  1520→.app-shell.pos-terminal .page-content { padding: 16px 34px 12px; }
+  1521→
+  1522→/* (7) SETTINGS — sticky tab rail + unsaved-changes save bar */
+  1523→.settings-layout { grid-template-columns: 230px minmax(0, 740px); gap: 20px; }
+  1524→.settings-nav { position: sticky; top: 22px; }
+  1525→.settings-save-bar { position: sticky; bottom: 14px; z-index: 8; display: flex; align-items: center; gap: 13px; background: linear-gradient(135deg, #235544, #2d8a6c); color: #fff; border-radius: 12px; padding: 12px 15px; box-shadow: 0 14px 34px rgba(23, 63, 49, .35); }
+  1526→.save-dot { width: 9px; height: 9px; border-radius: 50%; background: #ffc478; box-shadow: 0 0 0 4px rgba(255, 196, 120, .28); flex: 0 0 auto; }
+  1527→.save-bar-text { flex: 1; min-width: 0; }
+  1528→.save-bar-text b { display: block; font-size: 13px; }
+  1529→.save-bar-text small { display: block; color: #c9e6db; font-size: 11px; margin-top: 2px; line-height: 1.45; }
+  1530→.save-bar-actions { display: flex; gap: 8px; flex: 0 0 auto; }
+  1531→.save-bar-actions .outline-button { background: rgba(255, 255, 255, .08); border-color: rgba(255, 255, 255, .4); color: #eafaf4; height: 36px; }
+  1532→.save-bar-actions .outline-button:hover { background: rgba(255, 255, 255, .16); border-color: rgba(255, 255, 255, .65); color: #fff; }
+  1533→.save-bar-actions .primary-button { background: #fff; border-color: #fff; color: #1e6852; height: 36px; }
+  1534→.save-bar-actions .primary-button:hover { background: #eef8f4; color: #174f3d; }
+  1535→@media print { .settings-save-bar { display: none; } }
+  1536→
+  1537→/* (8) FRIENDLIER SCROLLBARS everywhere (thin, rounded, themed) */
+  1538→::-webkit-scrollbar { width: 10px; height: 10px; }
+  1539→::-webkit-scrollbar-track { background: transparent; }
+  1540→::-webkit-scrollbar-thumb { background: #cad9d3; border-radius: 8px; border: 2px solid #f4f7f5; }
+  1541→::-webkit-scrollbar-thumb:hover { background: #a9c2b8; }
+  1542→* { scrollbar-width: thin; scrollbar-color: #cad9d3 transparent; }
+  1543→
+  1544→/* (9) Responsive sync — keep the new sidebar metrics at each breakpoint */
+  1545→@media (max-width: 1120px) {
+  1546→  .sidebar { width: 240px; flex: 0 0 240px; }
+  1547→}
+  1548→@media (max-width: 820px) {
+  1549→  .sidebar { width: 276px; }
+  1550→  .page-content { padding: 20px 16px 16px; }
+  1551→  .settings-nav { position: static; }
+  1552→}
+  1553→@media (max-width: 560px) {
+  1554→  .settings-save-bar { flex-wrap: wrap; gap: 10px; }
+  1555→  .save-bar-actions { width: 100%; }
+  1556→  .save-bar-actions button { flex: 1; }
+  1557→}
+  1558→
+  1559→/* ============================================================
+  1560→   ROUND 18 — Locked App Frame (user-mandated layout rules)
+  1561→   1) horizontal overflow hard-locked: clip (stricter than
+  1562→      hidden — cannot be scrolled programmatically and does
+  1563→      NOT create a scroll container, so sticky/fixed children
+  1564→      keep working; hidden kept as legacy fallback)
+  1565→   2) whole app locked to the viewport height (100dvh frame)
+  1566→      — the page itself NEVER scrolls; sidebar and content
+  1567→      column each scroll inside their own box
+  1568→   3) POS three-pane lock: sidebar | products | cart —
+  1569→      products pane scrolls itself; cart is fixed-height with
+  1570→      totals + pay buttons pinned to the panel bottom edge
+  1571→   4) bottom action bar: position sticky bottom 0 — always
+  1572→      glued to the bottom edge of the screen
+  1573→   5) data tables: overflow-x auto on the wrapper div only —
+  1574→      wide tables never push the main frame sideways
+  1575→   ============================================================ */
+  1576→
+  1577→/* (1) hard horizontal lock */
+  1578→html { overflow-x: hidden; }
+  1579→body { max-width: 100vw; overflow-x: hidden; overflow-x: clip; min-height: 0; }
+  1580→
+  1581→/* (2) app frame — flex column, viewport-locked */
+  1582→.app-shell { height: calc(100dvh / var(--fs-zoom)); min-height: 0; overflow: hidden; }
+  1583→.sidebar { height: calc(100dvh / var(--fs-zoom)); min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  1584→.main-shell { height: calc(100dvh / var(--fs-zoom)); min-height: 0; overflow: hidden; }
+  1585→.topbar { position: relative; z-index: 5; flex: 0 0 auto; }
+  1586→.page-content { width: 100%; flex: 1 1 auto; min-height: 0; min-width: 0; overflow-y: auto; overscroll-behavior: contain; }
+  1587→.app-footer { flex: 0 0 auto; margin-top: 0; }
+  1588→
+  1589→/* (3) POS three-pane terminal — applies at every width now;
+  1590→       on phones the panes simply stack and each keeps its own
+  1591→       internal scrolling */
+  1592→.app-shell.pos-terminal .page-content { display: flex; flex-direction: column; overflow-y: auto; padding: 16px 34px 12px; }
+  1593→.pos-terminal .section-header { flex: 0 0 auto; }
+  1594→@media (min-width: 561px) {
+  1595→  /* locked terminal (Round 19: extended down from 821px) — the content
+  1596→     column never scrolls; the shortcut bar sits flush against the
+  1597→     screen bottom */
+  1598→  .app-shell.pos-terminal .page-content { overflow: hidden; }
+  1599→  .app-shell.pos-terminal .app-footer { display: none; }
+  1600→  .pos-layout { flex: 1 1 auto; min-height: 0; align-items: stretch; grid-template-rows: minmax(0, 1fr); }
+  1601→}
+  1602→.product-panel { display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  1603→.product-scroll { flex: 1 1 auto; min-height: 120px; overflow-y: auto; overscroll-behavior: contain; }
+  1604→.cart-panel { position: static; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  1605→.cart-heading, .shortcut-banner, .member-select-wrap, .cart-totals,
+  1606→.payment-actions, .admin-pos-note, .cart-status-line { flex: 0 0 auto; }
+  1607→.cart-mid { flex: 1 1 0; min-height: 56px; overflow-y: auto; display: flex; flex-direction: column; overscroll-behavior: contain; }
+  1608→.pos-terminal .cart-mid .cart-items { flex: 1 0 auto; min-height: 0; max-height: none; overflow: visible; }
+  1609→.pos-terminal .cart-mid .cart-items::-webkit-scrollbar, .pos-terminal .product-scroll::-webkit-scrollbar { width: 6px; }
+  1610→.pos-terminal .cart-mid::-webkit-scrollbar-thumb, .pos-terminal .product-scroll::-webkit-scrollbar-thumb { background: #cfe0d9; border-radius: 6px; }
+  1611→
+  1612→/* (4) bottom action bar — sticky to the screen bottom edge,
+  1613→       never pushed away by content above it */
+  1614→.pos-terminal .shortcut-strip { position: sticky; bottom: 0; z-index: 6; margin-top: 12px; background: #fff; box-shadow: 0 -8px 22px rgba(30, 60, 48, .09); border-radius: 12px; }
+  1615→
+  1616→/* (5) tables — horizontal scroll lives ONLY inside the wrapper */
+  1617→.table-wrap { overflow-x: auto; max-width: 100%; -webkit-overflow-scrolling: touch; }
+  1618→.table-wrap table { min-width: 680px; }
+  1619→.table-wrap::-webkit-scrollbar { height: 8px; }
+  1620→.table-wrap::-webkit-scrollbar-thumb { background: #c4d4cd; border-radius: 8px; }
+  1621→
+  1622→/* (6) phones — panes stack; inner lists keep their bounded
+  1623→       scroll so the mobile checkout flow stays reachable */
+  1624→@media (max-width: 560px) {
+  1625→  .product-scroll { flex: none; min-height: 0; overflow: visible; }
+  1626→  .cart-mid { flex: none; min-height: 0; overflow: visible; }
+  1627→  .pos-terminal .cart-mid .cart-items { max-height: 300px; overflow-y: auto; }
+  1628→  .pos-terminal .shortcut-strip { position: static; box-shadow: none; }
+  1629→}
+  1630→
+  1631→/* (7) print — unclamp the locked frame so receipts, member
+  1632→       cards and statements always print in full */
+  1633→@media print {
+  1634→  html, body { max-width: none !important; overflow-x: visible !important; overflow: visible !important; height: auto !important; }
+  1635→  .app-shell, .sidebar, .main-shell { height: auto !important; min-height: 0 !important; overflow: visible !important; }
+  1636→  .sidebar { overflow-y: visible !important; }
+  1637→  .page-content { overflow: visible !important; display: block !important; }
+  1638→  .app-shell.pos-terminal .page-content { overflow: visible !important; display: block !important; }
+  1639→  .product-scroll, .cart-mid { overflow: visible !important; }
+  1640→  .table-wrap { overflow: visible !important; }
+  1641→}
+  1642→
+  1643→/* ============================================================
+  1644→   ROUND 19 — POS functional layout redesign (user-mandated)
+  1645→   จากการทดสอบ: ① ห้ามเลื่อนทั้งหน้าจอเด็ดขาด — เลื่อนได้เฉพาะ
+  1646→   กรอบรายการสินค้าตรงกลาง และกรอบตะกร้าด้านขวา ② รายการในตะกร้า
+  1647→   1 บรรทัดต่อ 1 สินค้า แบบใบเสร็จ [ชื่อ | - 1 + | ราคา/หน่วย | รวม]
+  1648→   ③ sidebar ขวา: หัวบิลบนสุด / รายการ flex:1 เลื่อนเฉพาะในกรอบ /
+  1649→   ท้าย sticky ล็อคปุ่มชำระเงินติดล่างสุดเสมอ ④ แถบรายการด่วนล็อค
+  1650→   ล่างสุดของหน้าจอ แยกออกจากตะกร้าสินค้า
+  1651→   (the terminal lock in the Round-14/18 blocks above now starts at
+  1652→   561px instead of 821px; phones ≤560px keep natural flow + fixed
+  1653→   bottom docks so nothing important is ever off-screen)
+  1654→   ============================================================ */
+  1655→
+  1656→/* (1) Compact receipt-style cart rows — one line per item.
+  1657→       The header row and every item row share the same column grid
+  1658→       so the whole bill lines up like a printed receipt. */
+  1659→.cart-items-head, .cart-item { display: grid; grid-template-columns: minmax(0, 1fr) 78px 54px 64px; gap: 7px; align-items: center; }
+  1660→.cart-items-head { margin-top: 10px; padding: 0 6px 6px; border-bottom: 1px solid #e3ebe8; color: #7a7e6d; font-size: 10px; font-weight: 600; letter-spacing: .4px; }
+  1661→.cart-items-head span:nth-child(n+2) { text-align: right; }
+  1662→.cart-items-head span:nth-child(2) { text-align: center; }
+  1663→.cart-item { min-height: 33px; padding: 3px 6px; border-bottom: 1px solid #f1f5f3; border-radius: 7px; transition: background .14s ease; }
+  1664→.cart-item:last-child { border-bottom-color: transparent; }
+  1665→.cart-item:hover { background: #f6fbf9; }
+  1666→.cart-item .cart-item-name { min-width: 0; color: #5d624c; font-size: 12px; font-weight: 600; line-height: 1.25; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  1667→.cart-item .cart-item-unit { color: #808474; font-size: 11px; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  1668→.cart-item .cart-item-amount { color: #2f6150; font-size: 12px; font-weight: 700; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  1669→.cart-item .qty-control { margin: 0; gap: 4px; }
+  1670→.cart-item .qty-control button { width: 23px; height: 23px; border-radius: 6px; }
+  1671→.cart-item .qty-control span { min-width: 20px; text-align: center; font-size: 11.5px; }
+  1672→.empty-cart { height: 128px; }
+  1673→
+  1674→/* (2) Cart sidebar hierarchy — หัวบิลบนสุด / รายการยืดหดกลาง / ท้ายล็อคล่าง:
+  1675→       totals + payment buttons + status live in a sticky footer that
+  1676→       hugs the bottom edge of the cart frame no matter how many rows
+  1677→       are in the bill (flex-shrink: 0 + sticky bottom: 0 per spec) */
+  1678→.cart-foot { flex: 0 0 auto; display: flex; flex-direction: column; background: linear-gradient(180deg, #fbfdfc, #fff); border-top: 1px solid #e5edea; margin: 10px -16px -15px; padding: 9px 16px 12px; border-radius: 0 0 13px 13px; box-shadow: 0 -10px 24px rgba(30, 60, 48, .07); }
+  1679→.cart-foot .cart-totals { padding: 2px 0 4px; }
+  1680→.cart-foot .cart-totals > div { padding: 2.5px 0; }
+  1681→.cart-foot .cart-totals .total-line { padding-top: 8px; margin-top: 4px; }
+  1682→.cart-foot .payment-actions { padding-top: 9px; }
+  1683→.cart-foot .cart-status-line { margin-top: 8px; min-height: 32px; }
+  1684→.cart-foot .admin-pos-note { margin-top: 8px; }
+  1685→@media (min-width: 561px) { .cart-foot { position: sticky; bottom: 0; z-index: 4; } }
+  1686→
+  1687→/* (3) Density tier — compact the cart's fixed chrome so ~6-10
+  1688→       receipt rows stay visible even on 768/800px-tall laptops;
+  1689→       pay buttons never leave the frame */
+  1690→@media (min-width: 561px) and (max-height: 1040px) {
+  1691→  .pos-terminal .admin-pos-note { display: none; }
+  1692→  .pos-terminal .section-header p { display: none; }
+  1693→  .pos-terminal .cart-heading p { margin: 2px 0 0; }
+  1694→  .pos-terminal .cart-status-line { min-height: 28px; padding: 4px 9px; }
+  1695→  .pos-terminal .pay-button { height: 38px; }
+  1696→  .pos-terminal .pay-split button { height: 36px; }
+  1697→  .pos-terminal .cart-mid .cart-items { margin-top: 6px; }
+  1698→  .pos-terminal .shortcut-strip { padding: 7px 12px; }
+  1699→  .pos-terminal .shortcut-strip > button { min-height: 34px; }
+  1700→}
+  1701→@media (min-width: 561px) and (max-height: 880px) {
+  1702→  .cart-foot .cart-totals > div { padding: 1.5px 0; }
+  1703→  .cart-foot .cart-totals .total-line { padding-top: 5px; margin-top: 2px; }
+  1704→  .cart-foot .cart-totals .total-line strong { font-size: 20px; }
+  1705→  .cart-foot { padding: 7px 16px 10px; margin-top: 8px; }
+  1706→  .cart-foot .payment-actions { padding-top: 7px; }
+  1707→  .cart-foot .cart-status-line { margin-top: 6px; }
+  1708→  .pos-terminal .cart-panel { padding: 14px 16px 13px; }
+  1709→  .cart-foot { margin: 8px -16px -13px; }
+  1710→}
+  1711→
+  1712→/* (4) Locked terminal geometry per width — the cart column and the
+  1713→       product grid adapt to the pane; the frame itself never scrolls */
+  1714→@media (min-width: 981px) {
+  1715→  .pos-terminal .pos-layout { grid-template-columns: minmax(0, 1fr) 400px; }
+  1716→  .pos-terminal .product-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+  1717→}
+  1718→@media (min-width: 821px) and (max-width: 980px) {
+  1719→  .app-shell.pos-terminal .page-content { padding: 12px 20px 10px; }
+  1720→  .pos-terminal .pos-layout { grid-template-columns: minmax(0, 1fr) 335px; gap: 14px; }
+  1721→  .pos-terminal .product-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  1722→}
+  1723→@media (min-width: 561px) and (max-width: 820px) {
+  1724→  .app-shell.pos-terminal .page-content { padding: 12px 16px 10px; }
+  1725→  .pos-terminal .section-header { flex-direction: row; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+  1726→  .pos-terminal .pos-layout { grid-template-columns: minmax(0, 1fr) min(44vw, 330px); gap: 12px; }
+  1727→  .pos-terminal .product-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  1728→  .pos-terminal .shortcut-strip { grid-template-columns: minmax(120px, 1fr) repeat(3, 1fr); }
+  1729→}
+  1730→
+  1731→/* (5) Phones (≤560px) — natural flow + fixed bottom docks:
+  1732→       shortcut bar glued to the screen bottom edge (แยกจากตะกร้า),
+  1733→       checkout bar rides right above it, cart rows stay compact */
+  1734→@media (max-width: 560px) {
+  1735→  .app-shell.pos-terminal .app-footer { display: none; }
+  1736→  .app-shell.pos-terminal .page-content { padding: 12px 14px calc(130px + env(safe-area-inset-bottom, 0px)); }
+  1737→  .pos-terminal .cart-foot { position: static; }
+  1738→  .pos-terminal .shortcut-strip { position: fixed; left: 0; right: 0; bottom: 0; z-index: 17; margin: 0; border-width: 1px 0 0; border-radius: 14px 14px 0 0; grid-template-columns: repeat(3, 1fr); gap: 7px; padding: 8px 10px calc(9px + env(safe-area-inset-bottom, 0px)); box-shadow: 0 -10px 26px rgba(30, 60, 48, .18); }
+  1739→  .pos-terminal .shortcut-strip > div { display: none; }
+  1740→  .pos-terminal .shortcut-strip > button { min-height: 44px; justify-content: center; padding: 0 8px; }
+  1741→  .pos-terminal .shortcut-strip > button kbd { display: none; }
+  1742→  .pos-mobile-bar { bottom: calc(66px + env(safe-area-inset-bottom, 0px)); }
+  1743→}
+  1744→
+  1745→/* (6) Print — unstick the docks; receipts print unclamped */
+  1746→@media print {
+  1747→  .cart-foot { position: static !important; box-shadow: none; }
+  1748→  .pos-terminal .shortcut-strip { position: static !important; }
+  1749→}
+  1750→
+  1751→/* ============================================================
+  1752→   ROUND 20 — POS scan-first terminal (user-mandated redesign)
+  1753→   โฟกัสใหม่: "การสแกนบาร์โค้ดและการดูรายการบิล" แทนการกดเลือกจากรูป
+  1754→   ① แถบเมนูด่วนแนวตั้งบางๆ (.pos-rail) ชิดขอบซ้ายสุด — แทน sidebar
+  1755→      บนจอ POS ขนาด ≥821px (แท็บเล็ต 561-820 ยังมี hamburger ตามเดิม)
+  1756→   ② พื้นที่บิลกลางจอ ~60-70% — ช่องสแกน (.scan-hero) โดดเด่นบนสุด
+  1757→      autofocus ตลอดเวลา / รายการบิลเลื่อนในกรอบ / ปุ่มชำระเงินล็อค
+  1758→      ล่างสุดของฝั่งบิล อ่านจบกดจ่ายที่เดียว
+  1759→   ③ แผงสินค้าไม่มีบาร์โค้ด (.quick-pick-panel) ย้ายไปขวา ~30-40%
+  1760→      เลื่อนอิสระภายในกรอบ (overflow-y: auto)
+  1761→   ④ หน้าต่างหลักยังล็อค height:100vh overflow:hidden เหมือนเดิม
+  1762→   ============================================================ */
+  1763→
+  1764→/* (1) Thin vertical quick-action rail — flush to the screen's left edge.
+  1765→       Brand mark on top, frequent actions in the middle, back-office at
+  1766→       the bottom; badge counts parked bills (พักบิล). */
+  1767→.pos-rail { width: 78px; flex: 0 0 78px; min-height: 0; display: flex; flex-direction: column; align-items: stretch; gap: 7px; padding: 14px 9px 10px; background: linear-gradient(180deg, #f6faf8, #eef5f2); border-right: 1px solid #dde8e3; overflow-y: auto; }
+  1768→.pos-rail .rail-brand { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 2px 0 6px; }
+  1769→.pos-rail .rail-brand .brand-mark { width: 40px; height: 40px; font-size: 19px; font-weight: 700; }
+  1770→.pos-rail .rail-caption { font-size: 9.5px; letter-spacing: 1.2px; color: #797e69; font-weight: 600; }
+  1771→.rail-btn { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; min-height: 58px; padding: 8px 2px 7px; border-radius: 11px; border: 1px solid #e2ebe7; background: #fff; color: #6c715c; cursor: pointer; transition: .16s ease; }
+  1772→.rail-btn:hover { border-color: #a9d4c5; color: var(--teal); background: #f6fbf9; }
+  1773→.rail-btn.active { background: var(--teal); border-color: var(--teal); color: #fff; box-shadow: 0 6px 14px rgba(45, 138, 108, .28); }
+  1774→.rail-btn b { font-size: 10.5px; font-weight: 600; line-height: 1.15; }
+  1775→.rail-btn kbd { position: absolute; top: 5px; right: 5px; font-size: 7.5px; line-height: 1; padding: 2px 3px; background: #f1f6f4; color: #767b65; border: 1px solid #e0e9e5; border-radius: 4px; font-family: inherit; }
+  1776→.rail-btn.active kbd { background: #fff; color: var(--teal); border-color: rgba(255, 255, 255, .7); }
+  1777→.rail-badge { position: absolute; top: -5px; right: -4px; min-width: 18px; height: 18px; border-radius: 20px; background: #e19a3d; color: #fff; font-size: 10.5px; font-weight: 700; display: grid; place-items: center; padding: 0 4px; border: 2px solid #fff; }
+  1778→.rail-spacer { flex: 1 1 auto; }
+  1779→.rail-exit { border-color: #e7dfd4; background: #fdf9f2; color: #8a7550; }
+  1780→.rail-exit:hover { border-color: #d9c9a8; color: #6f5a35; background: #fbf5e8; }
+  1781→
+  1782→/* (2) The scan hero — the most prominent element on the screen. Teal-framed,
+  1783→       tall, glowing on focus; the scanner can be fired at any moment. */
+  1784→.pos-layout > .cart-panel { position: static; }
+  1785→.scan-hero { display: flex; align-items: center; gap: 10px; height: 54px; padding: 0 14px; background: #fff; border: 2px solid var(--teal); border-radius: 13px; box-shadow: 0 5px 18px rgba(45, 138, 108, .12); transition: box-shadow .16s ease, border-color .16s ease; }
+  1786→.scan-hero:focus-within { border-color: var(--teal-dark); box-shadow: 0 7px 22px rgba(45, 138, 108, .22); }
+  1787→.scan-hero .scan-hero-icon { color: var(--teal); flex-shrink: 0; }
+  1788→.scan-hero input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 14.5px; font-weight: 500; color: #335046; font-family: inherit; }
+  1789→.scan-hero input::placeholder { color: #b0b59f; font-weight: 400; font-size: 13px; }
+  1790→.scan-clear { flex-shrink: 0; border: 0; background: #eef4f1; color: #808571; width: 27px; height: 27px; border-radius: 8px; display: grid; place-items: center; }
+  1791→.scan-clear:hover { background: #e2ece7; color: #515641; }
+  1792→.scan-live { flex-shrink: 0; display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: #3f8f73; white-space: nowrap; }
+  1793→.scan-hero kbd { flex-shrink: 0; font-size: 10px; padding: 3px 6px; background: #f1f6f4; color: #656959; border: 1px solid #dfe9e4; border-radius: 5px; font-family: inherit; }
+  1794→.scan-hero-hint { display: flex; align-items: center; gap: 5px; color: #707464; font-size: 10.5px; margin-top: 6px; padding: 0 3px; }
+  1795→
+  1796→/* (3) Held-bill chips (พักบิล) — parked bills queue right under the scan
+  1797→       hero: restore ↺ or discard ✕ without leaving the bill pane. */
+  1798→.held-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+  1799→.held-chip { display: inline-flex; align-items: center; gap: 6px; border: 1px dashed #dcc99f; background: #fdf8ec; color: #8a6d2f; border-radius: 20px; padding: 4px 5px 4px 10px; font-size: 11px; }
+  1800→.held-chip b { color: #7a5f27; font-size: 11px; }
+  1801→.held-chip time { color: #a98f57; font-size: 10px; }
+  1802→.held-chip .chip-restore { border: 0; background: transparent; color: #8a6d2f; width: 22px; height: 22px; display: grid; place-items: center; border-radius: 7px; }
+  1803→.held-chip .chip-restore:hover { background: #f3e7c9; color: #5f4a17; }
+  1804→.held-chip .chip-discard { border: 0; background: transparent; color: #b8a06e; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; }
+  1805→.held-chip .chip-discard:hover { background: #f3e5c8; color: #8c5f2b; }
+  1806→
+  1807→/* (4) Quick-pick panel (right) — "สินค้าไม่มีบาร์โค้ด": header + chip
+  1808→       categories + independently scrollable tile grid. */
+  1809→.quick-pick-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+  1810→.quick-pick-head h2 { margin: 0; font-size: 14.5px; color: #2e463e; }
+  1811→.quick-pick-head p { margin: 3px 0 0; font-size: 10.5px; color: #7b7f6f; }
+  1812→.quick-pick-count { flex-shrink: 0; font-size: 11px; font-weight: 600; color: #3f8f73; background: #e9f5f0; border-radius: 20px; padding: 4px 10px; white-space: nowrap; }
+  1813→.quick-pick-panel .category-tabs { border-bottom: 0; margin-top: 12px; flex-wrap: wrap; gap: 6px; }
+  1814→.quick-pick-panel .category-tabs button { border: 1px solid #e3ebe8; border-radius: 20px; padding: 6px 12px; background: #fff; font-size: 11.5px; }
+  1815→.quick-pick-panel .category-tabs button.active { background: var(--teal); border-color: var(--teal); color: #fff; }
+  1816→.quick-pick-panel .category-tabs button.active::after { display: none; }
+  1817→
+  1818→/* (5) รายการพิเศษ — violet-tinted ad-hoc line form + row tag. */
+  1819→.special-form { border-color: #e9def8; background: #fbf9ff; }
+  1820→.special-form .special-icon { color: #896db6; background: #eee4fa; }
+  1821→.special-grid { display: grid; grid-template-columns: 1.3fr .8fr .9fr; gap: 7px; }
+  1822→.cart-item .special-tag { display: inline-block; font-style: normal; vertical-align: 1px; margin-right: 5px; font-size: 9px; font-weight: 700; letter-spacing: .3px; color: #896db6; background: #f0e9fa; border: 1px solid #e2d6f5; border-radius: 4px; padding: 1px 4px; }
+  1823→.shortcut-strip > button { position: relative; }
+  1824→.dock-badge { position: absolute; top: -5px; right: 6px; min-width: 16px; height: 16px; border-radius: 20px; background: #e19a3d; color: #fff; font-style: normal; font-size: 10px; font-weight: 700; display: grid; place-items: center; padding: 0 3px; border: 2px solid #fff; }
+  1825→
+  1826→/* (6) Terminal integration ≥561px — rail replaces the desktop sidebar, the
+  1827→       bottom strip retires (its actions live on the rail now), and the
+  1828→       bill pane's fixed chrome never shrinks. (Round 21: the locked header
+  1829→       is now the single .pos-head row — scan hero + customer selector.) */
+  1830→@media (min-width: 561px) {
+  1831→  .pos-terminal .pos-head { flex-shrink: 0; }
+  1832→  .pos-terminal .shortcut-strip { display: none; }
+  1833→}
+  1834→@media (min-width: 821px) {
+  1835→  .app-shell.pos-terminal .sidebar { display: none; }
+  1836→}
+  1837→
+  1838→/* (7) Swapped column geometry — bill (center-left, wide) | quick picks
+  1839→       (right, ~30-40%). Later rules supersede the Round-19 widths. */
+  1840→@media (min-width: 1121px) {
+  1841→  .pos-terminal .pos-layout { grid-template-columns: minmax(0, 1fr) minmax(360px, 30vw); }
+  1842→  .pos-terminal .product-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  1843→}
+  1844→@media (min-width: 981px) and (max-width: 1120px) {
+  1845→  .pos-terminal .pos-layout { grid-template-columns: minmax(0, 1fr) 380px; }
+  1846→  .pos-terminal .product-grid { grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)); }
+  1847→}
+  1848→@media (min-width: 821px) and (max-width: 980px) {
+  1849→  .pos-terminal .pos-layout { grid-template-columns: minmax(0, 1fr) min(38vw, 340px); gap: 13px; }
+  1850→  .pos-terminal .product-grid { grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)); }
+  1851→}
+  1852→@media (min-width: 561px) and (max-width: 820px) {
+  1853→  .pos-terminal .pos-layout { grid-template-columns: minmax(0, 1fr) min(42vw, 320px); gap: 11px; }
+  1854→  .pos-terminal .product-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+  1855→}
+  1856→
+  1857→/* (8) Short screens — the scan hero compacts so the bill list keeps its rows. */
+  1858→@media (min-width: 561px) and (max-height: 880px) {
+  1859→  .pos-terminal .scan-hero { height: 46px; }
+  1860→  .pos-terminal .cart-heading h2 { font-size: 13.5px; }
+  1861→}
+  1862→
+  1863→/* (9) Phones ≤560px — ROUND 42 (user 43): single entry point mandate — the
+  1864→       in-bill shortcut strip is gone, so the LEFT RAIL itself becomes the
+  1865→       fixed bottom dock on phones (same buttons, same F-key meaning, just
+  1866→       laid out horizontally above the safe-area). สแกน/เมนู hidden here:
+  1867→       the scan input is on screen anyway and the hamburger opens the menu. */
+  1868→@media (max-width: 560px) {
+  1869→  .pos-rail { position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; width: auto; flex: 0 0 auto; flex-direction: row; align-items: stretch; gap: 5px; padding: 6px 8px calc(7px + env(safe-area-inset-bottom, 0px)); border-right: 0; border-top: 1px solid rgba(255, 255, 255, .16); overflow-x: auto; overflow-y: hidden; box-shadow: 0 -8px 22px rgba(20, 50, 38, .18); scrollbar-width: none; }
+  1870→  .pos-rail::-webkit-scrollbar { display: none; }
+  1871→  .pos-rail .rail-brand, .pos-rail .rail-spacer, .pos-rail .rail-scan, .pos-rail .rail-exit { display: none; }
+  1872→  .pos-rail .rail-btn { flex: 1 1 0; min-width: 46px; min-height: 52px; padding: 6px 2px 5px; border-radius: 10px; }
+  1873→  .pos-rail .rail-btn kbd { display: none; }
+  1874→  .pos-rail .rail-btn b { font-size: 9px; line-height: 1.2; white-space: nowrap; }
+  1875→  .pos-rail .rail-btn svg { width: 20px; height: 20px; }
+  1876→  .pos-rail .rail-badge { top: 2px; right: 4px; }
+  1877→  .pos-terminal .main-shell { padding-bottom: calc(74px + env(safe-area-inset-bottom, 0px)); }
+  1878→  .pos-mobile-bar { bottom: calc(82px + env(safe-area-inset-bottom, 0px)); }
+  1879→  .scan-hero { height: 50px; border-radius: 12px; }
+  1880→  .scan-hero input { font-size: 13.5px; }
+  1881→  .scan-hero kbd, .scan-hero .scan-live { display: none; }
+  1882→  .quick-pick-head h2 { font-size: 13px; }
+  1883→}
+  1884→
+  1885→/* (10) Print — the rail is screen chrome; receipts print without it. */
+  1886→@media print {
+  1887→  .pos-rail { display: none; }
+  1888→}
+  1889→
+  1890→/* ============================================================
+  1891→   ROUND 21 — POS bill pane: 3-zone vertical lock + pick stepper
+  1892→   (user-mandated) โครงสร้างแนวตั้งของฝั่งบิล 3 ท่อน:
+  1893→   ① ท่อนบนล็อคตาย (.pos-head shrink-0) — ช่องสแกนบาร์โค้ด + ช่องเลือก
+  1894→      ลูกค้า (สมาชิก/บุคคลทั่วไป) อยู่บรรทัดเดียวกัน ซ้าย-ขวา
+  1895→      ประหยัดแนวตั้ง ลด margin/padding
+  1896→   ② ท่อนกลาง (.cart-mid flex-1 overflow-y-auto) — พื้นที่ยืดหยุ่นและ
+  1897→      เลื่อนได้เฉพาะส่วนนี้ท่อนเดียว: บิลที่พัก + แบนเนอร์ F2/F3/F4 +
+  1898→      กล่อง "รายการขาย · บิลปัจจุบัน" + รายการสินค้า + ฟอร์มต่างๆ
+  1899→      รายการยาวแค่ไหนก็ไม่ดันปุ่มด้านล่างตกจอ
+  1900→   ③ ท่อนล่างล็อคติดขอบล่าง (.cart-foot shrink-0 sticky bottom-0 พื้น
+  1901→      ขาว) — สรุปยอด 3 บรรทัด (ยอดรวม/ส่วนลด/ยอดที่ต้องชำระ) + ปุ่ม
+  1902→      ชำระเงินทั้งหมด มองเห็นชัดตลอดเวลา
+  1903→   ④ การ์ดสินค้าไม่มีบาร์โค้ดมีปุ่ม − จำนวน + (.pick-stepper) ในตัว —
+  1904→      แก้ไขเพิ่มลดจำนวนได้ทันทีบนการ์ด โดยไม่ต้องเลื่อนหาในบิล
+  1905→   ============================================================ */
+  1906→
+  1907→/* (1) locked header row — scan hero + customer selector share one line */
+  1908→.pos-head { flex: 0 0 auto; display: grid; grid-template-columns: minmax(0, 1fr) clamp(235px, 26vw, 340px); gap: 9px; align-items: stretch; }
+  1909→.pos-head .member-select { min-height: 54px; padding: 0 12px; gap: 9px; border: 1px solid #dbe7e2; border-radius: 13px; background: #fff; box-shadow: 0 2px 8px rgba(30, 60, 48, .04); transition: border-color .16s ease; }
+  1910→.pos-head .member-select:hover { border-color: #a9d4c5; }
+  1911→.pos-head .member-select > div:nth-child(2) { min-width: 0; }
+  1912→.pos-head .member-select b, .pos-head .member-select small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  1913→.pos-head .member-select .member-avatar { flex: 0 0 auto; }
+  1914→.pos-head .member-select .muted-icon { flex: 0 0 auto; }
+  1915→
+  1916→/* (2) middle zone — the single scrollable area (held bills / action
+  1917→       banners / bill heading / items / forms all live inside it) */
+  1918→.pos-terminal .cart-mid { padding: 2px 2px 4px; }
+  1919→.cart-mid > .held-chips { margin: 0 0 8px; }
+  1920→.cart-mid > .shortcut-banner { margin: 0 0 10px; }
+  1921→.cart-mid > :not(.cart-items) { flex: 0 0 auto; }
+  1922→
+  1923→/* (3) locked footer — solid white per spec, pinned to the bottom edge */
+  1924→.cart-foot { background: #fff; }
+  1925→
+  1926→/* (4) pick stepper on every no-barcode card — แก้ไขเพิ่ม/ลดได้ทันที */
+  1927→.quick-pick-panel .product-card { cursor: pointer; }
+  1928→.quick-pick-panel .product-art { height: 60px; font-size: 27px; }
+  1929→.quick-pick-panel .product-card-info { padding: 8px 10px 9px; }
+  1930→.pick-stepper { display: grid; grid-template-columns: 1fr 42px 1fr; gap: 5px; padding: 0 10px 10px; }
+  1931→.pick-stepper button { height: 30px; border: 1px solid #dfe9e4; background: #fff; border-radius: 8px; color: #557167; display: grid; place-items: center; cursor: pointer; transition: .14s ease; }
+  1932→.pick-stepper button:hover:not(:disabled) { border-color: var(--teal); color: var(--teal); background: #f2faf7; }
+  1933→.pick-stepper button:active:not(:disabled) { transform: scale(.94); }
+  1934→.pick-stepper button:disabled { opacity: .35; cursor: not-allowed; }
+  1935→.pick-stepper .pick-qty { display: grid; place-items: center; border: 1px dashed #d9e5e0; border-radius: 8px; background: #f8fbf9; color: #2f5548; font: 700 12.5px "IBM Plex Mono", monospace; }
+  1936→.pick-stepper .pick-qty.zero { color: #969b86; }
+  1937→.product-card.in-bill { border-color: #7cc4aa; box-shadow: inset 0 0 0 1.5px #7cc4aa, 0 6px 14px rgba(57, 110, 91, .1); }
+  1938→.product-card.in-bill .product-card-info strong { color: var(--teal-dark); }
+  1939→.pick-qty-badge { position: absolute; top: 6px; left: 6px; min-width: 20px; height: 20px; border-radius: 20px; background: var(--teal); color: #fff; font-size: 11px; font-weight: 700; display: grid; place-items: center; padding: 0 5px; border: 2px solid #fff; font-variant-numeric: tabular-nums; }
+  1940→
+  1941→/* (5) height tiers — the member button tracks the scan hero height so the
+  1942→       header row stays one clean line on short laptop screens */
+  1943→@media (min-width: 561px) and (max-height: 1040px) {
+  1944→  .pos-head .member-select { min-height: 48px; }
+  1945→  .pos-head .member-select .member-avatar { width: 25px; height: 25px; }
+  1946→}
+  1947→@media (min-width: 561px) and (max-height: 880px) {
+  1948→  .pos-head .member-select { min-height: 46px; padding: 0 10px; }
+  1949→  .pos-head .member-select .member-avatar { width: 24px; height: 24px; }
+  1950→  .pos-head { gap: 7px; }
+  1951→}
+  1952→
+  1953→/* (6) phones — the two header fields stack full-width, steppers grow
+  1954→       fat touch targets */
+  1955→@media (max-width: 560px) {
+  1956→  .pos-head { grid-template-columns: 1fr; gap: 7px; }
+  1957→  .pos-head .member-select { min-height: 50px; border-radius: 12px; }
+  1958→  .pick-stepper button { height: 40px; }
+  1959→  .pick-stepper { grid-template-columns: 1fr 48px 1fr; }
+  1960→  .quick-pick-panel .product-art { height: 68px; }
+  1961→  .quick-pick-panel .product-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  1962→}
+  1963→
+  1964→/* (7) print — steppers are screen chrome; receipts print clean */
+  1965→@media print {
+  1966→  .pick-stepper { display: none; }
+  1967→  .cart-foot { background: #fff !important; box-shadow: none !important; }
+  1968→}
+  1969→
+  1970→/* ============================================================
+  1971→   ROUND 23 — WSR DESIGN LANGUAGE (emerald + warm paper)
+  1972→   Restyle per user request: adopt the online-shop app's
+  1973→   layout feel, font and color usage (emerald green primary,
+  1974→   warm paper canvas, sand neutrals, pill CTAs, soft shadows)
+  1975→   on top of the locked POS layouts from rounds 13-21.
+  1976→   ============================================================ */
+  1977→
+  1978→/* Warm paper surfaces */
+  1979→.sidebar { background: #fbfaf6; }
+  1980→.topbar { background: rgba(252, 251, 247, .86); }
+  1981→nav button:hover { background: #f4f1e7; color: #006b47; }
+  1982→nav button.active { color: #006b47; background: #e0f4d6; box-shadow: inset 3px 0 0 #007a55; }
+  1983→nav button.active small { color: #4c7a58; }
+  1984→
+  1985→/* Soft green selection + warm scrollbar (WSR signatures) */
+  1986→::selection { background: #9ee1ab; color: #14301c; }
+  1987→::-webkit-scrollbar { width: 9px; height: 9px; }
+  1988→::-webkit-scrollbar-track { background: #f4f1e7; }
+  1989→::-webkit-scrollbar-thumb { background: #d9d2be; border-radius: 999px; border: 2px solid #f4f1e7; }
+  1990→::-webkit-scrollbar-thumb:hover { background: #007a55; }
+  1991→
+  1992→/* Global focus ring — emerald */
+  1993→:focus-visible { outline: 2px solid rgba(0, 122, 85, .5); outline-offset: 2px; border-radius: 4px; }
+  1994→
+  1995→/* Pill CTAs — WSR rounded-full action language */
+  1996→.primary-button, .outline-button, .scan-button, .danger-outline-button,
+  1997→.member-pay, .pay-split button, .login-submit, .mini-button {
+  1998→  border-radius: 999px;
+  1999→}
+  2000→.primary-button, .scan-button, .member-pay { padding: 0 18px; box-shadow: 0 4px 12px rgba(0, 122, 85, .22); }
+
+[showing lines 1-2000 of 5266; use offset=2001 with limit to continue reading]

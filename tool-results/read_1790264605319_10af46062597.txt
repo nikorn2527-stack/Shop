@@ -1,0 +1,1494 @@
+     1→import { z } from "zod";
+     2→import { TRPCError } from "@trpc/server";
+     3→import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
+     4→import { createRequire } from "node:module";
+     5→
+     6→const require = createRequire(import.meta.url);
+     7→const { DatabaseSync } = require("node:sqlite") as typeof import("node:sqlite");
+     8→import { join } from "node:path";
+     9→import { COOKIE_NAME } from "@shared/const";
+    10→import { EDITIONS, EDITION_TRIAL_DAYS, STANDARD_MAX_USERS, type Edition, type EditionFeatureKey } from "@shared/editions";
+    11→import { ensureEditionFeature, generateLicenseKey, parseLicenseKey, resolveEditionStatus, todayString } from "./license";
+    12→import { getSessionCookieOptions } from "./_core/cookies";
+    13→import { readAppSessionCookie, type TrpcContext } from "./_core/context";
+    14→import { systemRouter } from "./_core/systemRouter";
+    15→import { publicProcedure, router } from "./_core/trpc";
+    16→import { backupSqliteDatabase, listSqliteBackups, pruneSqliteBackupsByCount, restoreSqliteBackup, verifySqliteBackup } from "./sqliteBackup";
+    17→import { buildTemplateBase64, importMembers, importProducts, parseSpreadsheetBase64, readSheetRows, type MemberFieldMapping, type ProductFieldMapping } from "./importTool";
+    18→import { closeWelfareDb, getBackupDir, getWelfareDb, getWelfareDbPath } from "./welfareStore";
+    19→import {
+    20→  LOGIN_MAX_FAILURES,
+    21→  StoreError,
+    22→  appRoleThai,
+    23→  changeOwnPassword,
+    24→  checkout,
+    25→  clearLoginFailures,
+    26→  countAppUsers,
+    27→  createAppSession,
+    28→  createAppUser,
+    29→  createProduct,
+    30→  dailySalesRows,
+    31→  salesCashierOptions,
+    32→  deleteProduct,
+    33→  dashboardStats,
+    34→  setEditionSettings,
+    35→  memberTransactions,
+    36→  salesByCashier,
+    37→  salesByCategory,
+    38→  salesByProduct,
+    39→  salesLineItems,
+    40→  deleteAppSession,
+    41→  deleteMember,
+    42→  findAppUserByUsername,
+    43→  getMemberDetail,
+    44→  getSettings,
+    45→  installOverview,
+    46→  listAppSessions,
+    47→  listAppUsers,
+    48→  listAuditLogs,
+    49→  listDayClosures,
+    50→  listLimitRequests,
+    51→  countPendingLimitRequests,
+    52→  listMembers,
+    53→  listProducts,
+    54→  listStockRows,
+    55→  logAction,
+    56→  loginLockRemainingMinutes,
+    57→  memberBalances,
+    58→  memberSpendingStats,
+    59→  stockBalanceReport,
+    60→  receiveStockLines,
+    61→  requestLimitReduction,
+    62→  decideLimitRequest,
+    63→  registerLoginFailure,
+    64→  registerMember,
+    65→  revokeAppSession,
+    66→  revokeOtherAppSessions,
+    67→  salesList,
+    68→  getSaleSlip,
+    69→  getTransactionSlip,
+    70→  setMemberStatus,
+    71→  setProductActive,
+    72→  setSettings,
+    73→  setupInitialAdmin,
+    74→  stockCount,
+    75→  stockCountLots,
+    76→  listOrderItems,
+    77→  addOrderItem,
+    78→  updateOrderItem,
+    79→  removeOrderItem,
+    80→  clearOrderList,
+    81→  unlockAppUser,
+    82→  updateAppUser,
+    83→  updateMember,
+    84→  updateProduct,
+    85→  bulkUpdateProductPrices,
+    86→  verifyPassword,
+    87→  walletTx,
+    88→  businessPeriodStatus,
+    89→  closeBusinessDay,
+    90→} from "./sqliteStore";
+    91→
+    92→/** Maps business-rule StoreErrors (Thai messages) to tRPC BAD_REQUEST errors. */
+    93→function withStoreErrors<T>(fn: () => T): T {
+    94→  try {
+    95→    return fn();
+    96→  } catch (error) {
+    97→    if (error instanceof StoreError) {
+    98→      throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
+    99→    }
+   100→    throw error;
+   101→  }
+   102→}
+   103→
+   104→/** Same-origin cookie policy: secure only when the request is actually https. */
+   105→function isSecureRequest(req: TrpcContext["req"]) {
+   106→  if (req.protocol === "https") return true;
+   107→  const forwardedProto = req.headers["x-forwarded-proto"];
+   108→  if (!forwardedProto) return false;
+   109→  const protoList = Array.isArray(forwardedProto) ? forwardedProto : String(forwardedProto).split(",");
+   110→  return protoList.some((proto) => proto.trim().toLowerCase() === "https");
+   111→}
+   112→
+   113→/** Session-priority actor: a signed-in user overrides client-sent actor/role. */
+   114→function resolveActor(ctx: TrpcContext, input: { actor?: string; actorRole?: string }) {
+   115→  if (ctx.user) {
+   116→    return {
+   117→      actor: ctx.user.name ?? "ผู้ใช้ระบบ",
+   118→      actorRole: ctx.user.role === "admin" ? (ctx.user.appRole === "dev" ? "ผู้พัฒนา" : "ผู้บริหาร") : "เจ้าหน้าที่",
+   119→    };
+   120→  }
+   121→  return { actor: input.actor, actorRole: input.actorRole };
+   122→}
+   123→
+   124→/** Admin gate: session role wins; only anonymous requests fall back to input. */
+   125→function isAdminCtx(ctx: TrpcContext, input: { actorRole?: string }) {
+   126→  return ctx.user ? ctx.user.role === "admin" : (input.actorRole ?? "").trim() === "ผู้บริหาร";
+   127→}
+   128→
+   129→/** ROUND 56 (user) — ประตูโซนผู้พัฒนา (เครื่องมือติดตั้งระบบ): บัญชีที่เป็น dev เท่านั้น
+   130→ *  ใช้บทบาทจากเซสชันฝั่งเซิร์ฟเวอร์ (appRole จากฐานข้อมูล) ไม่เชื่อค่าที่ client ส่งมา */
+   131→function isDevCtx(ctx: TrpcContext) {
+   132→  return Boolean(ctx.user && ctx.user.role === "admin" && ctx.user.appRole === "dev");
+   133→}
+   134→
+   135→/** ROUND 40 (ข้อ 32) — แปลง mapping ที่ client ส่ง (อาจมี -1 = ไม่นำเข้า) ให้เป็น undefined ตาม contract ของ importTool */
+   136→function sanitizeMapping<T extends Record<string, number | undefined>>(mapping: T): T {
+   137→  const cleaned: Record<string, number | undefined> = {};
+   138→  for (const [key, value] of Object.entries(mapping)) {
+   139→    if (value !== undefined && value >= 0) cleaned[key] = value;
+   140→  }
+   141→  return cleaned as T;
+   142→}
+   143→
+   144→/** ROUND 61 (user) — ประตูเวอร์ชันฝั่งเซิร์ฟเวอร์: โยน StoreError ไทย (ผ่าน withStoreErrors) เมื่อเวอร์ชันยังไม่รวมฟีเจอร์นี้ */
+   145→function requireEdition(feature: EditionFeatureKey): void {
+   146→  ensureEditionFeature(getSettings(getWelfareDb()), feature);
+   147→}
+   148→
+   149→const paymentMethodSchema = z.enum(["เงินสด", "QR / สแกน", "หักบัญชีสมาชิก"]);
+   150→
+   151→const memberListInput = z
+   152→  .object({
+   153→    search: z.string().optional(),
+   154→    status: z.enum(["active", "suspended"]).optional(),
+   155→  })
+   156→  .nullish();
+   157→
+   158→const memberDetailInput = z.object({ memberNumber: z.string().min(1) });
+   159→
+   160→const memberRegisterInput = z.object({
+   161→  prename: z.string().max(30, "คำนำหน้ายาวเกินไป").optional(),
+   162→  firstName: z.string().min(1, "กรุณาระบุชื่อสมาชิก"),
+   163→  lastName: z.string().min(1, "กรุณาระบุนามสกุลสมาชิก"),
+   164→  citizenId: z.string().optional(),
+   165→  phone: z.string().optional(),
+   166→  type: z.string().optional(),
+   167→  gender: z.enum(["ชาย", "หญิง", "ไม่ระบุ"]).optional(),
+   168→  photoUrl: z.string().max(600_000).optional(),
+   169→  initialDeposit: z.number().positive("จำนวนเงินต้องมากกว่า 0").optional(),
+   170→  memberNumber: z.string().optional(),
+   171→  // ROUND 65 — รหัสบัตรเงินสด + รหัสผู้ป่วย (HN) ของสมาชิกโรงพยาบาล
+   172→  cardNumber: z.string().max(30, "รหัสบัตรยาวเกินไป").optional(),
+   173→  patientCode: z.string().max(30, "รหัสผู้ป่วยยาวเกินไป").optional(),
+   174→  actor: z.string().optional(),
+   175→  actorRole: z.string().optional(),
+   176→});
+   177→
+   178→const memberSetStatusInput = z.object({
+   179→  memberNumber: z.string().min(1),
+   180→  suspended: z.boolean(),
+   181→  actor: z.string().optional(),
+   182→  actorRole: z.string().optional(),
+   183→});
+   184→
+   185→const memberWalletInput = z.object({
+   186→  memberNumber: z.string().min(1),
+   187→  // ROUND 65 — 'refund' = คืนบัตรเงินสด (ผู้ป่วยคืนบัตร จ่ายเงินคืนตามยอดคงเหลือ)
+   188→  type: z.enum(["deposit", "withdrawal", "refund"]),
+   189→  amount: z.number(),
+   190→  note: z.string().optional(),
+   191→  actor: z.string().optional(),
+   192→  actorRole: z.string().optional(),
+   193→  // ROUND 63 (user) — รูปหลักฐานการโอน/สลิป แนบไปกับรายการเติม/ถอน
+   194→  slipImage: z.string().max(600_000).nullish(),
+   195→});
+   196→
+   197→const memberUpdateInput = z.object({
+   198→  memberNumber: z.string().min(1),
+   199→  prename: z.string().max(30, "คำนำหน้ายาวเกินไป").nullish(),
+   200→  firstName: z.string().optional(),
+   201→  lastName: z.string().optional(),
+   202→  idCard: z.string().nullish(),
+   203→  phone: z.string().nullish(),
+   204→  type: z.string().optional(),
+   205→  gender: z.enum(["ชาย", "หญิง", "ไม่ระบุ"]).nullish(),
+   206→  photoUrl: z.string().max(600_000).nullish(),
+   207→  // Req 23.2 — วงเงินซื้อสินค้าต่อวัน (null = ไม่จำกัด)
+   208→  creditLimit: z.number().min(1).max(1000000).nullable().optional(),
+   209→  // ROUND 65 — รหัสบัตรเงินสด / รหัสผู้ป่วย (HN)
+   210→  cardNumber: z.string().max(30, "รหัสบัตรยาวเกินไป").nullish(),
+   211→  patientCode: z.string().max(30, "รหัสผู้ป่วยยาวเกินไป").nullish(),
+   212→  actor: z.string().optional(),
+   213→  actorRole: z.string().optional(),
+   214→});
+   215→
+   216→// Req 23.2 — การขอลดวงเงิน: เจ้าหน้าที่ยื่นคำขอ · ผู้บริหารพิจารณา (approve/reject)
+   217→const memberLimitRequestInput = z.object({
+   218→  memberNumber: z.string().min(1),
+   219→  requestedLimit: z.number().int().min(1).max(1000000),
+   220→  reason: z.string().max(500).optional(),
+   221→  actor: z.string().optional(),
+   222→  actorRole: z.string().optional(),
+   223→});
+   224→
+   225→const memberLimitDecisionInput = z.object({
+   226→  requestId: z.number().int().positive(),
+   227→  decision: z.enum(["approve", "reject"]),
+   228→  actor: z.string().optional(),
+   229→  actorRole: z.string().optional(),
+   230→});
+   231→
+   232→const memberDeleteInput = z.object({
+   233→  memberNumber: z.string().min(1),
+   234→  actor: z.string().optional(),
+   235→  actorRole: z.string().optional(),
+   236→});
+   237→
+   238→const stockCountInput = z.object({
+   239→  productId: z.number().int(),
+   240→  countedQty: z.number(),
+   241→  note: z.string().optional(),
+   242→  actor: z.string().optional(),
+   243→  actorRole: z.string().optional(),
+   244→});
+   245→
+   246→const stockCountLotsInput = z.object({
+   247→  counts: z
+   248→    .array(z.object({ lotId: z.number().int(), countedQty: z.number().int().min(0) }))
+   249→    .min(1, "กรุณาระบุจำนวนที่นับได้อย่างน้อย 1 Lot"),
+   250→  note: z.string().optional(),
+   251→  actor: z.string().optional(),
+   252→  actorRole: z.string().optional(),
+   253→});
+   254→
+   255→// Round 32-15 — รายการสั่งซื้อ (สะสมสินค้าที่จะสั่งเข้า กันตกหล่น)
+   256→const orderAddInput = z.object({
+   257→  productId: z.number().int(),
+   258→  qty: z.number().positive().optional(),
+   259→  note: z.string().max(500).optional(),
+   260→  actor: z.string().optional(),
+   261→  actorRole: z.string().optional(),
+   262→});
+   263→
+   264→const orderUpdateInput = z.object({
+   265→  id: z.number().int().min(1),
+   266→  qty: z.number().positive().optional(),
+   267→  note: z.string().max(500).nullable().optional(),
+   268→  actor: z.string().optional(),
+   269→  actorRole: z.string().optional(),
+   270→});
+   271→
+   272→// A bill line is either a catalog product (barcode/quick-pick) or a "รายการพิเศษ"
+   273→// (special/custom line: weighed goods, services, ad-hoc charges — no product row,
+   274→// no stock movement). sale_items.product_id is nullable on purpose for these.
+   275→const checkoutInput = z.object({
+   276→  items: z
+   277→    .array(z.union([
+   278→      z.object({ productId: z.number().int().positive(), qty: z.number().int().positive(), price: z.number().positive().optional(), unit: z.string().max(30).optional(), label: z.string().max(120).optional() }),
+   279→      z.object({ name: z.string().min(1, "กรุณาระบุชื่อรายการพิเศษ"), price: z.number().positive("ราคาต้องมากกว่า 0"), qty: z.number().int().positive(), unit: z.string().optional() }),
+   280→    ]))
+   281→    .min(1, "ยังไม่มีสินค้าในบิล"),
+   282→  paymentMethod: paymentMethodSchema,
+   283→  memberNumber: z.string().nullish(),
+   284→  discount: z.number().min(0).optional(),
+   285→  cashier: z.string().optional(),
+   286→  actorRole: z.string().optional(),
+   287→  // ROUND 63 (user) — รูปหลักฐานการชำระ (สลิป QR / สแกน) แนบไปกับบิล
+   288→  slipImage: z.string().max(600_000).nullish(),
+   289→});
+   290→
+   291→const productCreateInput = z.object({
+   292→  name: z.string().min(1, "กรุณาระบุชื่อสินค้า"),
+   293→  sku: z.string().optional(),
+   294→  barcode: z.string().optional(),
+   295→  size: z.string().optional(),
+   296→  imageUrl: z.string().nullable().optional(),
+   297→  // round 31-12: สินค้าลัดหน้าร้าน + สินค้าขายเป็นเงิน (เช่น น้ำแข็ง)
+   298→  quickPick: z.number().int().min(0).max(1).nullish(),
+   299→  sellMode: z.enum(["unit", "money"]).nullish(),
+   300→  priceTiers: z.string().max(20_000).nullish(),
+   301→  unit: z.string().optional(),
+   302→  price: z.number().min(0, "ราคาขายต้องเป็นตัวเลข 0 ขึ้นไป"),
+   303→  cost: z.number().min(0).optional(),
+   304→  stock: z.number().int().min(0).optional(),
+   305→  reorderPoint: z.number().int().min(0).optional(),
+   306→  category: z.string().optional(),
+   307→  emoji: z.string().optional(),
+   308→  color: z.string().optional(),
+   309→  actor: z.string().optional(),
+   310→  actorRole: z.string().optional(),
+   311→});
+   312→
+   313→// Plain z.number() for price/cost/reorderPoint so the Thai StoreError validation surfaces instead of a zod message.
+   314→const productUpdateInput = z.object({
+   315→  productId: z.number().int(),
+   316→  name: z.string().optional(),
+   317→  barcode: z.string().nullable().optional(),
+   318→  size: z.string().nullable().optional(),
+   319→  imageUrl: z.string().nullable().optional(),
+   320→  // round 31-12: สินค้าลัดหน้าร้าน + สินค้าขายเป็นเงิน (เช่น น้ำแข็ง)
+   321→  quickPick: z.number().int().min(0).max(1).nullish(),
+   322→  sellMode: z.enum(["unit", "money"]).nullish(),
+   323→  priceTiers: z.string().max(20_000).nullish(),
+   324→  unit: z.string().optional(),
+   325→  price: z.number().optional(),
+   326→  cost: z.number().optional(),
+   327→  reorderPoint: z.number().optional(),
+   328→  category: z.string().optional(),
+   329→  emoji: z.string().optional(),
+   330→  actor: z.string().optional(),
+   331→  actorRole: z.string().optional(),
+   332→});
+   333→
+   334→const productSetActiveInput = z.object({
+   335→  productId: z.number().int(),
+   336→  active: z.boolean(),
+   337→  actor: z.string().optional(),
+   338→  actorRole: z.string().optional(),
+   339→});
+   340→
+   341→const productDeleteInput = z.object({
+   342→  productId: z.number().int(),
+   343→  actor: z.string().optional(),
+   344→  actorRole: z.string().optional(),
+   345→});
+   346→
+   347→// Round 64 — ปรับราคาขาย/ต้นทุนหลายรายการพร้อมกัน (ใช้ transaction เดียว + log สรุปก้อนเดียว)
+   348→const productBulkUpdatePricesInput = z.object({
+   349→  items: z
+   350→    .array(
+   351→      z.object({
+   352→        productId: z.number().int(),
+   353→        price: z.number().optional(),
+   354→        cost: z.number().optional(),
+   355→      }),
+   356→    )
+   357→    .min(1, "กรุณาเลือกรายการอย่างน้อย 1 รายการ")
+   358→    .max(500, "ปรับราคาได้ครั้งละไม่เกิน 500 รายการ"),
+   359→  actor: z.string().optional(),
+   360→  actorRole: z.string().optional(),
+   361→});
+   362→
+   363→const productListInput = z
+   364→  .object({ includeInactive: z.boolean().optional() })
+   365→  .nullish();
+   366→
+   367→const salesListInput = z
+   368→  .object({
+   369→    search: z.string().optional(),
+   370→    limit: z.number().int().min(1).max(500).optional(),
+   371→  })
+   372→  .nullish();
+   373→
+   374→const stockReceiveInput = z.object({
+   375→  productId: z.number().int(),
+   376→  lot: z.string().optional(),
+   377→  expiryDate: z.string().nullish(),
+   378→  // รับสินค้าแบบธุรกิจจริง: ซื้อกี่หน่วย + แถมกี่หน่วย + จ่ายเงินจริงเท่าไร
+   379→  purchaseQty: z.number().int().positive("จำนวนที่ซื้อต้องมากกว่า 0").optional(),
+   380→  freeQty: z.number().int().min(0, "จำนวนแถมต้องเป็น 0 ขึ้นไป").optional(),
+   381→  paidAmount: z.number().min(0, "เงินที่จ่ายจริงต้องเป็น 0 ขึ้นไป").optional(),
+   382→  // ROUND 77 (user) — รับเข้าหลายบรรทัดในรอบเดียว: สินค้าเดียวกัน ต้นทุนต่างกันได้
+   383→  // (เช่น 10 ห่อ @฿200 + แถม 2 ห่อ) แต่ละบรรทัดกลายเป็น Lot ของตัวเอง
+   384→  // และต้นทุนสินค้าถูกคำนวณใหม่เป็นต้นทุนถัวเฉลี่ยทันที
+   385→  lines: z.array(z.object({ qty: z.number().int().positive("จำนวนต้องมากกว่า 0"), cost: z.number().min(0).optional() })).min(1).optional(),
+   386→  qty: z.number().int().positive("จำนวนต้องมากกว่า 0").optional(),
+   387→  cost: z.number().min(0).optional(),
+   388→  actor: z.string().optional(),
+   389→  actorRole: z.string().optional(),
+   390→});
+   391→
+   392→const dashboardStatsInput = z
+   393→  .object({ rangeDays: z.number().int().min(1).max(365).optional() })
+   394→  .nullish();
+   395→
+   396→const reportRangeInput = z
+   397→  .object({
+   398→    from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
+   399→    to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
+   400→    /** ROUND 51 — กรองเฉพาะพนักงานขายคนนี้ ("" = ทุกคน · "ไม่ระบุพนักงาน" = บิลที่ไม่มีชื่อ) */
+   401→    cashier: z.string().trim().max(120).optional(),
+   402→    /** ROUND 79 (user) — เลือกหลายพนักงานพร้อมกันได้ (เช่น รวม 2 กะ) · ว่าง = ทุกคน */
+   403→    cashiers: z.array(z.string().trim().max(120)).max(30).optional(),
+   404→  })
+   405→  .nullish();
+   406→
+   407→const reportsDailyInput = z
+   408→  .object({
+   409→    days: z.number().int().min(1).max(365).optional(),
+   410→    from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
+   411→    to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
+   412→    /** ROUND 51 — กรองเฉพาะพนักงานขายคนนี้ ("" = ทุกคน · "ไม่ระบุพนักงาน" = บิลที่ไม่มีชื่อ) */
+   413→    cashier: z.string().trim().max(120).optional(),
+   414→    /** ROUND 79 (user) — เลือกหลายพนักงานพร้อมกันได้ (เช่น รวม 2 กะ) · ว่าง = ทุกคน */
+   415→    cashiers: z.array(z.string().trim().max(120)).max(30).optional(),
+   416→  })
+   417→  .nullish();
+   418→
+   419→const memberTransactionsInput = z
+   420→  .object({
+   421→    memberNumber: z.string().optional(),
+   422→    // ROUND 65 — เพิ่ม activation (เปิดใช้บัตร) และ refund (คืนบัตรเงินสด)
+   423→    type: z.enum(["purchase", "deposit", "withdrawal", "activation", "refund", "limit_request"]).optional(),
+   424→    // ROUND 77 (user) — เลือกหลายประเภทพร้อมกันได้ (เช่น เติมเงิน+ถอนเงิน) · ว่าง/ไม่ส่ง = ทุกประเภท
+   425→    types: z.array(z.enum(["purchase", "deposit", "withdrawal", "activation", "refund", "limit_request"])).optional(),
+   426→    from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
+   427→    to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
+   428→    limit: z.number().int().min(1).max(1000).optional(),
+   429→  })
+   430→  .nullish();
+   431→
+   432→// ROUND 65 (user) — รายงานยอดเงินในบัตรสมาชิกทุกใบ (ชีทโรงพยาบาล "ยอดเงินในบัตร")
+   433→const memberBalancesInput = z
+   434→  .object({
+   435→    search: z.string().max(120).optional(),
+   436→  })
+   437→  .nullish();
+   438→
+   439→// ROUND 65 (user) — รายงานสินค้าคงคลังตามช่วงเวลา (ยอดยกมา/ยอดขาย/คงเหลือ)
+   440→const stockBalanceInput = z
+   441→  .object({
+   442→    from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
+   443→    to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
+   444→    search: z.string().max(120).optional(),
+   445→  })
+   446→  .nullish();
+   447→
+   448→const logsListInput = z
+   449→  .object({ limit: z.number().int().min(1).max(1000).optional() })
+   450→  .nullish();
+   451→
+   452→const settingsPatchInput = z
+   453→  .object({
+   454→    memberNumberMode: z.enum(["running", "year", "manual"]).optional(),
+   455→    memberNumberPrefix: z.string().max(20).optional(),
+   456→    memberNumberYearMode: z.enum(["none", "buddhist", "gregorian"]).optional(),
+   457→    memberNumberYearDigits: z.union([z.literal(2), z.literal(4)]).optional(),
+   458→    memberNumberSeparator: z.enum(["-", "/", "_", ""]).optional(),
+   459→    memberNumberResetMonth: z.number().int().min(1).max(12).optional(),
+   460→    memberNumberSequenceDigits: z.number().int().min(1).max(10).optional(),
+   461→    storeName: z.string().optional(),
+   462→    storeCode: z.string().optional(),
+   463→    storeAddress: z.string().optional(),
+   464→    appName: z.string().max(80).optional(),
+   465→    appLogo: z.string().max(600_000).optional(),
+   466→    appTheme: z.string().max(32).optional(),
+   467→    // ROUND 75 (user) — ลบ autoPrintReceipt (ห้ามเด้งหน้าสั่งพิมพ์หลังชำระเงิน) ·
+   468→    // เพิ่มเมนูลัดหน้าร้าน: JSON array ของ key ปุ่ม POS ที่ปิดใช้งาน เช่น ["withdraw","special"]
+   469→    posRailHidden: z.string().max(200).optional(),
+   470→    posShortcutKeys: z.string().max(1200).optional(),
+   471→    showBalanceOnReceipt: z.boolean().optional(),
+   472→    lowBalanceAlert: z.boolean().optional(),
+   473→    lowBalanceThreshold: z.number().min(0).optional(),
+   474→    lowStockAlert: z.boolean().optional(),
+   475→    expiryAlert: z.boolean().optional(),
+   476→    expiryAlertDays: z.number().int().min(1).max(365).optional(),
+   477→    dailyCutOffMode: z.enum(["auto", "manual"]).optional(),
+   478→    dailyCutOffTime: z.string().regex(/^([01]?\d|2[0-3]):[0-5]\d$/, "รูปแบบเวลาต้องเป็น HH:MM").optional(),
+   479→    // ROUND 36 (ข้อ 31) — ประตูบัญชีผู้พัฒนา (dev): ปิดไว้เป็นค่าเริ่มต้น เปิดเฉพาะเมื่อจำเป็น
+   480→    devAccess: z.boolean().optional(),
+   481→    // ROUND 38 (ข้อ 39) — สไตล์การแสดงผลของแอป + การตั้งค่าสำรองข้อมูลอัตโนมัติ
+   482→    appStyle: z.string().max(32).optional(),
+   483→    backupAutoEnabled: z.boolean().optional(),
+   484→    backupIntervalHours: z.number().int().min(1).max(168).optional(),
+   485→    backupKeepCount: z.number().int().min(3).max(60).optional(),
+   486→    // ROUND 42 (ข้อ 32 ตอนที่ 3 — ข้อ 4) — ความกว้างกระดาษสลิปเครื่องพิมพ์ 58/72/80 มม.
+   487→    receiptPaperWidth: z.enum(["58", "72", "80"]).optional(),
+   488→    // ROUND 56 (user) — เช็คลิสต์วันขึ้นระบบ (โซนเครื่องมือติดตั้ง): JSON รหัสรายการที่ติ๊กแล้ว
+   489→    goliveChecks: z.string().max(4000).optional(),
+   490→    // ROUND 63 (user) — บัญชีพร้อมเพย์ร้าน: เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก
+   491→    promptpayId: z.string().max(20).optional(),
+   492→    // ROUND 68 (user) — เบอร์โทรศูนย์ช่วยเหลือ แสดงท้ายหน้าจอ (footer) · "" = ไม่แสดง
+   493→    helpPhone: z.string().max(32).optional(),
+   494→  })
+   495→  .nullish();
+   496→
+   497→// ROUND 38 (ข้อ 39) — ชื่อไฟล์สำรองที่รับได้: welfare-store-YYYYMMDDTHHMMSSZ.sqlite เท่านั้น
+   498→const backupFileInput = z.object({
+   499→  file: z.string().regex(/^welfare-store-\d{8}T\d{6}Z\.sqlite$/, "ชื่อไฟล์สำรองไม่ถูกต้อง"),
+   500→});
+   501→
+   502→const authLoginInput = z.object({
+   503→  username: z.string().min(1, "กรุณาระบุชื่อผู้ใช้"),
+   504→  password: z.string().min(1, "กรุณากรอกรหัสผ่าน"),
+   505→});
+   506→
+   507→// ROUND 36 (ข้อ 31) — ลงทะเบียนครั้งแรก: ใช้ได้เฉพาะระบบที่ยังไม่มีบัญชีผู้ใช้เลย
+   508→// ROUND 61 — เพิ่มการเลือกเวอร์ชันตอนลงทะเบียน: ทดลองใช้ 30 วัน / ใส่รหัสลิขสิทธิ์ / เริ่มที่ทั่วไป
+   509→const authSetupInput = z.object({
+   510→  username: z.string().min(1).max(30).regex(/^[^\s]+$/, "ชื่อผู้ใช้ห้ามมีช่องว่าง"),
+   511→  displayName: z.string().min(1),
+   512→  password: z.string().min(1),
+   513→  storeName: z.string().max(80).optional(),
+   514→  editionChoice: z.enum(["trial", "license", "standard"]).optional(),
+   515→  licenseKey: z.string().max(40).optional(),
+   516→});
+   517→
+   518→const authChangePasswordInput = z.object({
+   519→  currentPassword: z.string().min(1),
+   520→  newPassword: z.string().min(1),
+   521→});
+   522→
+   523→const userCreateInput = z.object({
+   524→  username: z.string().min(1, "กรุณาระบุชื่อผู้ใช้"),
+   525→  password: z.string().min(1, "กรุณากรอกรหัสผ่าน"),
+   526→  displayName: z.string().min(1, "กรุณาระบุชื่อ-นามสกุล"),
+   527→  role: z.enum(["staff", "admin", "dev"]),
+   528→});
+   529→
+   530→const userUpdateInput = z.object({
+   531→  userId: z.number().int().positive(),
+   532→  displayName: z.string().optional(),
+   533→  role: z.enum(["staff", "admin", "dev"]).optional(),
+   534→  active: z.boolean().optional(),
+   535→  password: z.string().optional(),
+   536→});
+   537→
+   538→export const appRouter = router({
+   539→    // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
+   540→  system: systemRouter,
+   541→  // ROUND 56 (user) — โซนเครื่องมือติดตั้งระบบ (บัญชีผู้พัฒนาเท่านั้น): ตัวเลขตรวจรับข้อมูล
+   542→  // วันขึ้นระบบ — จำนวนบัญชี/สมาชิก/สินค้า (รวมสินค้ายังไม่ตั้งราคา)/บิลวันนี้/ขนาดฐานข้อมูล
+   543→  install: router({
+   544→    overview: publicProcedure
+   545→      .input(z.unknown().optional())
+   546→      .query(({ ctx }) =>
+   547→        withStoreErrors(() => {
+   548→          if (!isDevCtx(ctx)) {
+   549→            throw new TRPCError({ code: "FORBIDDEN", message: "เครื่องมือติดตั้งระบบใช้ได้เฉพาะบัญชีผู้พัฒนา" });
+   550→          }
+   551→          // ROUND 61 — พ่วงสถานะเวอร์ชัน/ลิขสิทธิ์ให้ช่างเห็นตอนติดตั้ง (ลูกค้ายังไม่ได้ใส่รหัส = ทั่วไป)
+   552→          return { ...installOverview(getWelfareDb(), getWelfareDbPath()), edition: resolveEditionStatus(getSettings(getWelfareDb())) };
+   553→        }),
+   554→      ),
+   555→  }),
+   556→  auth: router({
+   557→    me: publicProcedure.query(opts => opts.ctx.user),
+   558→    /** ROUND 36 (ข้อ 31) — สถานะลงทะเบียนครั้งแรก: needsSetup = ยังไม่มีบัญชีผู้ใช้เลย */
+   559→    setupStatus: publicProcedure.query(() => withStoreErrors(() => ({ needsSetup: countAppUsers(getWelfareDb()) === 0 }))),
+   560→    /** ROUND 36 (ข้อ 31) — ลงทะเบียนผู้บริหารหลัก (ระบบใหม่เท่านั้น) แล้วเข้าสู่ระบบทันที
+   561→     *  ROUND 61 — บันทึกการเลือกเวอร์ชันไปพร้อมกัน: ทดลอง 30 วัน / ใช้รหัสลิขสิทธิ์ / ทั่วไป */
+   562→    setup: publicProcedure
+   563→      .input(authSetupInput)
+   564→      .mutation(({ ctx, input }) =>
+   565→        withStoreErrors(() => {
+   566→          const db = getWelfareDb();
+   567→          const user = setupInitialAdmin(db, input);
+   568→          // ROUND 61 — เวอร์ชันที่เลือกไว้ตอนลงทะเบียน (ค่าเริ่มต้น = ทดลองใช้ 30 วัน)
+   569→          const choice = input.editionChoice ?? "trial";
+   570→          const storeName = (input.storeName ?? "").trim();
+   571→          if (choice === "trial") {
+   572→            setEditionSettings(db, { trialStart: todayString() });
+   573→          } else if (choice === "license") {
+   574→            const key = (input.licenseKey ?? "").trim();
+   575→            const parsed = key ? parseLicenseKey(key) : null;
+   576→            if (!parsed) {
+   577→              throw new TRPCError({ code: "BAD_REQUEST", message: "รหัสลิขสิทธิ์ไม่ถูกต้อง — ตรวจอักขระให้ครบทุกกลุ่ม หรือเลือก “เริ่มทดลองใช้” ก่อนแล้วค่อยใส่รหัสภายหลังได้" });
+   578→            }
+   579→            setEditionSettings(db, { licenseKey: key, licenseName: storeName || user.displayName });
+   580→          }
+   581→          const roleThai = "ผู้บริหาร";
+   582→          const session = createAppSession(db, user.id);
+   583→          ctx.res.cookie(COOKIE_NAME, session.sessionId, {
+   584→            httpOnly: true,
+   585→            path: "/",
+   586→            sameSite: "lax",
+   587→            secure: isSecureRequest(ctx.req),
+   588→            maxAge: 7 * 24 * 60 * 60 * 1000,
+   589→          });
+   590→          logAction(db, "เข้าสู่ระบบ", user.displayName, `${user.username} · สิทธิ์ ${roleThai}`, "blue", roleThai);
+   591→          return { id: user.id, username: user.username, displayName: user.displayName, role: user.role, mustChangePassword: true };
+   592→        }),
+   593→      ),
+   594→    /** ROUND 36 (ข้อ 31) — เปลี่ยนรหัสผ่านของตัวเอง (บังคับตอน first login / ตั้งใหม่โดยผู้บริหาร) */
+   595→    changePassword: publicProcedure
+   596→      .input(authChangePasswordInput)
+   597→      .mutation(({ ctx, input }) =>
+   598→        withStoreErrors(() => {
+   599→          if (!ctx.user) {
+   600→            throw new TRPCError({ code: "UNAUTHORIZED", message: "กรุณาเข้าสู่ระบบก่อนเปลี่ยนรหัสผ่าน" });
+   601→          }
+   602→          const { actor, actorRole } = resolveActor(ctx, {});
+   603→          return changeOwnPassword(getWelfareDb(), {
+   604→            userId: ctx.user.id,
+   605→            currentPassword: input.currentPassword,
+   606→            newPassword: input.newPassword,
+   607→            keepSessionId: readAppSessionCookie(ctx.req),
+   608→            actor,
+   609→            actorRole,
+   610→          });
+   611→        }),
+   612→      ),
+   613→    login: publicProcedure
+   614→      .input(authLoginInput)
+   615→      .mutation(({ ctx, input }) =>
+   616→        withStoreErrors(() => {
+   617→          const db = getWelfareDb();
+   618→          const username = input.username.trim();
+   619→          const user = findAppUserByUsername(db, username);
+   620→          // Temporary wrong-password lockout: even the CORRECT password is
+   621→          // refused while the lock is live (admins can unlock early).
+   622→          if (user?.lockedUntil && loginLockRemainingMinutes(user.lockedUntil) > 0) {
+   623→            const minutes = loginLockRemainingMinutes(user.lockedUntil);
+   624→            throw new TRPCError({
+   625→              code: "FORBIDDEN",
+   626→              message: `บัญชีถูกระงับชั่วคราวเนื่องจากกรอกรหัสผ่านผิดหลายครั้ง · ลองอีกครั้งในอีก ${minutes} นาที หรือติดต่อผู้บริหารเพื่อปลดล็อก`,
+   627→            });
+   628→          }
+   629→          // Same message for unknown user and wrong password: no user enumeration.
+   630→          if (!user || !verifyPassword(input.password, user.passwordHash)) {
+   631→            const failure = registerLoginFailure(db, username);
+   632→            throw new TRPCError({
+   633→              code: "UNAUTHORIZED",
+   634→              message: failure.justLocked
+   635→                ? "รหัสผ่านไม่ถูกต้อง · บัญชีถูกระงับชั่วคราว 15 นาที"
+   636→                : failure.attempts > 0
+   637→                  ? `ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง · พยายามแล้ว ${failure.attempts}/${LOGIN_MAX_FAILURES} ครั้ง`
+   638→                  : "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง",
+   639→            });
+   640→          }
+   641→          // ROUND 36 (ข้อ 31) — ประตูบัญชีผู้พัฒนา (dev): ตรวจหลังรหัสผ่านถูกต้อง
+   642→          // แล้วเท่านั้น เพื่อไม่เปิดช่องให้เดารหัสผ่านของบัญชี dev จากข้อความปฏิเสธ
+   643→          if (user.role === "dev" && !getSettings(db).devAccess) {
+   644→            throw new TRPCError({
+   645→              code: "FORBIDDEN",
+   646→              message: "การเข้าใช้งานสำหรับผู้พัฒนา (dev) ถูกปิดอยู่ · ให้ผู้บริหารเปิดได้ที่ ตั้งค่า → สิทธิ์และความปลอดภัย",
+   647→            });
+   648→          }
+   649→          clearLoginFailures(db, user.id);
+   650→          const roleThai = appRoleThai(user.role);
+   651→          const session = createAppSession(db, user.id);
+   652→          ctx.res.cookie(COOKIE_NAME, session.sessionId, {
+   653→            httpOnly: true,
+   654→            path: "/",
+   655→            sameSite: "lax",
+   656→            secure: isSecureRequest(ctx.req),
+   657→            maxAge: 7 * 24 * 60 * 60 * 1000,
+   658→          });
+   659→          // บัญชี dev คือการเข้าถึงพิเศษ — บันทึกสีแดงและขึ้นต้นรายละเอียดด้วย DEV
+   660→          if (user.role === "dev") {
+   661→            logAction(db, "เข้าสู่ระบบ", user.displayName, `DEV · ${user.username} · สิทธิ์ ${roleThai}`, "red", roleThai);
+   662→          } else {
+   663→            logAction(db, "เข้าสู่ระบบ", user.displayName, `${user.username} · สิทธิ์ ${roleThai}`, "blue", roleThai);
+   664→          }
+   665→          return { id: user.id, username: user.username, displayName: user.displayName, role: user.role, mustChangePassword: user.mustChangePassword === 1 };
+   666→        }),
+   667→      ),
+   668→    logout: publicProcedure.mutation(({ ctx }) => {
+   669→      // Delete the local session row (and audit) before clearing the cookie.
+   670→      try {
+   671→        const sessionId = readAppSessionCookie(ctx.req);
+   672→        if (sessionId) {
+   673→          const db = getWelfareDb();
+   674→          deleteAppSession(db, sessionId);
+   675→          if (ctx.user) {
+   676→            const roleThai = ctx.user.role === "admin" ? (ctx.user.appRole === "dev" ? "ผู้พัฒนา" : "ผู้บริหาร") : "เจ้าหน้าที่";
+   677→            logAction(db, "ออกจากระบบ", ctx.user.name ?? "ผู้ใช้ระบบ", `${ctx.user.openId} · สิทธิ์ ${roleThai}`, "green", roleThai);
+   678→          }
+   679→        }
+   680→      } catch (error) {
+   681→        // Logout must always succeed for the cookie clear below.
+   682→        console.warn("[Auth] Session delete on logout failed:", String(error));
+   683→      }
+   684→      const cookieOptions = getSessionCookieOptions(ctx.req);
+   685→      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+   686→      return {
+   687→        success: true,
+   688→      } as const;
+   689→    }),
+   690→  }),
+   691→
+   692→  user: router({
+   693→    list: publicProcedure
+   694→      .input(z.unknown().optional())
+   695→      .query(({ ctx }) =>
+   696→        withStoreErrors(() => {
+   697→          if (!isAdminCtx(ctx, {})) {
+   698→            throw new TRPCError({ code: "FORBIDDEN", message: "การจัดการผู้ใช้ระบบต้องใช้สิทธิ์ผู้บริหาร" });
+   699→          }
+   700→          return listAppUsers(getWelfareDb());
+   701→        }),
+   702→      ),
+   703→    create: publicProcedure
+   704→      .input(userCreateInput)
+   705→      .mutation(({ ctx, input }) => {
+   706→        // The zod schema has no actor/actorRole fields, so the session is the
+   707→        // only source of identity — the admin gate requires an admin session.
+   708→        const { actor, actorRole } = resolveActor(ctx, {});
+   709→        return withStoreErrors(() => {
+   710→          if (!isAdminCtx(ctx, {})) {
+   711→            throw new TRPCError({ code: "FORBIDDEN", message: "การจัดการผู้ใช้ระบบต้องใช้สิทธิ์ผู้บริหาร" });
+   712→          }
+   713→          // ROUND 61 — เวอร์ชันทั่วไปจำกัดบัญชีที่ใช้งานได้ 3 บัญชี (โปร/โปรพลัสไม่จำกัด)
+   714→          const editionStatus = resolveEditionStatus(getSettings(getWelfareDb()));
+   715→          if (!editionStatus.features.includes("usersUnlimited")) {
+   716→            const activeUsers = listAppUsers(getWelfareDb()).filter((user) => user.active === 1).length;
+   717→            if (activeUsers >= STANDARD_MAX_USERS) {
+   718→              throw new TRPCError({ code: "FORBIDDEN", message: `เวอร์ชันทั่วไปใช้บัญชีได้สูงสุด ${STANDARD_MAX_USERS} บัญชี (ใช้อยู่ ${activeUsers} บัญชี) — อัปเกรดเป็นเวอร์ชันโปรเพื่อเพิ่มผู้ใช้ไม่จำกัด` });
+   719→            }
+   720→          }
+   721→          return createAppUser(getWelfareDb(), { ...input, actor, actorRole });
+   722→        });
+   723→      }),
+   724→    update: publicProcedure
+   725→      .input(userUpdateInput)
+   726→      .mutation(({ ctx, input }) => {
+   727→        const { actor, actorRole } = resolveActor(ctx, {});
+   728→        return withStoreErrors(() => {
+   729→          if (!isAdminCtx(ctx, {})) {
+   730→            throw new TRPCError({ code: "FORBIDDEN", message: "การจัดการผู้ใช้ระบบต้องใช้สิทธิ์ผู้บริหาร" });
+   731→          }
+   732→          // Self-protection: role changes and suspension target other accounts.
+   733→          if (ctx.user && ctx.user.id === input.userId && (input.role !== undefined || input.active === false)) {
+   734→            throw new TRPCError({ code: "FORBIDDEN", message: "ไม่สามารถเปลี่ยนสิทธิ์หรือระงับบัญชีของตัวเองได้" });
+   735→          }
+   736→          // Pass only the defined fields so the changed-fields diff in the store works.
+   737→          return updateAppUser(getWelfareDb(), {
+   738→            userId: input.userId,
+   739→            displayName: input.displayName,
+   740→            role: input.role,
+   741→            active: input.active,
+   742→            password: input.password,
+   743→            actor,
+   744→            actorRole,
+   745→          });
+   746→        });
+   747→      }),
+   748→    unlock: publicProcedure
+   749→      .input(z.object({ userId: z.number().int().positive() }))
+   750→      .mutation(({ ctx, input }) => {
+   751→        const { actor, actorRole } = resolveActor(ctx, {});
+   752→        return withStoreErrors(() => {
+   753→          if (!isAdminCtx(ctx, {})) {
+   754→            throw new TRPCError({ code: "FORBIDDEN", message: "การจัดการผู้ใช้ระบบต้องใช้สิทธิ์ผู้บริหาร" });
+   755→          }
+   756→          // Unlocking your own account is allowed: a locked admin with a live
+   757→          // session should be able to clear their own lock without waiting.
+   758→          return unlockAppUser(getWelfareDb(), input.userId, actor, actorRole);
+   759→        });
+   760→      }),
+   761→  }),
+   762→
+   763→  session: router({
+   764→    /** Lists active sessions; the caller's own session is flagged `current`. */
+   765→    list: publicProcedure
+   766→      .input(z.unknown().optional())
+   767→      .query(({ ctx }) =>
+   768→        withStoreErrors(() => {
+   769→          if (!isAdminCtx(ctx, {})) {
+   770→            throw new TRPCError({ code: "FORBIDDEN", message: "การจัดการเซสชันต้องใช้สิทธิ์ผู้บริหาร" });
+   771→          }
+   772→          const currentSessionId = readAppSessionCookie(ctx.req);
+   773→          return listAppSessions(getWelfareDb()).map((session) => ({ ...session, current: session.sessionId === currentSessionId }));
+   774→        }),
+   775→      ),
+   776→    revoke: publicProcedure
+   777→      .input(z.object({ sessionId: z.string().min(1) }))
+   778→      .mutation(({ ctx, input }) => {
+   779→        const { actor, actorRole } = resolveActor(ctx, {});
+   780→        return withStoreErrors(() => {
+   781→          if (!isAdminCtx(ctx, {})) {
+   782→            throw new TRPCError({ code: "FORBIDDEN", message: "การจัดการเซสชันต้องใช้สิทธิ์ผู้บริหาร" });
+   783→          }
+   784→          // Revoking the session making this very request is what logout is for.
+   785→          if (input.sessionId === readAppSessionCookie(ctx.req)) {
+   786→            throw new TRPCError({ code: "FORBIDDEN", message: "ไม่สามารถยกเลิกเซสชันที่กำลังใช้งานอยู่ · ใช้ปุ่มออกจากระบบ" });
+   787→          }
+   788→          return revokeAppSession(getWelfareDb(), input.sessionId, actor, actorRole);
+   789→        });
+   790→      }),
+   791→    revokeOthers: publicProcedure
+   792→      .input(z.unknown().optional())
+   793→      .mutation(({ ctx }) => {
+   794→        const { actor, actorRole } = resolveActor(ctx, {});
+   795→        return withStoreErrors(() => {
+   796→          if (!isAdminCtx(ctx, {})) {
+   797→            throw new TRPCError({ code: "FORBIDDEN", message: "การจัดการเซสชันต้องใช้สิทธิ์ผู้บริหาร" });
+   798→          }
+   799→          const currentSessionId = readAppSessionCookie(ctx.req);
+   800→          if (!currentSessionId) {
+   801→            throw new TRPCError({ code: "UNAUTHORIZED", message: "ไม่พบเซสชันที่ใช้งานอยู่" });
+   802→          }
+   803→          return { revoked: revokeOtherAppSessions(getWelfareDb(), currentSessionId, actor, actorRole) };
+   804→        });
+   805→      }),
+   806→  }),
+   807→
+   808→  product: router({
+   809→    list: publicProcedure
+   810→      .input(productListInput)
+   811→      .query(({ input }) => withStoreErrors(() => listProducts(getWelfareDb(), input?.includeInactive ?? false))),
+   812→    create: publicProcedure
+   813→      .input(productCreateInput)
+   814→      .mutation(({ ctx, input }) => {
+   815→        const { actor, actorRole } = resolveActor(ctx, input);
+   816→        return withStoreErrors(() => createProduct(getWelfareDb(), { ...input, actor, actorRole }));
+   817→      }),
+   818→    update: publicProcedure
+   819→      .input(productUpdateInput)
+   820→      .mutation(({ ctx, input }) => {
+   821→        const { actor, actorRole } = resolveActor(ctx, input);
+   822→        return withStoreErrors(() => updateProduct(getWelfareDb(), { ...input, actor, actorRole }));
+   823→      }),
+   824→    bulkUpdatePrices: publicProcedure
+   825→      .input(productBulkUpdatePricesInput)
+   826→      .mutation(({ ctx, input }) => {
+   827→        const { actor, actorRole } = resolveActor(ctx, input);
+   828→        return withStoreErrors(() => {
+   829→          if (!isAdminCtx(ctx, input)) {
+   830→            throw new TRPCError({ code: "FORBIDDEN", message: "การปรับราคาหลายรายการพร้อมกันต้องใช้สิทธิ์ผู้บริหาร" });
+   831→          }
+   832→          return bulkUpdateProductPrices(getWelfareDb(), { ...input, actor, actorRole });
+   833→        });
+   834→      }),
+   835→    setActive: publicProcedure
+   836→      .input(productSetActiveInput)
+   837→      .mutation(({ ctx, input }) => {
+   838→        const { actor, actorRole } = resolveActor(ctx, input);
+   839→        return withStoreErrors(() => {
+   840→          if (!isAdminCtx(ctx, input)) {
+   841→            throw new TRPCError({ code: "FORBIDDEN", message: "การปิด/เปิดการขายสินค้าต้องใช้สิทธิ์ผู้บริหาร" });
+   842→          }
+   843→          return setProductActive(getWelfareDb(), { ...input, actor, actorRole });
+   844→        });
+   845→      }),
+   846→    delete: publicProcedure
+   847→      .input(productDeleteInput)
+   848→      .mutation(({ ctx, input }) => {
+   849→        const { actor, actorRole } = resolveActor(ctx, input);
+   850→        return withStoreErrors(() => {
+   851→          if (!isAdminCtx(ctx, input)) {
+   852→            throw new TRPCError({ code: "FORBIDDEN", message: "การลบสินค้าต้องใช้สิทธิ์ผู้บริหาร" });
+   853→          }
+   854→          return deleteProduct(getWelfareDb(), { ...input, actor, actorRole });
+   855→        });
+   856→      }),
+   857→  }),
+   858→
+   859→  sales: router({
+   860→    list: publicProcedure
+   861→      .input(salesListInput)
+   862→      .query(({ input }) => withStoreErrors(() => salesList(getWelfareDb(), input ?? {}))),
+   863→    // ROUND 63 (user) — ดึงรูปหลักฐานการชำระของบิล (สลิป QR / สแกน) แยกจากลิสต์กัน payload หนัก
+   864→    slip: publicProcedure
+   865→      .input(z.object({ id: z.number().int().min(1) }))
+   866→      .query(({ input }) => withStoreErrors(() => getSaleSlip(getWelfareDb(), input.id))),
+   867→  }),
+   868→
+   869→  stock: router({
+   870→    rows: publicProcedure
+   871→      .input(z.unknown().optional())
+   872→      .query(() => withStoreErrors(() => listStockRows(getWelfareDb()))),
+   873→    receive: publicProcedure
+   874→      .input(stockReceiveInput)
+   875→      .mutation(({ ctx, input }) => {
+   876→        const { actor, actorRole } = resolveActor(ctx, input);
+   877→        // รับแบบซื้อ/แถมเป็นค่าหลัก; lines และ qty/cost เดิมยังรองรับฐานข้อมูล/ผู้เรียกรุ่นเก่า
+   878→        const lines = input.purchaseQty !== undefined
+   879→          ? [
+   880→              { qty: input.purchaseQty, cost: input.paidAmount === undefined ? undefined : input.paidAmount / input.purchaseQty },
+   881→              ...(input.freeQty && input.freeQty > 0 ? [{ qty: input.freeQty, cost: 0 }] : []),
+   882→            ]
+   883→          : input.lines ?? (input.qty !== undefined ? [{ qty: input.qty, cost: input.cost }] : []);
+   884→        return withStoreErrors(() =>
+   885→          receiveStockLines(
+   886→            getWelfareDb(),
+   887→            {
+   888→              productId: input.productId,
+   889→              lot: input.lot ?? "",
+   890→              expiryDate: input.expiryDate ?? null,
+   891→              lines,
+   892→              actor,
+   893→              actorRole,
+   894→            },
+   895→          ),
+   896→        );
+   897→      }),
+   898→    count: publicProcedure
+   899→      .input(stockCountInput)
+   900→      .mutation(({ ctx, input }) => {
+   901→        const { actor, actorRole } = resolveActor(ctx, input);
+   902→        return withStoreErrors(() => {
+   903→          requireEdition("stockCount"); // ROUND 61 — งานนับสต๊อกเป็นฟีเจอร์เวอร์ชันโปรพลัส
+   904→          return stockCount(getWelfareDb(), { ...input, actor, actorRole });
+   905→        });
+   906→      }),
+   907→    countLots: publicProcedure
+   908→      .input(stockCountLotsInput)
+   909→      .mutation(({ ctx, input }) => {
+   910→        const { actor, actorRole } = resolveActor(ctx, input);
+   911→        return withStoreErrors(() => {
+   912→          requireEdition("stockCount"); // ROUND 61 — นับแยกล็อตรวมอยู่ในงานนับสต๊อก (โปรพลัส)
+   913→          return stockCountLots(getWelfareDb(), { ...input, actor, actorRole });
+   914→        });
+   915→      }),
+   916→    // Round 32-15 — รายการสั่งซื้อ: สะสมรายการที่จะสั่งเข้า เพื่อกันตกหล่นก่อนสั่งจริง
+   917→    orderList: publicProcedure
+   918→      .input(z.unknown().optional())
+   919→      .query(() => withStoreErrors(() => listOrderItems(getWelfareDb()))),
+   920→    orderAdd: publicProcedure
+   921→      .input(orderAddInput)
+   922→      .mutation(({ ctx, input }) => {
+   923→        const { actor, actorRole } = resolveActor(ctx, input);
+   924→        return withStoreErrors(() => addOrderItem(getWelfareDb(), { ...input, actor, actorRole }));
+   925→      }),
+   926→    orderUpdate: publicProcedure
+   927→      .input(orderUpdateInput)
+   928→      .mutation(({ ctx, input }) => {
+   929→        const { actor, actorRole } = resolveActor(ctx, input);
+   930→        return withStoreErrors(() => updateOrderItem(getWelfareDb(), { ...input, actor, actorRole }));
+   931→      }),
+   932→    orderRemove: publicProcedure
+   933→      .input(z.object({ id: z.number().int().min(1), actor: z.string().optional(), actorRole: z.string().optional() }))
+   934→      .mutation(({ ctx, input }) => {
+   935→        const { actor, actorRole } = resolveActor(ctx, input);
+   936→        return withStoreErrors(() => removeOrderItem(getWelfareDb(), { ...input, actor, actorRole }));
+   937→      }),
+   938→    orderClear: publicProcedure
+   939→      .input(z.object({ actor: z.string().optional(), actorRole: z.string().optional() }).optional())
+   940→      .mutation(({ ctx, input }) => {
+   941→        const { actor, actorRole } = resolveActor(ctx, input ?? {});
+   942→        return withStoreErrors(() => clearOrderList(getWelfareDb(), { actor, actorRole }));
+   943→      }),
+   944→  }),
+   945→
+   946→  pos: router({
+   947→    checkout: publicProcedure
+   948→      .input(checkoutInput)
+   949→      .mutation(({ ctx, input }) => {
+   950→        const { actor, actorRole } = resolveActor(ctx, input);
+   951→        return withStoreErrors(() => {
+   952→          // ROUND 61 — รายการพิเศษ/ของสั่ง (บรรทัดไม่มี productId) เป็นฟีเจอร์เวอร์ชันโปรพลัส
+   953→          if (input.items.some((item) => !("productId" in item))) requireEdition("specialOrders");
+   954→          return checkout(getWelfareDb(), { ...input, cashier: input.cashier ?? actor, actorRole });
+   955→        });
+   956→      }),
+   957→  }),
+   958→
+   959→  member: router({
+   960→    list: publicProcedure
+   961→      .input(memberListInput)
+   962→      .query(({ input }) => withStoreErrors(() => listMembers(getWelfareDb(), input?.search, input?.status))),
+   963→    detail: publicProcedure
+   964→      .input(memberDetailInput)
+   965→      .query(({ input }) =>
+   966→        withStoreErrors(() => {
+   967→          const detail = getMemberDetail(getWelfareDb(), input.memberNumber);
+   968→          if (!detail) {
+   969→            throw new TRPCError({ code: "NOT_FOUND", message: `ไม่พบสมาชิก ${input.memberNumber} ในระบบ` });
+   970→          }
+   971→          return detail;
+   972→        }),
+   973→      ),
+   974→    stats: publicProcedure
+   975→      .input(memberDetailInput)
+   976→      .query(({ input }) => withStoreErrors(() => memberSpendingStats(getWelfareDb(), input.memberNumber))),
+   977→    register: publicProcedure
+   978→      .input(memberRegisterInput)
+   979→      .mutation(({ ctx, input }) => {
+   980→        const { actor, actorRole } = resolveActor(ctx, input);
+   981→        return withStoreErrors(() => registerMember(getWelfareDb(), { ...input, actor, actorRole }));
+   982→      }),
+   983→    setStatus: publicProcedure
+   984→      .input(memberSetStatusInput)
+   985→      .mutation(({ ctx, input }) => {
+   986→        const { actor, actorRole } = resolveActor(ctx, input);
+   987→        return withStoreErrors(() => setMemberStatus(getWelfareDb(), input.memberNumber, input.suspended, actor, actorRole));
+   988→      }),
+   989→    wallet: publicProcedure
+   990→      .input(memberWalletInput)
+   991→      .mutation(({ ctx, input }) => {
+   992→        const { actor, actorRole } = resolveActor(ctx, input);
+   993→        return withStoreErrors(() => walletTx(getWelfareDb(), { ...input, actor, actorRole }));
+   994→      }),
+   995→    // ROUND 63 (user) — ดึงรูปหลักฐานของรายการเติม/ถอนเงินสมาชิก (แนบตอนทำรายการที่ POS)
+   996→    transactionSlip: publicProcedure
+   997→      .input(z.object({ id: z.number().int().min(1) }))
+   998→      .query(({ input }) => withStoreErrors(() => getTransactionSlip(getWelfareDb(), input.id))),
+   999→    update: publicProcedure
+  1000→      .input(memberUpdateInput)
+  1001→      .mutation(({ ctx, input }) => {
+  1002→        const { actor, actorRole } = resolveActor(ctx, input);
+  1003→        return withStoreErrors(() => updateMember(getWelfareDb(), { ...input, actor, actorRole }));
+  1004→      }),
+  1005→    // Req 23.2 — การขอลดวงเงิน: เจ้าหน้าที่ที่ล็อกอินยื่นคำขอได้ (คำขอเข้าสถานะ pending)
+  1006→    requestLimitReduction: publicProcedure
+  1007→      .input(memberLimitRequestInput)
+  1008→      .mutation(({ ctx, input }) => {
+  1009→        const { actor, actorRole } = resolveActor(ctx, input);
+  1010→        return withStoreErrors(() => requestLimitReduction(getWelfareDb(), { ...input, actor, actorRole }));
+  1011→      }),
+  1012→    // Req 23.2 — พิจารณาคำขอลดวงเงิน: ผู้บริหารเท่านั้น (approve = ตั้งวงเงินใหม่ / reject = คงเดิม)
+  1013→    decideLimitRequest: publicProcedure
+  1014→      .input(memberLimitDecisionInput)
+  1015→      .mutation(({ ctx, input }) => {
+  1016→        const { actor, actorRole } = resolveActor(ctx, input);
+  1017→        return withStoreErrors(() => {
+  1018→          if (!isAdminCtx(ctx, input)) {
+  1019→            throw new TRPCError({ code: "FORBIDDEN", message: "การพิจารณาคำขอลดวงเงินต้องใช้สิทธิ์ผู้บริหาร" });
+  1020→          }
+  1021→          return decideLimitRequest(getWelfareDb(), { ...input, actor, actorRole });
+  1022→        });
+  1023→      }),
+  1024→    delete: publicProcedure
+  1025→      .input(memberDeleteInput)
+  1026→      .mutation(({ ctx, input }) => {
+  1027→        const { actor, actorRole } = resolveActor(ctx, input);
+  1028→        return withStoreErrors(() => {
+  1029→          if (!isAdminCtx(ctx, input)) {
+  1030→            throw new TRPCError({ code: "FORBIDDEN", message: "การลบสมาชิกต้องใช้สิทธิ์ผู้บริหาร" });
+  1031→          }
+  1032→          return deleteMember(getWelfareDb(), { ...input, actor, actorRole });
+  1033→        });
+  1034→      }),
+  1035→  }),
+  1036→
+  1037→  dashboard: router({
+  1038→    stats: publicProcedure
+  1039→      .input(dashboardStatsInput)
+  1040→      .query(({ input }) => withStoreErrors(() => dashboardStats(getWelfareDb(), input?.rangeDays ?? 30))),
+  1041→  }),
+  1042→
+  1043→  reports: router({
+  1044→    daily: publicProcedure
+  1045→      .input(reportsDailyInput)
+  1046→      .query(({ input }) => withStoreErrors(() => dailySalesRows(getWelfareDb(), input ?? {}))),
+  1047→    byCategory: publicProcedure
+  1048→      .input(reportRangeInput)
+  1049→      .query(({ input }) => withStoreErrors(() => salesByCategory(getWelfareDb(), input ?? {}))),
+  1050→    byProduct: publicProcedure
+  1051→      .input(reportRangeInput)
+  1052→      .query(({ input }) => withStoreErrors(() => {
+  1053→        requireEdition("reportsAdvanced"); // ROUND 61 — มุมมองตามสินค้า = เวอร์ชันโปรขึ้นไป
+  1054→        return salesByProduct(getWelfareDb(), input ?? {});
+  1055→      })),
+  1056→    /** ROUND 48 — รายการสินค้าทุกบรรทัดจากทุกบิลในช่วงเวลา (แยกตามรายการในบิล) */
+  1057→    lineItems: publicProcedure
+  1058→      .input(reportRangeInput)
+  1059→      .query(({ input }) => withStoreErrors(() => {
+  1060→        requireEdition("reportsAdvanced"); // ROUND 61 — รายการในบิล = เวอร์ชันโปรขึ้นไป
+  1061→        return salesLineItems(getWelfareDb(), input ?? {});
+  1062→      })),
+  1063→    byCashier: publicProcedure
+  1064→      .input(reportRangeInput)
+  1065→      .query(({ input }) => withStoreErrors(() => {
+  1066→        requireEdition("reportsAdvanced"); // ROUND 61 — มุมมองตามพนักงานขาย = เวอร์ชันโปรขึ้นไป
+  1067→        return salesByCashier(getWelfareDb(), input ?? {});
+  1068→      })),
+  1069→    /** ROUND 51 — รายชื่อพนักงานขายทั้งหมดจากบิลจริง (ตัวเลือกตัวกรองเจาะจงในรายงาน) */
+  1070→    cashiers: publicProcedure
+  1071→      .input(z.unknown().optional())
+  1072→      .query(() => withStoreErrors(() => salesCashierOptions(getWelfareDb()))),
+  1073→    memberTransactions: publicProcedure
+  1074→      .input(memberTransactionsInput)
+  1075→      .query(({ input }) => withStoreErrors(() => {
+  1076→        requireEdition("reportsAdvanced"); // ROUND 61 — ธุรกรรมสมาชิกทั้งระบบ = เวอร์ชันโปรขึ้นไป (สเตตเมนต์รายคนยังใช้ได้ทุกเวอร์ชัน)
+  1077→        return memberTransactions(getWelfareDb(), input ?? {});
+  1078→      })),
+  1079→    /** ROUND 65 (user) — รายงาน "ยอดเงินในบัตร" ทุกใบ: รหัสบัตร · ยอดทั้งหมด · ยอดจ่าย ·
+  1080→     * คงเหลือ · วันที่เปิดใช้บัตร · รหัสผู้ป่วย · ชื่อ (ตรงกับชีทรายงานโรงพยาบาล) */
+  1081→    memberBalances: publicProcedure
+  1082→      .input(memberBalancesInput)
+  1083→      .query(({ input }) => withStoreErrors(() => memberBalances(getWelfareDb(), input ?? {}))),
+  1084→    /** ROUND 65 (user) — รายงานสินค้าคงคลังตามช่วงเวลา: รหัสสินค้า · ยอดยกมา · ยอดขาย ·
+  1085→     * คงเหลือ (ตรงกับชีทรายงานสินค้าคงคลังของโรงพยาบาล) */
+  1086→    stockBalance: publicProcedure
+  1087→      .input(stockBalanceInput)
+  1088→      .query(({ input }) => withStoreErrors(() => stockBalanceReport(getWelfareDb(), input ?? {}))),
+  1089→    // Req 23.2 — คำขอลดวงเงินทั้งหมด (รอพิจารณาขึ้นก่อน) + จำนวนค้างพิจารณาสำหรับ badge
+  1090→    limitRequests: publicProcedure
+  1091→      .input(z.object({ status: z.enum(["pending", "approved", "rejected"]).optional(), limit: z.number().int().min(1).max(200).optional() }).optional())
+  1092→      .query(({ input }) =>
+  1093→        withStoreErrors(() => ({
+  1094→          items: listLimitRequests(getWelfareDb(), input ?? {}),
+  1095→          pendingCount: countPendingLimitRequests(getWelfareDb()),
+  1096→        })),
+  1097→      ),
+  1098→    businessPeriod: publicProcedure
+  1099→      .input(z.unknown().optional())
+  1100→      .query(() => withStoreErrors(() => businessPeriodStatus(getWelfareDb()))),
+  1101→    closeDay: publicProcedure
+  1102→      .input(z.object({ note: z.string().max(300).optional(), actor: z.string().optional(), actorRole: z.string().optional() }).nullish())
+  1103→      .mutation(({ ctx, input }) => {
+  1104→        const { actor, actorRole } = resolveActor(ctx, input ?? {});
+  1105→        return withStoreErrors(() => closeBusinessDay(getWelfareDb(), { ...(input ?? {}), actor, actorRole }));
+  1106→      }),
+  1107→    /** ประวัติการตัดยอดรอบขาย (ล่าสุดขึ้นก่อน) */
+  1108→    closures: publicProcedure
+  1109→      .input(z.number().int().min(1).max(90).nullish())
+  1110→      .query(({ input }) => withStoreErrors(() => listDayClosures(getWelfareDb(), input ?? 30))),
+  1111→  }),
+  1112→
+  1113→  settings: router({
+  1114→    get: publicProcedure
+  1115→      .input(z.unknown().optional())
+  1116→      .query(() => withStoreErrors(() => getSettings(getWelfareDb()))),
+  1117→    set: publicProcedure
+  1118→      .input(settingsPatchInput)
+  1119→      .mutation(({ ctx, input }) => {
+  1120→        const { actor, actorRole } = resolveActor(ctx, {});
+  1121→        return withStoreErrors(() => {
+  1122→          if (!isAdminCtx(ctx, {})) {
+  1123→            throw new TRPCError({ code: "FORBIDDEN", message: "การตั้งค่าระบบต้องใช้สิทธิ์ผู้บริหาร" });
+  1124→          }
+  1125→          return setSettings(getWelfareDb(), input ?? {}, actor ?? "ผู้บริหาร", actorRole);
+  1126→        });
+  1127→      }),
+  1128→  }),
+  1129→
+  1130→  // ROUND 61 (user) — ระบบเวอร์ชัน 3 แบบ (ทั่วไป/โปร/โปรพลัส):
+  1131→  // ดูสถานะเวอร์ชันปัจจุบัน · ใช้รหัสลิขสิทธิ์ · เริ่มทดลองใช้ · (เจ้าของระบบ) ออกรหัสให้ลูกค้า
+  1132→  edition: router({
+  1133→    /** สถานะเวอร์ชันที่ใช้งานจริง — ใช้ทั้งตกแต่ง UI และตรวจสิทธิ์ฝั่งหน้าจอ */
+  1134→    status: publicProcedure
+  1135→      .input(z.unknown().optional())
+  1136→      .query(() => withStoreErrors(() => resolveEditionStatus(getSettings(getWelfareDb())))),
+  1137→    /** ใช้รหัสลิขสิทธิ์ (ผู้บริหาร): ตรวจรหัส → บันทึก + audit · รหัสหมดอายุ/ไม่ถูกต้อง = BAD_REQUEST ไทย */
+  1138→    applyLicense: publicProcedure
+  1139→      .input(z.object({ key: z.string().min(8).max(40), licensedTo: z.string().max(120).optional() }))
+  1140→      .mutation(({ ctx, input }) => {
+  1141→        const { actor, actorRole } = resolveActor(ctx, {});
+  1142→        return withStoreErrors(() => {
+  1143→          if (!isAdminCtx(ctx, {})) {
+  1144→            throw new TRPCError({ code: "FORBIDDEN", message: "การใช้รหัสลิขสิทธิ์ต้องใช้สิทธิ์ผู้บริหาร" });
+  1145→          }
+  1146→          const db = getWelfareDb();
+  1147→          const key = input.key.trim().toUpperCase();
+  1148→          const parsed = parseLicenseKey(key);
+  1149→          if (!parsed) {
+  1150→            throw new TRPCError({ code: "BAD_REQUEST", message: "รหัสลิขสิทธิ์ไม่ถูกต้อง — ตรวจว่าพิมพ์ครบทุกกลุ่ม ไม่มีอักขระเกิน/ขาด" });
+  1151→          }
+  1152→          if (parsed.expiresAt !== null && parsed.expiresAt < todayString()) {
+  1153→            throw new TRPCError({ code: "BAD_REQUEST", message: `รหัสลิขสิทธิ์นี้หมดอายุแล้ว ( ${parsed.expiresAt} ) — ติดต่อผู้ขายเพื่อรับรหัสใหม่` });
+  1154→          }
+  1155→          const licensedTo = input.licensedTo?.trim() || getSettings(db).storeName || actor || "ผู้ถือลิขสิทธิ์";
+  1156→          setEditionSettings(db, { licenseKey: key, licenseName: licensedTo });
+  1157→          logAction(
+  1158→            db,
+  1159→            "ใช้รหัสลิขสิทธิ์",
+  1160→            actor ?? "ผู้บริหาร",
+  1161→            `เปิดใช้${EDITIONS[parsed.edition].label}${parsed.expiresAt ? ` ถึง ${parsed.expiresAt}` : " ถาวร"} · ผู้ถือ: ${licensedTo}`,
+  1162→            "green",
+  1163→            actorRole ?? null,
+  1164→          );
+  1165→          return resolveEditionStatus(getSettings(db));
+  1166→        });
+  1167→      }),
+  1168→    /** เริ่มทดลองใช้โปรพลัส (ผู้บริหาร): ทำได้ครั้งเดียวต่อระบบ — ถ้าเคยทดลองแล้วจะปฏิเสธ */
+  1169→    startTrial: publicProcedure
+  1170→      .input(z.unknown().optional())
+  1171→      .mutation(({ ctx }) => {
+  1172→        const { actor, actorRole } = resolveActor(ctx, {});
+  1173→        return withStoreErrors(() => {
+  1174→          if (!isAdminCtx(ctx, {})) {
+  1175→            throw new TRPCError({ code: "FORBIDDEN", message: "การเริ่มทดลองใช้ต้องใช้สิทธิ์ผู้บริหาร" });
+  1176→          }
+  1177→          const db = getWelfareDb();
+  1178→          const settings = getSettings(db);
+  1179→          if ((settings.trialStart ?? "").trim()) {
+  1180→            throw new TRPCError({ code: "BAD_REQUEST", message: `ระบบนี้เริ่มทดลองใช้ไปแล้วเมื่อ ${settings.trialStart} (ทดลองได้ครั้งเดียว) — ใส่รหัสลิขสิทธิ์เพื่อใช้ต่อ` });
+  1181→          }
+  1182→          setEditionSettings(db, { trialStart: todayString() });
+  1183→          logAction(db, "เริ่มทดลองใช้", actor ?? "ผู้บริหาร", `ทดลองใช้โปรพลัส ${EDITION_TRIAL_DAYS} วัน`, "blue", actorRole ?? null);
+  1184→          return resolveEditionStatus(getSettings(db));
+  1185→        });
+  1186→      }),
+  1187→    /** ออกรหัสลิขสิทธิ์ให้ลูกค้า — เจ้าของระบบเท่านั้น (บัญชีผู้พัฒนา ผ่านโซนเครื่องมือติดตั้ง) */
+  1188→    generateKey: publicProcedure
+  1189→      .input(z.object({ edition: z.enum(["standard", "pro", "proplus"]), months: z.number().int().min(1).max(48).nullable() }))
+  1190→      .mutation(({ ctx, input }) =>
+  1191→        withStoreErrors(() => {
+  1192→          if (!isDevCtx(ctx)) {
+  1193→            throw new TRPCError({ code: "FORBIDDEN", message: "การออกรหัสลิขสิทธิ์ใช้ได้เฉพาะบัญชีผู้พัฒนา (เจ้าของระบบ)" });
+  1194→          }
+  1195→          const key = generateLicenseKey(input.edition, input.months);
+  1196→          const db = getWelfareDb();
+  1197→          logAction(
+  1198→            db,
+  1199→            "ออกรหัสลิขสิทธิ์",
+  1200→            ctx.user?.name ?? "ผู้พัฒนา",
+  1201→            `${EDITIONS[input.edition].label} ${input.months ? `${input.months} เดือน` : "ถาวร"} · ${key}`,
+  1202→            "purple",
+  1203→            "ผู้พัฒนา",
+  1204→          );
+  1205→          return { key, edition: input.edition, months: input.months };
+  1206→        }),
+  1207→      ),
+  1208→  }),
+  1209→
+  1210→  // ROUND 38 (ข้อ 39) — ระบบสำรองข้อมูล: สำรองเดี๋ยวนี้ / รายการไฟล์ / ดาวน์โหลด / กู้คืน (ผู้บริหารเท่านั้น)
+  1211→  // ROUND 61 — สำรอง–กู้คืนอัตโนมัติเป็นฟีเจอร์เวอร์ชันโปรขึ้นไป (เวอร์ชันทั่วไปสำรองมือ — ก๊อปไฟล์ data\welfare-store.sqlite)
+  1212→  backup: router({
+  1213→    create: publicProcedure.mutation(({ ctx }) => {
+  1214→      const { actor, actorRole } = resolveActor(ctx, {});
+  1215→      return withStoreErrors(() => {
+  1216→        if (!isAdminCtx(ctx, {})) {
+  1217→          throw new TRPCError({ code: "FORBIDDEN", message: "การสำรองข้อมูลต้องใช้สิทธิ์ผู้บริหาร" });
+  1218→        }
+  1219→        requireEdition("backupRestore");
+  1220→        const db = getWelfareDb();
+  1221→        const keepCount = getSettings(db).backupKeepCount;
+  1222→        const manifest = backupSqliteDatabase({ sourcePath: getWelfareDbPath(), backupDir: getBackupDir(), retentionDays: 3650 });
+  1223→        pruneSqliteBackupsByCount(getBackupDir(), keepCount);
+  1224→        logAction(db, "สำรองข้อมูล", actor ?? "ผู้บริหาร", `สำรองข้อมูลด้วยตนเอง · ${manifest.file}`, "blue", actorRole ?? null);
+  1225→        return { ...manifest, keepCount };
+  1226→      });
+  1227→    }),
+  1228→    list: publicProcedure
+  1229→      .input(z.unknown().optional())
+  1230→      .query(({ ctx }) =>
+  1231→        withStoreErrors(() => {
+  1232→          if (!isAdminCtx(ctx, {})) {
+  1233→            throw new TRPCError({ code: "FORBIDDEN", message: "การดูรายการสำรองข้อมูลต้องใช้สิทธิ์ผู้บริหาร" });
+  1234→          }
+  1235→          requireEdition("backupRestore");
+  1236→          const settings = getSettings(getWelfareDb());
+  1237→          return {
+  1238→            backups: listSqliteBackups(getBackupDir()),
+  1239→            keepCount: settings.backupKeepCount,
+  1240→            autoEnabled: settings.backupAutoEnabled,
+  1241→            intervalHours: settings.backupIntervalHours,
+  1242→          };
+  1243→        }),
+  1244→      ),
+  1245→    download: publicProcedure
+  1246→      .input(backupFileInput)
+  1247→      .mutation(({ ctx, input }) =>
+  1248→        withStoreErrors(() => {
+  1249→          if (!isAdminCtx(ctx, {})) {
+  1250→            throw new TRPCError({ code: "FORBIDDEN", message: "การดาวน์โหลดไฟล์สำรองต้องใช้สิทธิ์ผู้บริหาร" });
+  1251→          }
+  1252→          requireEdition("backupRestore");
+  1253→          const backupPath = join(getBackupDir(), input.file);
+  1254→          if (!existsSync(backupPath)) {
+  1255→            throw new TRPCError({ code: "NOT_FOUND", message: `ไม่พบไฟล์สำรอง ${input.file}` });
+  1256→          }
+  1257→          try {
+  1258→            verifySqliteBackup(backupPath);
+  1259→          } catch {
+  1260→            throw new TRPCError({ code: "BAD_REQUEST", message: "ไฟล์สำรองไม่ถูกต้องหรือตรวจสอบความถูกต้องไม่ผ่าน" });
+  1261→          }
+  1262→          return { file: input.file, sizeBytes: statSync(backupPath).size, base64: readFileSync(backupPath).toString("base64") };
+  1263→        }),
+  1264→      ),
+  1265→    // r87 — อัปโหลดไฟล์ฐานข้อมูล .sqlite จากเครื่องอื่น (ย้ายร้าน/ขึ้นคลาวด์) เข้ารายการไฟล์สำรอง
+  1266→    // ก่อนกดกู้คืน: ตรวจ magic header + integrity + ตารางของระบบจริง ทุกไฟล์ทุกครั้ง
+  1267→    upload: publicProcedure
+  1268→      .input(z.object({
+  1269→        fileName: z.string().max(160).optional(),
+  1270→        dataBase64: z.string().min(1, "ไม่พบข้อมูลไฟล์"),
+  1271→      }))
+  1272→      .mutation(({ ctx, input }) => {
+  1273→        const { actor, actorRole } = resolveActor(ctx, {});
+  1274→        return withStoreErrors(() => {
+  1275→          if (!isAdminCtx(ctx, {})) {
+  1276→            throw new TRPCError({ code: "FORBIDDEN", message: "การอัปโหลดไฟล์สำรองต้องใช้สิทธิ์ผู้บริหาร" });
+  1277→          }
+  1278→          requireEdition("backupRestore");
+  1279→          const buffer = Buffer.from(input.dataBase64, "base64");
+  1280→          if (buffer.byteLength < 1024) {
+  1281→            throw new TRPCError({ code: "BAD_REQUEST", message: "ไฟล์เล็กผิดปกติ — ไม่ใช่ไฟล์ฐานข้อมูล SQLite ที่ใช้งานได้" });
+  1282→          }
+  1283→          if (buffer.byteLength > 200 * 1024 * 1024) {
+  1284→            throw new TRPCError({ code: "BAD_REQUEST", message: "ไฟล์ใหญ่เกิน 200 MB — ติดต่อผู้ดูแลระบบเพื่อย้ายด้วยวิธีอื่น" });
+  1285→          }
+  1286→          if (buffer.subarray(0, 16).toString("latin1") !== "SQLite format 3\u0000") {
+  1287→            throw new TRPCError({ code: "BAD_REQUEST", message: "ไฟล์นี้ไม่ใช่ฐานข้อมูล SQLite — ต้องเลือกไฟล์ welfare-store.sqlite หรือไฟล์สำรองของระบบเท่านั้น" });
+  1288→          }
+  1289→          const backupDir = getBackupDir();
+  1290→          mkdirSync(backupDir, { recursive: true });
+  1291→          const stamp = (date: Date) => date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+  1292→          let finalName = `welfare-store-${stamp(new Date())}.sqlite`;
+  1293→          for (let bump = 1; bump <= 60 && existsSync(join(backupDir, finalName)); bump += 1) {
+  1294→            finalName = `welfare-store-${stamp(new Date(Date.now() + bump * 1000))}.sqlite`;
+  1295→          }
+  1296→          const stagingPath = join(backupDir, `.upload-staging-${Date.now()}.sqlite`);
+  1297→          const finalPath = join(backupDir, finalName);
+  1298→          try {
+  1299→            writeFileSync(stagingPath, buffer);
+  1300→            verifySqliteBackup(stagingPath);
+  1301→            // กันไฟล์ SQLite ของโปรแกรมอื่น: ต้องมีตารางของระบบร้านค้าสวัสดิการจริงอย่างน้อย 2 ตาราง
+  1302→            const probe = new DatabaseSync(stagingPath, { readOnly: true });
+  1303→            try {
+  1304→              const row = probe.prepare("SELECT COUNT(*) AS n FROM sqlite_master WHERE type = 'table' AND name IN ('app_users', 'members', 'store_settings', 'products')").get() as { n: number };
+  1305→              if (row.n < 2) throw new Error("ไม่พบตารางของระบบร้านค้าสวัสดิการในไฟล์นี้ — ไฟล์นี้เป็นฐานข้อมูลของโปรแกรมอื่น");
+  1306→            } finally {
+  1307→              probe.close();
+  1308→            }
+  1309→            renameSync(stagingPath, finalPath);
+  1310→          } catch (error) {
+  1311→            rmSync(stagingPath, { force: true });
+  1312→            rmSync(finalPath, { force: true });
+  1313→            throw new TRPCError({ code: "BAD_REQUEST", message: `ไฟล์ไม่ผ่านการตรวจสอบ: ${error instanceof Error ? error.message : String(error)}` });
+  1314→          }
+  1315→          logAction(
+  1316→            getWelfareDb(),
+  1317→            "อัปโหลดไฟล์สำรอง",
+  1318→            actor ?? "ผู้บริหาร",
+  1319→            `อัปโหลดไฟล์ฐานข้อมูลจากเครื่องอื่นเข้ารายการสำรองเป็น ${finalName}${input.fileName ? ` (ไฟล์ต้นทาง: ${input.fileName})` : ""}`,
+  1320→            "blue",
+  1321→            actorRole ?? null,
+  1322→          );
+  1323→          return { file: finalName, sizeBytes: buffer.byteLength };
+  1324→        });
+  1325→      }),
+  1326→    restore: publicProcedure
+  1327→      .input(backupFileInput)
+  1328→      .mutation(({ ctx, input }) => {
+  1329→        const { actor, actorRole } = resolveActor(ctx, {});
+  1330→        return withStoreErrors(() => {
+  1331→          if (!isAdminCtx(ctx, {})) {
+  1332→            throw new TRPCError({ code: "FORBIDDEN", message: "การกู้คืนข้อมูลต้องใช้สิทธิ์ผู้บริหาร" });
+  1333→          }
+  1334→          requireEdition("backupRestore");
+  1335→          const backupPath = join(getBackupDir(), input.file);
+  1336→          if (!existsSync(backupPath)) {
+  1337→            throw new TRPCError({ code: "NOT_FOUND", message: `ไม่พบไฟล์สำรอง ${input.file}` });
+  1338→          }
+  1339→          try {
+  1340→            verifySqliteBackup(backupPath);
+  1341→          } catch {
+  1342→            throw new TRPCError({ code: "BAD_REQUEST", message: "ไฟล์สำรองไม่ถูกต้องหรือตรวจสอบความถูกต้องไม่ผ่าน" });
+  1343→          }
+  1344→          const dbPath = getWelfareDbPath();
+  1345→          // 1) สำรองไฟล์ป้องกันไว้ก่อนเสมอ — ถ้ากู้คืนพลาด ยังมีไฟล์กลับรออยู่
+  1346→          let safetyBackupFile: string;
+  1347→          try {
+  1348→            safetyBackupFile = backupSqliteDatabase({ sourcePath: dbPath, backupDir: getBackupDir(), retentionDays: 3650 }).file;
+  1349→          } catch (error) {
+  1350→            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `สำรองไฟล์ป้องกันก่อนกู้คืนไม่สำเร็จ: ${String(error)}` });
+  1351→          }
+  1352→          try {
+  1353→            // 2) ปิด handle เดิม แล้วลบตัวจริง + WAL/SHM คู่กัน (DatabaseSync จะเปิดใหม่แบบ lazy)
+  1354→            closeWelfareDb();
+  1355→            for (const suffix of ["", "-wal", "-shm"]) {
+  1356→              rmSync(`${dbPath}${suffix}`, { force: true });
+  1357→            }
+  1358→            // 3) คัดลอกไฟล์สำรองทับตำแหน่งเดิม พร้อมตรวจ integrity หลังเขียนเสร็จ
+  1359→            restoreSqliteBackup({ backupPath, targetPath: dbPath, overwrite: true });
+  1360→          } catch (error) {
+  1361→            throw new StoreError(`กู้คืนฐานข้อมูลไม่สำเร็จ: ${error instanceof Error ? error.message : String(error)} · ไฟล์ป้องกันที่พึ่งสำรองไว้: ${safetyBackupFile}`);
+  1362→          }
+  1363→          // 4) เปิดฐานข้อมูลใหม่ (lazy) แล้วบันทึก audit สีแดง — กู้คืนเป็นเหตุการณ์สำคัญ
+  1364→          logAction(
+  1365→            getWelfareDb(),
+  1366→            "กู้คืนข้อมูล",
+  1367→            actor ?? "ผู้บริหาร",
+  1368→            `กู้คืนฐานข้อมูลจากไฟล์สำรอง ${input.file} · สำรองไฟล์ป้องกันไว้ก่อนกู้คืน`,
+  1369→            "red",
+  1370→            actorRole ?? null,
+  1371→          );
+  1372→          return { ok: true as const, safetyBackupFile };
+  1373→        });
+  1374→      }),
+  1375→  }),
+  1376→
+  1377→  // ROUND 40 (ข้อ 32) — นำเข้าข้อมูลจริงจาก Excel/CSV: พรีวิว → map คอลัมน์ → นำเข้า (ผู้บริหารเท่านั้น)
+  1378→  // ROUND 61 — การนำเข้า–ส่งออกเป็นฟีเจอร์เวอร์ชันโปรขึ้นไป (เทมเพลตสำหรับขึ้นระบบอยู่ในแท็บนำเข้าข้อมูล)
+  1379→  importData: router({
+  1380→    /** อ่านไฟล์ (base64) → หัวตารางทุกชีต + ตัวอย่างแถว + mapping ที่ระบบเดาให้ — ยังไม่แตะฐานข้อมูล */
+  1381→    preview: publicProcedure
+  1382→      .input(
+  1383→        z.object({
+  1384→          kind: z.enum(["members", "products"]),
+  1385→          fileName: z.string().min(1).max(200),
+  1386→          base64: z.string().min(16).max(7_000_000), // ~5MB ไฟล์จริง
+  1387→          headerRowOverride: z.number().int().min(0).max(9).optional(),
+  1388→        }),
+  1389→      )
+  1390→      .mutation(({ ctx, input }) =>
+  1391→        withStoreErrors(() => {
+  1392→          if (!isAdminCtx(ctx, {})) {
+  1393→            throw new TRPCError({ code: "FORBIDDEN", message: "การนำเข้าข้อมูลต้องใช้สิทธิ์ผู้บริหาร" });
+  1394→          }
+  1395→          requireEdition("importExport");
+  1396→          return parseSpreadsheetBase64(input.base64, input.kind, input.headerRowOverride);
+  1397→        }),
+  1398→      ),
+  1399→    /** นำเข้าจริง — สำรองข้อมูลเป็นไฟล์ป้องกันก่อนเสมอ */
+  1400→    execute: publicProcedure
+  1401→      .input(
+  1402→        z.object({
+  1403→          kind: z.enum(["members", "products"]),
+  1404→          fileName: z.string().min(1).max(200),
+  1405→          base64: z.string().min(16).max(7_000_000),
+  1406→          sheetName: z.string().min(1).max(200),
+  1407→          headerRowIndex: z.number().int().min(0).max(9),
+  1408→          duplicateMode: z.enum(["skip", "replace"]),
+  1409→          memberMapping: z
+  1410→            .object({
+  1411→              firstName: z.number().int().min(-1).max(99),
+  1412→              memberNumber: z.number().int().min(-1).max(99).optional(),
+  1413→              lastName: z.number().int().min(-1).max(99).optional(),
+  1414→              balance: z.number().int().min(-1).max(99).optional(),
+  1415→              creditLimit: z.number().int().min(-1).max(99).optional(),
+  1416→              status: z.number().int().min(-1).max(99).optional(),
+  1417→              phone: z.number().int().min(-1).max(99).optional(),
+  1418→              idCard: z.number().int().min(-1).max(99).optional(),
+  1419→              type: z.number().int().min(-1).max(99).optional(),
+  1420→              gender: z.number().int().min(-1).max(99).optional(),
+  1421→            })
+  1422→            .optional(),
+  1423→          productMapping: z
+  1424→            .object({
+  1425→              name: z.number().int().min(-1).max(99),
+  1426→              barcode: z.number().int().min(-1).max(99).optional(),
+  1427→              sku: z.number().int().min(-1).max(99).optional(),
+  1428→              category: z.number().int().min(-1).max(99).optional(),
+  1429→              unit: z.number().int().min(-1).max(99).optional(),
+  1430→              price: z.number().int().min(-1).max(99).optional(),
+  1431→              cost: z.number().int().min(-1).max(99).optional(),
+  1432→              stock: z.number().int().min(-1).max(99).optional(),
+  1433→              reorderPoint: z.number().int().min(-1).max(99).optional(),
+  1434→              size: z.number().int().min(-1).max(99).optional(),
+  1435→            })
+  1436→            .optional(),
+  1437→        }),
+  1438→      )
+  1439→      .mutation(({ ctx, input }) => {
+  1440→        const { actor, actorRole } = resolveActor(ctx, {});
+  1441→        return withStoreErrors(() => {
+  1442→          if (!isAdminCtx(ctx, {})) {
+  1443→            throw new TRPCError({ code: "FORBIDDEN", message: "การนำเข้าข้อมูลต้องใช้สิทธิ์ผู้บริหาร" });
+  1444→          }
+  1445→          requireEdition("importExport");
+  1446→          if (input.kind === "members" && (!input.memberMapping || input.memberMapping.firstName < 0)) {
+  1447→            throw new TRPCError({ code: "BAD_REQUEST", message: "กรุณาเลือกคอลัมน์ “ชื่อ” ของสมาชิกก่อนนำเข้า" });
+  1448→          }
+  1449→          if (input.kind === "products" && (!input.productMapping || input.productMapping.name < 0)) {
+  1450→            throw new TRPCError({ code: "BAD_REQUEST", message: "กรุณาเลือกคอลัมน์ “ชื่อสินค้า” ก่อนนำเข้า" });
+  1451→          }
+  1452→          const { rows } = readSheetRows(input.base64, input.sheetName, input.headerRowIndex);
+  1453→          if (rows.length === 0) {
+  1454→            throw new TRPCError({ code: "BAD_REQUEST", message: "ชีตที่เลือกไม่มีแถวข้อมูลให้นำเข้า" });
+  1455→          }
+  1456→          // 1) สำรองไฟล์ป้องกันก่อนนำเข้าเสมอ — ถ้าผลไม่ตามที่คิด กู้คืนกลับได้ทันที
+  1457→          let safetyBackupFile = "";
+  1458→          try {
+  1459→            safetyBackupFile = backupSqliteDatabase({ sourcePath: getWelfareDbPath(), backupDir: getBackupDir(), retentionDays: 3650 }).file;
+  1460→          } catch (error) {
+  1461→            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `สำรองไฟล์ป้องกันก่อนนำเข้าไม่สำเร็จ: ${String(error)}` });
+  1462→          }
+  1463→          // 2) นำเข้าตาม kind + mapping ที่ผู้บริหารยืนยัน
+  1464→          const db = getWelfareDb();
+  1465→          const summary =
+  1466→            input.kind === "members"
+  1467→              ? importMembers(db, { rows, mapping: sanitizeMapping(input.memberMapping!) as MemberFieldMapping, duplicateMode: input.duplicateMode, actor, actorRole })
+  1468→              : importProducts(db, { rows, mapping: sanitizeMapping(input.productMapping!) as ProductFieldMapping, duplicateMode: input.duplicateMode, actor, actorRole });
+  1469→          return { ...summary, safetyBackupFile, fileName: input.fileName };
+  1470→        });
+  1471→      }),
+  1472→    /** ดาวน์โหลดไฟล์เทมเพลต .xlsx ให้กรอกตามรูปแบบที่ระบบนำเข้าได้ทันที */
+  1473→    template: publicProcedure
+  1474→      .input(z.object({ kind: z.enum(["members", "products"]) }))
+  1475→      .mutation(({ ctx, input }) =>
+  1476→        withStoreErrors(() => {
+  1477→          if (!isAdminCtx(ctx, {})) {
+  1478→            throw new TRPCError({ code: "FORBIDDEN", message: "การดาวน์โหลดเทมเพลตนำเข้าต้องใช้สิทธิ์ผู้บริหาร" });
+  1479→          }
+  1480→          requireEdition("importExport");
+  1481→          return buildTemplateBase64(input.kind);
+  1482→        }),
+  1483→      ),
+  1484→  }),
+  1485→
+  1486→  logs: router({
+  1487→    list: publicProcedure
+  1488→      .input(logsListInput)
+  1489→      .query(({ input }) => withStoreErrors(() => listAuditLogs(getWelfareDb(), input?.limit ?? 200))),
+  1490→  }),
+  1491→});
+  1492→
+  1493→export type AppRouter = typeof appRouter;
+  1494→

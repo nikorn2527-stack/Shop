@@ -1,0 +1,602 @@
+   800→  db: SqliteDb,
+   801→  input: { productId: number; lot?: string; expiryDate?: string | null; lines: (ReceiveStockLine | null | undefined)[] | null | undefined; actor?: string; actorRole?: string },
+   802→): ReceiveStockResult {
+   803→  const lines = (input.lines ?? []).filter((line): line is ReceiveStockLine => line != null);
+   804→  if (lines.length === 0) throw new StoreError("กรุณาระบุจำนวนที่รับเข้าอย่างน้อย 1 บรรทัด");
+   805→  for (const line of lines) {
+   806→    if (!Number.isInteger(line.qty) || line.qty <= 0) throw new StoreError("จำนวนต้องมากกว่า 0");
+   807→    if (line.cost !== undefined && !(line.cost >= 0)) throw new StoreError("ต้นทุนต่อหน่วยต้องเป็นตัวเลข 0 ขึ้นไป");
+   808→  }
+   809→  const product = getProductById(db, input.productId);
+   810→  if (!product || !product.active) throw new StoreError(`ไม่พบสินค้ารหัส ${input.productId} ในระบบ`);
+   811→  const parsed = lines.map((line) => ({ qty: line.qty, cost: line.cost === undefined ? undefined : round2(line.cost) }));
+   812→  const totalQty = parsed.reduce((sum, line) => sum + line.qty, 0);
+   813→  const previousCost = product.cost;
+   814→  // บรรทัดที่ไม่ใส่ต้นทุน = ใช้ต้นทุนเฉลี่ยปัจจุบันของสินค้า (พฤติกรรมเดิม)
+   815→  const lineValue = parsed.reduce((sum, line) => sum + line.qty * (line.cost ?? previousCost), 0);
+   816→  const oldQty = Math.max(0, Math.trunc(product.stock));
+   817→  const averageCost = round2((oldQty * previousCost + lineValue) / (oldQty + totalQty));
+   818→  const lotLabel = input.lot?.trim() || `LOT-${formatDate()}`;
+   819→  const createdAt = formatDateTime();
+   820→  return runInTransaction(db, () => {
+   821→    const insert = db.prepare(`INSERT INTO stock_lots (product_id, lot, expiry_date, qty, cost, received_at, received_qty) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+   822→    const lots = parsed.map((line) => {
+   823→      const result = insert.run(input.productId, lotLabel, input.expiryDate || null, line.qty, line.cost ?? previousCost, createdAt, line.qty);
+   824→      return { id: Number(result.lastInsertRowid), productId: input.productId, lot: lotLabel, expiry: input.expiryDate || null, qty: line.qty, cost: line.cost ?? previousCost, receivedAt: createdAt };
+   825→    });
+   826→    db.prepare(`UPDATE products SET stock = stock + ?, cost = ? WHERE id = ?`).run(totalQty, averageCost, input.productId);
+   827→    // Log: บรรทัดเดียวไม่ใส่ต้นทุน = ข้อความเดิม · มีต้นทุน/หลายบรรทัด = สรุปทุกบรรทัด + ต้นทุนเฉลี่ยใหม่
+   828→    const anyCost = parsed.some((line) => line.cost !== undefined);
+   829→    const lineSummary = anyCost ? ` · ${parsed.map((line) => `${line.qty}×${money(line.cost ?? previousCost)}${line.cost === 0 ? " แถม" : ""}`).join(" + ")}` : "";
+   830→    const avgSummary = anyCost ? ` · ต้นทุนเฉลี่ย ${money(averageCost)} (เดิม ${money(previousCost)})` : "";
+   831→    logAction(db, "รับเข้าสินค้า", input.actor?.trim() || "ระบบ", `${product.name} · Lot ${lotLabel} · +${totalQty} ${product.unit}${lineSummary}${avgSummary}`, "green", input.actorRole ?? null, createdAt);
+   832→    return { lots, lot: lots[0], product: getProductById(db, input.productId)!, averageCost, previousCost };
+   833→  });
+   834→}
+   835→
+   836→export function receiveStock(
+   837→  db: SqliteDb,
+   838→  productId: number,
+   839→  lot: string,
+   840→  expiryDate: string | null,
+   841→  qty: number,
+   842→  cost?: number,
+   843→  actor?: string,
+   844→  actorRole?: string,
+   845→) {
+   846→  const result = receiveStockLines(db, { productId, lot, expiryDate, lines: [{ qty, cost }], actor, actorRole });
+   847→  // รูปเอาต์พุตเดิม { lot, product } + เผื่อ averageCost ไว้ให้ผู้เรียกรุ่นใหม่
+   848→  return { lot: result.lot, product: result.product, averageCost: result.averageCost };
+   849→}
+   850→
+   851→export function listStockRows(db: SqliteDb): SqliteStockRow[] {
+   852→  const rows = db.prepare(`SELECT l.id, p.id AS productId, p.sku, p.name, p.unit, l.lot, l.expiry_date AS expiry, l.qty, l.cost, p.price, p.stock, p.reorder_point AS reorderPoint, l.received_at AS receivedAt, p.active AS active FROM stock_lots l JOIN products p ON p.id = l.product_id ORDER BY p.sku, l.id`).all() as unknown as (Omit<SqliteStockRow, "status" | "tone">)[];
+   853→  const today = startOfToday();
+   854→  return rows.map((row) => {
+   855→    let status: SqliteStockRow["status"] = "ปกติ";
+   856→    let tone: SqliteStockRow["tone"] = "green";
+   857→    if (!row.active) {
+   858→      status = "ปิดการขาย";
+   859→      tone = "purple";
+   860→    } else if (row.stock <= row.reorderPoint) {
+   861→      status = "สต็อกต่ำ";
+   862→      tone = "red";
+   863→    } else if (row.expiry) {
+   864→      const daysLeft = Math.floor((Date.parse(`${row.expiry}T00:00:00`) - today.getTime()) / 86400000);
+   865→      if (daysLeft <= 30) {
+   866→        status = "ใกล้หมดอายุ";
+   867→        tone = "amber";
+   868→      }
+   869→    }
+   870→    return { ...row, status, tone };
+   871→  });
+   872→}
+   873→
+   874→export type StockCountInput = {
+   875→  productId: number;
+   876→  countedQty: number;
+   877→  note?: string;
+   878→  actor?: string;
+   879→  actorRole?: string;
+   880→};
+   881→
+   882→/** Reconciles the authoritative products.stock with a physical count. */
+   883→export function stockCount(db: SqliteDb, input: StockCountInput) {
+   884→  if (!Number.isInteger(input.countedQty) || input.countedQty < 0) throw new StoreError("จำนวนที่นับได้ต้องเป็น 0 ขึ้นไป");
+   885→  const product = getProductById(db, input.productId);
+   886→  if (!product || !product.active) throw new StoreError(`ไม่พบสินค้ารหัส ${input.productId} ในระบบ`);
+   887→  const diff = input.countedQty - product.stock;
+   888→  const note = input.note?.trim();
+   889→  const detail =
+   890→    (diff === 0
+   891→      ? `${product.name} · ตรงตามระบบ ${input.countedQty} ${product.unit}`
+   892→      : `${product.name} · ระบบ ${product.stock} → นับได้ ${input.countedQty} ${product.unit} (${diff})`) + (note ? ` · ${note}` : "");
+   893→  const tone = diff < 0 ? "red" : diff > 0 ? "green" : "blue";
+   894→  runInTransaction(db, () => {
+   895→    db.prepare(`UPDATE products SET stock = ? WHERE id = ?`).run(input.countedQty, input.productId);
+   896→    logAction(db, "นับสต็อก", input.actor?.trim() || "เจ้าหน้าที่ร้านค้า", detail, tone, input.actorRole ?? null, formatDateTime());
+   897→  });
+   898→  return {
+   899→    productId: product.id,
+   900→    sku: product.sku,
+   901→    name: product.name,
+   902→    unit: product.unit,
+   903→    systemQty: product.stock,
+   904→    countedQty: input.countedQty,
+   905→    diff,
+   906→    product: getProductById(db, input.productId)!,
+   907→  };
+   908→}
+   909→
+   910→export type LotCountEntry = { lotId: number; countedQty: number };
+   911→
+   912→export type StockCountLotsInput = {
+   913→  counts: LotCountEntry[];
+   914→  note?: string;
+   915→  actor?: string;
+   916→  actorRole?: string;
+   917→};
+   918→
+   919→export type StockCountLotResult = {
+   920→  lotId: number;
+   921→  lot: string;
+   922→  expiry: string | null;
+   923→  systemQty: number;
+   924→  countedQty: number;
+   925→  diff: number;
+   926→};
+   927→
+   928→export type StockCountLotsResult = {
+   929→  productId: number;
+   930→  sku: string;
+   931→  name: string;
+   932→  unit: string;
+   933→  systemQty: number;
+   934→  countedQty: number;
+   935→  diff: number;
+   936→  lots: StockCountLotResult[];
+   937→};
+   938→
+   939→/**
+   940→ * Reconciles physical counts PER LOT: each listed lot's qty is set to its
+   941→ * counted value, then the product's sellable stock is recomputed as the SUM
+   942→ * of all its lots (lots not listed keep their current qty). One audit entry
+   943→ * per product records every lot old→new plus the product total.
+   944→ */
+   945→export function stockCountLots(db: SqliteDb, input: StockCountLotsInput): StockCountLotsResult {
+   946→  if (!Array.isArray(input.counts) || input.counts.length === 0) {
+   947→    throw new StoreError("กรุณาระบุจำนวนที่นับได้อย่างน้อย 1 Lot");
+   948→  }
+   949→  const seen = new Set<number>();
+   950→  for (const entry of input.counts) {
+   951→    if (!Number.isInteger(entry.lotId)) throw new StoreError("รหัส Lot ไม่ถูกต้อง");
+   952→    if (!Number.isInteger(entry.countedQty) || entry.countedQty < 0) {
+   953→      throw new StoreError("จำนวนที่นับได้ต้องเป็น 0 ขึ้นไป");
+   954→    }
+   955→    if (seen.has(entry.lotId)) throw new StoreError("พบ Lot ซ้ำในรายการนับ กรุณาตรวจสอบอีกครั้ง");
+   956→    seen.add(entry.lotId);
+   957→  }
+   958→
+   959→  const lotSelect = `SELECT l.id, l.lot, l.expiry_date AS expiry, l.qty, p.id AS productId, p.sku, p.name, p.unit, p.stock, p.active FROM stock_lots l JOIN products p ON p.id = l.product_id`;
+   960→  const lots = input.counts.map((entry) => {
+   961→    const lot = db.prepare(`${lotSelect} WHERE l.id = ?`).get(entry.lotId) as
+   962→      | { id: number; lot: string; expiry: string | null; qty: number; productId: number; sku: string; name: string; unit: string; stock: number; active: number }
+   963→      | undefined;
+   964→    if (!lot) throw new StoreError(`ไม่พบ Lot รหัส ${entry.lotId} ในระบบ`);
+   965→    return { lot, countedQty: entry.countedQty };
+   966→  });
+   967→
+   968→  // A single count session covers exactly one product (the UI enforces it;
+   969→  // the server double-checks so mixed submissions can never corrupt stock).
+   970→  const productIds = new Set(lots.map((item) => item.lot.productId));
+   971→  if (productIds.size !== 1) {
+   972→    throw new StoreError("การนับแยกตาม Lot ทำได้ครั้งละ 1 สินค้า");
+   973→  }
+   974→  const head = lots[0]!.lot;
+   975→  if (!head.active) throw new StoreError(`ไม่พบสินค้ารหัส ${head.productId} ในระบบ`);
+   976→
+   977→  const note = input.note?.trim();
+   978→  return runInTransaction(db, () => {
+   979→    const results: StockCountLotResult[] = [];
+   980→    for (const { lot, countedQty } of lots) {
+   981→      db.prepare(`UPDATE stock_lots SET qty = ? WHERE id = ?`).run(countedQty, lot.id);
+   982→      results.push({ lotId: lot.id, lot: lot.lot, expiry: lot.expiry, systemQty: lot.qty, countedQty, diff: countedQty - lot.qty });
+   983→    }
+   984→    // Recompute sellable stock from every lot of this product.
+   985→    const { total } = db.prepare(`SELECT COALESCE(SUM(qty), 0) AS total FROM stock_lots WHERE product_id = ?`).get(head.productId) as { total: number };
+   986→    db.prepare(`UPDATE products SET stock = ? WHERE id = ?`).run(total, head.productId);
+   987→
+   988→    const lotBreakdown = results
+   989→      .map((result) => `${result.lot}: ${result.systemQty} → ${result.countedQty}${result.diff !== 0 ? ` (${result.diff > 0 ? "+" : ""}${result.diff})` : ""}`)
+   990→      .join(" · ");
+   991→    const detail = `${head.name} · รวม ${head.stock} → ${total} ${head.unit} (${total - head.stock}) · ${lotBreakdown}` + (note ? ` · ${note}` : "");
+   992→    const tone = total < head.stock ? "red" : total > head.stock ? "green" : "blue";
+   993→    logAction(db, "นับสต็อก (แยกล็อต)", input.actor?.trim() || "เจ้าหน้าที่ร้านค้า", detail, tone, input.actorRole ?? null, formatDateTime());
+   994→
+   995→    return {
+   996→      productId: head.productId,
+   997→      sku: head.sku,
+   998→      name: head.name,
+   999→      unit: head.unit,
+  1000→      systemQty: head.stock,
+  1001→      countedQty: total,
+  1002→      diff: total - head.stock,
+  1003→      lots: results,
+  1004→    };
+  1005→  });
+  1006→}
+  1007→
+  1008→// --- order list (รายการสั่งซื้อ — round 32-15) --------------------------------
+  1009→
+  1010→export type SqliteOrderItem = {
+  1011→  id: number;
+  1012→  productId: number;
+  1013→  sku: string;
+  1014→  name: string;
+  1015→  unit: string;
+  1016→  category: string;
+  1017→  cost: number;
+  1018→  stock: number;
+  1019→  reorderPoint: number;
+  1020→  qty: number;
+  1021→  note: string | null;
+  1022→  createdBy: string | null;
+  1023→  createdAt: string;
+  1024→};
+  1025→
+  1026→const ORDER_ITEM_SELECT = `SELECT o.id, o.qty, o.note, o.created_by AS createdBy, o.created_at AS createdAt, p.id AS productId, p.sku, p.name, p.unit, p.category, p.cost, p.stock, p.reorder_point AS reorderPoint FROM order_list_items o JOIN products p ON p.id = o.product_id`;
+  1027→
+  1028→export function listOrderItems(db: SqliteDb): SqliteOrderItem[] {
+  1029→  return db.prepare(`${ORDER_ITEM_SELECT} ORDER BY o.id ASC`).all() as SqliteOrderItem[];
+  1030→}
+  1031→
+  1032→export type OrderAddInput = {
+  1033→  productId: number;
+  1034→  qty?: number;
+  1035→  note?: string;
+  1036→  actor?: string;
+  1037→  actorRole?: string;
+  1038→};
+  1039→
+  1040→/** Adds (or merges +qty when the product is already on the list) an order row. */
+  1041→export function addOrderItem(db: SqliteDb, input: OrderAddInput): SqliteOrderItem[] {
+  1042→  const qty = input.qty === undefined ? 1 : input.qty;
+  1043→  if (!Number.isFinite(qty) || qty <= 0) throw new StoreError("จำนวนที่จะสั่งซื้อต้องมากกว่า 0");
+  1044→  const product = getProductById(db, input.productId);
+  1045→  if (!product) throw new StoreError(`ไม่พบสินค้ารหัส ${input.productId} ในระบบ`);
+  1046→  const actor = input.actor?.trim() || "เจ้าหน้าที่ร้านค้า";
+  1047→  runInTransaction(db, () => {
+  1048→    const existing = db.prepare(`SELECT id, qty FROM order_list_items WHERE product_id = ?`).get(input.productId) as { id: number; qty: number } | undefined;
+  1049→    const note = input.note?.trim() || null;
+  1050→    if (existing) {
+  1051→      db.prepare(`UPDATE order_list_items SET qty = ?, note = COALESCE(?, note) WHERE id = ?`).run(existing.qty + qty, note, existing.id);
+  1052→    } else {
+  1053→      db.prepare(`INSERT INTO order_list_items (product_id, qty, note, created_by) VALUES (?, ?, ?, ?)`).run(input.productId, qty, note, actor);
+  1054→    }
+  1055→    logAction(db, "ขอสั่งซื้อสินค้า", actor, `${product.name} · ${qty} ${product.unit} · คงเหลือ ${product.stock} ${product.unit}`, "amber", input.actorRole ?? null, formatDateTime());
+  1056→  });
+  1057→  return listOrderItems(db);
+  1058→}
+  1059→
+  1060→export type OrderUpdateInput = {
+  1061→  id: number;
+  1062→  qty?: number;
+  1063→  note?: string | null;
+  1064→  actor?: string;
+  1065→  actorRole?: string;
+  1066→};
+  1067→
+  1068→export function updateOrderItem(db: SqliteDb, input: OrderUpdateInput): SqliteOrderItem[] {
+  1069→  const existing = db.prepare(`${ORDER_ITEM_SELECT} WHERE o.id = ?`).get(input.id) as SqliteOrderItem | undefined;
+  1070→  if (!existing) throw new StoreError("ไม่พบรายการสั่งซื้อนี้ในระบบ (อาจถูกลบไปแล้ว)");
+  1071→  if (input.qty !== undefined && (!Number.isFinite(input.qty) || input.qty <= 0)) throw new StoreError("จำนวนที่จะสั่งซื้อต้องมากกว่า 0");
+  1072→  const actor = input.actor?.trim() || "เจ้าหน้าที่ร้านค้า";
+  1073→  runInTransaction(db, () => {
+  1074→    db.prepare(`UPDATE order_list_items SET qty = ?, note = ? WHERE id = ?`).run(
+  1075→      input.qty ?? existing.qty,
+  1076→      input.note === undefined ? existing.note : input.note,
+  1077→      input.id,
+  1078→    );
+  1079→    logAction(db, "แก้ไขรายการสั่งซื้อ", actor, `${existing.name} · ${input.qty ?? existing.qty} ${existing.unit}`, "blue", input.actorRole ?? null, formatDateTime());
+  1080→  });
+  1081→  return listOrderItems(db);
+  1082→}
+  1083→
+  1084→export function removeOrderItem(db: SqliteDb, input: { id: number; actor?: string; actorRole?: string }): SqliteOrderItem[] {
+  1085→  const existing = db.prepare(`${ORDER_ITEM_SELECT} WHERE o.id = ?`).get(input.id) as SqliteOrderItem | undefined;
+  1086→  if (!existing) return listOrderItems(db);
+  1087→  const actor = input.actor?.trim() || "เจ้าหน้าที่ร้านค้า";
+  1088→  runInTransaction(db, () => {
+  1089→    db.prepare(`DELETE FROM order_list_items WHERE id = ?`).run(input.id);
+  1090→    logAction(db, "ถอดออกจากรายการสั่งซื้อ", actor, `${existing.name} · ${existing.qty} ${existing.unit}`, "purple", input.actorRole ?? null, formatDateTime());
+  1091→  });
+  1092→  return listOrderItems(db);
+  1093→}
+  1094→
+  1095→/** Clears the whole list — used after the order has been placed/received. */
+  1096→export function clearOrderList(db: SqliteDb, input: { actor?: string; actorRole?: string }): SqliteOrderItem[] {
+  1097→  const items = listOrderItems(db);
+  1098→  if (items.length === 0) return items;
+  1099→  const actor = input.actor?.trim() || "เจ้าหน้าที่ร้านค้า";
+  1100→  runInTransaction(db, () => {
+  1101→    db.prepare(`DELETE FROM order_list_items`).run();
+  1102→    logAction(db, "ล้างรายการสั่งซื้อ", actor, `ล้าง ${items.length} รายการ (สั่งซื้อ/ตรวจสอบแล้ว)`, "green", input.actorRole ?? null, formatDateTime());
+  1103→  });
+  1104→  return listOrderItems(db);
+  1105→}
+  1106→
+  1107→export type UpdateProductInput = {
+  1108→  productId: number;
+  1109→  name?: string;
+  1110→  barcode?: string | null;
+  1111→  size?: string | null;
+  1112→  imageUrl?: string | null;
+  1113→  /** 1 = สินค้าลัดหน้าร้าน (boolean ก็รับแล้วแปลงเป็น 0/1) */
+  1114→  quickPick?: number | boolean | null;
+  1115→  /** "unit" (default) | "money" — ขายเป็นเงินใช้ priceTiers */
+  1116→  sellMode?: "unit" | "money" | null;
+  1117→  /** JSON [{ label, price, qty }] สำหรับ sellMode "money" */
+  1118→  priceTiers?: string | null;
+  1119→  unit?: string;
+  1120→  price?: number;
+  1121→  cost?: number;
+  1122→  reorderPoint?: number;
+  1123→  category?: string;
+  1124→  emoji?: string;
+  1125→  actor?: string;
+  1126→  actorRole?: string;
+  1127→};
+  1128→
+  1129→/** Updates only the provided product fields. Undefined keeps the current value; only fields whose value actually changed are written/logged. */
+  1130→export function updateProduct(db: SqliteDb, input: UpdateProductInput): SqliteProduct {
+  1131→  const product = getProductById(db, input.productId);
+  1132→  if (!product) throw new StoreError(`ไม่พบสินค้ารหัส ${input.productId} ในระบบ`);
+  1133→  if (input.name !== undefined && !input.name.trim()) throw new StoreError("กรุณาระบุชื่อสินค้า");
+  1134→  if (input.unit !== undefined && !input.unit.trim()) throw new StoreError("กรุณาระบุหน่วยสินค้า");
+  1135→  if (input.price !== undefined && !(input.price >= 0)) throw new StoreError("ราคาขายต้องเป็นตัวเลข 0 ขึ้นไป");
+  1136→  if (input.cost !== undefined && input.cost < 0) throw new StoreError("ต้นทุนต้องเป็น 0 ขึ้นไป");
+  1137→  if (input.reorderPoint !== undefined && (!Number.isInteger(input.reorderPoint) || input.reorderPoint < 0)) throw new StoreError("จุดสั่งซื้อต้องเป็นจำนวนเต็ม 0 ขึ้นไป");
+  1138→
+  1139→  // Resolved values for the new round-31-12 fields: undefined keeps the stored
+  1140→  // value; null sellMode falls back to the "unit" default. Money-mode
+  1141→  // products must carry a valid price-tiers payload (new or already stored).
+  1142→  const nextQuickPick = toQuickPickFlag(input.quickPick);
+  1143→  const nextSellMode = input.sellMode !== undefined ? (input.sellMode ?? "unit") : (product.sellMode ?? "unit");
+  1144→  const nextPriceTiers = input.priceTiers !== undefined ? (input.priceTiers?.trim() || null) : product.priceTiers;
+  1145→  if (nextSellMode === "money") assertValidPriceTiers(nextPriceTiers);
+  1146→
+  1147→  const assignments: string[] = [];
+  1148→  const values: (string | number | null)[] = [];
+  1149→  const changedLabels: string[] = [];
+  1150→  const normalizeEmoji = (value: string | undefined) => value?.trim() || null;
+  1151→
+  1152→  if (input.name !== undefined && input.name.trim() !== product.name) {
+  1153→    assignments.push("name = ?");
+  1154→    values.push(input.name.trim());
+  1155→    changedLabels.push("ชื่อ");
+  1156→  }
+  1157→  if (input.unit !== undefined && input.unit.trim() !== product.unit) {
+  1158→    assignments.push("unit = ?");
+  1159→    values.push(input.unit.trim());
+  1160→    changedLabels.push("หน่วย");
+  1161→  }
+  1162→  if (input.price !== undefined && round2(input.price) !== product.price) {
+  1163→    assignments.push("price = ?");
+  1164→    values.push(round2(input.price));
+  1165→    changedLabels.push("ราคาขาย");
+  1166→  }
+  1167→  if (input.cost !== undefined && round2(input.cost) !== product.cost) {
+  1168→    assignments.push("cost = ?");
+  1169→    values.push(round2(input.cost));
+  1170→    changedLabels.push("ต้นทุน");
+  1171→  }
+  1172→  if (input.reorderPoint !== undefined && input.reorderPoint !== product.reorderPoint) {
+  1173→    assignments.push("reorder_point = ?");
+  1174→    values.push(input.reorderPoint);
+  1175→    changedLabels.push("จุดสั่งซื้อ");
+  1176→  }
+  1177→  if (input.category !== undefined && input.category.trim() !== product.category) {
+  1178→    assignments.push("category = ?");
+  1179→    values.push(input.category.trim());
+  1180→    changedLabels.push("หมวดหมู่");
+  1181→  }
+  1182→  if (input.emoji !== undefined && normalizeEmoji(input.emoji) !== product.emoji) {
+  1183→    assignments.push("emoji = ?");
+  1184→    values.push(normalizeEmoji(input.emoji));
+  1185→    changedLabels.push("สัญลักษณ์");
+  1186→  }
+  1187→  if (input.barcode !== undefined && (input.barcode?.trim() || null) !== product.barcode) {
+  1188→    assignments.push("barcode = ?");
+  1189→    values.push(input.barcode?.trim() || null);
+  1190→    changedLabels.push("บาร์โค้ด");
+  1191→  }
+  1192→  if (input.size !== undefined && (input.size?.trim() || null) !== product.size) {
+  1193→    assignments.push("size = ?");
+  1194→    values.push(input.size?.trim() || null);
+  1195→    changedLabels.push("ขนาด");
+  1196→  }
+  1197→  if (input.imageUrl !== undefined && (input.imageUrl || null) !== product.imageUrl) {
+  1198→    assignments.push("image_url = ?");
+  1199→    values.push(input.imageUrl || null);
+  1200→    changedLabels.push("รูปสินค้า");
+  1201→  }
+  1202→  if (input.quickPick !== undefined && nextQuickPick !== product.quickPick) {
+  1203→    assignments.push("quick_pick = ?");
+  1204→    values.push(nextQuickPick);
+  1205→    changedLabels.push("สินค้าลัดหน้าร้าน");
+  1206→  }
+  1207→  if (input.sellMode !== undefined && nextSellMode !== (product.sellMode ?? "unit")) {
+  1208→    assignments.push("sell_mode = ?");
+  1209→    values.push(nextSellMode);
+  1210→    changedLabels.push("วิธีขาย");
+  1211→  }
+  1212→  if (input.priceTiers !== undefined && nextPriceTiers !== product.priceTiers) {
+  1213→    assignments.push("price_tiers = ?");
+  1214→    values.push(nextPriceTiers);
+  1215→    changedLabels.push("ราคาสั้นๆ");
+  1216→  }
+  1217→
+  1218→  const displayName = input.name?.trim() || product.name;
+  1219→  const changeSummary = changedLabels.length > 0 ? `แก้ไข: ${changedLabels.join(", ")}` : "ตรวจสอบข้อมูลแล้ว · ไม่มีการเปลี่ยนแปลง";
+  1220→  const detail = `${product.sku} · ${displayName} · ${changeSummary}`;
+  1221→
+  1222→  runInTransaction(db, () => {
+  1223→    if (assignments.length > 0) {
+  1224→      db.prepare(`UPDATE products SET ${assignments.join(", ")} WHERE id = ?`).run(...values, input.productId);
+  1225→    }
+  1226→    logAction(db, "แก้ไขสินค้า", input.actor?.trim() || "เจ้าหน้าที่ร้านค้า", detail, "blue", input.actorRole ?? null, formatDateTime());
+  1227→  });
+  1228→  return getProductById(db, input.productId)!;
+  1229→}
+  1230→
+  1231→export type BulkPriceItemInput = {
+  1232→  productId: number;
+  1233→  price?: number;
+  1234→  cost?: number;
+  1235→};
+  1236→
+  1237→export type BulkUpdatePricesInput = {
+  1238→  items: BulkPriceItemInput[];
+  1239→  actor?: string;
+  1240→  actorRole?: string;
+  1241→};
+  1242→
+  1243→export type BulkUpdatePricesResult = {
+  1244→  updated: number;
+  1245→  priceChanges: number;
+  1246→  costChanges: number;
+  1247→  skipped: number;
+  1248→  /** ตัวอย่างชื่อสินค้าที่แก้ (ใช้ทำ toast สรุป) */
+  1249→  sampleNames: string[];
+  1250→};
+  1251→
+  1252→/**
+  1253→ * Round 64 — ปรับราคาขาย/ต้นทุนหลายรายการพร้อมกันใน transaction เดียว
+  1254→ * (use case จริง: ร้านใหม่มีสินค้า 100+ รายการที่ยังไม่มีราคา)
+  1255→ * - validate ทุกรายการก่อนแตะ DB (fail fast — ไม่มีการแก้ครึ่งชุด)
+  1256→ * - รายการที่ค่าเท่าเดิมถูกนับเป็น skipped (ไม่เขียน DB ไม่ลง log ต่อชิ้น)
+  1257→ * - ลง log สรุปก้อนเดียว กันปนคอมไพล์ log หลายร้อยแถว
+  1258→ */
+  1259→export function bulkUpdateProductPrices(db: SqliteDb, input: BulkUpdatePricesInput): BulkUpdatePricesResult {
+  1260→  if (input.items.length === 0) throw new StoreError("กรุณาเลือกรายการที่ต้องการปรับราคาอย่างน้อย 1 รายการ");
+  1261→  if (input.items.length > 500) throw new StoreError("ปรับราคาได้ครั้งละไม่เกิน 500 รายการ");
+  1262→
+  1263→  // 1) ตรวจทุกรายการก่อน — ผิดสักชิ้นเดียวโยนทิ้งทั้งชุด (ไม่มี partial write)
+  1264→  const seen = new Set<number>();
+  1265→  const prepared: Array<{ product: SqliteProduct; price: number | null; cost: number | null }> = [];
+  1266→  for (const item of input.items) {
+  1267→    if (seen.has(item.productId)) continue; // ซ้ำ (เช่น client ส่งมาสองแถว) — เอาแถวแรก
+  1268→    seen.add(item.productId);
+  1269→    const product = getProductById(db, item.productId);
+  1270→    if (!product) throw new StoreError(`ไม่พบสินค้ารหัส ${item.productId} ในระบบ`);
+  1271→    if (item.price !== undefined && !(item.price >= 0)) throw new StoreError(`ราคาขายของ "${product.name}" ต้องเป็นตัวเลข 0 ขึ้นไป`);
+  1272→    if (item.cost !== undefined && item.cost < 0) throw new StoreError(`ต้นทุนของ "${product.name}" ต้องเป็นตัวเลข 0 ขึ้นไป`);
+  1273→    const nextPrice = item.price !== undefined ? round2(item.price) : null;
+  1274→    const nextCost = item.cost !== undefined ? round2(item.cost) : null;
+  1275→    if (nextPrice !== null && nextPrice === product.price && nextCost !== null && nextCost === product.cost) continue;
+  1276→    prepared.push({ product, price: nextPrice, cost: nextCost });
+  1277→  }
+  1278→  const willChange = (row: { product: SqliteProduct; price: number | null; cost: number | null }) =>
+  1279→    (row.price !== null && row.price !== row.product.price) || (row.cost !== null && row.cost !== row.product.cost);
+  1280→  const changing = prepared.filter(willChange);
+  1281→  if (changing.length === 0) {
+  1282→    return { updated: 0, priceChanges: 0, costChanges: 0, skipped: input.items.length, sampleNames: [] };
+  1283→  }
+  1284→
+  1285→  // 2) เขียนทั้งชุดใน transaction เดียว
+  1286→  let priceChanges = 0;
+  1287→  let costChanges = 0;
+  1288→  const sampleNames: string[] = [];
+  1289→  runInTransaction(db, () => {
+  1290→    for (const row of changing) {
+  1291→      const assignments: string[] = [];
+  1292→      const values: (string | number | null)[] = [];
+  1293→      if (row.price !== null && row.price !== row.product.price) {
+  1294→        assignments.push("price = ?");
+  1295→        values.push(row.price);
+  1296→        priceChanges += 1;
+  1297→        if (sampleNames.length < 3) sampleNames.push(row.product.name);
+  1298→      }
+  1299→      if (row.cost !== null && row.cost !== row.product.cost) {
+  1300→        assignments.push("cost = ?");
+  1301→        values.push(row.cost);
+  1302→        costChanges += 1;
+  1303→        if (sampleNames.length < 3 && !sampleNames.includes(row.product.name)) sampleNames.push(row.product.name);
+  1304→      }
+  1305→      if (assignments.length > 0) {
+  1306→        db.prepare(`UPDATE products SET ${assignments.join(", ")} WHERE id = ?`).run(...values, row.product.id);
+  1307→      }
+  1308→    }
+  1309→    const actor = input.actor?.trim() || "เจ้าหน้าที่ร้านค้า";
+  1310→    const detail = `${changing.length} รายการ · แก้ราคาขาย ${priceChanges} · แก้ต้นทุน ${costChanges}${sampleNames.length > 0 ? ` · เช่น ${sampleNames.join(", ")}${changing.length > sampleNames.length ? " และอื่นๆ" : ""}` : ""}`;
+  1311→    logAction(db, "ปรับราคาหลายรายการ", actor, detail, "blue", input.actorRole ?? null, formatDateTime());
+  1312→  });
+  1313→
+  1314→  return { updated: changing.length, priceChanges, costChanges, skipped: input.items.length - changing.length, sampleNames };
+  1315→}
+  1316→
+  1317→export type DeleteProductInput = {
+  1318→  productId: number;
+  1319→  actor?: string;
+  1320→  actorRole?: string;
+  1321→};
+  1322→
+  1323→/**
+  1324→ * Permanently removes a product and its remaining lots from the catalog.
+  1325→ * Sale history keeps its own name/price snapshot, so old bills stay intact.
+  1326→ */
+  1327→export function deleteProduct(db: SqliteDb, input: DeleteProductInput): { deleted: true; name: string; sku: string } {
+  1328→  const product = getProductById(db, input.productId);
+  1329→  if (!product) throw new StoreError(`ไม่พบสินค้ารหัส ${input.productId} ในระบบ`);
+  1330→  const saleRefs = db.prepare(`SELECT COUNT(*) AS n FROM sale_items WHERE product_id = ?`).get(input.productId) as { n: number };
+  1331→  runInTransaction(db, () => {
+  1332→    db.prepare(`DELETE FROM stock_lots WHERE product_id = ?`).run(input.productId);
+  1333→    db.prepare(`DELETE FROM products WHERE id = ?`).run(input.productId);
+  1334→    logAction(
+  1335→      db,
+  1336→      "ลบสินค้า",
+  1337→      input.actor?.trim() || "ระบบ",
+  1338→      `${product.name} (${product.sku}) · เหลือ ${product.stock} ${product.unit} ในคลัง · ปรากฏในประวัติขาย ${saleRefs.n} รายการ`,
+  1339→      "red",
+  1340→      input.actorRole ?? null,
+  1341→    );
+  1342→  });
+  1343→  return { deleted: true, name: product.name, sku: product.sku };
+  1344→}
+  1345→
+  1346→export type SetProductActiveInput = {
+  1347→  productId: number;
+  1348→  active: boolean;
+  1349→  actor?: string;
+  1350→  actorRole?: string;
+  1351→};
+  1352→
+  1353→/** Archives (active = 0) or restores (active = 1) a product. Archived products keep their stock, lots and history. */
+  1354→export function setProductActive(db: SqliteDb, input: SetProductActiveInput): SqliteProduct {
+  1355→  const product = getProductById(db, input.productId);
+  1356→  if (!product) throw new StoreError(`ไม่พบสินค้ารหัส ${input.productId} ในระบบ`);
+  1357→  const nextActive = input.active ? 1 : 0;
+  1358→  if (product.active === nextActive) return product;
+  1359→  runInTransaction(db, () => {
+  1360→    db.prepare(`UPDATE products SET active = ? WHERE id = ?`).run(nextActive, input.productId);
+  1361→    logAction(
+  1362→      db,
+  1363→      input.active ? "เปิดขายสินค้า" : "ปิดการขายสินค้า",
+  1364→      input.actor?.trim() || "เจ้าหน้าที่ร้านค้า",
+  1365→      `${product.sku} · ${product.name} · คงเหลือ ${product.stock} ${product.unit}`,
+  1366→      input.active ? "green" : "purple",
+  1367→      input.actorRole ?? null,
+  1368→      formatDateTime(),
+  1369→    );
+  1370→  });
+  1371→  return getProductById(db, input.productId)!;
+  1372→}
+  1373→
+  1374→// --- POS checkout -----------------------------------------------------------
+  1375→
+  1376→function yyMMdd(date: Date) {
+  1377→  return `${String(date.getFullYear()).slice(-2)}${pad2(date.getMonth() + 1)}${pad2(date.getDate())}`;
+  1378→}
+  1379→
+  1380→function nextOrderNumber(db: SqliteDb, date = new Date()) {
+  1381→  const prefix = `RC-${yyMMdd(date)}-`;
+  1382→  const row = db.prepare(`SELECT MAX(CAST(SUBSTR(order_number, 11) AS INTEGER)) AS maxSeq FROM sales WHERE order_number LIKE ?`).get(`${prefix}%`) as { maxSeq: number | null };
+  1383→  return `${prefix}${String((row?.maxSeq ?? 0) + 1).padStart(3, "0")}`;
+  1384→}
+  1385→
+  1386→function summarizeItems(items: { name: string; qty: number; unit: string }[]) {
+  1387→  const head = items.slice(0, 3).map((item) => `${item.name} ${item.qty} ${item.unit}`).join(", ");
+  1388→  return items.length > 3 ? `${head} และอีก ${items.length - 3} รายการ` : head;
+  1389→}
+  1390→
+  1391→/** A catalog line references a product; a "รายการพิเศษ" line is a priced ad-hoc item with no product/stock behind it. */
+  1392→export type CheckoutItemInput =
+  1393→  | { productId: number; qty: number; price?: number; unit?: string; label?: string }
+  1394→  | { name: string; price: number; qty: number; unit?: string };
+  1395→
+  1396→/**
+  1397→ * Deducts sold qty from the product's lots FEFO-style (first-expiry-first-out:
+  1398→ * earliest expiry first, undated lots last, then oldest received, then lot id).
+  1399→ * Best-effort by design: when the lots cannot cover the whole qty — drift
+
+[showing lines 800-1399 of 3723; use offset=1400 with limit to continue reading]

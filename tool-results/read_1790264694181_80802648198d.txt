@@ -1,0 +1,602 @@
+   200→  expirySoon: { id: number; productId: number; sku: string; name: string; unit: string; lot: string; expiry: string; qty: number }[];
+   201→  recentActivities: SqliteAuditLog[];
+   202→  memberWalletTotal: number;
+   203→  memberCount: { total: number; active: number; suspended: number };
+   204→};
+   205→
+   206→export type StoreSettings = {
+   207→  memberNumberMode: "running" | "year" | "manual";
+   208→  memberNumberPrefix: string;
+   209→  memberNumberYearMode: "none" | "buddhist" | "gregorian";
+   210→  memberNumberYearDigits: 2 | 4;
+   211→  memberNumberSeparator: "-" | "/" | "_" | "";
+   212→  memberNumberResetMonth: number;
+   213→  memberNumberSequenceDigits: number;
+   214→  storeName: string;
+   215→  storeCode: string;
+   216→  storeAddress: string;
+   217→  /** Round 25 — ปรับแต่งแอป: ชื่อที่แสดงบน sidebar/login/title */
+   218→  appName: string;
+   219→  /** data-URL รูปโลโก้ (สูงสุด ~512KB) — ว่าง = ใช้อักษรย่อ */
+   220→  appLogo: string;
+   221→  /** สีธีมหลัก: preset id เช่น "emerald" หรือ hex "#007a55" */
+   222→  appTheme: string;
+   223→  /** ROUND 75 (user) — หน้าแจ้งผลหลังชำระเงิน ไม่เด้งไปหน้าสั่งพิมพ์อีกต่อไป:
+   224→   *  แสดงหน้าใบเสร็จพร้อมปุ่ม พิมพ์/บันทึกรูป/ดาวน์โหลด PDF ให้ผู้ใช้กดเอง —
+   225→   *  ตัวตั้ง autoPrintReceipt เดิมถูกลบออก (พฤติกรรม window.print() อัตโนมัติ)
+   226→   *  · เพิ่ม posRailHidden: ปุ่มรางซ้าย POS ที่ปิดใช้งาน (JSON array ของ key) */
+   227→  posRailHidden: string;
+   228→  posShortcutKeys: string;
+   229→  showBalanceOnReceipt: boolean;
+   230→  lowBalanceAlert: boolean;
+   231→  lowBalanceThreshold: number;
+   232→  lowStockAlert: boolean;
+   233→  expiryAlert: boolean;
+   234→  expiryAlertDays: number;
+   235→  /** Round 31 — รอบตัดยอดประจำวัน: auto = ระบบตัดตามเวลาที่กำหนด · manual = เจ้าหน้าที่กดตัดยอดเอง */
+   236→  dailyCutOffMode: "auto" | "manual";
+   237→  /** "HH:MM" เวลาตัดยอดของรอบอัตโนมัติ (เช่น "02:00" = รอบวันวิ่ง 02:00→02:00 ของวันถัดไป) */
+   238→  dailyCutOffTime: string;
+   239→  /** ROUND 36 (ข้อ 31) — ประตูบัญชีผู้พัฒนา (dev): ปิดอยู่ (false) = บัญชี dev เข้าสู่ระบบไม่ได้ทั้งหมด */
+   240→  devAccess: boolean;
+   241→  /** ROUND 38 (ข้อ 39) — สไตล์การแสดงผลของแอป: "shop" (ค่าเริ่มต้น) | "apple" | "microsoft" | "android" */
+   242→  appStyle: string;
+   243→  /** ROUND 38 (ข้อ 39) — สำรองข้อมูลอัตโนมัติ: เปิด/ปิดตัวตรวจตามรอบเวลาของเซิร์ฟเวอร์ */
+   244→  backupAutoEnabled: boolean;
+   245→  /** ROUND 38 (ข้อ 39) — รอบสำรองข้อมูลอัตโนมัติเป็นชั่วโมง (1-168) */
+   246→  backupIntervalHours: number;
+   247→  /** ROUND 38 (ข้อ 39) — จำนวนไฟล์สำรองที่เก็บสูงสุด (3-60) — เกินจากนี้ลบไฟล์เก่าสุด */
+   248→  backupKeepCount: number;
+   249→  /** ROUND 42 (ข้อ 32 ตอนที่ 3 — ข้อ 4) — ความกว้างกระดาษสลิปเครื่องพิมพ์: "58" (สลิปเล็ก) | "72" (มาตรฐานเดิม) | "80" (สลิปใหญ่) */
+   250→  receiptPaperWidth: "58" | "72" | "80";
+   251→  /** ROUND 56 (user) — เช็คลิสต์วันขึ้นระบบ (โซนเครื่องมือติดตั้ง): JSON array ของ id ที่ติ๊กแล้ว
+   252→   *  เก็บฝั่งเซิร์ฟเวอร์ให้ทุกเครื่องเห็นตรงกัน · "" = ยังไม่ได้ติ๊กอะไร */
+   253→  goliveChecks: string;
+   254→  /** ROUND 61 (user) — ระบบเวอร์ชัน 3 แบบ (ทั่วไป/โปร/โปรพลัส): รหัสลิขสิทธิ์ที่ใส่แล้ว ("" = ยังไม่มี) ·
+   255→   *  เปลี่ยนผ่าน edition.applyLicense เท่านั้น (settings.set กลั่น fields เหล่านี้ทิ้งเสมอ) */
+   256→  licenseKey: string;
+   257→  /** ชื่อผู้ถือลิขสิทธิ์ที่พิมพ์ตอนใช้รหัส — แสดงบนหน้าเวอร์ชันและโซนช่าง */
+   258→  licenseName: string;
+   259→  /** วันเริ่มทดลองใช้โปรพลัส 30 วัน "YYYY-MM-DD" · "" = ยังไม่เคยทดลอง · ตั้งผ่าน edition.startTrial เท่านั้น */
+   260→  trialStart: string;
+   261→  /** ROUND 63 (user) — บัญชีพร้อมเพย์ของร้าน (เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก)
+   262→   *  ใช้สร้าง QR ให้ลูกค้าสแกนจ่ายที่หน้ายืนยันการชำระเงิน · "" = ยังไม่ตั้ง (ไม่แสดง QR) */
+   263→  promptpayId: string;
+   264→  /** ROUND 68 (user) — เบอร์โทรศูนย์ช่วยเหลือของร้าน แสดงท้ายหน้าจอทุกหน้า
+   265→   *  (แถบ footer) · "" = ไม่แสดง (เดิมเคยเป็นข้อความล็อก 02-XXX-XXXX แก้ไม่ได้) */
+   266→  helpPhone: string;
+   267→};
+   268→
+   269→/**
+   270→ * Lightweight SQLite adapter for local feature testing.
+   271→ * Uses Node 22's built-in node:sqlite, so a cloned project needs no native binary build.
+   272→ * Production auth/runtime remains on the template's configured database.
+   273→ */
+   274→export function createSqliteStore(filename = ":memory:"): SqliteDb {
+   275→  const db = new DatabaseSync(filename);
+   276→  db.exec(`
+   277→    PRAGMA foreign_keys = ON;
+   278→    CREATE TABLE IF NOT EXISTS members (
+   279→      id INTEGER PRIMARY KEY AUTOINCREMENT,
+   280→      member_number TEXT NOT NULL UNIQUE,
+   281→      first_name TEXT NOT NULL,
+   282→      last_name TEXT NOT NULL,
+   283→      id_card TEXT,
+   284→      phone TEXT,
+   285→      type TEXT NOT NULL DEFAULT 'สมาชิก',
+   286→      balance REAL NOT NULL DEFAULT 0,
+   287→      status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'suspended')),
+   288→      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+   289→    );
+   290→    -- ROUND 65 (user): type เพิ่ม 'activation' (เปิดใช้บัตร = ลงทะเบียนพร้อมเงินเริ่มต้น)
+   291→    -- และ 'refund' (คืนบัตรเงินสด = ผู้ป่วยคืนบัตร ร้านจ่ายเงินคืนตามยอดคงเหลือ)
+   292→    CREATE TABLE IF NOT EXISTS member_transactions (
+   293→      id INTEGER PRIMARY KEY AUTOINCREMENT,
+   294→      member_number TEXT NOT NULL,
+   295→      type TEXT NOT NULL CHECK (type IN ('purchase', 'deposit', 'withdrawal', 'activation', 'refund')),
+   296→      detail TEXT NOT NULL,
+   297→      amount REAL NOT NULL,
+   298→      payment_method TEXT,
+   299→      balance_after REAL,
+   300→      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   301→      FOREIGN KEY (member_number) REFERENCES members(member_number)
+   302→    );
+   303→    CREATE TABLE IF NOT EXISTS store_settings (
+   304→      key TEXT PRIMARY KEY,
+   305→      value TEXT NOT NULL
+   306→    );
+   307→    CREATE TABLE IF NOT EXISTS products (
+   308→      id INTEGER PRIMARY KEY AUTOINCREMENT,
+   309→      sku TEXT NOT NULL UNIQUE,
+   310→      barcode TEXT,
+   311→      name TEXT NOT NULL,
+   312→      category TEXT NOT NULL DEFAULT 'ของใช้',
+   313→      emoji TEXT,
+   314→      color TEXT,
+   315→      unit TEXT NOT NULL DEFAULT 'ชิ้น',
+   316→      price REAL NOT NULL,
+   317→      cost REAL NOT NULL DEFAULT 0,
+   318→      stock INTEGER NOT NULL DEFAULT 0,
+   319→      reorder_point INTEGER NOT NULL DEFAULT 10,
+   320→      active INTEGER NOT NULL DEFAULT 1,
+   321→      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+   322→    );
+   323→    CREATE TABLE IF NOT EXISTS stock_lots (
+   324→      id INTEGER PRIMARY KEY AUTOINCREMENT,
+   325→      product_id INTEGER NOT NULL REFERENCES products(id),
+   326→      lot TEXT NOT NULL,
+   327→      expiry_date TEXT,
+   328→      qty INTEGER NOT NULL,
+   329→      cost REAL NOT NULL DEFAULT 0,
+   330→      received_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+   331→    );
+   332→    CREATE TABLE IF NOT EXISTS sales (
+   333→      id INTEGER PRIMARY KEY AUTOINCREMENT,
+   334→      order_number TEXT NOT NULL UNIQUE,
+   335→      payment_method TEXT NOT NULL,
+   336→      member_number TEXT REFERENCES members(member_number),
+   337→      subtotal REAL NOT NULL,
+   338→      discount REAL NOT NULL DEFAULT 0,
+   339→      total REAL NOT NULL,
+   340→      cashier TEXT,
+   341→      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+   342→    );
+   343→    CREATE TABLE IF NOT EXISTS sale_items (
+   344→      id INTEGER PRIMARY KEY AUTOINCREMENT,
+   345→      sale_id INTEGER NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
+   346→      product_id INTEGER,
+   347→      name TEXT NOT NULL,
+   348→      qty INTEGER NOT NULL,
+   349→      price REAL NOT NULL,
+   350→      cost REAL NOT NULL DEFAULT 0
+   351→    );
+   352→    CREATE TABLE IF NOT EXISTS day_closures (
+   353→      id INTEGER PRIMARY KEY AUTOINCREMENT,
+   354→      period_start TEXT NOT NULL,
+   355→      closed_at TEXT NOT NULL,
+   356→      bills INTEGER NOT NULL DEFAULT 0,
+   357→      pieces INTEGER NOT NULL DEFAULT 0,
+   358→      revenue REAL NOT NULL DEFAULT 0,
+   359→      cash_total REAL NOT NULL DEFAULT 0,
+   360→      qr_total REAL NOT NULL DEFAULT 0,
+   361→      wallet_total REAL NOT NULL DEFAULT 0,
+   362→      deposits REAL NOT NULL DEFAULT 0,
+   363→      withdrawals REAL NOT NULL DEFAULT 0,
+   364→      closed_by TEXT,
+   365→      note TEXT
+   366→    );
+   367→    CREATE TABLE IF NOT EXISTS audit_logs (
+   368→      id INTEGER PRIMARY KEY AUTOINCREMENT,
+   369→      action TEXT NOT NULL,
+   370→      actor TEXT NOT NULL,
+   371→      actor_role TEXT,
+   372→      detail TEXT,
+   373→      tone TEXT NOT NULL DEFAULT 'blue',
+   374→      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+   375→    );
+   376→    CREATE TABLE IF NOT EXISTS app_users (
+   377→      id INTEGER PRIMARY KEY AUTOINCREMENT,
+   378→      username TEXT NOT NULL UNIQUE,
+   379→      password_hash TEXT NOT NULL,
+   380→      display_name TEXT NOT NULL,
+   381→      role TEXT NOT NULL DEFAULT 'staff',
+   382→      active INTEGER NOT NULL DEFAULT 1,
+   383→      created_at TEXT NOT NULL
+   384→    );
+   385→    CREATE TABLE IF NOT EXISTS app_sessions (
+   386→      id TEXT PRIMARY KEY,
+   387→      user_id INTEGER NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
+   388→      expires_at TEXT NOT NULL,
+   389→      created_at TEXT NOT NULL
+   390→    );
+   391→    CREATE TABLE IF NOT EXISTS order_list_items (
+   392→      id INTEGER PRIMARY KEY AUTOINCREMENT,
+   393→      product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+   394→      qty REAL NOT NULL DEFAULT 1,
+   395→      note TEXT,
+   396→      created_by TEXT,
+   397→      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+   398→    );
+   399→    CREATE TABLE IF NOT EXISTS limit_requests (
+   400→      id INTEGER PRIMARY KEY AUTOINCREMENT,
+   401→      member_number TEXT NOT NULL,
+   402→      current_limit REAL,
+   403→      requested_limit REAL NOT NULL,
+   404→      reason TEXT,
+   405→      status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
+   406→      requested_by TEXT NOT NULL,
+   407→      decided_by TEXT,
+   408→      decided_at TEXT,
+   409→      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   410→      FOREIGN KEY (member_number) REFERENCES members(member_number)
+   411→    );
+   412→  `);
+   413→  ensureColumn(db, "members", "phone", "TEXT");
+   414→  ensureColumn(db, "members", "type", "TEXT NOT NULL DEFAULT 'สมาชิก'");
+   415→  ensureColumn(db, "member_transactions", "balance_after", "REAL");
+   416→  ensureColumn(db, "audit_logs", "actor_role", "TEXT");
+   417→  ensureColumn(db, "sale_items", "unit", "TEXT");
+   418→  ensureColumn(db, "app_users", "failed_attempts", "INTEGER NOT NULL DEFAULT 0");
+   419→  // ROUND 36 (ข้อ 31) — บังคับเปลี่ยนรหัสผ่านครั้งแรก: 1 = บัญชีใหม่/รหัสที่ผู้บริหารตั้งให้ ต้องเปลี่ยนก่อนใช้งาน
+   420→  ensureColumn(db, "app_users", "must_change_password", "INTEGER NOT NULL DEFAULT 0");
+   421→  ensureColumn(db, "products", "size", "TEXT");
+   422→  ensureColumn(db, "products", "image_url", "TEXT");
+   423→  ensureColumn(db, "products", "quick_pick", "INTEGER NOT NULL DEFAULT 0");
+   424→  ensureColumn(db, "products", "sell_mode", "TEXT");
+   425→  ensureColumn(db, "products", "price_tiers", "TEXT");
+   426→  ensureColumn(db, "members", "photo_url", "TEXT");
+   427→  ensureColumn(db, "members", "gender", "TEXT");
+   428→  // Round 43 — คำนำหน้าชื่อสมาชิก (นาย/นาง/นางสาว/ด.ช./... ) NULL = ไม่มี
+   429→  ensureColumn(db, "members", "prename", "TEXT");
+   430→  // Req 23.2 — วงเงินซื้อสินค้าต่อวันของสมาชิก (NULL = ไม่จำกัด)
+   431→  ensureColumn(db, "members", "credit_limit", "REAL");
+   432→  ensureColumn(db, "member_transactions", "actor", "TEXT");
+   433→  // Backfill the new actor column from audit_logs (round 30): every wallet /
+   434→  // purchase transaction was logged with the same timestamp as its
+   435→  // member_transactions row, so an exact created_at match recovers the staff
+   436→  // member who did it. Idempotent — only rows still missing actor are touched.
+   437→  db.prepare(`UPDATE member_transactions SET actor = (
+   438→    SELECT a.actor FROM audit_logs a
+   439→    WHERE a.action = 'ขายสินค้า' AND a.created_at = member_transactions.created_at
+   440→      AND a.detail LIKE 'บิล #' || substr(member_transactions.detail, 6, instr(member_transactions.detail || ' ·', ' ·') - 6) || ' ·%'
+   441→    ORDER BY a.id DESC LIMIT 1
+   442→  ) WHERE actor IS NULL AND type = 'purchase' AND detail LIKE 'บิล #%'`).run();
+   443→  db.prepare(`UPDATE member_transactions SET actor = (
+   444→    SELECT a.actor FROM audit_logs a
+   445→    WHERE a.action IN ('เติมเงินสมาชิก', 'ถอนเงินสมาชิก')
+   446→      AND a.created_at = member_transactions.created_at
+   447→      AND a.detail LIKE member_transactions.member_number || ' ·%'
+   448→    ORDER BY a.id DESC LIMIT 1
+   449→  ) WHERE actor IS NULL AND type IN ('deposit', 'withdrawal')`).run();
+   450→  ensureColumn(db, "app_users", "locked_until", "TEXT");
+   451→  // ROUND 63 (user) — หลักฐานการชำระเงิน: รูปสลิปที่แนบมากับบิลขาย (QR/สแกน) และ
+   452→  // รายการเติม/ถอนเงินสมาชิก เก็บเป็น data-URL JPEG (ย่อ ~800px ฝั่ง client ก่อนส่ง)
+   453→  ensureColumn(db, "sales", "slip_url", "TEXT");
+   454→  ensureColumn(db, "member_transactions", "slip_url", "TEXT");
+   455→  // ROUND 65 (user) — รหัสบัตรเงินสด (23951…) และรหัสผู้ป่วย (HN) ของสมาชิกร้านค้าสวัสดิการ
+   456→  ensureColumn(db, "members", "card_number", "TEXT");
+   457→  ensureColumn(db, "members", "patient_code", "TEXT");
+   458→  // ROUND 65 (user) — DB เดิมสร้าง member_transactions ด้วย CHECK 3 ชนิดเดิม →
+   459→  // ขยายเป็น 5 ชนิด (เพิ่ม activation/refund) ด้วยการสร้างตารางใหม่แล้วคัดลอกข้อมูล
+   460→  upgradeMemberTransactionsTypes(db);
+   461→  // ROUND 65 (user) — จำนวนที่ "รับเข้าจริง" ของแต่ละ Lot (qty ปัจจุบันโดนหักตอนขาย
+   462→  // ไปแล้ว) ใช้คำนวณยอดยกมาของรายงานสินค้าคงคลังให้ตรงชีทโรงพยาบาล
+   463→  ensureColumn(db, "stock_lots", "received_qty", "INTEGER");
+   464→  db.prepare("UPDATE stock_lots SET received_qty = qty WHERE received_qty IS NULL").run();
+   465→  // Backfill units for sale_items rows written before the column existed (idempotent).
+   466→  db.prepare("UPDATE sale_items SET unit = (SELECT p.unit FROM products p WHERE p.id = sale_items.product_id) WHERE unit IS NULL").run();
+   467→  return db;
+   468→}
+   469→
+   470→/** Migration-safe column add for databases created before a column existed. */
+   471→function ensureColumn(db: SqliteDb, table: string, column: string, definition: string) {
+   472→  const columns = db.prepare(`PRAGMA table_info(${table})`).all() as unknown as { name: string }[];
+   473→  if (!columns.some((entry) => entry.name === column)) {
+   474→    db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+   475→  }
+   476→}
+   477→
+   478→/**
+   479→ * ROUND 65 (user) — ขยายชนิดธุรกรรมสมาชิกจาก 3 เป็น 5 ชนิด (เพิ่ม 'activation' เปิดใช้บัตร
+   480→ * และ 'refund' คืนบัตรเงินสด) ให้กับฐานข้อมูลที่สร้างตารางไว้ก่อนหน้า — SQLite
+   481→ * แก้ CHECK ไม่ได้โดยตรง จึงสร้างตารางใหม่→คัดลอก→สลับชื่อ (idempotent: ถ้าเจอ
+   482→ * 'activation' ในคำนิยามเดิมแล้วถือว่าย้ายเสร็จ ข้ามทันที)
+   483→ */
+   484→function upgradeMemberTransactionsTypes(db: SqliteDb) {
+   485→  const row = db.prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'member_transactions'`).get() as { sql: string } | undefined;
+   486→  if (!row?.sql || row.sql.includes("'activation'")) return;
+   487→  db.exec(`
+   488→    CREATE TABLE member_transactions_new (
+   489→      id INTEGER PRIMARY KEY AUTOINCREMENT,
+   490→      member_number TEXT NOT NULL,
+   491→      type TEXT NOT NULL CHECK (type IN ('purchase', 'deposit', 'withdrawal', 'activation', 'refund')),
+   492→      detail TEXT NOT NULL,
+   493→      amount REAL NOT NULL,
+   494→      payment_method TEXT,
+   495→      balance_after REAL,
+   496→      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+   497→      FOREIGN KEY (member_number) REFERENCES members(member_number)
+   498→    );
+   499→  `);
+   500→  db.exec(`
+   501→    INSERT INTO member_transactions_new (id, member_number, type, detail, amount, payment_method, balance_after, created_at)
+   502→      SELECT id, member_number, type, detail, amount, payment_method, balance_after, created_at FROM member_transactions;
+   503→    DROP TABLE member_transactions;
+   504→    ALTER TABLE member_transactions_new RENAME TO member_transactions;
+   505→  `);
+   506→  // คอลัมน์เสริมที่เคยเพิ่มด้วย ensureColumn ในรอบก่อนต้องกลับมาให้ครบหลังสลับตาราง
+   507→  ensureColumn(db, "member_transactions", "balance_after", "REAL");
+   508→  ensureColumn(db, "member_transactions", "actor", "TEXT");
+   509→  ensureColumn(db, "member_transactions", "slip_url", "TEXT");
+   510→}
+   511→
+   512→export function seedSqliteDemoData(db: SqliteDb) {
+   513→  // ROUND 36 (ข้อ 31) — ไม่ seed บัญชีผู้ใช้แล้ว: ฐานข้อมูลใหม่ต้องลงทะเบียน
+   514→  // ผู้บริหารหลักผ่าน SetupView ก่อน (setupInitialAdmin) เพื่อบังคับเปลี่ยนรหัสผ่าน
+   515→  const insertMember = db.prepare(`INSERT OR IGNORE INTO members (member_number, first_name, last_name, id_card, balance, status) VALUES (?, ?, ?, ?, ?, ?)`);
+   516→  insertMember.run("M-000218", "อรทัย", "ส.", null, 1240, "active");
+   517→  insertMember.run("M-000092", "พิมพ์ชนก", "ร.", null, 0, "suspended");
+   518→  const insertTransaction = db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, created_at) VALUES (?, ?, ?, ?, ?, ?)`);
+   519→  insertTransaction.run("M-000218", "purchase", "บิล #INV-260917-038 · น้ำดื่ม 2 ขวด, ข้าวกล่อง 1 กล่อง", -59, "member_balance", "2026-09-17 14:38:00");
+   520→  insertTransaction.run("M-000218", "deposit", "ผู้ฝาก: น.ส.กัญญาณัฐ พ.", 500, "cash", "2026-09-17 14:32:00");
+   521→  insertTransaction.run("M-000218", "withdrawal", "ถอนเพื่อถอนฟัน", -200, "cash", "2026-09-12 10:16:00");
+   522→  insertTransaction.run("M-000092", "withdrawal", "ถอนเพื่อถอนฟัน · แนบหลักฐานแล้ว", -200, "cash", "2026-09-16 09:12:00");
+   523→}
+   524→
+   525→export function getMemberDetail(db: SqliteDb, memberNumber: string, transactionLimit = 50) {
+   526→  const member = db.prepare(`SELECT id, member_number as memberNumber, prename, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, credit_limit as creditLimit, card_number as cardNumber, patient_code as patientCode FROM members WHERE member_number = ?`).get(memberNumber) as SqliteMember | undefined;
+   527→  if (!member) return undefined;
+   528→  const transactions = db.prepare(`SELECT id, member_number as memberNumber, type, detail, amount, payment_method as paymentMethod, balance_after as balanceAfter, created_at as createdAt, slip_url IS NOT NULL AS hasSlip FROM member_transactions WHERE member_number = ? ORDER BY created_at DESC, id DESC LIMIT ?`).all(memberNumber, transactionLimit) as unknown as SqliteTransaction[];
+   529→  return { member, transactions };
+   530→}
+   531→
+   532→/** ROUND 63 (user) — ดึงรูปหลักฐานของรายการเติม/ถอนเงินสมาชิก ตามรหัสแถว member_transactions */
+   533→export function getTransactionSlip(db: SqliteDb, id: number): { slipUrl: string | null } {
+   534→  const row = db.prepare(`SELECT slip_url AS slipUrl FROM member_transactions WHERE id = ?`).get(id) as { slipUrl: string | null } | undefined;
+   535→  if (!row) throw new StoreError("ไม่พบรายการธุรกรรมนี้ในระบบ");
+   536→  return { slipUrl: row.slipUrl };
+   537→}
+   538→
+   539→export function setMemberNumberMode(db: SqliteDb, mode: "running" | "year" | "manual") {
+   540→  db.prepare(`INSERT INTO store_settings (key, value) VALUES ('member_number_mode', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(mode);
+   541→}
+   542→
+   543→export function getMemberNumberMode(db: SqliteDb) {
+   544→  const row = db.prepare(`SELECT value FROM store_settings WHERE key = 'member_number_mode'`).get() as { value: "running" | "year" | "manual" } | undefined;
+   545→  return row?.value ?? "running";
+   546→}
+   547→
+   548→function memberNumberSettings(db: SqliteDb) {
+   549→  const settings = getSettings(db);
+   550→  return {
+   551→    // An empty prefix is intentional: it enables formats such as 69-00001
+   552→    // or 6900001 instead of silently restoring the historical "M" prefix.
+   553→    prefix: settings.memberNumberPrefix.trim().replace(/[^A-Za-z0-9ก-๙._-]/g, "").slice(0, 20),
+   554→    yearMode: settings.memberNumberYearMode,
+   555→    yearDigits: settings.memberNumberYearDigits === 4 ? 4 : 2,
+   556→    separator: settings.memberNumberSeparator === "" || settings.memberNumberSeparator === "/" || settings.memberNumberSeparator === "_" ? settings.memberNumberSeparator : "-",
+   557→    resetMonth: Math.min(12, Math.max(1, Math.floor(settings.memberNumberResetMonth || 1))),
+   558→    sequenceDigits: Math.min(10, Math.max(1, Math.floor(settings.memberNumberSequenceDigits || 6))),
+   559→  };
+   560→}
+   561→
+   562→export function suspendMember(db: SqliteDb, memberNumber: string) {
+   563→  const result = db.prepare(`UPDATE members SET status = 'suspended' WHERE member_number = ?`).run(memberNumber);
+   564→  return result.changes > 0;
+   565→}
+   566→
+   567→// ---------------------------------------------------------------------------
+   568→// Welfare store domain: products, stock, POS checkout, members, wallet,
+   569→// reports, settings and audit logs. All user-facing errors are Thai.
+   570→// ---------------------------------------------------------------------------
+   571→
+   572→const PAYMENT_METHODS = ["เงินสด", "QR / สแกน", "หักบัญชีสมาชิก"] as const;
+   573→const WALLET_PAYMENT = "หักบัญชีสมาชิก";
+   574→
+   575→const pad2 = (value: number) => String(value).padStart(2, "0");
+   576→
+   577→// ROUND 40 (ข้อ 32) — export ให้ importTool.ts ใช้ร่วมกัน (ตัวเล็ก ไร้ผลข้างเนียง)
+   578→export function round2(value: number) {
+   579→  return Math.round((value + Number.EPSILON) * 100) / 100;
+   580→}
+   581→
+   582→export function formatDateTime(date = new Date()) {
+   583→  return `${formatDate(date)} ${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`;
+   584→}
+   585→
+   586→function formatDate(date = new Date()) {
+   587→  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`;
+   588→}
+   589→
+   590→function addDays(date: Date, days: number) {
+   591→  const next = new Date(date);
+   592→  next.setDate(next.getDate() + days);
+   593→  return next;
+   594→}
+   595→
+   596→function startOfToday() {
+   597→  const today = new Date();
+   598→  today.setHours(0, 0, 0, 0);
+   599→  return today;
+   600→}
+   601→
+   602→/** ฿-formatted money for log details, e.g. "฿1,240.00" */
+   603→export function money(value: number) {
+   604→  return `฿${value.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+   605→}
+   606→
+   607→export function runInTransaction<T>(db: SqliteDb, fn: () => T): T {
+   608→  db.exec("BEGIN");
+   609→  try {
+   610→    const result = fn();
+   611→    db.exec("COMMIT");
+   612→    return result;
+   613→  } catch (error) {
+   614→    db.exec("ROLLBACK");
+   615→    throw error;
+   616→  }
+   617→}
+   618→
+   619→function countRows(db: SqliteDb, table: string) {
+   620→  const row = db.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number };
+   621→  return row.count;
+   622→}
+   623→
+   624→/** Audit trail entry. Called from every mutation. */
+   625→export function logAction(
+   626→  db: SqliteDb,
+   627→  action: string,
+   628→  actor: string,
+   629→  detail: string,
+   630→  tone = "blue",
+   631→  actorRole: string | null = null,
+   632→  createdAt: string = formatDateTime(),
+   633→): SqliteAuditLog {
+   634→  const result = db.prepare(`INSERT INTO audit_logs (action, actor, actor_role, detail, tone, created_at) VALUES (?, ?, ?, ?, ?, ?)`).run(action, actor, actorRole, detail, tone, createdAt);
+   635→  return { id: Number(result.lastInsertRowid), action, actor, actorRole, detail, tone, createdAt };
+   636→}
+   637→
+   638→export function listAuditLogs(db: SqliteDb, limit = 200): SqliteAuditLog[] {
+   639→  const capped = Math.max(1, Math.min(1000, Math.floor(limit)));
+   640→  return db.prepare(`SELECT id, action, actor, actor_role AS actorRole, detail, tone, created_at AS createdAt FROM audit_logs ORDER BY created_at DESC, id DESC LIMIT ?`).all(capped) as unknown as SqliteAuditLog[];
+   641→}
+   642→
+   643→// --- products & stock -------------------------------------------------------
+   644→
+   645→export function listProducts(db: SqliteDb, includeInactive = false): SqliteProduct[] {
+   646→  if (includeInactive) {
+   647→    return db.prepare(`SELECT id, sku, barcode, name, category, emoji, color, size, image_url AS imageUrl, quick_pick AS quickPick, sell_mode AS sellMode, price_tiers AS priceTiers, unit, price, cost, stock, reorder_point AS reorderPoint, active, created_at AS createdAt FROM products ORDER BY active DESC, id`).all() as unknown as SqliteProduct[];
+   648→  }
+   649→  return db.prepare(`SELECT id, sku, barcode, name, category, emoji, color, size, image_url AS imageUrl, quick_pick AS quickPick, sell_mode AS sellMode, price_tiers AS priceTiers, unit, price, cost, stock, reorder_point AS reorderPoint, active, created_at AS createdAt FROM products WHERE active = 1 ORDER BY id`).all() as unknown as SqliteProduct[];
+   650→}
+   651→
+   652→function getProductById(db: SqliteDb, productId: number): SqliteProduct | undefined {
+   653→  return db.prepare(`SELECT id, sku, barcode, name, category, emoji, color, size, image_url AS imageUrl, quick_pick AS quickPick, sell_mode AS sellMode, price_tiers AS priceTiers, unit, price, cost, stock, reorder_point AS reorderPoint, active, created_at AS createdAt FROM products WHERE id = ?`).get(productId) as SqliteProduct | undefined;
+   654→}
+   655→
+   656→export type CreateProductInput = {
+   657→  name: string;
+   658→  sku?: string;
+   659→  barcode?: string;
+   660→  size?: string;
+   661→  imageUrl?: string | null;
+   662→  /** 1 = สินค้าลัดหน้าร้าน (boolean ก็รับแล้วแปลงเป็น 0/1) */
+   663→  quickPick?: number | boolean | null;
+   664→  /** "unit" (default) | "money" — ขายเป็นเงินใช้ priceTiers */
+   665→  sellMode?: "unit" | "money" | null;
+   666→  /** JSON [{ label, price, qty }] สำหรับ sellMode "money" */
+   667→  priceTiers?: string | null;
+   668→  unit?: string;
+   669→  price: number;
+   670→  cost?: number;
+   671→  stock?: number;
+   672→  reorderPoint?: number;
+   673→  category?: string;
+   674→  emoji?: string;
+   675→  color?: string;
+   676→  actor?: string;
+   677→  actorRole?: string;
+   678→};
+   679→
+   680→// ROUND 71 — รหัสสินค้าอัตโนมัติแยกตามหมวด (ตามชุดข้อมูลจริง 120 รายการ):
+   681→// เครื่องดื่ม=DRK · ของใช้ส่วนตัว=HYG · ขนม=SNK · อาหาร=FD · ของใช้ในครัวเรือน=HH · เครื่องเขียน=ST
+   682→// ("ของใช้" คือหมวดเดโมรุ่นเก่า — ให้ HYG เหมือนเดิม) — ชุดเดียวกันใช้ที่ scripts/seed-data-products.ts
+   683→// และ IMPORT_SKU_PREFIXES ใน server/importTool.ts เพื่อให้ import XLSX ออกรหัสชุดเดียวกัน
+   684→const CATEGORY_SKU_PREFIXES: Record<string, string> = {
+   685→  "เครื่องดื่ม": "DRK",
+   686→  "อาหาร": "FD",
+   687→  "ของใช้": "HYG",
+   688→  "ของใช้ส่วนตัว": "HYG",
+   689→  "ของใช้ในครัวเรือน": "HH",
+   690→  "ขนม": "SNK",
+   691→  "เครื่องเขียน": "ST",
+   692→};
+   693→
+   694→function generateSku(db: SqliteDb, category: string) {
+   695→  const prefix = CATEGORY_SKU_PREFIXES[category] ?? "GEN";
+   696→  const rows = db.prepare(`SELECT sku FROM products WHERE sku LIKE ?`).all(`${prefix}-%`) as unknown as { sku: string }[];
+   697→  const used = new Set(rows.map((row) => row.sku));
+   698→  let sequence = rows.length + 1;
+   699→  while (used.has(`${prefix}-${String(sequence).padStart(3, "0")}`)) sequence += 1;
+   700→  return `${prefix}-${String(sequence).padStart(3, "0")}`;
+   701→}
+   702→
+   703→/** Error thrown when a sell-by-money product carries bad price-tiers JSON. */
+   704→const PRICE_TIERS_ERROR = "รูปแบบราคาสั้นๆ (price tiers) ไม่ถูกต้อง";
+   705→
+   706→/** 0/1 coercion for quickPick — accepts boolean or 0/1 from any caller. */
+   707→const toQuickPickFlag = (value: number | boolean | null | undefined) => (value === 1 || value === true ? 1 : 0);
+   708→
+   709→/**
+   710→ * Guard for sell-by-money products (round 31-12): priceTiers must be valid
+   711→ * JSON — a non-empty array of { label: string, price: number > 0, qty: number > 0 }.
+   712→ */
+   713→function assertValidPriceTiers(raw: string | null): void {
+   714→  let parsed: unknown;
+   715→  try {
+   716→    parsed = JSON.parse(raw ?? "");
+   717→  } catch {
+   718→    throw new StoreError(PRICE_TIERS_ERROR);
+   719→  }
+   720→  if (!Array.isArray(parsed) || parsed.length === 0) throw new StoreError(PRICE_TIERS_ERROR);
+   721→  for (const tier of parsed) {
+   722→    if (typeof tier !== "object" || tier === null || Array.isArray(tier)) throw new StoreError(PRICE_TIERS_ERROR);
+   723→    const { label, price, qty } = tier as { label?: unknown; price?: unknown; qty?: unknown };
+   724→    if (
+   725→      typeof label !== "string" ||
+   726→      !label.trim() ||
+   727→      typeof price !== "number" ||
+   728→      !Number.isFinite(price) ||
+   729→      price <= 0 ||
+   730→      typeof qty !== "number" ||
+   731→      !Number.isFinite(qty) ||
+   732→      qty <= 0
+   733→    ) {
+   734→      throw new StoreError(PRICE_TIERS_ERROR);
+   735→    }
+   736→  }
+   737→}
+   738→
+   739→export function createProduct(db: SqliteDb, input: CreateProductInput): SqliteProduct {
+   740→  const name = input.name?.trim();
+   741→  if (!name) throw new StoreError("กรุณาระบุชื่อสินค้า");
+   742→  // ROUND 54 (user) — อนุญาตราคา ฿0 = "ยังไม่ได้ตั้งราคา" (สินค้านำเข้า 120 รายการยังไม่มีราคา
+   743→  // ต้องแก้ชื่อ/ขนาด/หน่วยได้ก่อน โดยยังไม่ต้องใส่ราคา) — ห้ามติดลบเท่านั้น
+   744→  if (!(input.price >= 0)) throw new StoreError("ราคาขายต้องเป็นตัวเลข 0 ขึ้นไป");
+   745→  if (input.stock !== undefined && (!Number.isInteger(input.stock) || input.stock < 0)) throw new StoreError("จำนวนสต็อกเริ่มต้นไม่ถูกต้อง");
+   746→  const sellMode = input.sellMode ?? "unit";
+   747→  const quickPick = toQuickPickFlag(input.quickPick);
+   748→  const priceTiers = input.priceTiers?.trim() || null;
+   749→  if (sellMode === "money") assertValidPriceTiers(priceTiers);
+   750→  const sku = input.sku?.trim() || generateSku(db, input.category ?? "ของใช้");
+   751→  if (db.prepare(`SELECT id FROM products WHERE sku = ?`).get(sku)) {
+   752→    throw new StoreError(`รหัสสินค้า ${sku} ถูกใช้แล้ว กรุณาระบุรหัสอื่น`);
+   753→  }
+   754→  const result = db.prepare(`INSERT INTO products (sku, barcode, name, category, emoji, color, size, image_url, unit, price, cost, stock, reorder_point, quick_pick, sell_mode, price_tiers, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`).run(
+   755→    sku,
+   756→    input.barcode?.trim() || null,
+   757→    name,
+   758→    input.category?.trim() || "ของใช้",
+   759→    input.emoji ?? null,
+   760→    input.color ?? null,
+   761→    input.size?.trim() || null,
+   762→    input.imageUrl || null,
+   763→    input.unit?.trim() || "ชิ้น",
+   764→    round2(input.price),
+   765→    round2(input.cost ?? 0),
+   766→    input.stock ?? 0,
+   767→    input.reorderPoint ?? 10,
+   768→    quickPick,
+   769→    sellMode,
+   770→    priceTiers,
+   771→  );
+   772→  logAction(db, "เพิ่มสินค้า", input.actor?.trim() || "ระบบ", `${name} (${sku})`, "green", input.actorRole ?? null);
+   773→  return getProductById(db, Number(result.lastInsertRowid))!;
+   774→}
+   775→
+   776→/**
+   777→ * ROUND 77 (user) — รับเข้าสินค้า "ต้นทุนต่างกันแต่ละรอบ" ได้:
+   778→ * สินค้าชนิดเดียวกัน รอบละราคาไม่เท่ากัน (เช่น รอบนี้ 10 ห่อ @฿200 แถมอีก 2 ห่อ)
+   779→ * ต้นทุนที่ fix คงที่ใช้ไม่ได้ → ระบบเก็บเป็น "ต้นทุนถัวเฉลี่ย" (weighted average):
+   780→ * ผสมมูลค่าของเดิมในคลังกับทุกบรรทัดที่รับเข้ารอบนี้ บรรทัดแถม (ต้นทุน ฿0) จะดึง
+   781→ * ค่าเฉลี่ยลงให้เอง — รายงานกำไรจึงถูกต้องตามของจริงเสมอ
+   782→ */
+   783→export type ReceiveStockLine = { qty: number; cost?: number };
+   784→
+   785→export type ReceiveStockLotRow = { id: number; productId: number; lot: string; expiry: string | null; qty: number; cost: number; receivedAt: string };
+   786→
+   787→export type ReceiveStockResult = {
+   788→  /** ทุกบรรทัดที่รับเข้ารอบนี้ (แต่ละบรรทัด = 1 stock_lot ใช้ Lot เดียวกัน) */
+   789→  lots: ReceiveStockLotRow[];
+   790→  /** บรรทัดแรก — ผู้เรียกแบบเดิม (บรรทัดเดียว) ยังอ่านได้ตามรูปเก่า */
+   791→  lot: ReceiveStockLotRow;
+   792→  product: SqliteProduct;
+   793→  /** ต้นทุนถัวเฉลี่ยใหม่ที่เก็บในสินค้า (ของเดิมในคลัง + ทุกบรรทัดรอบนี้) */
+   794→  averageCost: number;
+   795→  /** ต้นทุนเฉลี่ยก่อนรับเข้ารอบนี้ */
+   796→  previousCost: number;
+   797→};
+   798→
+   799→export function receiveStockLines(
+
+[showing lines 200-799 of 3723; use offset=800 with limit to continue reading]

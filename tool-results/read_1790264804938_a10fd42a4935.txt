@@ -1,0 +1,452 @@
+  3239→  }
+  3240→  logAction(db, "ตั้งค่าระบบครั้งแรก", displayName, `สร้างบัญชีผู้บริหารหลัก @${username} · ชื่อร้าน ${storeName || "-"}`, "green", "ผู้บริหาร", createdAt);
+  3241→  return getAppUserSummaryById(db, Number(result.lastInsertRowid))!;
+  3242→}
+  3243→
+  3244→export type ChangeOwnPasswordInput = {
+  3245→  userId: number;
+  3246→  currentPassword: string;
+  3247→  newPassword: string;
+  3248→  /** เซสชันที่ผู้ใช้กำลังใช้อยู่ (จากคุกกี้) — จะไม่ถูกยกเลิกไปด้วย */
+  3249→  keepSessionId?: string;
+  3250→  actor?: string;
+  3251→  actorRole?: string | null;
+  3252→};
+  3253→
+  3254→/**
+  3255→ * ROUND 36 (ข้อ 31) — ผู้ใช้เปลี่ยนรหัสผ่านของตัวเอง: ตรวจรหัสปัจจุบัน + กฎความแข็งแรง
+  3256→ * + ห้ามซ้ำของเดิม แล้วล้างธง must_change_password · ยกเลิกเซสชันอื่นทั้งหมด
+  3257→ * เหลือเฉพาะเซสชันที่ใช้อยู่ (keepSessionId)
+  3258→ */
+  3259→export function changeOwnPassword(db: SqliteDb, input: ChangeOwnPasswordInput): { success: boolean; revokedSessions: number } {
+  3260→  const user = db.prepare(`${APP_USER_SELECT} WHERE id = ?`).get(input.userId) as AppUser | undefined;
+  3261→  if (!user) throw new StoreError("ไม่พบบัญชีผู้ใช้นี้");
+  3262→  if (!verifyPassword(input.currentPassword ?? "", user.passwordHash)) {
+  3263→    throw new StoreError("รหัสผ่านปัจจุบันไม่ถูกต้อง");
+  3264→  }
+  3265→  const issues = validatePasswordStrength(input.newPassword, user.role);
+  3266→  if (issues.length > 0) throw new StoreError(issues.join(" · "));
+  3267→  if (verifyPassword(input.newPassword, user.passwordHash)) {
+  3268→    throw new StoreError("รหัสผ่านใหม่ต้องไม่ซ้ำกับรหัสผ่านปัจจุบัน");
+  3269→  }
+  3270→  const forced = user.mustChangePassword === 1;
+  3271→  const actor = input.actor?.trim() || user.displayName;
+  3272→  const actorRole = input.actorRole?.trim() || appRoleThai(user.role);
+  3273→  const createdAt = formatDateTime();
+  3274→  const doomed = (db
+  3275→    .prepare(`SELECT id FROM app_sessions WHERE user_id = ? AND expires_at > ?`)
+  3276→    .all(input.userId, formatDateTime()) as { id: string }[])
+  3277→    .filter((session) => session.id !== input.keepSessionId);
+  3278→  runInTransaction(db, () => {
+  3279→    db.prepare(`UPDATE app_users SET password_hash = ?, must_change_password = 0, failed_attempts = 0, locked_until = NULL WHERE id = ?`).run(hashPassword(input.newPassword), input.userId);
+  3280→    const deleteSession = db.prepare(`DELETE FROM app_sessions WHERE id = ?`);
+  3281→    for (const session of doomed) deleteSession.run(session.id);
+  3282→    logAction(
+  3283→      db,
+  3284→      "เปลี่ยนรหัสผ่าน",
+  3285→      actor,
+  3286→      forced ? "เปลี่ยนรหัสผ่านบังคับครั้งแรกเสร็จสิ้น · ยกเลิกเซสชันอื่นทั้งหมด" : "เปลี่ยนรหัสผ่านเรียบร้อย · ยกเลิกเซสชันอื่นทั้งหมด",
+  3287→      "green",
+  3288→      actorRole,
+  3289→      createdAt,
+  3290→    );
+  3291→  });
+  3292→  return { success: true, revokedSessions: doomed.length };
+  3293→}
+  3294→
+  3295→/** Creates a login account with a scrypt-hashed password and audits it. */
+  3296→export function createAppUser(db: SqliteDb, input: CreateAppUserInput): AppUserSummary {
+  3297→  const username = input.username?.trim() ?? "";
+  3298→  if (!USERNAME_PATTERN.test(username)) {
+  3299→    throw new StoreError("ชื่อผู้ใช้ต้องเป็นตัวอักษรอังกฤษ ตัวเลข จุด หรือขีดล่าง ความยาว 3-30 ตัวอักษร");
+  3300→  }
+  3301→  if (db.prepare(`SELECT id FROM app_users WHERE LOWER(username) = LOWER(?)`).get(username)) {
+  3302→    throw new StoreError("มีชื่อผู้ใช้นี้ในระบบแล้ว");
+  3303→  }
+  3304→  // ROUND 36 (ข้อ 31) — กฎความแข็งแรงของรหัสผ่านตามบทบาท (dev เข้มที่สุด)
+  3305→  const strengthIssues = validatePasswordStrength(input.password ?? "", input.role);
+  3306→  if (strengthIssues.length > 0) {
+  3307→    throw new StoreError(strengthIssues.join(" · "));
+  3308→  }
+  3309→  const displayName = input.displayName?.trim() ?? "";
+  3310→  if (!displayName) throw new StoreError("กรุณาระบุชื่อ-นามสกุลผู้ใช้");
+  3311→  const createdAt = formatDateTime();
+  3312→  // ROUND 36 — บัญชีใหม่ทุกบทบาทต้องเปลี่ยนรหัสผ่านเมื่อเข้าสู่ระบบครั้งแรก
+  3313→  const result = db.prepare(`INSERT INTO app_users (username, password_hash, display_name, role, active, created_at, must_change_password) VALUES (?, ?, ?, ?, 1, ?, 1)`).run(
+  3314→    username,
+  3315→    hashPassword(input.password),
+  3316→    displayName,
+  3317→    input.role,
+  3318→    createdAt,
+  3319→  );
+  3320→  const roleThai = appRoleThai(input.role);
+  3321→  logAction(db, "เพิ่มผู้ใช้ระบบ", input.actor?.trim() || "ผู้บริหาร", `${username} · ${displayName} · สิทธิ์ ${roleThai} · ผู้ใช้ใหม่ต้องเปลี่ยนรหัสผ่านเมื่อเข้าสู่ระบบครั้งแรก`, "green", input.actorRole ?? null, createdAt);
+  3322→  return getAppUserSummaryById(db, Number(result.lastInsertRowid))!;
+  3323→}
+  3324→
+  3325→export type UpdateAppUserInput = {
+  3326→  userId: number;
+  3327→  displayName?: string;
+  3328→  role?: AppUserRole;
+  3329→  active?: boolean;
+  3330→  password?: string;
+  3331→  actor?: string;
+  3332→  actorRole?: string | null;
+  3333→};
+  3334→
+  3335→/** Updates only the provided account fields. Undefined keeps the current value; empty password strings are ignored. */
+  3336→export function updateAppUser(db: SqliteDb, input: UpdateAppUserInput): AppUserSummary {
+  3337→  const user = db.prepare(`${APP_USER_SELECT} WHERE id = ?`).get(input.userId) as AppUser | undefined;
+  3338→  if (!user) throw new StoreError("ไม่พบผู้ใช้ระบบรายนี้");
+  3339→  if (input.displayName !== undefined && !input.displayName.trim()) {
+  3340→    throw new StoreError("กรุณาระบุชื่อ-นามสกุลผู้ใช้");
+  3341→  }
+  3342→  const newPassword = typeof input.password === "string" && input.password !== "" ? input.password : undefined;
+  3343→  // ROUND 36 (ข้อ 31) — รหัสที่ผู้บริหารตั้งให้ผู้อื่น ต้องผ่านกฎความแข็งแรงตามบทบาท
+  3344→  // เป้าหมาย (บทบาทจะเปลี่ยนพร้อมกันก็ใช้บทบาทใหม่เลย)
+  3345→  if (newPassword !== undefined) {
+  3346→    const strengthIssues = validatePasswordStrength(newPassword, input.role ?? user.role);
+  3347→    if (strengthIssues.length > 0) {
+  3348→      throw new StoreError(strengthIssues.join(" · "));
+  3349→    }
+  3350→  }
+  3351→
+  3352→  const nextDisplayName = input.displayName !== undefined && input.displayName.trim() !== user.displayName ? input.displayName.trim() : undefined;
+  3353→  const nextRole = input.role !== undefined && input.role !== user.role ? input.role : undefined;
+  3354→  const nextActive = input.active !== undefined && (input.active ? 1 : 0) !== user.active ? (input.active ? 1 : 0) : undefined;
+  3355→
+  3356→  // Last-admin guard: the final active admin cannot be demoted or deactivated.
+  3357→  if (user.role === "admin" && user.active === 1 && (nextRole !== undefined || nextActive === 0)) {
+  3358→    const others = db.prepare(`SELECT COUNT(*) AS count FROM app_users WHERE role = 'admin' AND active = 1 AND id != ?`).get(input.userId) as { count: number };
+  3359→    if (others.count === 0) {
+  3360→      throw new StoreError("ต้องมีผู้ดูแลระบบ (ผู้บริหาร) ที่ใช้งานได้อย่างน้อย 1 รายเสมอ");
+  3361→    }
+  3362→  }
+  3363→
+  3364→  const assignments: string[] = [];
+  3365→  const values: (string | number)[] = [];
+  3366→  const changedLabels: string[] = [];
+  3367→  if (nextDisplayName !== undefined) {
+  3368→    assignments.push("display_name = ?");
+  3369→    values.push(nextDisplayName);
+  3370→    changedLabels.push("ชื่อ-นามสกุล");
+  3371→  }
+  3372→  if (nextRole !== undefined) {
+  3373→    assignments.push("role = ?");
+  3374→    values.push(nextRole);
+  3375→    changedLabels.push("สิทธิ์การใช้งาน");
+  3376→  }
+  3377→  if (nextActive !== undefined) {
+  3378→    assignments.push("active = ?");
+  3379→    values.push(nextActive);
+  3380→    changedLabels.push("สถานะ");
+  3381→  }
+  3382→
+  3383→  // Nothing actually changed → return the current state without an audit entry.
+  3384→  if (assignments.length === 0 && newPassword === undefined) {
+  3385→    return getAppUserSummaryById(db, input.userId)!;
+  3386→  }
+  3387→
+  3388→  const actor = input.actor?.trim() || "ผู้บริหาร";
+  3389→  const createdAt = formatDateTime();
+  3390→  runInTransaction(db, () => {
+  3391→    if (assignments.length > 0) {
+  3392→      db.prepare(`UPDATE app_users SET ${assignments.join(", ")} WHERE id = ?`).run(...values, input.userId);
+  3393→      logAction(
+  3394→        db,
+  3395→        "แก้ไขผู้ใช้ระบบ",
+  3396→        actor,
+  3397→        `${user.username} · ${nextDisplayName ?? user.displayName} · แก้ไข: ${changedLabels.join(", ")}`,
+  3398→        nextRole !== undefined || nextActive !== undefined ? "amber" : "blue",
+  3399→        input.actorRole ?? null,
+  3400→        createdAt,
+  3401→      );
+  3402→    }
+  3403→    if (newPassword !== undefined) {
+  3404→      // ROUND 36 — ตั้งรหัสใหม่ = บังคับให้ผู้ใช้เปลี่ยนอีกครั้งเมื่อเข้าสู่ระบบครั้งถัดไป
+  3405→      db.prepare(`UPDATE app_users SET password_hash = ?, must_change_password = 1 WHERE id = ?`).run(hashPassword(newPassword), input.userId);
+  3406→      // The plaintext password must never appear anywhere in the audit trail.
+  3407→      logAction(db, "ตั้งรหัสผ่านใหม่", actor, `${user.username} · ตั้งรหัสผ่านใหม่ · ผู้ใช้ต้องเปลี่ยนรหัสผ่านอีกครั้งเมื่อเข้าสู่ระบบครั้งถัดไป`, "amber", input.actorRole ?? null, createdAt);
+  3408→    }
+  3409→  });
+  3410→  return getAppUserSummaryById(db, input.userId)!;
+  3411→}
+  3412→
+  3413→// --- member spending stats ----------------------------------------------------
+  3414→
+  3415→export type MemberSpendingStats = {
+  3416→  totalSpent: number;
+  3417→  billCount: number;
+  3418→  lastPurchaseAt: string | null;
+  3419→  topProducts: { name: string; qty: number; total: number }[];
+  3420→};
+  3421→
+  3422→/** Lifetime purchase summary for one member, computed from the sales tables (paid totals after discount). */
+  3423→export function memberSpendingStats(db: SqliteDb, memberNumber: string): MemberSpendingStats {
+  3424→  const number = memberNumber?.trim() ?? "";
+  3425→  const member = db.prepare(`SELECT member_number FROM members WHERE member_number = ?`).get(number);
+  3426→  if (!member) throw new StoreError(`ไม่พบสมาชิก ${memberNumber} ในระบบ`);
+  3427→  const totals = db.prepare(
+  3428→    `SELECT ROUND(COALESCE(SUM(total), 0), 2) AS totalSpent, COUNT(*) AS billCount, MAX(created_at) AS lastPurchaseAt FROM sales WHERE member_number = ?`,
+  3429→  ).get(number) as { totalSpent: number; billCount: number; lastPurchaseAt: string | null };
+  3430→  const topProducts = db.prepare(
+  3431→    `SELECT COALESCE(si.name, p.name) AS name, SUM(si.qty) AS qty, ROUND(SUM(si.qty * si.price), 2) AS total
+  3432→     FROM sales s
+  3433→     JOIN sale_items si ON si.sale_id = s.id
+  3434→     LEFT JOIN products p ON p.id = si.product_id
+  3435→     WHERE s.member_number = ?
+  3436→     GROUP BY si.name
+  3437→     ORDER BY qty DESC, total DESC
+  3438→     LIMIT 3`,
+  3439→  ).all(number) as unknown as MemberSpendingStats["topProducts"];
+  3440→  return {
+  3441→    totalSpent: round2(totals.totalSpent ?? 0),
+  3442→    billCount: totals.billCount ?? 0,
+  3443→    lastPurchaseAt: totals.lastPurchaseAt ?? null,
+  3444→    topProducts,
+  3445→  };
+  3446→}
+  3447→
+  3448→// --- seeding ----------------------------------------------------------------
+  3449→
+  3450→const SEED_PRODUCTS: { sku: string; barcode: string; name: string; category: string; emoji: string; color: string; unit: string; price: number; cost: number; stock: number; reorderPoint: number }[] = [
+  3451→  { sku: "DRK-001", barcode: "8850000000017", name: "น้ำดื่มคริสตัล 600 มล.", category: "เครื่องดื่ม", emoji: "💧", color: "blue", unit: "ขวด", price: 7, cost: 4.2, stock: 124, reorderPoint: 60 },
+  3452→  { sku: "DRK-002", barcode: "8850000000024", name: "กาแฟกระป๋อง เบอร์ดี้", category: "เครื่องดื่ม", emoji: "☕", color: "amber", unit: "กระป๋อง", price: 18, cost: 13.5, stock: 42, reorderPoint: 48 },
+  3453→  { sku: "FD-014", barcode: "8850000000031", name: "ข้าวกล่องกะเพราไก่", category: "อาหาร", emoji: "🍱", color: "orange", unit: "กล่อง", price: 45, cost: 32, stock: 18, reorderPoint: 10 },
+  3454→  { sku: "DRK-003", barcode: "8850000000048", name: "นมยูเอชที รสจืด", category: "เครื่องดื่ม", emoji: "🥛", color: "sky", unit: "กล่อง", price: 13, cost: 9.5, stock: 65, reorderPoint: 24 },
+  3455→  { sku: "FD-015", barcode: "8850000000055", name: "ขนมปังแซนด์วิช", category: "อาหาร", emoji: "🥪", color: "rose", unit: "ชิ้น", price: 25, cost: 18, stock: 9, reorderPoint: 12 },
+  3456→  { sku: "HYG-032", barcode: "8850000000062", name: "สบู่เหลวล้างมือ", category: "ของใช้", emoji: "🧴", color: "mint", unit: "ขวด", price: 32, cost: 24, stock: 28, reorderPoint: 10 },
+  3457→  { sku: "HYG-033", barcode: "8850000000079", name: "หน้ากากอนามัย 3 ชิ้น", category: "ของใช้", emoji: "😷", color: "violet", unit: "แพ็ก", price: 20, cost: 14, stock: 86, reorderPoint: 20 },
+  3458→  { sku: "ICE-004", barcode: "8850000000086", name: "น้ำแข็งถุงเล็ก", category: "ของใช้", emoji: "🧊", color: "cyan", unit: "ถุง", price: 10, cost: 6, stock: 35, reorderPoint: 40 },
+  3459→];
+  3460→
+  3461→/**
+  3462→ * Round 32-18 — สินค้าตัวอย่างสำหรับทดสอบการยิงบาร์โค้ด (สินค้าปกติมีบาร์โค้ดครบ
+  3463→ * ไม่เกี่ยวกับสินค้าไม่มีบาร์โค้ด) · แทรกแบบ idempotent ผ่าน INSERT OR IGNORE
+  3464→ * เพื่อให้ฐานข้อมูลเดิมที่ใช้งานอยู่ก็ได้รายการทดสอบด้วย
+  3465→ */
+  3466→const SEED_TEST_PRODUCTS: { sku: string; barcode: string; name: string; category: string; emoji: string; color: string; unit: string; price: number; cost: number; stock: number; reorderPoint: number }[] = [
+  3467→  { sku: "SNK-011", barcode: "8850101100015", name: "ขนมเคี้ยวกรอบรสชีส", category: "อาหาร", emoji: "🍪", color: "amber", unit: "แพ็ก", price: 20, cost: 14, stock: 54, reorderPoint: 20 },
+  3468→  { sku: "SNK-012", barcode: "8850101100022", name: "วุ้นมะพร้าวแช่เย็น", category: "อาหาร", emoji: "🍮", color: "rose", unit: "ถุง", price: 10, cost: 6, stock: 70, reorderPoint: 24 },
+  3469→  { sku: "DRK-005", barcode: "8850101100039", name: "ชาเขียวขวดพร้อมดื่ม", category: "เครื่องดื่ม", emoji: "🍵", color: "mint", unit: "ขวด", price: 25, cost: 17, stock: 38, reorderPoint: 12 },
+  3470→  { sku: "HYG-034", barcode: "8850101100046", name: "แปรงฟันสมุนไพร", category: "ของใช้", emoji: "🪥", color: "orange", unit: "ชิ้น", price: 35, cost: 24, stock: 22, reorderPoint: 10 },
+  3471→  { sku: "FD-016", barcode: "8850101100053", name: "โจ๊กหมูกระป๋อง", category: "อาหาร", emoji: "🍲", color: "sky", unit: "กระป๋อง", price: 22, cost: 15, stock: 40, reorderPoint: 12 },
+  3472→];
+  3473→
+  3474→/** Seed expiry anchored to today so demo data (และเทส expirySoon) ไม่หมดอายุไปตามเวลาจริง */
+  3475→const seedExpiryFromToday = (offsetDays: number) => {
+  3476→  const date = new Date();
+  3477→  date.setDate(date.getDate() + offsetDays);
+  3478→  return date.toISOString().slice(0, 10);
+  3479→};
+  3480→
+  3481→const SEED_STOCK_LOTS: { sku: string; lot: string; expiry: string | null; qty: number; cost: number; receivedAt: string }[] = [
+  3482→  { sku: "DRK-001", lot: "CR-2608-01", expiry: "2027-08-18", qty: 124, cost: 4.2, receivedAt: "2026-08-20 09:12:00" },
+  3483→  { sku: "DRK-002", lot: "CF-2607-02", expiry: "2027-03-10", qty: 42, cost: 13.5, receivedAt: "2026-08-15 10:40:00" },
+  3484→  { sku: "FD-014", lot: "ครัวกลาง-17", expiry: seedExpiryFromToday(12), qty: 18, cost: 32, receivedAt: "2026-09-17 07:20:00" },
+  3485→  { sku: "DRK-003", lot: "ML-2608-08", expiry: seedExpiryFromToday(25), qty: 65, cost: 9.5, receivedAt: "2026-08-22 08:55:00" },
+  3486→  { sku: "FD-015", lot: "BR-260917-A", expiry: seedExpiryFromToday(2), qty: 9, cost: 18, receivedAt: "2026-09-17 06:45:00" },
+  3487→  { sku: "HYG-032", lot: "HM-2606-03", expiry: "2028-06-04", qty: 28, cost: 24, receivedAt: "2026-06-28 13:10:00" },
+  3488→  { sku: "HYG-033", lot: "MSK-2606-01", expiry: "2029-06-30", qty: 86, cost: 14, receivedAt: "2026-06-28 13:25:00" },
+  3489→  { sku: "ICE-004", lot: "รับรายวัน", expiry: null, qty: 35, cost: 6, receivedAt: "2026-09-17 05:30:00" },
+  3490→  { sku: "SNK-011", lot: "TS-SNK-01", expiry: seedExpiryFromToday(120), qty: 54, cost: 14, receivedAt: "2026-09-10 09:00:00" },
+  3491→  { sku: "SNK-012", lot: "TS-SNK-02", expiry: seedExpiryFromToday(30), qty: 70, cost: 6, receivedAt: "2026-09-10 09:05:00" },
+  3492→  { sku: "DRK-005", lot: "TS-DRK-05", expiry: seedExpiryFromToday(180), qty: 38, cost: 17, receivedAt: "2026-09-10 09:10:00" },
+  3493→  { sku: "HYG-034", lot: "TS-HYG-34", expiry: seedExpiryFromToday(400), qty: 22, cost: 24, receivedAt: "2026-09-10 09:15:00" },
+  3494→  { sku: "FD-016", lot: "TS-FD-16", expiry: seedExpiryFromToday(200), qty: 40, cost: 15, receivedAt: "2026-09-10 09:20:00" },
+  3495→];
+  3496→
+  3497→const SEED_MEMBERS: { memberNumber: string; firstName: string; lastName: string; type: string; balance: number; status: "active" | "suspended" }[] = [
+  3498→  { memberNumber: "M-000218", firstName: "อรทัย", lastName: "ส.", type: "สมาชิก", balance: 1240, status: "active" },
+  3499→  { memberNumber: "M-000184", firstName: "ธนกร", lastName: "พ.", type: "เจ้าหน้าที่", balance: 860, status: "active" },
+  3500→  { memberNumber: "M-000092", firstName: "พิมพ์ชนก", lastName: "ร.", type: "สมาชิก", balance: 0, status: "suspended" },
+  3501→  { memberNumber: "M-000241", firstName: "สมชาย", lastName: "ว.", type: "สมาชิก", balance: 340, status: "active" },
+  3502→  { memberNumber: "M-000119", firstName: "จุฑามาศ", lastName: "ก.", type: "เจ้าหน้าที่", balance: 2180, status: "active" },
+  3503→];
+  3504→
+  3505→const SEED_MEMBER_TRANSACTIONS: { memberNumber: string; type: "purchase" | "deposit" | "withdrawal"; detail: string; amount: number; paymentMethod: string | null; balanceAfter: number; createdAt: string; actor: string | null }[] = [
+  3506→  { memberNumber: "M-000218", type: "purchase", detail: "บิล #INV-260917-038 · น้ำดื่ม 2 ขวด, ข้าวกล่อง 1 กล่อง", amount: -59, paymentMethod: "member_balance", balanceAfter: 1240, createdAt: "2026-09-17 14:38:00", actor: "น.ส.กัญญาณัฐ พ." },
+  3507→  { memberNumber: "M-000218", type: "deposit", detail: "เงินสด · ผู้ฝาก: น.ส.กัญญาณัฐ พ.", amount: 500, paymentMethod: "cash", balanceAfter: 1299, createdAt: "2026-09-17 14:32:00", actor: "น.ส.กัญญาณัฐ พ." },
+  3508→  { memberNumber: "M-000218", type: "withdrawal", detail: "ถอนเพื่อถอนฟัน · เงินสด", amount: -200, paymentMethod: "cash", balanceAfter: 799, createdAt: "2026-09-12 10:16:00", actor: "นายวรพจน์ ด." },
+  3509→  { memberNumber: "M-000218", type: "purchase", detail: "บิล #INV-260901-006 · สินค้า 4 รายการ", amount: -132, paymentMethod: "member_balance", balanceAfter: 999, createdAt: "2026-09-01 09:05:00", actor: "น.ส.กัญญาณัฐ พ." },
+  3510→  { memberNumber: "M-000092", type: "withdrawal", detail: "ถอนเพื่อถอนฟัน · แนบหลักฐานแล้ว", amount: -200, paymentMethod: "cash", balanceAfter: 0, createdAt: "2026-09-16 09:12:00", actor: "นายวรพจน์ ด." },
+  3511→  { memberNumber: "M-000092", type: "purchase", detail: "บิล #INV-260912-091 · สินค้า 2 รายการ", amount: -80, paymentMethod: "member_balance", balanceAfter: 200, createdAt: "2026-09-12 11:40:00", actor: "น.ส.กัญญาณัฐ พ." },
+  3512→];
+  3513→
+  3514→const SEED_AUDIT_LOGS: { action: string; actor: string; actorRole: string; detail: string; tone: string; createdAt: string }[] = [
+  3515→  { action: "ขายสินค้า", actor: "น.ส.กัญญาณัฐ พ.", actorRole: "เจ้าหน้าที่", detail: "บิล #INV-260917-038 · ฿186.00", tone: "blue", createdAt: "2026-09-17 14:38:00" },
+  3516→  { action: "เติมเงินสมาชิก", actor: "น.ส.กัญญาณัฐ พ.", actorRole: "เจ้าหน้าที่", detail: "M-000218 · ฿500.00 · เงินสด", tone: "green", createdAt: "2026-09-17 14:32:00" },
+  3517→  { action: "แก้ไขสต็อก", actor: "นายวรพจน์ ด.", actorRole: "ผู้บริหาร", detail: "น้ำดื่มคริสตัล · +24 ขวด", tone: "amber", createdAt: "2026-09-17 13:51:00" },
+  3518→  { action: "ถอนเงินสมาชิก", actor: "น.ส.กัญญาณัฐ พ.", actorRole: "เจ้าหน้าที่", detail: "M-000092 · ฿200.00 · ถอนเพื่อถอนฟัน", tone: "purple", createdAt: "2026-09-17 12:06:00" },
+  3519→];
+  3520→
+  3521→// ROUND 36 (ข้อ 31) — SEED_APP_USERS + seedAppUsers ถูกลบออก: ฐานข้อมูลใหม่เริ่มด้วย
+  3522→// ศูนย์บัญชีผู้ใช้เสมอ หน้าลงทะเบียนผู้บริหารหลัก (SetupView) จะโผล่มาเอง (ฐาน
+  3523→// ข้อมูลเดิมที่มีผู้ใช้อยู่แล้วไม่กระทบ — INSERT OR IGNORE เดิมก็ไม่เคยเขียนซ้ำ)
+  3524→
+  3525→/** Deterministic pseudo-random generator so seeded history is reproducible. */
+  3526→function createRng(seed: number) {
+  3527→  let state = seed >>> 0;
+  3528→  return () => {
+  3529→    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
+  3530→    return state / 0x100000000;
+  3531→  };
+  3532→}
+  3533→
+  3534→function seedHistoricalSales(db: SqliteDb) {
+  3535→  const products = listProducts(db);
+  3536→  const bySku = new Map(products.map((product) => [product.sku, product]));
+  3537→  const weights: { sku: string; weight: number }[] = [
+  3538→    { sku: "DRK-001", weight: 30 },
+  3539→    { sku: "DRK-002", weight: 12 },
+  3540→    { sku: "FD-014", weight: 8 },
+  3541→    { sku: "DRK-003", weight: 12 },
+  3542→    { sku: "FD-015", weight: 8 },
+  3543→    { sku: "HYG-032", weight: 6 },
+  3544→    { sku: "HYG-033", weight: 12 },
+  3545→    { sku: "ICE-004", weight: 12 },
+  3546→  ];
+  3547→  const rand = createRng(20260918);
+  3548→  const pickProduct = () => {
+  3549→    let roll = rand() * 100;
+  3550→    for (const entry of weights) {
+  3551→      roll -= entry.weight;
+  3552→      if (roll < 0) return bySku.get(entry.sku)!;
+  3553→    }
+  3554→    return bySku.get("DRK-001")!;
+  3555→  };
+  3556→  const today = startOfToday();
+  3557→  runInTransaction(db, () => {
+  3558→    const insertSale = db.prepare(`INSERT INTO sales (order_number, payment_method, member_number, subtotal, discount, total, cashier, created_at) VALUES (?, ?, NULL, ?, ?, ?, ?, ?)`);
+  3559→    const insertItem = db.prepare(`INSERT INTO sale_items (sale_id, product_id, name, qty, price, cost, unit) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+  3560→    for (let daysAgo = 30; daysAgo >= 1; daysAgo -= 1) {
+  3561→      const date = addDays(today, -daysAgo);
+  3562→      const orders = 90 + Math.floor(rand() * 40);
+  3563→      for (let sequence = 1; sequence <= orders; sequence += 1) {
+  3564→        const itemCount = 2 + Math.floor(rand() * 4);
+  3565→        const chosen = new Map<number, { product: SqliteProduct; qty: number }>();
+  3566→        for (let index = 0; index < itemCount; index += 1) {
+  3567→          const product = pickProduct();
+  3568→          const qty = 1 + Math.floor(rand() * 3);
+  3569→          const existing = chosen.get(product.id);
+  3570→          chosen.set(product.id, { product, qty: (existing?.qty ?? 0) + qty });
+  3571→        }
+  3572→        const items = Array.from(chosen.values());
+  3573→        const subtotal = round2(items.reduce((sum, { product, qty }) => sum + product.price * qty, 0));
+  3574→        const discount = rand() < 0.1 ? round2(5 + Math.floor(rand() * 11)) : 0;
+  3575→        const total = round2(subtotal - discount);
+  3576→        const paymentMethod = rand() < 0.6 ? "เงินสด" : "QR / สแกน";
+  3577→        const createdAt = `${formatDate(date)} ${pad2(8 + Math.floor(rand() * 10))}:${pad2(Math.floor(rand() * 60))}:${pad2(Math.floor(rand() * 60))}`;
+  3578→        const orderNumber = `RC-${yyMMdd(date)}-${String(sequence).padStart(3, "0")}`;
+  3579→        const cashier = rand() < 0.75 ? "น.ส.กัญญาณัฐ พ." : "นายวรพจน์ ด.";
+  3580→        const result = insertSale.run(orderNumber, paymentMethod, subtotal, discount, total, cashier, createdAt);
+  3581→        const saleId = Number(result.lastInsertRowid);
+  3582→        for (const { product, qty } of items) {
+  3583→          insertItem.run(saleId, product.id, product.name, qty, product.price, product.cost, product.unit);
+  3584→        }
+  3585→      }
+  3586→    }
+  3587→  });
+  3588→}
+  3589→
+  3590→/**
+  3591→ * Idempotent seeding of the welfare store demo dataset, mirroring the client
+  3592→ * mock data in client/src/pages/pageData.ts plus a plausible 30-day sales
+  3593→ * history. Each table only seeds when it is still empty.
+  3594→ */
+  3595→export function seedWelfareStoreData(db: SqliteDb) {
+  3596→  // ROUND 36 (ข้อ 31) — ไม่ seed บัญชีผู้ใช้: ฐานข้อมูลใหม่ (countAppUsers === 0)
+  3597→  // ต้องลงทะเบียนผู้บริหารหลักผ่าน SetupView → setupInitialAdmin แล้วบังคับ
+  3598→  // เปลี่ยนรหัสผ่านก่อนเข้าใช้งานจริง
+  3599→  const insertMember = db.prepare(`INSERT OR IGNORE INTO members (member_number, first_name, last_name, id_card, balance, status, type) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+  3600→  for (const member of SEED_MEMBERS) {
+  3601→    insertMember.run(member.memberNumber, member.firstName, member.lastName, null, member.balance, member.status, member.type);
+  3602→  }
+  3603→  if (countRows(db, "member_transactions") === 0) {
+  3604→    const insertTransaction = db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, actor, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
+  3605→    for (const transaction of SEED_MEMBER_TRANSACTIONS) {
+  3606→      insertTransaction.run(transaction.memberNumber, transaction.type, transaction.detail, transaction.amount, transaction.paymentMethod, transaction.balanceAfter, transaction.actor, transaction.createdAt);
+  3607→    }
+  3608→  }
+  3609→  // Req 23.2 — ตัวอย่างวงเงินซื้อสินค้าต่อวัน + คำขอลดวงเงิน (idempotent):
+  3610→  // หยิบสมาชิกจริง 3 รายแรกจากฐานข้อมูล ตั้งวงเงินกว้างๆ ที่ไม่กระทบการซื้อปกติ
+  3611→  // แล้วใส่คำขอรอพิจารณา 2 รายการ + อนุมัติแล้ว 1 รายการ (ไม่เขียน audit log
+  3612→  // เพื่อไม่ให้เกินจำนวน seed ที่เทสตรวจ)
+  3613→  if (countRows(db, "limit_requests") === 0) {
+  3614→    const demoMembers = db.prepare(`SELECT member_number AS memberNumber FROM members WHERE status = 'active' ORDER BY member_number LIMIT 3`).all() as unknown as { memberNumber: string }[];
+  3615→    if (demoMembers.length >= 3) {
+  3616→      const [memberA, memberB, memberC] = demoMembers;
+  3617→      const daysAgoStamp = (days: number, time: string) => `${formatDate(addDays(new Date(), -days))} ${time}`;
+  3618→      const setLimit = db.prepare(`UPDATE members SET credit_limit = ? WHERE member_number = ?`);
+  3619→      setLimit.run(5000, memberA.memberNumber);
+  3620→      setLimit.run(3000, memberB.memberNumber);
+  3621→      setLimit.run(10000, memberC.memberNumber);
+  3622→      const insertRequest = db.prepare(`INSERT INTO limit_requests (member_number, current_limit, requested_limit, reason, status, requested_by, decided_by, decided_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  3623→      insertRequest.run(memberA.memberNumber, 5000, 3000, "ขอควบคุมการใช้จ่ายของตนเอง", "pending", "กัญญาณัฐ ส.", null, null, daysAgoStamp(2, "09:24:00"));
+  3624→      insertRequest.run(memberB.memberNumber, 3000, 1000, "ลดวงเงินชั่วคราวตามคำขอของสมาชิก", "pending", "กัญญาณัฐ ส.", null, null, daysAgoStamp(1, "14:05:00"));
+  3625→      insertRequest.run(memberC.memberNumber, 10000, 4000, "ปรับวงเงินให้เหมาะกับการใช้จ่ายจริง", "approved", "วรพจน์ ด.", "วรพจน์ ด.", daysAgoStamp(3, "16:40:00"), daysAgoStamp(4, "10:12:00"));
+  3626→      // คำขอที่อนุมัติไปแล้ว → วงเงินจริงของสมาชิกต้องเป็นค่าที่ขอ
+  3627→      setLimit.run(4000, memberC.memberNumber);
+  3628→    }
+  3629→  }
+  3630→  if (countRows(db, "products") === 0) {
+  3631→    const insertProduct = db.prepare(`INSERT INTO products (sku, barcode, name, category, emoji, color, unit, price, cost, stock, reorder_point, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`);
+  3632→    for (const product of [...SEED_PRODUCTS, ...SEED_TEST_PRODUCTS]) {
+  3633→      insertProduct.run(product.sku, product.barcode, product.name, product.category, product.emoji, product.color, product.unit, product.price, product.cost, product.stock, product.reorderPoint);
+  3634→    }
+  3635→  } else {
+  3636→    // Round 32-18 — ฐานข้อมูลที่มีข้อมูลอยู่แล้วก็ได้สินค้าทดสอบยิงบาร์โค้ด (idempotent)
+  3637→    const insertTest = db.prepare(`INSERT OR IGNORE INTO products (sku, barcode, name, category, emoji, color, unit, price, cost, stock, reorder_point, active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`);
+  3638→    for (const product of SEED_TEST_PRODUCTS) {
+  3639→      const info = insertTest.run(product.sku, product.barcode, product.name, product.category, product.emoji, product.color, product.unit, product.price, product.cost, product.stock, product.reorderPoint);
+  3640→      if (info.changes > 0) {
+  3641→        const created = db.prepare(`SELECT id FROM products WHERE sku = ?`).get(product.sku) as { id: number } | undefined;
+  3642→        if (created) {
+  3643→          db.prepare(`INSERT INTO stock_lots (product_id, lot, expiry_date, qty, cost, received_at, received_qty) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+  3644→            .run(created.id, `TEST-${product.sku}`, null, product.stock, product.cost, new Date().toISOString().slice(0, 19).replace("T", " "), product.stock);
+  3645→        }
+  3646→      }
+  3647→    }
+  3648→  }
+  3649→  if (countRows(db, "stock_lots") === 0) {
+  3650→    const insertLot = db.prepare(`INSERT INTO stock_lots (product_id, lot, expiry_date, qty, cost, received_at, received_qty) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+  3651→    for (const lot of SEED_STOCK_LOTS) {
+  3652→      const product = db.prepare(`SELECT id FROM products WHERE sku = ?`).get(lot.sku) as { id: number } | undefined;
+  3653→      if (product) insertLot.run(product.id, lot.lot, lot.expiry, lot.qty, lot.cost, lot.receivedAt, lot.qty);
+  3654→    }
+  3655→  }
+  3656→  if (countRows(db, "sales") === 0) {
+  3657→    seedHistoricalSales(db);
+  3658→  }
+  3659→  if (countRows(db, "audit_logs") === 0) {
+  3660→    const insertLog = db.prepare(`INSERT INTO audit_logs (action, actor, actor_role, detail, tone, created_at) VALUES (?, ?, ?, ?, ?, ?)`);
+  3661→    for (const log of SEED_AUDIT_LOGS) {
+  3662→      insertLog.run(log.action, log.actor, log.actorRole, log.detail, log.tone, log.createdAt);
+  3663→    }
+  3664→  }
+  3665→}
+  3666→
+  3667→/**
+  3668→ * Opens (and creates if needed) the welfare store database, runs migrations
+  3669→ * and seeds demo data. Uses SQLITE_DB_PATH when no filename is provided.
+  3670→ */
+  3671→/**
+  3672→ * ROUND 48 (user) — โหมดพัฒนา (pnpm dev) กับฐานข้อมูลใหม่: สร้างบัญชีทดสอบ
+  3673→ * ให้อัตโนมัติ ไม่ต้องผ่านหน้าลงทะเบียนครั้งแรก (SetupView) — ตรงกับชิปบัญชี
+  3674→ * ทดลองที่หน้าล็อกอินโชว์ไว้แล้ว (kanyanat / woraphot · รหัส 1234)
+  3675→ * ทำงานเฉพาะ NODE_ENV=development เท่านั้น: production (pnpm start) ยัง
+  3676→ * บังคับลงทะเบียนผู้บริหารจริงตามดีไซน์ Round 36 เสมอ
+  3677→ */
+  3678→function seedDevAppUsers(db: SqliteDb): void {
+  3679→  const createdAt = formatDateTime();
+  3680→  const insert = db.prepare(`INSERT INTO app_users (username, password_hash, display_name, role, active, created_at, must_change_password) VALUES (?, ?, ?, ?, 1, ?, 0)`);
+  3681→  insert.run("kanyanat", hashPassword("1234"), "น.ส.กัญญาณัฐ พ.", "staff", createdAt);
+  3682→  insert.run("woraphot", hashPassword("1234"), "นายวรพจน์ ด.", "admin", createdAt);
+  3683→  logAction(db, "โหมดพัฒนา", "ระบบ", "สร้างบัญชีทดสอบอัตโนมัติ kanyanat (เจ้าหน้าที่) + woraphot (ผู้บริหาร) · รหัสผ่าน 1234 · ข้ามหน้าลงทะเบียนครั้งแรกให้โหมดพัฒนา", "green", null, createdAt);
+  3684→}
+  3685→
+  3686→/**
+  3687→ * ROUND 66 (user) — "ทำไมยังเป็นข้อมูลเดโม": SEED_DEMO_DATA=1 ที่ตั้งค้างไว้ใน .env
+  3688→ * เคยฉีดสมาชิกเดโม 5 คน + สินค้าทดสอบ 5 รายการกลับเข้าฐานข้อมูลที่ "ไม่ว่าง"
+
+[showing lines 3239-3688 of 3723; use offset=3689 with limit to continue reading]

@@ -1,0 +1,502 @@
+   300→    setWalletSlipBusy("");
+   301→    setWalletPrintPreview(false);
+   302→  };
+   303→  const downloadWalletSlip = async (format: "pdf" | "image") => {
+   304→    if (!walletResult) return;
+   305→    setWalletSlipBusy(format);
+   306→    try {
+   307→      const stamp = walletDoneAt
+   308→        ? `${String(walletDoneAt.getFullYear() + 543).slice(2)}${String(walletDoneAt.getMonth() + 1).padStart(2, "0")}${String(walletDoneAt.getDate()).padStart(2, "0")}-${String(walletDoneAt.getHours()).padStart(2, "0")}${String(walletDoneAt.getMinutes()).padStart(2, "0")}`
+   309→        : String(Date.now());
+   310→      const kindLabel = walletResult.type === "deposit" ? "เติมเงิน" : walletResult.type === "refund" ? "คืนบัตรเงินสด" : "ถอนเงิน";
+   311→      await downloadSlipFile("member-wallet-slip", `สลิป${kindLabel}-${walletResult.memberNumber}-${stamp}`, format);
+   312→    } finally { setWalletSlipBusy(""); }
+   313→  };
+   314→  const statusMutation = trpc.member.setStatus.useMutation({
+   315→    onSuccess: (result) => {
+   316→      const member = result?.member;
+   317→      if (!member) return;
+   318→      setNotice(`${member.status === "suspended" ? "ระงับการใช้งาน" : "คืนสถานะการใช้งาน"} ${memberFullName(member)} แล้ว`);
+   319→      void utils.member.list.invalidate();
+   320→      void utils.member.detail.invalidate();
+   321→    },
+   322→    onError: (mutationError) => setError(getErrorMessage(mutationError)),
+   323→  });
+   324→  const updateMutation = trpc.member.update.useMutation({
+   325→    onSuccess: (result) => {
+   326→      setEditOpen(false);
+   327→      setError("");
+   328→      setNotice(`บันทึกการแก้ไขข้อมูลสมาชิกเรียบร้อยแล้ว · ${memberFullName(result)}`);
+   329→      void utils.member.detail.invalidate({ memberNumber: member.memberNumber });
+   330→      void utils.member.list.invalidate();
+   331→    },
+   332→    onError: (mutationError) => setError(getErrorMessage(mutationError)),
+   333→  });
+   334→  // ROUND 34 (req 23.2) — ยื่นคำขอลดวงเงิน: เจ้าหน้าที่ทุกคนทำได้ คำขอเข้าสถานะรอพิจารณา
+   335→  const limitRequestMutation = trpc.member.requestLimitReduction.useMutation({
+   336→    onSuccess: () => {
+   337→      setLimitOpen(false);
+   338→      setLimitStep("form");
+   339→      setLimitValue("");
+   340→      setLimitReason("");
+   341→      setError("");
+   342→      setNotice("ส่งคำขอลดวงเงินเรียบร้อย · รอผู้บริหารพิจารณา");
+   343→      void utils.member.list.invalidate();
+   344→      void utils.member.detail.invalidate();
+   345→      void utils.reports.memberTransactions.invalidate();
+   346→    },
+   347→    onError: (mutationError) => setError(getErrorMessage(mutationError)),
+   348→  });
+   349→  const deleteMutation = trpc.member.delete.useMutation({
+   350→    onSuccess: (result) => {
+   351→      void utils.member.list.invalidate();
+   352→      void utils.dashboard.stats.invalidate();
+   353→      onDeleted(`ลบสมาชิก ${result.memberName} (${result.memberNumber}) ออกจากระบบแล้ว`);
+   354→    },
+   355→    onError: (mutationError) => setError(getErrorMessage(mutationError)),
+   356→  });
+   357→  const openEdit = () => {
+   358→    const detail = detailQuery.data?.member;
+   359→    setEditForm({ prename: detail?.prename ?? profile.prename ?? "", firstName: detail?.firstName ?? profile.firstName, lastName: detail?.lastName ?? profile.lastName, type: detail?.type ?? profile.type, phone: detail?.phone ?? "", idCard: detail?.idCard ?? "", gender: detail?.gender === "ชาย" ? "ชาย" : detail?.gender === "หญิง" ? "หญิง" : "ไม่ระบุ", photoUrl: detail?.photoUrl ?? "", creditLimit: detail?.creditLimit != null ? String(detail.creditLimit) : "", cardNumber: detail?.cardNumber ?? profile.cardNumber ?? "", patientCode: detail?.patientCode ?? profile.patientCode ?? "" });
+   360→    setError("");
+   361→    setEditOpen(true);
+   362→  };
+   363→  // Round 31 — member photo upload in the edit dialog (shrunk to a data-URL).
+   364→  const onEditPhotoPick = (event: React.ChangeEvent<HTMLInputElement>) => {
+   365→    const file = event.target.files?.[0];
+   366→    event.target.value = "";
+   367→    if (!file) return;
+   368→    if (!/^image\/(png|jpe?g|webp)$/.test(file.type)) { setError("รองรับเฉพาะไฟล์รูป PNG JPG WEBP"); return; }
+   369→    if (file.size > 8_000_000) { setError("ไฟล์รูปใหญ่เกิน 8MB — เลือกไฟล์เล็กลง"); return; }
+   370→    compressImageToDataUrl(file, 480, 0.72).then((dataUrl) => { setEditForm((current) => (current ? { ...current, photoUrl: dataUrl } : current)); setError(""); }).catch(() => setError("อ่านไฟล์รูปไม่สำเร็จ"));
+   371→  };
+   372→  const submitEdit = () => {
+   373→    if (!editForm) return;
+   374→    if (!editForm.firstName.trim() || !editForm.lastName.trim()) { setError("กรุณาระบุชื่อและนามสกุลสมาชิก"); return; }
+   375→    // ROUND 34 — วงเงินซื้อสินค้าต่อวัน: เว้นว่าง = ไม่จำกัด (null) ไม่งั้นต้องเป็นจำนวนเต็มบวก
+   376→    const creditLimitDraft = editForm.creditLimit.trim();
+   377→    const creditLimitValue = creditLimitDraft === "" ? null : Number(creditLimitDraft);
+   378→    if (creditLimitValue !== null && (!Number.isFinite(creditLimitValue) || !Number.isInteger(creditLimitValue) || creditLimitValue <= 0 || creditLimitValue > 1_000_000)) { setError("วงเงินต้องเป็นตัวเลขมากกว่า 0 และไม่เกิน 1,000,000"); return; }
+   379→    setError("");
+   380→    updateMutation.mutate({
+   381→      memberNumber: member.memberNumber,
+   382→      prename: editForm.prename.trim() || null,
+   383→      firstName: editForm.firstName.trim(),
+   384→      lastName: editForm.lastName.trim(),
+   385→      idCard: editForm.idCard.trim() || null,
+   386→      phone: editForm.phone.trim() || null,
+   387→      type: editForm.type,
+   388→      gender: editForm.gender,
+   389→      photoUrl: editForm.photoUrl || null,
+   390→      creditLimit: creditLimitValue,
+   391→      cardNumber: editForm.cardNumber.trim() || null,
+   392→      patientCode: editForm.patientCode.trim() || null,
+   393→      actor,
+   394→      actorRole,
+   395→    });
+   396→  };
+   397→  const submitWallet = () => {
+   398→    if (!walletOpen) return;
+   399→    const amount = Number(walletAmount);
+   400→    if (!(amount > 0)) { setError("กรุณาระบุจำนวนเงินมากกว่า 0"); return; }
+   401→    if (walletOpen !== "deposit" && amount > profile.balance) { setError(`ยอดเงินคงเหลือไม่พอ · ${walletOpen === "refund" ? "คืนบัตร" : "ถอน"} ${money(amount)} คงเหลือ ${money(profile.balance)}`); return; }
+   402→    setError("");
+   403→    setWalletConfirm(true);
+   404→  };
+   405→  const confirmWallet = () => {
+   406→    if (!walletOpen || !(Number(walletAmount) > 0)) { setWalletConfirm(false); return; }
+   407→    walletMutation.mutate({ memberNumber: member.memberNumber, type: walletOpen, amount: Number(walletAmount), note: walletNote.trim() || undefined, actor, actorRole });
+   408→  };
+   409→  // ROUND 34 (req 23.2) — ขอลดวงเงิน: เปิดโมดัล + ตรวจข้อมูลก่อนขั้นยืนยัน + ส่งคำขอ
+   410→  const openLimitDialog = () => { setLimitValue(""); setLimitReason(""); setLimitStep("form"); setError(""); setLimitOpen(true); };
+   411→  const submitLimitRequest = () => {
+   412→    const value = Number(limitValue);
+   413→    if (limitValue.trim() === "" || !Number.isFinite(value) || !Number.isInteger(value) || value <= 0 || value > 1_000_000) { setError("วงเงินใหม่ต้องเป็นตัวเลขจำนวนเต็มมากกว่า 0 และไม่เกิน 1,000,000"); return; }
+   414→    if (profile.creditLimit != null && value >= profile.creditLimit) { setError(`วงเงินใหม่ต้องน้อยกว่าวงเงินปัจจุบัน (${money(profile.creditLimit)})`); return; }
+   415→    setError("");
+   416→    setLimitStep("confirm");
+   417→  };
+   418→  const confirmLimitRequest = () => {
+   419→    const value = Number(limitValue);
+   420→    if (!Number.isInteger(value) || value <= 0) { setLimitStep("form"); return; }
+   421→    limitRequestMutation.mutate({ memberNumber: member.memberNumber, requestedLimit: value, reason: limitReason.trim() || undefined, actor, actorRole });
+   422→  };
+   423→  return <><SectionHeader eyebrow="สมาชิกและบัญชี / รายละเอียด" title={`รายละเอียด ${displayName}`} description="ตรวจสอบประวัติการซื้อสินค้า เติมเงิน และถอนเงินของสมาชิกแต่ละราย" action={<button className="outline-button" onClick={onBack}><ArrowDownToLine size={16} style={{ transform: "rotate(90deg)" }} /> กลับไปรายการสมาชิก</button>} /><div className="member-detail-head"><div className="member-detail-profile"><span className="member-detail-avatar">{profile.firstName.slice(0, 1)}</span><div><span className="eyebrow">{profile.type} · {profile.memberNumber}</span><h2>{displayName}</h2><p>บัตร <b className="cell-mono">{profile.cardNumber ?? "—"}</b> · รหัสผู้ป่วย <b className="cell-mono">{profile.patientCode ?? "—"}</b> · เปิดใช้ {formatThaiDate(profile.createdAt)}<br />สถานะ <StatusPill tone={statusMeta.tone}>{statusMeta.label}</StatusPill> <span className="member-limit-chip" title="วงเงินซื้อสินค้าต่อวันของสมาชิกนี้ (ชำระหักบัญชี) — เว้นว่างคือไม่จำกัด">วงเงินซื้อ/วัน {profile.creditLimit != null ? money(profile.creditLimit) : "ไม่จำกัด"}</span></p></div></div><div className="member-detail-actions"><button className="primary-button" disabled={profile.status !== "active"} onClick={() => { setWalletOpen("deposit"); setWalletConfirm(false); setWalletResult(null); setError(""); }}><ArrowDownToLine size={15} /> เติมเงิน</button><button className="outline-button" disabled={profile.status !== "active"} onClick={() => { setWalletOpen("withdrawal"); setWalletConfirm(false); setWalletResult(null); setError(""); }}><ArrowUpFromLine size={15} /> ถอนเงิน</button><button className="outline-button refund-card-button" disabled={profile.status !== "active" || profile.balance <= 0} onClick={() => { setWalletOpen("refund"); setWalletAmount(profile.balance > 0 ? String(profile.balance) : ""); setWalletConfirm(false); setWalletResult(null); setError(""); }} title="ผู้ป่วยคืนบัตรเมื่อออกจากโรงพยาบาล — จ่ายเงินสดคืนตามยอดคงเหลือ แล้วยอดเหลือเป็น 0"><IdCard size={15} /> คืนบัตรเงินสด</button><button className="outline-button" onClick={openLimitDialog} title="ยื่นคำขอลดวงเงินซื้อสินค้าต่อวัน — รอผู้บริหารพิจารณา"><TrendingDown size={15} /> ขอลดวงเงิน</button>{profile.status === "active" ? <button className="danger-outline-button" onClick={() => setConfirmStatus(true)}><LockKeyhole size={15} /> ระงับการใช้งาน</button> : <button className="outline-button" onClick={() => setConfirmStatus(true)}><Check size={15} /> คืนสถานะ</button>}<button className="outline-button" onClick={openEdit}><Settings2 size={15} /> แก้ไขข้อมูลสมาชิก</button><button className="outline-button" disabled={detailQuery.isLoading} onClick={() => setStatementOpen(true)}><FileText size={15} /> ส่งออกรายงานธุรกรรม</button><button className="outline-button" onClick={() => setCardOpen(true)}><IdCard size={15} /> พิมพ์บัตรสมาชิก</button>{isAdminRole(role) && <button className="danger-outline-button" onClick={() => { setConfirmDelete(true); setError(""); }}><Trash2 size={15} /> ลบสมาชิก</button>}</div></div>{error && !walletOpen && !editOpen && !limitOpen && <div className="notice-bar error" style={{ marginBottom: 14 }}><ShieldCheck size={16} /> {error}<button onClick={() => setError("")}><X size={14} /></button></div>}<div className="member-detail-stats"><div><span className="stat-icon green"><WalletCards size={18} /></span><div><small>ยอดเงินคงเหลือ</small><strong>{money(profile.balance)}</strong></div></div><div><span className="stat-icon blue"><ShoppingCart size={18} /></span><div><small>ยอดซื้อเดือนนี้</small><strong>{money(monthPurchase)}</strong></div></div><div><span className="stat-icon purple"><ArrowDownToLine size={18} /></span><div><small>เติมเงินสะสม</small><strong>{money(totalDeposited)}</strong></div></div><div><span className="stat-icon amber"><CalendarDays size={18} /></span><div><small>รายการล่าสุด</small><strong>{lastActivity}</strong></div></div></div>{statsQuery.isLoading ? <div className="member-detail-stats member-purchase-stats" aria-busy="true">{Array.from({ length: 4 }, (_, index) => <div key={`stat-skeleton-${index}`}><span className="skeleton-avatar" /><div className="member-stat-skeleton"><span className="skeleton-cell-n" /><span className="skeleton-cell-w" /></div></div>)}</div> : statsQuery.data ? <div className="member-detail-stats member-purchase-stats"><div><span className="stat-icon blue"><ReceiptText size={18} /></span><div><small>ยอดซื้อสะสม</small><strong>{money(statsQuery.data.totalSpent)}</strong></div></div><div><span className="stat-icon green"><ShoppingBag size={18} /></span><div><small>จำนวนบิล</small><strong>{statsQuery.data.billCount} บิล</strong></div></div><div><span className="stat-icon purple"><CalendarDays size={18} /></span><div><small>ซื้อครั้งล่าสุด</small><strong>{statsQuery.data.lastPurchaseAt ? formatHistoryDate(statsQuery.data.lastPurchaseAt) : "ยังไม่เคยซื้อ"}</strong></div></div><div><span className="stat-icon amber"><Star size={18} /></span><div className="member-top-products"><small>สินค้าที่ซื้อบ่อย</small>{statsQuery.data.topProducts.length === 0 ? <span className="top-products-empty">ยังไม่มีประวัติการซื้อสินค้า</span> : <div className="top-products-list">{statsQuery.data.topProducts.map((product) => <span className="top-product-chip" key={product.name}>{product.name} <b>×{product.qty}</b></span>)}</div>}</div></div></div> : null}<section className="panel table-panel member-history-panel"><div className="table-toolbar"><div><h2>ประวัติการทำรายการ</h2><p>ข้อมูลย้อนหลังของ {displayName} · รวม {transactions.length} รายการ</p></div><div className="filter-pills history-tabs">{["ทั้งหมด", "ซื้อสินค้า", "เติมเงิน", "ถอนเงิน", "เปิดใช้บัตร", "คืนบัตรเงินสด"].map((item) => <button className={tab === item ? "active" : ""} key={item} onClick={() => setTab(item as typeof tab)}>{item}</button>)}</div></div><div className="member-history-list">{detailQuery.isLoading ? <div className="table-loading"><ReceiptText size={22} /><b>กำลังโหลดประวัติการทำรายการ</b><span>ดึงข้อมูลธุรกรรมของสมาชิกจากระบบ</span></div> : filtered.length === 0 ? <div className="table-loading"><ReceiptText size={22} /><b>ไม่พบรายการตามเงื่อนไข</b><span>ลองเปลี่ยนแท็บหรือทำรายการผ่าน POS</span></div> : filtered.map((transaction) => { const meta = WALLET_TX_META[transaction.type] ?? { label: transaction.type, tone: "blue" }; return <div className="history-row" key={transaction.id}><span className={`history-icon ${meta.tone}`}>{transaction.type === "purchase" ? <ShoppingCart size={16} /> : transaction.type === "deposit" ? <ArrowDownToLine size={16} /> : transaction.type === "activation" ? <IdCard size={16} /> : <ArrowUpFromLine size={16} />}</span><div className="history-main"><div><b>{meta.label}</b><span>{`TX-${String(transaction.id).padStart(3, "0")}`}</span></div><small>{transaction.detail}</small><time>{formatHistoryDate(transaction.createdAt)}</time></div>{transaction.hasSlip === 1 && <SlipViewButton kind="tx" id={transaction.id} title={`หลักฐาน${meta.label}`} subtitle={`${profile.memberNumber} · ${formatHistoryDate(transaction.createdAt)}`} />}<strong className={transaction.amount > 0 ? "positive" : "negative"}>{transaction.amount > 0 ? "+ " : "- "}{money(Math.abs(transaction.amount))}</strong></div>; })}</div>{notice && <div className="notice-bar"><Check size={16} /> {notice}<button onClick={() => setNotice("")}><X size={14} /></button></div>}</section>{walletOpen && <div className="modal-backdrop" onClick={closeWalletSlip}><div className="form-modal" onClick={(event) => event.stopPropagation()}><div className="modal-heading"><div><span className="eyebrow">{walletResult ? (walletResult.type === "deposit" ? "WALLET SLIP · DEPOSIT" : walletResult.type === "refund" ? "WALLET SLIP · REFUND" : "WALLET SLIP · WITHDRAWAL") : "WALLET TRANSACTION"}</span><h2>{walletResult ? (walletResult.type === "deposit" ? "สลิปเติมเงิน" : walletResult.type === "refund" ? "สลิปคืนบัตรเงินสด" : "สลิปถอนเงิน") : walletOpen === "deposit" ? "เติมเงินเข้าบัญชีสมาชิก" : walletOpen === "refund" ? "คืนบัตรเงินสด (จ่ายเงินคืนผู้ป่วย)" : "ถอนเงินจากบัญชีสมาชิก"}</h2><p>{walletResult ? `${walletResult.memberName} · ${walletResult.memberNumber} · บันทึกเรียบร้อย` : `${displayName} · ${profile.memberNumber} · ยอดคงเหลือ ${money(profile.balance)}${walletOpen === "refund" ? " · บัตรที่คืนต้องเหลือยอด 0" : ""}`}</p></div><button className="icon-button" onClick={closeWalletSlip}><X size={17} /></button></div>{walletResult ? <><div className="wallet-success"><div className="receipt-paper wallet-slip" id="member-wallet-slip"><div className="receipt-success slip"><span>{walletResult.type === "deposit" ? <ArrowDownToLine size={22} /> : <ArrowUpFromLine size={22} />}</span><div><b>{walletResult.type === "deposit" ? "เติมเงินสำเร็จ" : walletResult.type === "refund" ? "คืนบัตรเงินสดสำเร็จ" : "ถอนเงินสำเร็จ"}</b><small>บันทึกลงรายการธุรกรรมของสมาชิกแล้ว</small></div></div><div className="receipt-divider" /><div className="receipt-meta"><span>{walletResult.type === "deposit" ? "ใบยืนยันการเติมเงิน" : walletResult.type === "refund" ? "ใบยืนยันการคืนบัตรเงินสด" : "ใบยืนยันการถอนเงิน"}</span><b>{walletDoneAt ? `${walletDoneAt.toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" })} · ${walletDoneAt.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })} น.` : ""}</b></div><div className="receipt-customer"><span>สมาชิก</span><b>{walletResult.memberName} · {walletResult.memberNumber}</b></div><div className="receipt-line"><span>{walletResult.type === "deposit" ? "จำนวนเงินที่เติม" : walletResult.type === "refund" ? "จำนวนเงินที่คืน" : "จำนวนเงินที่ถอน"}</span><b>{money(walletResult.amount)}</b></div><div className="receipt-line"><span>ยอดคงเหลือก่อนรายการ</span><b>{money(walletResult.balanceBefore)}</b></div><div className="receipt-total"><span>ยอดคงเหลือหลังรายการ</span><b>{money(walletResult.balanceAfter)}</b></div><div className="receipt-payment"><span>ผู้ทำรายการ</span><b>{actor} · {actorRole}</b></div><div className="receipt-thanks">บันทึกเข้าระบบเรียบร้อย ตรวจสอบยอดได้ที่ประวัติการทำรายการด้านล่าง<br /><small>ข้อมูลถูกบันทึกในระบบ Log แล้ว</small></div></div><div className="wallet-success-actions"><button className="outline-button" disabled={Boolean(walletSlipBusy)} onClick={() => void downloadWalletSlip("pdf")}><Download size={16} /> {walletSlipBusy === "pdf" ? "กำลังสร้าง PDF..." : "ดาวน์โหลด PDF"}</button><button className="outline-button" disabled={Boolean(walletSlipBusy)} onClick={() => void downloadWalletSlip("image")}><FileImage size={16} /> {walletSlipBusy === "image" ? "กำลังสร้างรูป..." : "ดาวน์โหลดรูปภาพ"}</button><button className="outline-button" onClick={() => setWalletPrintPreview(true)}><Printer size={16} /> พิมพ์สลิป</button><button className="primary-button" onClick={closeWalletSlip}><Check size={16} /> เสร็จสิ้น · ปิดหน้าต่าง</button></div></div></> : walletConfirm ? <><div className="wallet-confirm-warning"><ShieldCheck size={16} /><span>ยอดเงินจะยังไม่ถูกบันทึกเข้าบัญชี จนกว่าจะกด “ยืนยันการทำรายการ”</span></div><div className="wallet-confirm-rows"><div><span>ประเภทรายการ</span><b className={walletOpen === "deposit" ? "green-text" : "amber-text"}>{walletModeLabel}</b></div><div><span>สมาชิก</span><b>{displayName} · {profile.memberNumber}</b></div><div><span>จำนวนเงิน</span><b>{money(walletPreviewAmount)}</b></div><div><span>ยอดคงเหลือก่อนรายการ</span><b>{money(profile.balance)}</b></div><div><span>ยอดคงเหลือหลังยืนยัน</span><b className={balanceAfterWallet < 0 ? "red-text" : ""}>{money(balanceAfterWallet)}</b></div><div><span>ผู้ทำรายการ</span><b>{actor} · {actorRole}</b></div>{walletNote.trim() && <div><span>หมายเหตุ</span><b>{walletNote.trim()}</b></div>}</div>{balanceAfterWallet < 0 && <div className="notice-bar error"><ShieldCheck size={16} /> ยอดเงินคงเหลือไม่พอสำหรับถอนจำนวนนี้ — ย้อนกลับแก้ไขจำนวนเงิน<button onClick={() => setError("")}><X size={14} /></button></div>}{error && <div className="notice-bar error"><ShieldCheck size={16} /> {error}<button onClick={() => setError("")}><X size={14} /></button></div>}<div className="modal-actions"><button className="outline-button" onClick={() => setWalletConfirm(false)}><RotateCcw size={15} /> ย้อนกลับแก้ไข</button><button className="primary-button" disabled={walletMutation.isPending || balanceAfterWallet < 0} onClick={confirmWallet}><Check size={16} /> {walletMutation.isPending ? "กำลังบันทึก…" : "ยืนยันการทำรายการ"}</button></div></> : <><div className="member-number-preview"><span><WalletCards size={16} /> ยอดคงเหลือหลังรายการ</span><b className={balanceAfterWallet < 0 ? "red-text" : ""}>{money(balanceAfterWallet)}</b></div>{balanceAfterWallet < 0 && <div className="notice-bar error"><ShieldCheck size={16} /> ยอดเงินคงเหลือไม่พอสำหรับถอนจำนวนนี้<button onClick={() => setError("")}><X size={14} /></button></div>}<div className="form-grid compact-form"><label>จำนวนเงิน (฿) *<input autoFocus type="number" min="0" step="0.01" value={walletAmount} onChange={(event) => setWalletAmount(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submitWallet(); } }} placeholder="0.00" /></label><label className="wide">หมายเหตุ<input value={walletNote} onChange={(event) => setWalletNote(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submitWallet(); } }} placeholder={walletOpen === "deposit" ? "เช่น เติมเงินสดที่เคาน์เตอร์" : walletOpen === "refund" ? "เช่น ผู้ป่วยคืนบัตร ออกจากโรงพยาบาลแล้ว" : "เช่น ถอนเพื่อใช้จ่ายส่วนตัว"} /></label></div>{error && <div className="notice-bar error"><ShieldCheck size={16} /> {error}<button onClick={() => setError("")}><X size={14} /></button></div>}<div className="modal-actions"><button className="outline-button" onClick={() => setWalletOpen(null)}>ยกเลิก</button><button className="primary-button" disabled={walletMutation.isPending || !(Number(walletAmount) > 0) || balanceAfterWallet < 0} onClick={submitWallet}><Check size={16} /> {walletMutation.isPending ? "กำลังบันทึก…" : walletOpen === "deposit" ? "บันทึกการเติมเงิน" : walletOpen === "refund" ? "ยืนยันคืนบัตรเงินสด" : "บันทึกการถอนเงิน"}</button></div></>}</div></div>}<ConfirmDialog open={confirmStatus} title={profile.status === "active" ? "ยืนยันการระงับสมาชิก?" : "ยืนยันการคืนสถานะสมาชิก?"} description={profile.status === "active" ? `สมาชิก ${displayName} จะไม่สามารถใช้ยอดคงเหลือซื้อสินค้าได้จนกว่าจะเปิดใช้งานอีกครั้ง` : `สมาชิก ${displayName} จะสามารถใช้ยอดคงเหลือซื้อสินค้าและรับการเติมเงินได้อีกครั้ง`} confirmLabel={profile.status === "active" ? "ยืนยันระงับการใช้งาน" : "ยืนยันคืนสถานะการใช้งาน"} onCancel={() => setConfirmStatus(false)} onConfirm={() => { setConfirmStatus(false); statusMutation.mutate({ memberNumber: member.memberNumber, suspended: profile.status === "active", actor, actorRole }); }} />{editOpen && editForm && <div className="modal-backdrop" onClick={() => setEditOpen(false)}><div className="form-modal" onClick={(event) => event.stopPropagation()}><div className="modal-heading"><div><span className="eyebrow">EDIT MEMBER</span><h2>แก้ไขข้อมูลสมาชิก</h2><p>{displayName} · {profile.memberNumber}</p></div><button className="icon-button" onClick={() => setEditOpen(false)}><X size={17} /></button></div><div className="form-grid compact-form" onKeyDownCapture={(event) => formEnterNav(event, submitEdit)}><label>คำนำหน้า<input list="prename-options" value={editForm.prename} onChange={(event) => setEditForm({ ...editForm, prename: event.target.value })} placeholder="เช่น นาย / นาง / นางสาว" maxLength={30} title="คำนำหน้าชื่อสมาชิก — เลือกจากรายการหรือพิมพ์เอง เว้นว่างได้" /><datalist id="prename-options">{PRENAME_OPTIONS.map((option) => <option key={option} value={option} />)}</datalist></label><label>ชื่อ *<input autoFocus value={editForm.firstName} onChange={(event) => setEditForm({ ...editForm, firstName: event.target.value })} placeholder="ชื่อ" /></label><label>นามสกุล *<input value={editForm.lastName} onChange={(event) => setEditForm({ ...editForm, lastName: event.target.value })} placeholder="นามสกุล" /></label><label>ประเภทสมาชิก<select value={editForm.type} onChange={(event) => setEditForm({ ...editForm, type: event.target.value })}><option>สมาชิก</option><option>เจ้าหน้าที่</option></select></label><label>วงเงินซื้อสินค้าต่อวัน (บาท)<input type="number" inputMode="numeric" min="1" step="1" value={editForm.creditLimit} onChange={(event) => setEditForm({ ...editForm, creditLimit: event.target.value })} placeholder="เว้นว่าง = ไม่จำกัด" title="ยอดซื้อรวมต่อวันเมื่อชำระหักบัญชีสมาชิก · เว้นว่าง = ไม่จำกัด" /></label><label>เบอร์โทรศัพท์<input value={editForm.phone} onChange={(event) => setEditForm({ ...editForm, phone: event.target.value })} placeholder="เช่น 08x-xxx-xxxx" /></label><label>รหัสบัตรเงินสด<input value={editForm.cardNumber} onChange={(event) => setEditForm({ ...editForm, cardNumber: event.target.value })} placeholder="เช่น 2395100201" maxLength={30} title="รหัสบัตรเงินสดของสมาชิก — ใช้ค้นหาและขึ้นรายงานยอดเงินในบัตร" /></label><label>รหัสผู้ป่วย (HN)<input value={editForm.patientCode} onChange={(event) => setEditForm({ ...editForm, patientCode: event.target.value })} placeholder="เช่น 70001" maxLength={30} title="รหัสผู้ป่วยที่ผูกกับบัตร — แสดงในรายงานยอดเงินในบัตร" /></label><label className="wide">เลขที่บัตรประชาชน<input value={editForm.idCard} onChange={(event) => setEditForm({ ...editForm, idCard: event.target.value })} placeholder="-" /></label><label className="wide">รูปสมาชิก (แสดงบนบัตร)<div className="member-photo-uploader">{editForm.photoUrl ? <><img className="member-photo-preview" src={editForm.photoUrl} alt="รูปสมาชิกปัจจุบัน" /><div className="member-photo-actions"><div className="photo-action-row"><button type="button" className="outline-button compact" onClick={() => setEditCameraOpen(true)}><Camera size={15} /> ถ่ายใหม่จากกล้อง</button><button type="button" className="danger-outline-button compact" onClick={() => setEditForm((current) => (current ? { ...current, photoUrl: "" } : current))}><Trash2 size={15} /> ลบรูป</button></div></div></> : <><div className="photo-action-row"><label className="upload-drop member-photo-drop" htmlFor="edit-member-photo"><ImagePlus size={17} /><span><b>เลือกรูปจากไฟล์</b><small>PNG JPG WEBP · ระบบย่อ 480px อัตโนมัติ</small></span><input id="edit-member-photo" type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={onEditPhotoPick} /></label></div><button type="button" className="outline-button compact camera-hint-inline" onClick={() => setEditCameraOpen(true)}><Camera size={15} /> หรือถ่ายรูปจากกล้องเลย</button></>}</div></label></div><div className="initial-balance-note"><ShieldCheck size={15} /> การแก้ไขจะบันทึกลงระบบทันทีและบันทึกลง Log</div>{error && <div className="notice-bar error"><ShieldCheck size={16} /> {error}<button onClick={() => setError("")}><X size={14} /></button></div>}<div className="modal-actions"><button className="outline-button" onClick={() => setEditOpen(false)}>ยกเลิก</button><button className="primary-button" disabled={updateMutation.isPending || !editForm.firstName.trim() || !editForm.lastName.trim()} onClick={submitEdit}><Check size={16} /> {updateMutation.isPending ? "กำลังบันทึก…" : "บันทึกการแก้ไข"}</button></div></div></div>}{walletPrintPreview && walletResult && <PrintPreviewModal targetId="member-wallet-slip" title={walletResult.type === "deposit" ? "พรีวิวก่อนพิมพ์สลิปเติมเงิน" : walletResult.type === "refund" ? "พรีวิวก่อนพิมพ์สลิปคืนบัตรเงินสด" : "พรีวิวก่อนพิมพ์สลิปถอนเงิน"} subtitle={`${walletResult.memberName} · ${walletResult.memberNumber} · ${money(walletResult.amount)}`} paper="thermal" chips={[walletResult.type === "deposit" ? "เติมเงินเข้าบัญชีสมาชิก" : walletResult.type === "refund" ? "คืนบัตรเงินสด" : "ถอนเงินจากบัญชีสมาชิก", `คงเหลือ ${money(walletResult.balanceAfter)}`]} onClose={() => setWalletPrintPreview(false)} />}{editCameraOpen && <CameraCaptureModal open title={`ถ่ายรูปสมาชิก · ${displayName}`} hint="ตรวจสอบรูปก่อนกด “ใช้รูปนี้” — รูปจะแทนที่รูปเดิมของสมาชิกทันทีในฟอร์ม (ยังไม่บันทึกจนกดบันทึกการแก้ไข)" onClose={() => setEditCameraOpen(false)} onCapture={(dataUrl) => { setEditForm((current) => (current ? { ...current, photoUrl: dataUrl } : current)); setError(""); }} />}{limitOpen && <div className="modal-backdrop" onClick={() => setLimitOpen(false)}><div className="form-modal limit-dialog" role="dialog" aria-modal="true" aria-label="ยื่นคำขอลดวงเงินซื้อสินค้าต่อวัน" onClick={(event) => event.stopPropagation()}><div className="modal-heading"><div><span className="eyebrow">LIMIT REDUCTION REQUEST</span><h2>ขอลดวงเงินซื้อสินค้าต่อวัน</h2><p>{displayName} · {profile.memberNumber}</p></div><button className="icon-button" onClick={() => setLimitOpen(false)} aria-label="ปิดหน้าต่าง"><X size={17} /></button></div><div className="member-number-preview"><span><TrendingDown size={16} /> วงเงินซื้อ/วัน ปัจจุบัน</span><b>{profile.creditLimit != null ? money(profile.creditLimit) : "ไม่จำกัด"}</b></div>{limitStep === "form" ? <><div className="form-grid compact-form"><label>วงเงินใหม่ (฿) *<input autoFocus type="number" inputMode="numeric" min="1" step="1" value={limitValue} onChange={(event) => setLimitValue(event.target.value)} placeholder={profile.creditLimit != null ? "ต่ำกว่าวงเงินปัจจุบัน" : "0"} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submitLimitRequest(); } }} /></label><label>เหตุผล (ไม่บังคับ)<input value={limitReason} maxLength={500} onChange={(event) => setLimitReason(event.target.value)} placeholder="เช่น ขอควบคุมการใช้จ่ายของตนเอง" onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submitLimitRequest(); } }} /></label></div><div className="initial-balance-note"><CircleHelp size={15} /> {profile.creditLimit != null ? "วงเงินใหม่ต้องน้อยกว่าวงเงินปัจจุบัน · คำขอจะเข้าสถานะรอพิจารณา — วงเงินเปลี่ยนเมื่อผู้บริหารอนุมัติ" : "สมาชิกนี้ยังไม่จำกัดวงเงิน — ระบุวงเงินที่ต้องการ · คำขอจะเข้าสถานะรอพิจารณา ผู้บริหารพิจารณาที่รายงาน → ประวัติธุรกรรม"}</div>{error && <div className="notice-bar error"><ShieldCheck size={16} /> {error}<button onClick={() => setError("")}><X size={14} /></button></div>}<div className="modal-actions"><button className="outline-button" onClick={() => setLimitOpen(false)}>ยกเลิก</button><button className="primary-button" onClick={submitLimitRequest}><Check size={16} /> ต่อไป: ตรวจสอบคำขอ</button></div></> : <><div className="wallet-confirm-warning"><ShieldCheck size={16} /><span>คำขอจะยังไม่ถูกส่งจนกว่าจะกด “ส่งคำขอ” — วงเงินของสมาชิกยังไม่เปลี่ยนจนกว่าผู้บริหารจะอนุมัติ</span></div><div className="wallet-confirm-rows"><div><span>สมาชิก</span><b>{displayName} · {profile.memberNumber}</b></div><div><span>วงเงินปัจจุบัน</span><b>{profile.creditLimit != null ? money(profile.creditLimit) : "ไม่จำกัด"}</b></div><div><span>วงเงินใหม่ที่ขอ</span><b className="purple-text">{money(Number(limitValue) || 0)}</b></div>{limitReason.trim() && <div><span>เหตุผล</span><b>{limitReason.trim()}</b></div>}<div><span>ผู้ยื่นคำขอ</span><b>{actor} · {actorRole}</b></div></div>{error && <div className="notice-bar error"><ShieldCheck size={16} /> {error}<button onClick={() => setError("")}><X size={14} /></button></div>}<div className="modal-actions"><button className="outline-button" onClick={() => setLimitStep("form")}>ย้อนกลับ</button><button className="primary-button" disabled={limitRequestMutation.isPending} onClick={confirmLimitRequest}><Check size={16} /> {limitRequestMutation.isPending ? "กำลังส่งคำขอ…" : "ส่งคำขอ"}</button></div></>}</div></div>}<ConfirmDialog open={confirmDelete} title="ยืนยันการลบสมาชิก?" description={`ลบ ${displayName} (${member.memberNumber}) ออกจากระบบถาวร · ลบได้เฉพาะบัญชีที่ยอดเงินเป็น 0 และไม่มีประวัติธุรกรรม หากมีประวัติการใช้งาน แนะนำใช้การระงับการใช้งานแทน`} confirmLabel="ยืนยันลบสมาชิก" onCancel={() => setConfirmDelete(false)} onConfirm={() => { setConfirmDelete(false); deleteMutation.mutate({ memberNumber: member.memberNumber, actor, actorRole }); }} />{cardOpen && <MemberCardModal member={detailQuery.data?.member ?? { ...member, createdAt: new Date().toISOString() }} onClose={() => setCardOpen(false)} />}{statementOpen && <StatementModal member={detailQuery.data?.member ?? { ...member, createdAt: new Date().toISOString() }} transactions={transactions} onClose={() => setStatementOpen(false)} />}</>;
+   424→}
+   425→
+   426→function Members({ role, userName, focusMemberNumber, onFocusMemberConsumed }: { role: Role; userName: string; focusMemberNumber: string | null; onFocusMemberConsumed: () => void }) {
+   427→  const utils = trpc.useUtils();
+   428→  const [query, setQuery] = useState("");
+   429→  const [debouncedSearch, setDebouncedSearch] = useState("");
+   430→  const [statusFilter, setStatusFilter] = useState("ทั้งหมด");
+   431→  const [notice, setNotice] = useState("");
+   432→  const [error, setError] = useState("");
+   433→  // Round 32-16 — ลงทะเบียนสมาชิกใหม่+พิมพ์บัตร อยู่ที่ POS จุดเดียว (F6) แล้ว
+   434→  // หน้านี้คงไว้เฉพาะการจัดการสมาชิกที่มีอยู่ (ดูรายละเอียด เติม/ถอน ระงับ พิมพ์บัตร)
+   435→  const [selectedMember, setSelectedMember] = useState<MemberLite | null>(null);
+   436→  const actor = userName || "ผู้ใช้ระบบ";
+   437→  const actorRole = roleThaiLabel(role);
+   438→  useEffect(() => {
+   439→    const timer = setTimeout(() => setDebouncedSearch(scanCandidates(query.trim()).pop() ?? query.trim()), 350);
+   440→    return () => clearTimeout(timer);
+   441→  }, [query]);
+   442→  const allMembersQuery = trpc.member.list.useQuery();
+   443→  const statusParam = statusFilter === "ใช้งาน" ? "active" : statusFilter === "ระงับ" ? "suspended" : undefined;
+   444→  const hasFilter = Boolean(debouncedSearch) || statusParam !== undefined;
+   445→  const filteredQuery = trpc.member.list.useQuery(hasFilter ? { search: debouncedSearch || undefined, status: statusParam } : undefined, { placeholderData: (previous) => previous });
+   446→  const allMembers = allMembersQuery.data ?? [];
+   447→  useEffect(() => {
+   448→    if (!focusMemberNumber || allMembersQuery.isLoading || !allMembersQuery.isSuccess) return;
+   449→    const match = allMembers.find((row) => row.memberNumber === focusMemberNumber);
+   450→    if (match) setSelectedMember(match);
+   451→    onFocusMemberConsumed();
+   452→  }, [focusMemberNumber, allMembersQuery.isLoading, allMembersQuery.isSuccess, allMembers, onFocusMemberConsumed]);
+   453→  // Round 31 — sidebar “เพิ่มสมาชิกใหม่” lands here: open the register modal once.
+   454→  const rows = hasFilter ? (filteredQuery.data ?? []) : allMembers;
+   455→  const walletTotal = allMembers.reduce((sum, member) => sum + member.balance, 0);
+   456→  const activeCount = allMembers.filter((member) => member.status === "active").length;
+   457→  const suspendedCount = allMembers.length - activeCount;
+   458→  const newThisMonth = allMembers.filter((member) => isSameMonth(parseStoreDate(member.createdAt), new Date())).length;
+   459→  if (selectedMember) return <MemberDetail member={selectedMember} onBack={() => setSelectedMember(null)} role={role} userName={userName} onDeleted={(message) => { setSelectedMember(null); setNotice(message); }} />;
+   460→  return <><SectionHeader eyebrow="สมาชิกและบัญชีสวัสดิการ" title="จัดการสมาชิก" description="ดูรายละเอียด เติม/ถอนเงิน ระงับการใช้งาน และพิมพ์บัตรสมาชิกรายคน — ลงทะเบียนสมาชิกใหม่+พิมพ์บัตร ทำที่ POS · ขายสินค้า (F6) จุดเดียว" /><div className="member-scope-note compact" role="note"><span className="member-scope-icon"><IdCard size={16} /></span><div><b>ระบบสมาชิกแยกจากผู้ใช้ระบบ</b></div><HelpDisclosure id="members-scope-help" label="ดูรายละเอียด"><span>บัญชีสมาชิกสวัสดิการใช้เพื่อใช้จ่ายที่เคาน์เตอร์เท่านั้น — สมาชิกไม่มีบัญชีเข้าสู่ระบบแอปนี้ · แอปนี้สำหรับเจ้าหน้าที่และผู้บริหารร้านค้า (จัดการบัญชีเข้าสู่ระบบที่เมนูผู้ใช้ระบบ)</span></HelpDisclosure></div><div className="member-top-grid"><div className="member-balance-card"><div><span className="eyebrow">ยอดเงินในบัญชีสมาชิกทั้งหมด</span><strong>{money(walletTotal)}</strong><small>สมาชิกใช้งาน {activeCount} ราย · ระงับ {suspendedCount} ราย</small></div><div className="balance-orb"><WalletCards size={26} /></div></div><div className="member-mini-card"><span className="stat-icon green"><UsersRound size={18} /></span><div><small>สมาชิกทั้งหมด</small><strong>{allMembers.length.toLocaleString("th-TH")} <em>ราย</em></strong><p><span className="green-text">{activeCount} ใช้งาน</span> · {suspendedCount} ระงับ</p></div></div><div className="member-mini-card"><span className="stat-icon purple"><ArrowDownToLine size={18} /></span><div><small>ลงทะเบียนเดือนนี้</small><strong>{newThisMonth} <em>ราย</em></strong><p>ลงทะเบียนที่ POS (F6) · ดูยอดรวมได้ในรายงาน</p></div></div></div><section className="panel table-panel"><div className="table-toolbar"><div><h2>สมาชิกทั้งหมด</h2><p>ค้นหาและกรองตามสถานะการใช้งานได้ทันที</p></div><div className="toolbar-actions"><div className="search-field"><Search size={16} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="ค้นหาชื่อ เลขสมาชิก หรือพิมพ์เลขบางส่วน/ท้ายเลข" /></div><div className="filter-pills">{["ทั้งหมด", "ใช้งาน", "ระงับ"].map((item) => <button className={statusFilter === item ? "active" : ""} key={item} onClick={() => setStatusFilter(item)}>{item}{item === "ใช้งาน" && <span>{activeCount}</span>}{item === "ระงับ" && <span>{suspendedCount}</span>}</button>)}</div></div></div><div className="table-filter-summary"><span><Search size={13} /> {query ? `ค้นหา “${query}”` : "สมาชิกทั้งหมด · กดแถวเพื่อดูรายละเอียด เติม/ถอนเงิน"}</span><span>แสดง {rows.length} จาก {allMembers.length} รายการ</span></div><div className="table-wrap">{allMembersQuery.isLoading ? <div className="table-loading"><UsersRound size={22} /><b>กำลังโหลดรายการสมาชิก</b><span>ดึงข้อมูลจากระบบ</span></div> : allMembersQuery.isError ? <div className="entity-state error" role="alert"><ShieldCheck size={22} /><b>โหลดรายการสมาชิกไม่สำเร็จ</b><span>{getErrorMessage(allMembersQuery.error)}</span></div> : rows.length === 0 ? <div className="entity-state"><UsersRound size={22} /><b>ไม่พบสมาชิกตามเงื่อนไข</b><span>ลองเปลี่ยนคำค้นหาหรือสถานะ · ลงทะเบียนใหม่ที่ POS (F6)</span></div> : <table className="entity-table rows-members" aria-label="รายการสมาชิก"><thead><tr><th>หมายเลขสมาชิก</th><th>ชื่อ-นามสกุล</th><th>สถานะ</th><th className="num">ยอดเงินคงเหลือ</th><th className="hide-sm">รายการล่าสุด</th><th aria-label="เปิดรายละเอียด" /></tr></thead><tbody>{rows.map((row) => { const statusMeta = MEMBER_STATUS_META[row.status]; return <tr className="clickable" key={row.memberNumber} onClick={() => setSelectedMember(row)} title={`ดูรายละเอียด ${memberFullName(row)} — เติม/ถอนเงิน พิมพ์บัตรสมาชิก`}><td className="cell-mono">{row.memberNumber}{row.cardNumber && <small className="cell-sub cell-mono-line">{`บัตร ${row.cardNumber}`}</small>}</td><td><span className="cell-strong">{memberFullName(row)}</span><small className="cell-sub">{row.type}{row.patientCode ? ` · HN ${row.patientCode}` : ""}</small></td><td><StatusPill tone={statusMeta.tone}>{statusMeta.label}</StatusPill></td><td className="cell-num"><span className={row.balance < 0 ? "negative" : ""}>{money(row.balance)}</span></td><td className="hide-sm"><small className="cell-sub" style={{ marginTop: 0 }}>{formatLastActivity(row.lastTransactionAt)}</small></td><td><span className="row-chevron"><ArrowRight size={15} /></span></td></tr>; })}</tbody></table>}</div>{notice && <div className="notice-bar"><Check size={16} /> {notice}<button onClick={() => setNotice("")}><X size={14} /></button></div>}</section></>;
+   461→}
+   462→
+   463→const TX_TYPE_LABEL: Record<"purchase" | "deposit" | "withdrawal" | "activation" | "refund" | "limit_request", string> = { purchase: "ใช้จ่าย", deposit: "เติมเงิน", withdrawal: "ถอนเงิน", activation: "เปิดใช้บัตร", refund: "คืนบัตรเงินสด", limit_request: "ขอลดวงเงิน" };
+   464→const TX_TYPE_TONE: Record<"purchase" | "deposit" | "withdrawal" | "activation" | "refund" | "limit_request", "blue" | "green" | "amber" | "purple" | "red"> = { purchase: "blue", deposit: "green", withdrawal: "amber", activation: "green", refund: "red", limit_request: "purple" };
+   465→
+   466→/** ROUND 34 (req 23.2) — สถานะคำขอลดวงเงิน → ป้ายสี (แถว kind "limit" ในตารางธุรกรรม) */
+   467→const LIMIT_STATUS_META: Record<"pending" | "approved" | "rejected", { label: string; tone: string }> = {
+   468→  pending: { label: "รอพิจารณา", tone: "amber" },
+   469→  approved: { label: "อนุมัติ", tone: "green" },
+   470→  rejected: { label: "ปฏิเสธ", tone: "red" },
+   471→};
+   472→
+   473→/** memberTransactions merges limit rows with ids offset by 1,000,000 so they stay
+   474→ *  unique next to member_transactions ids — reverse the offset to get the real
+   475→ *  limit_requests.id needed by member.decideLimitRequest. */
+   476→const LIMIT_ROW_ID_OFFSET = 1_000_000;
+   477→
+   478→/** ROUND 48 — แถวสรุปตามช่วงเวลา พร้อมช่วงวันที่จริงของแถว (date → end) สำหรับกดขยายดูรายการสินค้า */
+   479→type TimelineRow = { label: string; date: string; end: string; orders: number; items: number; revenue: number; cogs: number; profit: number };
+   480→
+   481→/**
+   482→ * ROUND 48 (user) — "แสดงเป็นจำนวนบิลแต่ไม่แสดงสินค้า ทำให้ไม่รู้ว่ามีรายการอะไร"
+   483→ * กดแถวในมุมมองภาพรวมตามช่วงเวลา → ขยายดูรายการสินค้าที่ขายในช่วงนั้นทันที
+   484→ */
+   485→function TimelineDrilldown({ from, to, cashiers }: { from: string; to: string; cashiers?: string[] }) {
+   486→  const query = trpc.reports.byProduct.useQuery({ from, to, cashiers: cashiers && cashiers.length > 0 ? cashiers : undefined }, { placeholderData: (previous) => previous });
+   487→  if (query.isLoading) return <div className="timeline-drill-loading"><FileBarChart size={15} /> กำลังรวบรวมรายการสินค้าในช่วงนี้…</div>;
+   488→  if (query.isError) return <div className="timeline-drill-loading error"><FileBarChart size={15} /> โหลดรายการไม่สำเร็จ — {getErrorMessage(query.error)}</div>;
+   489→  const rows = query.data ?? [];
+   490→  if (rows.length === 0) return <div className="timeline-drill-loading"><FileBarChart size={15} /> ไม่มีรายการขายในช่วงเวลานี้</div>;
+   491→  return <table className="timeline-drill-table" aria-label="รายการสินค้าที่ขายในช่วงเวลานี้"><thead><tr><th>สินค้าที่ขายในช่วงนี้</th><th className="num">บิล</th><th className="num">ชิ้น</th><th className="num">ยอดขาย</th></tr></thead><tbody>{rows.map((row) => <tr key={row.productId ?? row.name}><td><b>{row.name}</b>{row.sku && <small className="cell-sub cell-mono">{row.sku}</small>}</td><td className="num">{row.bills.toLocaleString("th-TH")}</td><td className="num">{row.qty.toLocaleString("th-TH")}</td><td className="num"><strong>{money(row.revenue)}</strong></td></tr>)}</tbody></table>;
+   492→}
+   493→
+   494→// ROUND 49 — เครื่องมือเลือกช่วงเวลาฉบับเรียบง่าย: ปุ่มลัดกดครั้งเดียวได้ช่วงที่ตั้งใจ
+   495→// "วันนี้/เมื่อวาน" = เลือกวันเดียวโดยไม่ต้องแตะปฏิทิน · "กำหนดเอง" = เลือกวันเดียวหรือช่วง
+   496→type ReportRangeMode = "today" | "yesterday" | "7d" | "thisMonth" | "custom";
+   497→type ReportGroupBy = "day" | "week" | "month";
+   498→const REPORT_RANGE_CHIPS: { value: ReportRangeMode; label: string }[] = [
+   499→  { value: "today", label: "วันนี้" },
+   500→  { value: "yesterday", label: "เมื่อวาน" },
+   501→  { value: "7d", label: "7 วันล่าสุด" },
+   502→  { value: "thisMonth", label: "เดือนนี้" },
+   503→  { value: "custom", label: "กำหนดเอง" },
+   504→];
+   505→const REPORT_GROUPBY_CHIPS: { value: ReportGroupBy; label: string }[] = [
+   506→  { value: "day", label: "รายวัน" },
+   507→  { value: "week", label: "รายสัปดาห์" },
+   508→  { value: "month", label: "รายเดือน" },
+   509→];
+   510→
+   511→function Reports({ focusBill, onFocusBillConsumed, role, userName }: { focusBill: string | null; onFocusBillConsumed: () => void; role: Role; userName: string }) {
+   512→  const utils = trpc.useUtils();
+   513→  const logsQuery = trpc.logs.list.useQuery({ limit: 1000 });
+   514→  // ROUND 61 (user) — เวอร์ชัน: มุมมอง “แยกตามสินค้า / รายการในบิล / พนักงานขาย” เป็นรายงานขั้นสูง (เวอร์ชันโปรขึ้นไป)
+   515→  const edition = useEditionStatus();
+   516→  const hasAdvancedReports = edition.status?.has("reportsAdvanced") ?? false;
+   517→  const [upgradeFeature, setUpgradeFeature] = useState<EditionFeatureKey | null>(null);
+   518→  // ROUND 49 — ช่วงเวลา (ปุ่มลัด) แยกจากการจัดกลุ่มแถว (รายวัน/สัปดาห์/เดือน) อย่างชัดเจน
+   519→  const [rangeMode, setRangeMode] = useState<ReportRangeMode>("7d");
+   520→  const [groupBy, setGroupBy] = useState<ReportGroupBy>("day");
+   521→  // กำหนดเอง: เว้นวันสิ้นสุดว่าง = วันเดียวกับวันเริ่มต้น (เลือกวันเดียวแบบกดครั้งเดียว)
+   522→  const [rangeFrom, setRangeFrom] = useState("");
+   523→  const [rangeTo, setRangeTo] = useState("");
+   524→  // ROUND 51 — ตัวกรองพนักงานขายแบบเจาะจง: ใช้ร่วมกับทุกมุมมอง ทุกช่วงเวลา
+   525→  // ROUND 79 (user) — เลือกได้หลายคนพร้อมกัน (เช่น รวม 2 กะในรายงานเดียว) · [] = ทุกคน
+   526→  const [staffFilters, setStaffFilters] = useState<string[]>([]);
+   527→  // ROUND 30 — สรุปยอดขายแยกตามชนิดสินค้า / พนักงานขาย + ประวัติธุรกรรมสมาชิก
+   528→  const [salesView, setSalesView] = useState<"timeline" | "category" | "product" | "items" | "cashier">("timeline");
+   529→  // ROUND 48 — แถวช่วงเวลาที่กดขยายอยู่ (ดูรายการสินค้าของช่วงนั้น)
+   530→  const [expandedPeriod, setExpandedPeriod] = useState<string | null>(null);
+   531→  const [billMember, setBillMember] = useState<MemberLite | null>(null);
+   532→  const [txMember, setTxMember] = useState<MemberLite | null>(null);
+   533→  // ROUND 77 (user) — เลือกประเภทธุรกรรมได้หลายอย่างพร้อมกัน (เช่น เติมเงิน+ถอนเงิน+คืนบัตร):
+   534→  // ชุดว่าง = ทุกประเภท · กดทับตัวที่กดอยู่เพื่อถอนออก · “ทั้งหมด” ล้างชุด
+   535→  const [txTypes, setTxTypes] = useState<("purchase" | "deposit" | "withdrawal" | "activation" | "refund" | "limit_request")[]>([]);
+   536→  const toggleTxType = (value: "purchase" | "deposit" | "withdrawal" | "activation" | "refund" | "limit_request") => {
+   537→    setTxTypes((current) => (current.includes(value) ? current.filter((type) => type !== value) : [...current, value]));
+   538→  };
+   539→  const [txFrom, setTxFrom] = useState("");
+   540→  const [txTo, setTxTo] = useState("");
+   541→  // ROUND 49 — เลือกวันเดียวในแท็บธุรกรรม: กดวันที่ฝั่งเดียว อีกฝั่งเว้นว่าง → วันเดียวกันทันที (ไม่ดึงถึงวันนี้แบบเดิม)
+   542→  const pickTxFrom = (iso: string) => { setTxFrom(iso); if (iso && !txTo) setTxTo(iso); };
+   543→  const pickTxTo = (iso: string) => { setTxTo(iso); if (iso && !txFrom) setTxFrom(iso); };
+   544→  // ROUND 65 — ช่องค้นหาของรายงานใหม่: ยอดเงินในบัตร + สินค้าคงคลัง (debounce เหมือนประวัติบิล)
+   545→  const [balanceSearch, setBalanceSearch] = useState("");
+   546→  const [debouncedBalanceSearch, setDebouncedBalanceSearch] = useState("");
+   547→  const [stockSearch, setStockSearch] = useState("");
+   548→  const [debouncedStockSearch, setDebouncedStockSearch] = useState("");
+   549→  // ROUND 34 (req 23.2) — การพิจารณาคำขอลดวงเงิน: ผู้บริหารกดอนุมัติ/ปฏิเสธที่แถวรอพิจารณา
+   550→  const [limitDecision, setLimitDecision] = useState<{ row: MemberTransactionRow; decision: "approve" | "reject" } | null>(null);
+   551→  const [limitError, setLimitError] = useState("");
+   552→  const isoDay = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+   553→  // ROUND 49 — ช่วงเวลาของรายงานมาจากแหล่งเดียว: ปุ่มลัด หรือช่องกำหนดเอง
+   554→  // (เดิม: เลือกวันเดียวแต่ "ถึง" ยังค้างช่วงเดือน → รายงานดึงทั้งเดือนโดยไม่ตรงกับที่เลือก)
+   555→  const quickRangeOf = (mode: ReportRangeMode): { from: string; to: string } | null => {
+   556→    const now = new Date();
+   557→    if (mode === "today") return { from: isoDay(now), to: isoDay(now) };
+   558→    if (mode === "yesterday") { const y = new Date(Date.now() - 86_400_000); return { from: isoDay(y), to: isoDay(y) }; }
+   559→    if (mode === "7d") return { from: isoDay(new Date(Date.now() - 6 * 86_400_000)), to: isoDay(now) };
+   560→    if (mode === "thisMonth") return { from: isoDay(new Date(now.getFullYear(), now.getMonth(), 1)), to: isoDay(now) };
+   561→    return null;
+   562→  };
+   563→  const lastQuickRange = useRef({ from: isoDay(new Date(Date.now() - 6 * 86_400_000)), to: isoDay(new Date()) });
+   564→  const pickRangeChip = (mode: ReportRangeMode) => {
+   565→    if (mode === "custom") { setRangeFrom(""); setRangeTo(""); setRangeMode("custom"); return; }
+   566→    const quick = quickRangeOf(mode);
+   567→    if (quick) lastQuickRange.current = quick;
+   568→    setRangeMode(mode);
+   569→  };
+   570→  // กำหนดเองแบบเลือกวันเดียว: กดวันที่ฝั่งเดียว อีกฝั่งเว้นว่าง → วันสิ้นสุด = วันเริ่มต้นทันที
+   571→  const pickCustomFrom = (iso: string) => {
+   572→    setRangeFrom(iso);
+   573→    if (iso && (!rangeTo || rangeTo < iso)) setRangeTo(iso);
+   574→  };
+   575→  const pickCustomTo = (iso: string) => {
+   576→    setRangeTo(iso);
+   577→    if (iso && (!rangeFrom || rangeFrom > iso)) setRangeFrom(iso);
+   578→  };
+   579→  // ช่วงที่ใช้จริง — ปุ่มลัดใช้ค่าของปุ่มนั้น · กำหนดเอง: ฝั่งว่างสะท้อนอีกฝั่ง (วันเดียว) · ว่างทั้งคู่ = ช่วงปุ่มลัดล่าสุด
+   580→  const quickActive = rangeMode !== "custom" ? quickRangeOf(rangeMode) : null;
+   581→  const customFrom = rangeFrom || rangeTo || lastQuickRange.current.from;
+   582→  const customTo = rangeTo || rangeFrom || lastQuickRange.current.to;
+   583→  const effectiveFrom = quickActive?.from ?? (customFrom <= customTo ? customFrom : customTo);
+   584→  const effectiveTo = quickActive?.to ?? (customFrom <= customTo ? customTo : customFrom);
+   585→  const effectiveDays = Math.round((Date.parse(`${effectiveTo}T00:00:00`) - Date.parse(`${effectiveFrom}T00:00:00`)) / 86_400_000) + 1;
+   586→  const rangeChipLabel = rangeMode !== "custom"
+   587→    ? (REPORT_RANGE_CHIPS.find((chip) => chip.value === rangeMode)?.label ?? "7 วันล่าสุด")
+   588→    : ((rangeFrom || rangeTo) ? (rangeFrom === rangeTo || (!rangeFrom || !rangeTo) ? formatThaiDate(effectiveFrom) : `${formatShortDay(effectiveFrom)}–${formatShortDay(effectiveTo)}`) : "ล่าสุด (7 วัน)");
+   589→  const rangeLabel = effectiveFrom === effectiveTo ? formatThaiDate(effectiveFrom) : `${formatThaiDate(effectiveFrom)} – ${formatThaiDate(effectiveTo)}`;
+   590→  // ROUND 51 — ป้ายกำกับตัวกรองพนักงาน สำหรับสถานะ/การ์ดสรุป/หัวเอกสารส่งออก
+   591→  const staffSuffix = staffFilters.length > 0 ? ` · พนักงาน: ${staffFilters.length === 1 ? staffFilters[0] : `${staffFilters.length} คน`}` : "";
+   592→  // ทุกมุมมอง (ภาพรวม/สินค้า/รายการในบิล/ชนิดสินค้า/พนักงาน) ใช้ช่วงเวลาและพนักงานเดียวกันเสมอ
+   593→  const dailyQuery = trpc.reports.daily.useQuery({ from: effectiveFrom, to: effectiveTo, cashiers: staffFilters.length > 0 ? staffFilters : undefined }, { placeholderData: (previous) => previous });
+   594→  // ROUND 27 — รายงานเป็น tab workspace: สรุปยอดขาย / ประวัติบิล / การส่งออก
+   595→  const [reportTab, setReportTab] = useState<"sales" | "bills" | "transactions" | "stock" | "balances" | "export">("sales");
+   596→  // Round 32-21 — แท็บย่อยในส่งออกข้อมูล: ไม่ต้องเลื่อนลงไปให้หัวข้อท้ายหลุดจอ
+   597→  const [exportTopic, setExportTopic] = useState<"sales" | "bills" | "transactions">("sales");
+   598→  // ROUND 51 — รายชื่อพนักงานขายจากบิลจริง (ตัวเลือกในดรอปดาวน์ พร้อมจำนวนบิลให้เทียบว่าใครขายเยอะ)
+   599→  const cashiersQuery = trpc.reports.cashiers.useQuery(undefined, { enabled: reportTab === "sales" });
+   600→  const cashierOptions = cashiersQuery.data ?? [];
+   601→  // ROUND 79 — กดทับถอนออก / กดเพิ่มเข้า — สไตล์เดียวกับชิปหลายประเภทธุรกรรม (r77)
+   602→  const toggleStaffFilter = (name: string) => setStaffFilters((current) => (current.includes(name) ? current.filter((entry) => entry !== name) : [...current, name]));
+   603→  const resetReportFilters = () => { setRangeMode("7d"); setRangeFrom(""); setRangeTo(""); setGroupBy("day"); setStaffFilters([]); setSalesView("timeline"); setTxMember(null); setTxTypes([]); setTxFrom(""); setTxTo(""); setBalanceSearch(""); setStockSearch(""); setReportTab("sales"); };
+   604→  const membersQuery = trpc.member.list.useQuery();
+   605→  const members = membersQuery.data ?? [];
+   606→  // Round 32-23 — การ์ดสมาชิก (สมาชิกใหม่/เปิดใช้งาน + ยอดเงินคงเหลือ) แทนการ์ดเติม/ถอน
+   607→  // ที่ย้ายไปอยู่ในแท็บประวัติธุรกรรมสมาชิกแล้ว
+   608→  const memberActiveCount = members.filter((member) => member.status === "active").length;
+   609→  const memberNewThisMonth = members.filter((member) => isSameMonth(parseStoreDate(member.createdAt), new Date())).length;
+   610→  const memberWalletTotal = members.reduce((sum, member) => sum + member.balance, 0);
+   611→  const categoryQuery = trpc.reports.byCategory.useQuery({ from: effectiveFrom, to: effectiveTo, cashiers: staffFilters.length > 0 ? staffFilters : undefined }, { enabled: reportTab === "sales" && salesView === "category", placeholderData: (previous) => previous });
+   612→  const cashierQuery = trpc.reports.byCashier.useQuery({ from: effectiveFrom, to: effectiveTo, cashiers: staffFilters.length > 0 ? staffFilters : undefined }, { enabled: reportTab === "sales" && salesView === "cashier", placeholderData: (previous) => previous });
+   613→  const productQuery = trpc.reports.byProduct.useQuery({ from: effectiveFrom, to: effectiveTo, cashiers: staffFilters.length > 0 ? staffFilters : undefined }, { enabled: reportTab === "sales" && salesView === "product", placeholderData: (previous) => previous });
+   614→  // ROUND 48 — มุมมอง "แยกตามรายการในบิล": ทุกบรรทัดสินค้าจากทุกบิลในช่วงเวลา
+   615→  const lineItemsQuery = trpc.reports.lineItems.useQuery({ from: effectiveFrom, to: effectiveTo, cashiers: staffFilters.length > 0 ? staffFilters : undefined }, { enabled: reportTab === "sales" && salesView === "items", placeholderData: (previous) => previous });
+   616→  const txQuery = trpc.reports.memberTransactions.useQuery({ memberNumber: txMember?.memberNumber, types: txTypes.length > 0 ? txTypes : undefined, from: txFrom || undefined, to: txTo || undefined, limit: 300 });
+   617→  const txRows = txQuery.data ?? [];
+   618→  // ROUND 65 — รายงานใหม่: ยอดเงินในบัตรทุกใบ + สินค้าคงคลังตามช่วงเวลา (ยอดยกมา/ยอดขาย/คงเหลือ)
+   619→  const balancesQuery = trpc.reports.memberBalances.useQuery({ search: debouncedBalanceSearch || undefined }, { enabled: reportTab === "balances" });
+   620→  const balanceRows = balancesQuery.data ?? [];
+   621→  const stockBalanceQuery = trpc.reports.stockBalance.useQuery({ from: effectiveFrom, to: effectiveTo, search: debouncedStockSearch || undefined }, { enabled: reportTab === "stock" });
+   622→  const stockBalanceRows = stockBalanceQuery.data ?? [];
+   623→  const balanceTotals = useMemo(() => ({
+   624→    members: balanceRows.length,
+   625→    active: balanceRows.filter((row) => row.status === "active").length,
+   626→    totalIn: balanceRows.reduce((sum, row) => sum + row.totalIn, 0),
+   627→    totalOut: balanceRows.reduce((sum, row) => sum + row.totalOut, 0),
+   628→    balance: balanceRows.reduce((sum, row) => sum + row.balance, 0),
+   629→  }), [balanceRows]);
+   630→  const stockTotals = useMemo(() => ({
+   631→    items: stockBalanceRows.length,
+   632→    opening: stockBalanceRows.reduce((sum, row) => sum + row.opening, 0),
+   633→    sold: stockBalanceRows.reduce((sum, row) => sum + row.sold, 0),
+   634→    remaining: stockBalanceRows.reduce((sum, row) => sum + row.remaining, 0),
+   635→  }), [stockBalanceRows]);
+   636→  useEffect(() => {
+   637→    const timer = setTimeout(() => setDebouncedBalanceSearch(balanceSearch.trim()), 350);
+   638→    return () => clearTimeout(timer);
+   639→  }, [balanceSearch]);
+   640→  useEffect(() => {
+   641→    const timer = setTimeout(() => setDebouncedStockSearch(stockSearch.trim()), 350);
+   642→    return () => clearTimeout(timer);
+   643→  }, [stockSearch]);
+   644→  // ROUND 34 (req 23.2) — คำขอลดวงเงินค้างพิจารณา (ข้อมูลน้อย ดึงตลอดเพื่อการ์ดสรุปและ badge)
+   645→  const limitRequestsQuery = trpc.reports.limitRequests.useQuery({ status: "pending", limit: 200 });
+   646→  const pendingLimitCount = limitRequestsQuery.data?.pendingCount ?? 0;
+   647→  // ผู้บริหารอนุมัติ/ปฏิเสธคำขอจากแถวรอพิจารณาในตาราง (approve = ตั้งวงเงินเป็นค่าที่ขอ)
+   648→  const decideLimitMutation = trpc.member.decideLimitRequest.useMutation({
+   649→    onSuccess: (result) => {
+   650→      const name = result.memberName ?? result.memberNumber;
+   651→      setLimitDecision(null);
+   652→      setLimitError("");
+   653→      setNotice(result.status === "approved"
+   654→        ? `อนุมัติคำขอลดวงเงิน ${name} แล้ว · วงเงินใหม่ ${money(result.requestedLimit)}`
+   655→        : `ปฏิเสธคำขอลดวงเงิน ${name} แล้ว · วงเงินคงเดิม ${result.currentLimit != null ? money(result.currentLimit) : "ไม่จำกัด"}`);
+   656→      void utils.reports.memberTransactions.invalidate();
+   657→      void utils.reports.limitRequests.invalidate();
+   658→      void utils.member.list.invalidate();
+   659→    },
+   660→    onError: (mutationError) => setLimitError(getErrorMessage(mutationError)),
+   661→  });
+   662→  const confirmLimitDecision = () => {
+   663→    if (!limitDecision) return;
+   664→    decideLimitMutation.mutate({ requestId: limitDecision.row.id - LIMIT_ROW_ID_OFFSET, decision: limitDecision.decision, actor: userName || "ผู้ใช้ระบบ", actorRole: role === "admin" ? "ผู้บริหาร" : "เจ้าหน้าที่" });
+   665→  };
+   666→  const [notice, setNotice] = useState("");
+   667→  const [billSearch, setBillSearch] = useState("");
+   668→  const [debouncedBillSearch, setDebouncedBillSearch] = useState("");
+   669→  // Render caps (round 15): bills history starts collapsed (ยอดขายเห็นครบในกรอบเลื่อนแล้ว).
+   670→  const [billsVisible, setBillsVisible] = useState(15);
+   671→  const [viewedReceipt, setViewedReceipt] = useState<SaleHistoryEntry | null>(null);
+   672→  const salesHistoryQuery = trpc.sales.list.useQuery(billMember ? { search: billMember.memberNumber, limit: 200 } : debouncedBillSearch ? { search: debouncedBillSearch } : undefined, { placeholderData: (previous) => previous });
+   673→  const salesHistory = salesHistoryQuery.data ?? [];
+   674→  useEffect(() => {
+   675→    const timer = setTimeout(() => setDebouncedBillSearch(scanCandidates(billSearch.trim()).pop() ?? billSearch.trim()), 350);
+   676→    return () => clearTimeout(timer);
+   677→  }, [billSearch]);
+   678→  // A new search returns the bills list to its first page.
+   679→  useEffect(() => { setBillsVisible(15); }, [debouncedBillSearch, billMember]);
+   680→  // Auto-open the reprint modal for a bill requested from the ⌘K palette.
+   681→  // Waits until the list has loaded (50 newest bills), opens the same modal a
+   682→  // row click uses, and consumes the request exactly once — silently skips if
+   683→  // the bill is not among the loaded rows.
+   684→  const consumedBillRef = useRef<string | null>(null);
+   685→  useEffect(() => {
+   686→    if (!focusBill || consumedBillRef.current === focusBill) return;
+   687→    if (salesHistoryQuery.isLoading || !salesHistoryQuery.isSuccess) return;
+   688→    const match = salesHistory.find((entry) => entry.orderNumber === focusBill);
+   689→    consumedBillRef.current = focusBill;
+   690→    onFocusBillConsumed();
+   691→    setReportTab("bills"); // ⌘K ส่งมาที่บิล — สลับไปแท็บประวัติบิลให้อัตโนมัติ
+   692→    if (match) setViewedReceipt(match);
+   693→  }, [focusBill, salesHistoryQuery.isLoading, salesHistoryQuery.isSuccess, salesHistory, onFocusBillConsumed]);
+   694→  const dailyRows = dailyQuery.data ?? [];
+   695→  const walletTotals = useMemo(() => {
+   696→    const totals = { deposit: 0, depositCount: 0, withdraw: 0, withdrawCount: 0 };
+   697→    for (const log of logsQuery.data ?? []) {
+   698→      const amount = parseBahtFromDetail(log.detail);
+   699→      if (log.action === "เติมเงินสมาชิก") { totals.deposit += amount; totals.depositCount += 1; }
+   700→      else if (log.action === "ถอนเงินสมาชิก") { totals.withdraw += amount; totals.withdrawCount += 1; }
+   701→    }
+   702→    return totals;
+   703→  }, [logsQuery.data]);
+   704→  // ROUND 49 — จัดกลุ่มแถว (รายวัน/สัปดาห์/เดือน) บนข้อมูลของ "ช่วงเวลาที่เลือกจริง" เท่านั้น
+   705→  // ทุกแถวพกวันที่จริงของตัวเอง (date → end) เพื่อกดขยายดูรายการสินค้าของช่วงนั้น
+   706→  const reportRows = useMemo(() => {
+   707→    const sum = (list: typeof dailyRows) => list.reduce((acc, row) => ({ orders: acc.orders + row.orders, items: acc.items + row.items, revenue: acc.revenue + row.revenue, cogs: acc.cogs + row.cogs, profit: acc.profit + row.profit }), { orders: 0, items: 0, revenue: 0, cogs: 0, profit: 0 });
+   708→    if (dailyRows.length === 0) return [] as TimelineRow[];
+   709→    if (groupBy === "month") {
+   710→      const months: { key: string; rows: typeof dailyRows }[] = [];
+   711→      for (const row of dailyRows) {
+   712→        const key = row.date.slice(0, 7);
+   713→        const last = months[months.length - 1];
+   714→        if (last && last.key === key) last.rows.push(row);
+   715→        else months.push({ key, rows: [row] });
+   716→      }
+   717→      return months.map((group) => ({ label: formatThaiMonthYear(group.rows[0].date), date: group.rows[0].date, end: group.rows[group.rows.length - 1].date, ...sum(group.rows) }));
+   718→    }
+   719→    if (groupBy === "week") {
+   720→      const weeks: TimelineRow[] = [];
+   721→      for (let start = 0; start < dailyRows.length; start += 7) {
+   722→        const chunk = dailyRows.slice(start, start + 7);
+   723→        weeks.push({ label: `${formatShortDay(chunk[0].date)}–${formatShortDay(chunk[chunk.length - 1].date)}`, date: chunk[0].date, end: chunk[chunk.length - 1].date, ...sum(chunk) });
+   724→      }
+   725→      return weeks;
+   726→    }
+   727→    return dailyRows.map((row) => ({ label: formatShortDay(row.date), date: row.date, end: row.date, orders: row.orders, items: row.items, revenue: row.revenue, cogs: row.cogs, profit: row.profit }));
+   728→  }, [dailyRows, groupBy]);
+   729→  const totals = reportRows.reduce((acc, row) => ({ orders: acc.orders + row.orders, items: acc.items + row.items, revenue: acc.revenue + row.revenue, cogs: acc.cogs + row.cogs, profit: acc.profit + row.profit }), { orders: 0, items: 0, revenue: 0, cogs: 0, profit: 0 });
+   730→  const marginPercent = totals.revenue > 0 ? ((totals.profit / totals.revenue) * 100).toFixed(1) : "0.0";
+   731→  // ROUND 79 (user) — การ์ดสรุป 4 ใบ: เตี้ยลงแต่ใส่ข้อมูลเพิ่ม (ชิ้น · เฉลี่ยต่อบิล · ต้นทุน · เฉลี่ยต่อบัญชี)
+   732→  const avgPerBill = totals.orders > 0 ? Math.round((totals.revenue / totals.orders) * 100) / 100 : 0;
+   733→  const avgWalletPerMember = members.length > 0 ? Math.round((memberWalletTotal / members.length) * 100) / 100 : 0;
+   734→  const maxRevenue = Math.max(...reportRows.map((row) => row.revenue), 1);
+   735→  // ROUND 30 — ตัวเลขสำหรับมุมมองแยกตามชนิดสินค้า / พนักงานขาย และประวัติธุรกรรม
+   736→  const categoryRows = categoryQuery.data ?? [];
+   737→  const categoryTotal = categoryRows.reduce((acc, row) => ({ orders: acc.orders + row.orders, qty: acc.qty + row.qty, revenue: acc.revenue + row.revenue, cogs: acc.cogs + row.cogs, profit: acc.profit + row.profit }), { orders: 0, qty: 0, revenue: 0, cogs: 0, profit: 0 });
+   738→  const productRows = productQuery.data ?? [];
+   739→  const productTotal = productRows.reduce((acc, row) => ({ bills: acc.bills + row.bills, qty: acc.qty + row.qty, revenue: acc.revenue + row.revenue, cogs: acc.cogs + row.cogs, profit: acc.profit + row.profit }), { bills: 0, qty: 0, revenue: 0, cogs: 0, profit: 0 });
+   740→  const cashierRows = cashierQuery.data ?? [];
+   741→  const cashierTotal = cashierRows.reduce((acc, row) => ({ orders: acc.orders + row.orders, items: acc.items + row.items, memberBills: acc.memberBills + row.memberBills, discount: acc.discount + row.discount, total: acc.total + row.total }), { orders: 0, items: 0, memberBills: 0, discount: 0, total: 0 });
+   742→  // ROUND 48 — ข้อมูลมุมมอง "แยกตามรายการในบิล" + ตัวรวมสำหรับสรุปหัวรายงาน
+   743→  const lineItemRows = lineItemsQuery.data ?? [];
+   744→  const lineItemTotals = useMemo(() => ({
+   745→    bills: new Set(lineItemRows.map((row) => row.orderNumber)).size,
+   746→    lines: lineItemRows.length,
+   747→    qty: lineItemRows.reduce((sum, row) => sum + row.qty, 0),
+   748→    revenue: lineItemRows.reduce((sum, row) => sum + row.amount, 0),
+   749→  }), [lineItemRows]);
+   750→  const txTotals = {
+   751→    spend: txRows.filter((row) => row.type === "purchase").reduce((sum, row) => sum + row.amount, 0),
+   752→    spendCount: txRows.filter((row) => row.type === "purchase").length,
+   753→    deposit: txRows.filter((row) => row.type === "deposit").reduce((sum, row) => sum + row.amount, 0),
+   754→    depositCount: txRows.filter((row) => row.type === "deposit").length,
+   755→    withdraw: txRows.filter((row) => row.type === "withdrawal").reduce((sum, row) => sum + row.amount, 0),
+   756→    withdrawCount: txRows.filter((row) => row.type === "withdrawal").length,
+   757→    // ROUND 65 — เปิดใช้บัตร (พร้อมเงินเริ่มต้น) + คืนบัตรเงินสด
+   758→    activation: txRows.filter((row) => row.type === "activation").reduce((sum, row) => sum + row.amount, 0),
+   759→    activationCount: txRows.filter((row) => row.type === "activation").length,
+   760→    refund: txRows.filter((row) => row.type === "refund").reduce((sum, row) => sum + row.amount, 0),
+   761→    refundCount: txRows.filter((row) => row.type === "refund").length,
+   762→    // ROUND 34 — แถวคำขอลดวงเงินตามตัวกรองปัจจุบัน
+   763→    limitCount: txRows.filter((row) => row.kind === "limit").length,
+   764→  };
+   765→  const dailySalesRows = [
+   766→    ["วันที่ / ช่วงเวลา", "จำนวนบิล", "รายการที่ขาย", "ยอดขาย", "ต้นทุน", "กำไร"],
+   767→    ...reportRows.map((row) => [row.label, exportCount(row.orders), exportCount(row.items), exportNumber(row.revenue), exportNumber(row.cogs), exportNumber(row.profit)]),
+   768→    ["รวม", exportCount(totals.orders), exportCount(totals.items), exportNumber(totals.revenue), exportNumber(totals.cogs), exportNumber(totals.profit)],
+   769→  ];
+   770→  // ROUND 45 — ชุดข้อมูลส่งออกตามมุมมองที่เลือก (timeline / สินค้า / ชนิดสินค้า / พนักงานขาย)
+   771→  // CSV กับ Excel ใช้แถวชุดเดียวกับ PDF (dailySalesDocConfig) เพื่อให้ตัวเลขตรงกันทุกไฟล์
+   772→  const dailySalesExportPack = (): { rows: string[][]; fileName: string; sheetName: string; label: string } => {
+   773→    if (salesView === "product") {
+   774→      return {
+   775→        fileName: "sales-by-product", sheetName: "ยอดขายตามสินค้า", label: "แยกตามสินค้า",
+   776→        rows: [
+   777→          ["สินค้า (รหัส)", "บิล", "ชิ้น", "ยอดขาย (บาท)", "ต้นทุน (บาท)", "กำไร (บาท)"],
+   778→          ...productRows.map((row) => [`${row.name}${row.sku ? ` (${row.sku})` : ""}`, exportCount(row.bills), exportCount(row.qty), exportNumber(row.revenue), exportNumber(row.cogs), exportNumber(row.profit)]),
+   779→          ["รวมทุกสินค้า", exportCount(productTotal.bills), exportCount(productTotal.qty), exportNumber(productTotal.revenue), exportNumber(productTotal.cogs), exportNumber(productTotal.profit)],
+   780→        ],
+   781→      };
+   782→    }
+   783→    if (salesView === "category") {
+   784→      return {
+   785→        fileName: "sales-by-category", sheetName: "ยอดขายตามชนิดสินค้า", label: "แยกตามชนิดสินค้า",
+   786→        rows: [
+   787→          ["ชนิดสินค้า", "บิล", "ชิ้น", "ยอดขาย (บาท)", "ต้นทุน (บาท)", "กำไร (บาท)"],
+   788→          ...categoryRows.map((row) => [row.category, exportCount(row.orders), exportCount(row.qty), exportNumber(row.revenue), exportNumber(row.cogs), exportNumber(row.profit)]),
+   789→          ["รวมทุกชนิดสินค้า", exportCount(categoryTotal.orders), exportCount(categoryTotal.qty), exportNumber(categoryTotal.revenue), exportNumber(categoryTotal.cogs), exportNumber(categoryTotal.profit)],
+   790→        ],
+   791→      };
+   792→    }
+   793→    if (salesView === "cashier") {
+   794→      return {
+   795→        fileName: "sales-by-cashier", sheetName: "ยอดขายตามพนักงานขาย", label: "แยกตามพนักงานขาย",
+   796→        rows: [
+   797→          ["พนักงานขาย (ผู้ทำรายการ)", "บิล", "ชิ้น", "บิลสมาชิก", "ส่วนลดรวม (บาท)", "ยอดขายรวม (บาท)"],
+   798→          ...cashierRows.map((row) => [row.cashier, exportCount(row.orders), exportCount(row.items), exportCount(row.memberBills), exportNumber(row.discount), exportNumber(row.total)]),
+   799→          ["รวมทุกพนักงาน", exportCount(cashierTotal.orders), exportCount(cashierTotal.items), exportCount(cashierTotal.memberBills), exportNumber(cashierTotal.discount), exportNumber(cashierTotal.total)],
+
+[showing lines 300-799 of 1913; use offset=800 with limit to continue reading]
