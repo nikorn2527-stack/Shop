@@ -129,6 +129,18 @@ export function Stock({ role, userName, initialAction, embeddedAction = false, o
     if (initialAction === "receive") setReceiveOpen(true);
     if (initialAction === "add") setAddOpen(true);
   }, [initialAction]);
+  // Embedded Stock is rendered inside POS's outer modal. If a nested form is
+  // closed by any path (X, cancel, backdrop, or a future action), notify POS
+  // so an empty outer backdrop cannot remain over the page.
+  const embeddedReadyRef = useRef(false);
+  useEffect(() => {
+    if (!embeddedAction || !onClose || !initialAction) return;
+    if (!embeddedReadyRef.current) {
+      embeddedReadyRef.current = true;
+      return;
+    }
+    if (!addOpen && !receiveOpen) onClose();
+  }, [addOpen, embeddedAction, initialAction, onClose, receiveOpen]);
   const [editOpen, setEditOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<SqliteProduct | null>(null);
   // ROUND 38 (ข้อ 37) — ถ่ายรูปสินค้าจากกล้อง (เพิ่มใหม่ + แก้ไข)

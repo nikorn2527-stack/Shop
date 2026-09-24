@@ -955,7 +955,7 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
     document.querySelector(".scan-drop-row.active")?.scrollIntoView({ block: "nearest" });
   }, [scanHighlight]);
   return <>
-    {inventoryQuickOpen && <div className="modal-backdrop pos-inventory-backdrop" role="dialog" aria-modal="true" aria-label="จัดการสินค้าและรับสินค้าเข้า"><div className="pos-inventory-modal"><div className="pos-inventory-modal-body"><Stock role={role} userName={userName} initialAction={inventoryQuickAction} embeddedAction onClose={() => setInventoryQuickOpen(false)} /></div></div></div>}
+    {inventoryQuickOpen && <div className="modal-backdrop pos-inventory-backdrop" role="dialog" aria-modal="true" aria-label="จัดการสินค้าและรับสินค้าเข้า" onClick={() => setInventoryQuickOpen(false)}><div className="pos-inventory-modal" onClick={(event) => event.stopPropagation()}><div className="pos-inventory-modal-body"><Stock role={role} userName={userName} initialAction={inventoryQuickAction} embeddedAction onClose={() => setInventoryQuickOpen(false)} /></div></div></div>}
     <SectionHeader eyebrow="หน้าร้าน / จุดขายสินค้า" title="POS · ขายสินค้า" description="สแกนบาร์โค้ดที่ช่องด้านบน · สินค้าไม่มีบาร์โค้ดปรับจำนวนได้ที่การ์ดด้านขวา · สรุปยอดและปุ่มชำระเงินล็อคอยู่ด้านล่างตลอดเวลา" action={<div className="pos-header-actions"><div className="pos-status"><span className="live-dot" /> จุดขายที่ 01 · เปิดให้บริการ</div></div>} />
     <div className="pos-layout">
       <section className="panel cart-panel" ref={cartPanelRef}>
