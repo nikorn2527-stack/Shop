@@ -335,7 +335,7 @@ export default function AppShell({ user }: AppShellProps) {
 
       {/* Main column */}
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <header className="sticky top-0 z-30 border-b border-[#e5e2d8] bg-[rgba(255,255,255,.82)] backdrop-blur-[12px]">
           <div className="flex h-[72px] items-center gap-3 px-4 sm:px-[38px]">
             <Button
               type="button"
@@ -347,10 +347,10 @@ export default function AppShell({ user }: AppShellProps) {
             >
               <Menu className="size-5" aria-hidden="true" />
             </Button>
-            <nav aria-label="เบรดครัมบ์" className="flex items-center gap-2 text-sm min-w-0">
+            <nav aria-label="เบรดครัมบ์" className="flex items-center gap-[10px] text-[12px] text-[#838776] min-w-0">
               <span className="text-muted-foreground truncate hidden sm:inline">{appName}</span>
-              <span className="text-muted-foreground/50 hidden sm:inline">/</span>
-              <span className="font-medium truncate">{NAV_ITEMS.find((n) => n.id === safeView)?.label ?? "ภาพรวม"}</span>
+              <span className="text-[#d6d8d0] hidden sm:inline">/</span>
+              <span className="font-medium text-[#5f6352] truncate">{NAV_ITEMS.find((n) => n.id === safeView)?.label ?? "ภาพรวม"}</span>
             </nav>
 
             <div className="ml-auto flex items-center gap-2">
@@ -429,7 +429,7 @@ export default function AppShell({ user }: AppShellProps) {
                             >
                               <span className="mt-1.5 size-1.5 rounded-full bg-red-500 shrink-0" aria-hidden="true" />
                               <div className="min-w-0">
-                                <p className="text-sm font-medium truncate">{row.name}</p>
+                                <p className="text-sm font-medium text-[#5f6352] truncate">{row.name}</p>
                                 <p className="text-xs text-muted-foreground">
                                   เหลือ {row.stock} {row.unit} · ต่ำกว่าจุดสั่งซื้อ {row.reorderPoint}
                                 </p>
@@ -451,7 +451,7 @@ export default function AppShell({ user }: AppShellProps) {
                             >
                               <span className="mt-1.5 size-1.5 rounded-full bg-amber-500 shrink-0" aria-hidden="true" />
                               <div className="min-w-0">
-                                <p className="text-sm font-medium truncate">{row.productName}</p>
+                                <p className="text-sm font-medium text-[#5f6352] truncate">{row.productName}</p>
                                 <p className="text-xs text-muted-foreground">
                                   หมดอายุ {row.expiryLabel} · เหลือ {row.qty}
                                 </p>
@@ -479,7 +479,7 @@ export default function AppShell({ user }: AppShellProps) {
                                 aria-hidden="true"
                               />
                               <div className="min-w-0">
-                                <p className="text-sm font-medium truncate">
+                                <p className="text-sm font-medium text-[#5f6352] truncate">
                                   {[row.prename, row.firstName, row.lastName].filter(Boolean).join(" ")}
                                 </p>
                                 <p className="text-xs text-muted-foreground">
@@ -500,7 +500,7 @@ export default function AppShell({ user }: AppShellProps) {
               </DropdownMenu>
 
               {/* Profile pill */}
-              <div className="flex items-center gap-2 pl-2 pr-1 sm:pl-3 sm:pr-2 border-l">
+              <div className="flex items-center gap-2 pl-1 min-w-[145px] pr-1 sm:pl-3 sm:pr-2 border-l">
                 <span
                   className={cn(
                     "size-7 rounded-full grid place-items-center text-xs font-semibold",
