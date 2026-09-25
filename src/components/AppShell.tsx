@@ -591,13 +591,13 @@ function SidebarContent({
   return (
     <div className="flex h-full flex-col">
       {/* Brand */}
-      <div className="flex items-center gap-2.5 px-4 h-14 border-b">
-        <div className="size-8 rounded-lg bg-emerald-600 text-white grid place-items-center font-semibold">
+      <div className="flex items-center gap-[11px] px-[10px] pt-[25px] pb-[25px]">
+        <div className="size-[38px] rounded-[12px] bg-[#007a55] text-white grid place-items-center font-bold text-xl shadow-[0_5px_12px_rgba(35,124,97,.2)]">
           {brandInitial(appName)}
         </div>
         <div className="flex flex-col leading-tight min-w-0">
-          <b className="text-sm font-semibold tracking-tight truncate">{appName}</b>
-          <small className="text-[11px] text-muted-foreground">Welfare Store</small>
+          <b className="text-base font-semibold tracking-tight truncate text-[#29241b]">{appName}</b>
+          <small className="text-[11px] text-[#757869]">Welfare Store</small>
         </div>
         {onCloseMobile ? (
           <Button
@@ -614,11 +614,11 @@ function SidebarContent({
       </div>
 
       {/* Role card */}
-      <div className="px-4 py-3 border-b">
-        <div className="flex items-center gap-2.5">
+      <div className="mx-[5px] mb-[22px] bg-[#f1f7f4] border border-[#e2eee9] rounded-[12px] p-[10px]">
+        <div className="flex items-center gap-[9px]">
           <div
             className={cn(
-              "size-9 rounded-full grid place-items-center text-sm font-semibold",
+              "size-[31px] rounded-full grid place-items-center text-sm font-bold bg-[#e2c9be] text-[#6d4739]",
               roleChipClass(role),
             )}
             aria-hidden="true"
@@ -626,18 +626,15 @@ function SidebarContent({
             {user.displayName.slice(0, 1) || "ผู้"}
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-medium truncate">{user.displayName}</p>
-            <div className="flex items-center gap-1 text-[11px] text-muted-foreground">
-              <RoleIcon role={role} />
-              <span className="truncate">{roleLabel(role)}</span>
-            </div>
+            <b className="text-xs font-medium block truncate text-[#29241b]">{user.displayName}</b>
+            <span className="text-[11px] text-[#6d6157] block mt-[2px]">{roleLabel(role)}</span>
           </div>
         </div>
       </div>
 
       {/* Nav */}
       <nav className="flex-1 overflow-y-auto px-2 py-3" aria-label="เมนูนำทาง">
-        <p className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        <p className="px-[10px] py-1 text-[11px] font-medium text-[#838776]">
           เมนูหลัก
         </p>
         <ul className="space-y-0.5">
@@ -650,17 +647,17 @@ function SidebarContent({
                   type="button"
                   onClick={() => onNavigate(item.id)}
                   className={cn(
-                    "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm font-medium transition-colors",
+                    "w-full flex items-center gap-[11px] px-[10px] py-[10px] rounded-[11px] text-sm transition-all",
                     active
-                      ? "bg-emerald-100 text-emerald-800"
-                      : "text-foreground/80 hover:bg-accent hover:text-foreground",
+                      ? "text-[#007a55] bg-[#eaf5f1] shadow-[inset_3px_0_0_#007a55]"
+                      : "text-[#747868] hover:bg-[#f1f6f4] hover:text-[#007a55]",
                   )}
                   aria-current={active ? "page" : undefined}
                 >
-                  <Icon className="size-4 shrink-0" aria-hidden="true" />
-                  <span className="truncate">{item.label}</span>
+                  <Icon className="size-5 shrink-0" aria-hidden="true" />
+                  <span className="flex-1 min-w-0"><b className="block text-[13px] font-semibold leading-tight truncate">{item.label}</b><small className="block text-[11px] text-[#797c6d] mt-[1px] truncate">{item.caption}</small></span>
                   {item.id === "stock" && lowStockCount > 0 ? (
-                    <span className="ml-auto inline-flex items-center justify-center min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-semibold">
+                    <span className="ml-auto inline-flex items-center justify-center min-w-[21px] h-[21px] px-1 rounded-full bg-[#fff0df] text-[#b87827] text-[11px] font-semibold">
                       {lowStockCount > 99 ? "99+" : lowStockCount}
                     </span>
                   ) : null}
@@ -685,15 +682,15 @@ function SidebarContent({
                       type="button"
                       onClick={() => onNavigate(item.id)}
                       className={cn(
-                        "w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md text-sm font-medium transition-colors",
+                        "w-full flex items-center gap-[11px] px-[10px] py-[10px] rounded-[11px] text-sm transition-all",
                         active
-                          ? "bg-emerald-100 text-emerald-800"
-                          : "text-foreground/80 hover:bg-accent hover:text-foreground",
+                          ? "text-[#007a55] bg-[#eaf5f1] shadow-[inset_3px_0_0_#007a55]"
+                          : "text-[#747868] hover:bg-[#f1f6f4] hover:text-[#007a55]",
                       )}
                       aria-current={active ? "page" : undefined}
                     >
-                      <Icon className="size-4 shrink-0" aria-hidden="true" />
-                      <span className="truncate">{item.label}</span>
+                      <Icon className="size-5 shrink-0" aria-hidden="true" />
+                      <span className="flex-1 min-w-0"><b className="block text-[13px] font-semibold leading-tight truncate">{item.label}</b><small className="block text-[11px] text-[#797c6d] mt-[1px] truncate">{item.caption}</small></span>
                     </button>
                   </li>
                 );
@@ -703,7 +700,7 @@ function SidebarContent({
         ) : (
           <div className="mt-3 px-2.5 py-2 rounded-md border border-dashed border-neutral-200 text-[11px] text-muted-foreground flex items-center gap-2">
             <Settings2 className="size-3.5" aria-hidden="true" />
-            <span>เมนูผู้บริหารถูกซ่อน</span>
+            <span>สำหรับผู้บริหารถูกซ่อน</span>
           </div>
         )}
       </nav>
@@ -711,9 +708,8 @@ function SidebarContent({
       {/* Sidebar footer */}
       <div className="border-t px-3 py-3 space-y-2">
         <div className="flex items-center justify-between gap-2 text-[11px]">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 px-2 py-0.5 text-emerald-700 dark:text-emerald-300 font-medium ring-1 ring-emerald-600/30">
-            <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" aria-hidden="true" />
-            Next.js v1.0
+          <span className="inline-flex items-center gap-1 font-mono text-[10px] text-[#848876]">
+            v1.0.0 · ระบบร้านค้าสวัสดิการ
           </span>
           {helpPhone ? (
             <span className="truncate max-w-28 text-muted-foreground" title={helpPhone}>{helpPhone}</span>
