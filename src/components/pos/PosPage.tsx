@@ -1008,8 +1008,8 @@ export function PosPage({ userName }: PosPageProps) {
   }
 
   return (
-    <div className="h-[calc(100vh-3.5rem)] lg:h-[calc(100vh-3.5rem)] flex flex-col">
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[1fr_1.2fr] gap-3 p-3 min-h-0">
+    <div className="h-[calc(100vh-72px)] flex flex-col">
+      <div className="flex-1 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_380px] gap-[18px] p-[18px] min-h-0">
         <CartPanel
           scanInputName={formNoiseRef.current}
           scanHeroRef={scanHeroRef}
