@@ -276,7 +276,7 @@ export function SettingsPage({ role }: SettingsPageProps) {
                 <Card className="py-0">
                   <CardContent className="p-6 space-y-4">
                     <h3 className="font-semibold">รูปแบบเลขสมาชิก</h3>
-                    <div className="grid sm:grid-cols-2 gap-3">
+                    <div className="grid sm:grid-cols-2 gap-[13px]">
                       <div className="space-y-2">
                         <Label htmlFor="member-mode">รูปแบบ</Label>
                         <Select
@@ -373,7 +373,7 @@ export function SettingsPage({ role }: SettingsPageProps) {
                 <Card className="py-0">
                   <CardContent className="p-6 space-y-4">
                     <h3 className="font-semibold">รอบตัดยอดประจำวัน</h3>
-                    <div className="grid sm:grid-cols-2 gap-3">
+                    <div className="grid sm:grid-cols-2 gap-[13px]">
                       <div className="space-y-2">
                         <Label htmlFor="cutoff-mode">โหมด</Label>
                         <Select
@@ -472,7 +472,7 @@ export function SettingsPage({ role }: SettingsPageProps) {
                 <Card className="py-0">
                   <CardContent className="p-6 space-y-4">
                     <h3 className="font-semibold">ชื่อแบรนด์</h3>
-                    <div className="grid sm:grid-cols-2 gap-3">
+                    <div className="grid sm:grid-cols-2 gap-[13px]">
                       <div className="space-y-2">
                         <Label htmlFor="app-name">ชื่อแอป</Label>
                         <Input
@@ -584,7 +584,7 @@ export function SettingsPage({ role }: SettingsPageProps) {
                       onCheckedChange={(c) => update("backupAutoEnabled", c)}
                     />
                     {value("backupAutoEnabled") ? (
-                      <div className="grid sm:grid-cols-2 gap-3">
+                      <div className="grid sm:grid-cols-2 gap-[13px]">
                         <div className="space-y-2">
                           <Label htmlFor="backup-interval">รอบการสำรอง (ชม.)</Label>
                           <Input
@@ -671,7 +671,7 @@ function RadioCards<T extends string>({
   options: { value: T; label: string; hint?: string }[];
 }) {
   return (
-    <div className="grid grid-cols-3 gap-2">
+    <div className="grid grid-cols-3 gap-[13px]">
       {options.map((o) => (
         <button
           key={o.value}

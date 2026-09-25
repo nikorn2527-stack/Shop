@@ -360,11 +360,11 @@ function ByProductReport({ qs }: { qs: string }) {
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto max-h-96">
-          <table className="w-full text-sm">
+          <table className="w-full text-[11px]">
             <thead className="sticky top-0 bg-card border-b">
               <tr className="text-left">
-                <th className="py-2 px-2">#</th>
-                <th className="py-2 px-2">สินค้า</th>
+                <th className="py-[12px] px-[9px]">#</th>
+                <th className="py-[12px] px-[9px]">สินค้า</th>
                 <th className="py-2 px-2 text-right">จำนวน</th>
                 <th className="py-2 px-2 text-right">ยอดขาย</th>
                 <th className="py-2 px-2 text-right">บิล</th>
@@ -386,7 +386,7 @@ function ByProductReport({ qs }: { qs: string }) {
             </tbody>
             <tfoot className="border-t-2 font-semibold">
               <tr>
-                <td colSpan={2} className="py-2 px-2">รวม</td>
+                <td colSpan={2} className="py-[12px] px-[9px]">รวม</td>
                 <td className="py-2 px-2 text-right tabular-nums">{data.totals.qty}</td>
                 <td className="py-2 px-2 text-right tabular-nums">{money(data.totals.revenue)}</td>
                 <td></td>
@@ -428,10 +428,10 @@ function ByCashierReport({ qs }: { qs: string }) {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <table className="w-full text-sm">
+        <table className="w-full text-[11px]">
           <thead className="border-b">
             <tr className="text-left">
-              <th className="py-2 px-2">พนักงาน</th>
+              <th className="py-[12px] px-[9px]">พนักงาน</th>
               <th className="py-2 px-2 text-right">บิล</th>
               <th className="py-2 px-2 text-right">ชิ้น</th>
               <th className="py-2 px-2 text-right">ยอดขาย</th>
@@ -453,7 +453,7 @@ function ByCashierReport({ qs }: { qs: string }) {
           </tbody>
           <tfoot className="border-t-2 font-semibold">
             <tr>
-              <td className="py-2 px-2">รวม</td>
+              <td className="py-[12px] px-[9px]">รวม</td>
               <td className="py-2 px-2 text-right tabular-nums">{data.totals.orders}</td>
               <td colSpan={4} className="py-2 px-2 text-right tabular-nums">{money(data.totals.revenue)}</td>
             </tr>
@@ -493,12 +493,12 @@ function LineItemsReport({ qs }: { qs: string }) {
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto max-h-96">
-          <table className="w-full text-sm">
+          <table className="w-full text-[11px]">
             <thead className="sticky top-0 bg-card border-b">
               <tr className="text-left">
-                <th className="py-2 px-2">เลขบิล</th>
-                <th className="py-2 px-2">วันที่</th>
-                <th className="py-2 px-2">สินค้า</th>
+                <th className="py-[12px] px-[9px]">เลขบิล</th>
+                <th className="py-[12px] px-[9px]">วันที่</th>
+                <th className="py-[12px] px-[9px]">สินค้า</th>
                 <th className="py-2 px-2 text-right">จำนวน</th>
                 <th className="py-2 px-2 text-right">ราคา/หน่วย</th>
                 <th className="py-2 px-2 text-right">ยอด</th>
@@ -573,13 +573,13 @@ function MemberTransactionsReport({ qs }: { qs: string }) {
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto max-h-96">
-          <table className="w-full text-sm">
+          <table className="w-full text-[11px]">
             <thead className="sticky top-0 bg-card border-b">
               <tr className="text-left">
-                <th className="py-2 px-2">วันที่</th>
-                <th className="py-2 px-2">สมาชิก</th>
-                <th className="py-2 px-2">ประเภท</th>
-                <th className="py-2 px-2">รายละเอียด</th>
+                <th className="py-[12px] px-[9px]">วันที่</th>
+                <th className="py-[12px] px-[9px]">สมาชิก</th>
+                <th className="py-[12px] px-[9px]">ประเภท</th>
+                <th className="py-[12px] px-[9px]">รายละเอียด</th>
                 <th className="py-2 px-2 text-right">จำนวน</th>
                 <th className="py-2 px-2 text-right">คงเหลือ</th>
               </tr>
@@ -656,12 +656,12 @@ function MemberBalancesReport() {
         </CardHeader>
         <CardContent>
           <div className="overflow-x-auto max-h-96">
-            <table className="w-full text-sm">
+            <table className="w-full text-[11px]">
               <thead className="sticky top-0 bg-card border-b">
                 <tr className="text-left">
-                  <th className="py-2 px-2">เลขสมาชิก</th>
-                  <th className="py-2 px-2">ชื่อ</th>
-                  <th className="py-2 px-2">บัตร</th>
+                  <th className="py-[12px] px-[9px]">เลขสมาชิก</th>
+                  <th className="py-[12px] px-[9px]">ชื่อ</th>
+                  <th className="py-[12px] px-[9px]">บัตร</th>
                   <th className="py-2 px-2 text-right">เติมเข้า</th>
                   <th className="py-2 px-2 text-right">ถอนออก</th>
                   <th className="py-2 px-2 text-right">คงเหลือ</th>
@@ -724,10 +724,10 @@ function StockBalanceReport({ qs }: { qs: string }) {
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto max-h-96">
-          <table className="w-full text-sm">
+          <table className="w-full text-[11px]">
             <thead className="sticky top-0 bg-card border-b">
               <tr className="text-left">
-                <th className="py-2 px-2">สินค้า</th>
+                <th className="py-[12px] px-[9px]">สินค้า</th>
                 <th className="py-2 px-2 text-right">ยกมา</th>
                 <th className="py-2 px-2 text-right">รับเข้า</th>
                 <th className="py-2 px-2 text-right">ขายออก</th>

@@ -583,11 +583,11 @@ export function MemberDetailModal({ memberNumber, role, onClose }: MemberDetailM
                   />
                 ) : (
                   <div className="max-h-72 overflow-y-auto rounded-lg border">
-                    <table className="w-full text-sm">
+                    <table className="w-full text-[11px]">
                       <thead className="bg-muted/50 sticky top-0">
                         <tr className="text-left text-xs text-muted-foreground">
-                          <th className="py-2 px-2">วันที่-เวลา</th>
-                          <th className="py-2 px-2">รายการ</th>
+                          <th className="py-[12px] px-[9px]">วันที่-เวลา</th>
+                          <th className="py-[12px] px-[9px]">รายการ</th>
                           <th className="py-2 px-2 text-right">จำนวน</th>
                           <th className="py-2 px-2 text-right">คงเหลือ</th>
                         </tr>
@@ -598,7 +598,7 @@ export function MemberDetailModal({ memberNumber, role, onClose }: MemberDetailM
                             <td className="py-2 px-2 text-xs text-muted-foreground tabular-nums whitespace-nowrap">
                               {formatThaiDateTime(t.createdAt)}
                             </td>
-                            <td className="py-2 px-2">
+                            <td className="py-[12px] px-[9px]">
                               <p className="text-sm">{t.detail}</p>
                               <p className="text-[10px] text-muted-foreground">
                                 {t.paymentMethod ?? ""}

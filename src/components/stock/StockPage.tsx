@@ -413,7 +413,7 @@ export function StockPage() {
             {/* Inventory tab */}
             <TabsContent value="inventory" className="mt-3 space-y-3">
               {/* Stat cards */}
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-[10px]">
                 <StatCard
                   icon={<Package className="size-4" />}
                   label="สินค้าทั้งหมด"
@@ -499,7 +499,7 @@ export function StockPage() {
 
               {/* Product list */}
               {loading ? (
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="grid gap-[10px] grid-cols-[repeat(auto-fill,minmax(258px,1fr))]">
                   {Array.from({ length: 6 }).map((_, i) => (
                     <Skeleton key={i} className="h-32 rounded-lg" />
                   ))}
@@ -509,7 +509,7 @@ export function StockPage() {
                   ไม่พบสินค้าตามตัวกรองที่เลือก
                 </div>
               ) : (
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                <div className="grid gap-[10px] grid-cols-[repeat(auto-fill,minmax(258px,1fr))]">
                   {filteredProducts.map((p) => (
                     <ProductCard
                       key={p.id}
@@ -552,7 +552,7 @@ export function StockPage() {
                 </div>
               ) : (
                 <div className="overflow-hidden rounded-lg border">
-                  <table className="w-full text-sm">
+                  <table className="w-full text-[11px]">
                     <thead className="bg-muted">
                       <tr className="text-left">
                         <th className="px-3 py-2">สินค้า</th>

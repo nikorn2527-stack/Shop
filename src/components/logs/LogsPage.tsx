@@ -144,7 +144,7 @@ export function LogsPage() {
       />
 
       {/* Stat cards */}
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+      <div className="grid gap-[13px] grid-cols-1 sm:grid-cols-3">
         <Card className="py-0">
           <CardContent className="p-4">
             <p className="text-xs text-muted-foreground">รายการวันนี้</p>
@@ -206,10 +206,10 @@ export function LogsPage() {
                 <thead>
                   <tr className="text-left text-xs text-muted-foreground border-b">
                     <th className="py-2 px-2 w-8" aria-label="ระดับกิจกรรม" />
-                    <th className="py-2 px-2">วันที่-เวลา</th>
-                    <th className="py-2 px-2">ผู้ทำ</th>
-                    <th className="py-2 px-2">กิจกรรม</th>
-                    <th className="py-2 px-2">รายละเอียด</th>
+                    <th className="py-[12px] px-[9px]">วันที่-เวลา</th>
+                    <th className="py-[12px] px-[9px]">ผู้ทำ</th>
+                    <th className="py-[12px] px-[9px]">กิจกรรม</th>
+                    <th className="py-[12px] px-[9px]">รายละเอียด</th>
                   </tr>
                 </thead>
                 <tbody>

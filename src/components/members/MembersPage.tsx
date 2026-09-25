@@ -142,7 +142,7 @@ export function MembersPage({ role, userName, focusMemberNumber, onFocusMemberCo
       />
 
       {/* Stat cards */}
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-3">
+      <div className="grid gap-[10px] grid-cols-1 sm:grid-cols-[1.45fr_0.85fr_0.85fr]">
         <Card className="py-0">
           <CardContent className="p-4 flex items-center gap-3">
             <span className="size-10 rounded-lg bg-emerald-100 text-emerald-700 grid place-items-center">
@@ -238,11 +238,11 @@ export function MembersPage({ role, userName, focusMemberNumber, onFocusMemberCo
               <table className="w-full text-sm min-w-[640px]">
                 <thead>
                   <tr className="text-left text-xs text-muted-foreground border-b">
-                    <th className="py-2 px-2">เลขสมาชิก</th>
-                    <th className="py-2 px-2">ชื่อ-สกุล</th>
-                    <th className="py-2 px-2">สถานะ</th>
+                    <th className="py-[12px] px-[9px]">เลขสมาชิก</th>
+                    <th className="py-[12px] px-[9px]">ชื่อ-สกุล</th>
+                    <th className="py-[12px] px-[9px]">สถานะ</th>
                     <th className="py-2 px-2 text-right">ยอดคงเหลือ</th>
-                    <th className="py-2 px-2">รายการล่าสุด</th>
+                    <th className="py-[12px] px-[9px]">รายการล่าสุด</th>
                     <th className="py-2 px-2 text-right">การจัดการ</th>
                   </tr>
                 </thead>

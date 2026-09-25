@@ -44,16 +44,17 @@ export type Tone =
 export type StatusTone = Tone;
 
 const TONES: Record<Tone, string> = {
-  active: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  suspended: "bg-rose-100 text-rose-700 border-rose-200",
-  locked: "bg-amber-100 text-amber-700 border-amber-200",
-  pending: "bg-amber-100 text-amber-700 border-amber-200",
-  green: "bg-emerald-100 text-emerald-800 border-emerald-200",
-  red: "bg-rose-100 text-rose-800 border-rose-200",
-  amber: "bg-amber-100 text-amber-800 border-amber-200",
-  purple: "bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200",
-  blue: "bg-cyan-100 text-cyan-800 border-cyan-200",
-  neutral: "bg-neutral-100 text-neutral-700 border-neutral-200",
+  // Match original Shop .status-pill colors exactly
+  active:   "text-[#4b987b] bg-[#edf8f3] border-transparent",
+  suspended:"text-[#c16b6e] bg-[#fff0f0] border-transparent",
+  locked:   "text-[#b8863d] bg-[#fff5e6] border-transparent",
+  pending:  "text-[#b8863d] bg-[#fff5e6] border-transparent",
+  green:    "text-[#4b987b] bg-[#edf8f3] border-transparent",
+  red:      "text-[#c16b6e] bg-[#fff0f0] border-transparent",
+  amber:    "text-[#b8863d] bg-[#fff5e6] border-transparent",
+  purple:   "text-[#8870af] bg-[#f3edfb] border-transparent",
+  blue:     "text-[#5d91b5] bg-[#edf6fb] border-transparent",
+  neutral:  "text-neutral-600 bg-neutral-100 border-transparent",
 };
 
 const LABELS: Partial<Record<Tone, string>> = {
@@ -81,23 +82,20 @@ export function StatusPill({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium whitespace-nowrap",
+        "inline-flex items-center gap-[5px] rounded-[20px] px-[7px] py-[4px] text-[10px] font-medium whitespace-nowrap",
         TONES[tone],
         className,
       )}
     >
       <span
         className={cn(
-          "size-1.5 rounded-full",
-          tone === "active" && "bg-emerald-500",
-          tone === "green" && "bg-emerald-500",
-          tone === "suspended" && "bg-rose-500",
-          tone === "red" && "bg-rose-500",
-          tone === "locked" && "bg-amber-500",
-          tone === "pending" && "bg-amber-500",
-          tone === "amber" && "bg-amber-500",
-          tone === "purple" && "bg-fuchsia-500",
-          tone === "blue" && "bg-cyan-500",
+          "size-[5px] rounded-full",
+          (tone === "active" || tone === "green") && "bg-[#4b987b]",
+          (tone === "suspended" || tone === "red") && "bg-[#c16b6e]",
+          (tone === "locked" || tone === "pending" || tone === "amber") && "bg-[#b8863d]",
+          tone === "purple" && "bg-[#8870af]",
+          tone === "blue" && "bg-[#5d91b5]",
+          tone === "neutral" && "bg-neutral-400",
           tone === "neutral" && "bg-neutral-400",
         )}
         aria-hidden="true"

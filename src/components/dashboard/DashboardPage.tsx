@@ -920,7 +920,7 @@ export function DashboardPage({ role, userName, onNavigate }: DashboardPageProps
             />
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-[11px]">
                 <thead>
                   <tr className="text-left text-xs text-muted-foreground border-b">
                     <th className="py-2 pr-2 w-8" aria-label="ระดับกิจกรรม" />

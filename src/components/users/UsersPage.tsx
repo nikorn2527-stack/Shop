@@ -260,7 +260,7 @@ export function UsersPage({ currentUserId, currentRole }: UsersPageProps) {
       />
 
       {/* Stat cards */}
-      <div className="grid gap-4 grid-cols-2 sm:grid-cols-5">
+      <div className="grid gap-[13px] grid-cols-2 sm:grid-cols-5">
         <StatCard label="ผู้ใช้ทั้งหมด" value={stats.total} tone="emerald" icon={UserCog} />
         <StatCard label="ผู้ดูแล" value={stats.administrators} tone="amber" icon={Crown} />
         <StatCard label="พนักงานขาย" value={stats.staff} tone="neutral" icon={User} />
