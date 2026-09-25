@@ -76,6 +76,7 @@ const UsersPage = dynamic(() => import("@/components/users/UsersPage").then((m) 
 const PosPage = dynamic(() => import("@/components/pos/PosPage").then((m) => m.PosPage), { loading: Loading });
 const StockPage = dynamic(() => import("@/components/stock/StockPage").then((m) => m.StockPage), { loading: Loading });
 const ReportsPage = dynamic(() => import("@/components/reports/ReportsPage").then((m) => m.ReportsPage), { loading: Loading });
+const ShiftPage = dynamic(() => import("@/components/shift/ShiftPage").then((m) => m.ShiftPage), { loading: Loading });
 
 function PageSkeleton({ label }: { label: string }) {
   return (
@@ -266,6 +267,8 @@ export default function AppShell({ user }: AppShellProps) {
         return <PosPage userName={user.displayName} />;
       case "stock":
         return <StockPage />;
+      case "shift":
+        return <ShiftPage />;
       case "members":
         return <MembersPage role={role} userName={user.displayName} />;
       case "reports":

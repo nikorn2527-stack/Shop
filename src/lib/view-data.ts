@@ -9,6 +9,7 @@
 
 import {
   Activity,
+  Clock,
   LayoutDashboard,
   PackageSearch,
   Settings2,
@@ -23,6 +24,7 @@ export type View =
   | "dashboard"
   | "pos"
   | "stock"
+  | "shift"
   | "members"
   | "reports"
   | "settings"
@@ -58,6 +60,13 @@ export const NAV_ITEMS: NavItem[] = [
     label: "สต็อกสินค้า",
     caption: "รับเข้าและนับสต็อก",
     icon: PackageSearch,
+    section: "main",
+  },
+  {
+    id: "shift",
+    label: "กะขาย",
+    caption: "เปิดกะ · ปิดกะ · นับเงิน",
+    icon: Clock,
     section: "main",
   },
   {
