@@ -525,8 +525,8 @@ export default function AppShell({ user }: AppShellProps) {
           </div>
         </main>
 
-        <footer className="mt-auto border-t bg-card">
-          <div className="px-4 sm:px-[38px] py-3 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
+        <footer className="mt-auto border-t border-[#e5e2d8] bg-[#fcfbf7]">
+          <div className="px-4 sm:px-[38px] py-3 flex flex-col sm:flex-row items-center justify-between gap-2 text-[10px] text-[#848979] max-w-[1540px] mx-auto py-[15px] px-4 sm:px-[42px] pb-[19px]">
             <span className="flex items-center gap-2">
               <span className="font-medium text-foreground">{appName}</span>
               <span>· ระบบร้านค้าสวัสดิการ</span>
@@ -538,7 +538,7 @@ export default function AppShell({ user }: AppShellProps) {
                   ศูนย์ช่วยเหลือ {helpPhone}
                 </span>
               ) : null}
-              <span>⚡ Powered by <b className="text-foreground">PNG TEAM</b></span>
+              <span>⚡ Powered by <b className="text-[#557469]">PNG TEAM</b></span>
             </div>
           </div>
         </footer>

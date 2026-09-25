@@ -264,26 +264,31 @@ function KpiCard({
   loading?: boolean;
 }) {
   const toneClass: Record<typeof tone, string> = {
-    emerald: "bg-emerald-100 text-emerald-700",
-    neutral: "bg-neutral-100 text-neutral-700",
-    amber: "bg-amber-100 text-amber-700",
-    purple: "bg-purple-100 text-purple-700",
+    emerald: "bg-[#e0f4d6] text-[#3d8c71]",
+    neutral: "bg-[#f3f4f1] text-[#717869]",
+    amber: "bg-[#fff5df] text-[#b8863d]",
+    purple: "bg-[#f3eefb] text-[#8e78bb]",
   };
   return (
-    <Card className="py-0">
-      <CardContent className="p-4 space-y-3">
-        <div className="flex items-start justify-between">
-          <span className="text-xs font-medium text-muted-foreground">{title}</span>
-          <span className={cn("size-8 rounded-lg grid place-items-center", toneClass[tone])}>
-            <Icon className="size-4" aria-hidden="true" />
-          </span>
-        </div>
-        <div className="text-2xl font-semibold tracking-tight tabular-nums">
-          {loading ? <Skeleton className="h-7 w-32" /> : value}
-        </div>
-        {foot ? <div className="text-xs text-muted-foreground space-y-0.5">{foot}</div> : null}
-      </CardContent>
-    </Card>
+    <div
+      className={cn(
+        "rounded-[12px] border border-[#e5e2d8] bg-white p-[12px_14px_10px] min-h-[98px]",
+        "shadow-[0_10px_30px_rgba(64,51,24,.05),0_2px_7px_rgba(64,51,24,.04)]",
+        "transition-[border-color] duration-200 hover:border-[#d9e9e2]",
+        tone === "emerald" && "shadow-[inset_3px_0_0_#007a55,0_10px_30px_rgba(64,51,24,.05),0_2px_7px_rgba(64,51,24,.04)]"
+      )}
+    >
+      <div className="flex items-start justify-between">
+        <span className="text-[11px] font-medium text-[#7a7e6e]">{title}</span>
+        <span className={cn("size-[34px] rounded-[9px] grid place-items-center", toneClass[tone])}>
+          <Icon className="size-[18px]" aria-hidden="true" />
+        </span>
+      </div>
+      <strong className="block text-[22px] font-bold tracking-tight tabular-nums text-[#33513f] mt-[6px]">
+        {loading ? <Skeleton className="h-7 w-32" /> : value}
+      </strong>
+      {foot ? <div className="text-[10px] text-[#868a7b] mt-[4px] space-y-0.5">{foot}</div> : null}
+    </div>
   );
 }
 

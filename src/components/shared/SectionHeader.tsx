@@ -27,21 +27,21 @@ export function SectionHeader({
   return (
     <header
       className={cn(
-        "flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between",
+        "flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between gap-[20px] mb-[16px]",
         className,
       )}
     >
       <div className="space-y-1 min-w-0">
         {eyebrow ? (
-          <p className="text-xs font-medium uppercase tracking-wider text-emerald-700">
+          <p className="text-[10.5px] font-medium uppercase tracking-[0.2px] text-[#84887a]">
             {eyebrow}
           </p>
         ) : null}
-        <h1 className="text-xl font-semibold tracking-tight text-foreground truncate">
+        <h1 className="text-[22px] font-bold tracking-tight text-[#3d4a43] truncate">
           {title}
         </h1>
         {description ? (
-          <p className="text-sm text-muted-foreground leading-relaxed">
+          <p className="text-[12px] text-[#868a7b] leading-relaxed max-w-[520px]">
             {description}
           </p>
         ) : null}
