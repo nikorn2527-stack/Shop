@@ -18,6 +18,7 @@ import * as React from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
+  CalendarClock,
   BarChart3,
   CalendarDays,
   Crown,
@@ -27,9 +28,22 @@ import {
   Wallet,
 } from "lucide-react";
 
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { toast } from "sonner";
 import { SectionHeader } from "@/components/shared/SectionHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { apiGet } from "@/lib/api-client";
@@ -277,6 +291,7 @@ export function DashboardPage({ role, userName, onNavigate }: DashboardPageProps
   const [rangeId, setRangeId] = React.useState("30");
   const [selectedBar, setSelectedBar] = React.useState(0);
   const [bestMode, setBestMode] = React.useState<"qty" | "revenue">("qty");
+  const [dashTab, setDashTab] = React.useState<"sales" | "best" | "watch" | "activity" | "cutoff">("sales");
   const rangeDays = RANGE_PRESETS.find((p) => p.id === rangeId)?.days ?? 30;
 
   const statsQuery = useQuery({
@@ -368,7 +383,37 @@ export function DashboardPage({ role, userName, onNavigate }: DashboardPageProps
         }
       />
 
-      {/* KPI grid */}
+      {/* Dashboard tabs — mirrors original Shop's DASH_TABS */}
+      <div className="flex gap-1 border-b pb-2 overflow-x-auto">
+        {[
+          { id: "sales", label: "ยอดขาย", icon: BarChart3 },
+          { id: "best", label: "สินค้าขายดี", icon: Crown },
+          { id: "watch", label: "ต้องติดตาม", icon: PackageSearch },
+          { id: "activity", label: "กิจกรรมล่าสุด", icon: Activity },
+          { id: "cutoff", label: "รอบตัดยอด", icon: CalendarClock },
+        ].map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setDashTab(t.id as typeof dashTab)}
+            className={cn(
+              "inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-t-md transition-colors whitespace-nowrap",
+              dashTab === t.id
+                ? "bg-emerald-50 text-emerald-700 border-b-2 border-emerald-600"
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+            )}
+          >
+            <t.icon className="size-3.5" />
+            {t.label}
+            {t.id === "watch" && (lowStock.length > 0 || expirySoon.length > 0) && (
+              <span className="ml-1 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 text-[10px] font-bold rounded-full bg-red-500 text-white">
+                {lowStock.length + expirySoon.length}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* KPI grid — always visible */}
       <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
           title={`ยอดขายทั้งหมด · ${RANGE_PRESETS.find((p) => p.id === rangeId)?.label ?? ""}`}
@@ -930,6 +975,126 @@ export function DashboardPage({ role, userName, onNavigate }: DashboardPageProps
           ) : null}
         </CardContent>
       </Card>
+
+      {/* Cutoff tab — Z-report widget */}
+      {dashTab === "cutoff" && <CutoffWidget role={role} userName={userName} />}
+    </div>
+  );
+}
+
+// CutoffWidget — mirrors original Shop's CutoffWidget
+// Shows current business period + close day button + Z-report
+function CutoffWidget({ role, userName }: { role: string; userName: string }) {
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const [closedReport, setClosedReport] = React.useState<{
+    bills: number; pieces: number; revenue: number;
+    cashTotal: number; qrTotal: number; walletTotal: number;
+    deposits: number; withdrawals: number; closedAt: string; closedBy: string | null;
+    periodStart: string; note: string | null;
+  } | null>(null);
+
+  const { data: period, isLoading, refetch } = useQuery({
+    queryKey: ["reports", "business-period"],
+    queryFn: () => apiGet<{
+      periodStart: string; nextCutOffAt: string; lastClosureAt: string | null;
+      totals: { bills: number; pieces: number; revenue: number; cash: number; qr: number; wallet: number; deposits: number; withdrawals: number };
+    }>("/api/reports/business-period"),
+    refetchInterval: 60_000,
+  });
+
+  const closeDay = async () => {
+    try {
+      const res = await fetch("/api/reports/business-period", { method: "POST", credentials: "include" });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error?.message ?? "ปิดรอบไม่สำเร็จ");
+      }
+      const data = await res.json();
+      setClosedReport(data.closure);
+      setConfirmOpen(false);
+      refetch();
+      toast.success("ปิดรอบขายสำเร็จ");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "ปิดรอบไม่สำเร็จ");
+    }
+  };
+
+  if (isLoading) return <div className="text-sm text-muted-foreground">กำลังโหลดข้อมูลรอบ...</div>;
+
+  const totals = closedReport
+    ? { bills: closedReport.bills, pieces: closedReport.pieces, revenue: closedReport.revenue, cashTotal: closedReport.cashTotal, qrTotal: closedReport.qrTotal, walletTotal: closedReport.walletTotal, deposits: closedReport.deposits, withdrawals: closedReport.withdrawals }
+    : period?.totals;
+
+  return (
+    <Card className="border-emerald-200">
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between text-base">
+          <span className="flex items-center gap-2">
+            <CalendarClock className="size-5 text-emerald-600" />
+            รอบตัดยอดวันนี้
+          </span>
+          {closedReport && <Badge className="bg-emerald-600 text-white">ตัดยอดแล้ว</Badge>}
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="text-sm text-muted-foreground">
+          {period ? `รอบเริ่ม ${formatThaiDate(period.periodStart)}` : "กำลังโหลด..."}
+        </div>
+        {totals && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <Stat label="บิลในรอบ" value={String(totals.bills)} />
+            <Stat label="ชิ้นที่ขาย" value={String(totals.pieces)} />
+            <Stat label="ยอดขายรอบนี้" value={money(totals.revenue)} tone="emerald" />
+            <Stat label="เงินสด" value={money(totals.cashTotal)} />
+            <Stat label="QR / สแกน" value={money(totals.qrTotal)} />
+            <Stat label="หักบัญชีสมาชิก" value={money(totals.walletTotal)} />
+            <Stat label="เติมเงิน" value={money(totals.deposits)} tone="emerald" />
+            <Stat label="ถอนเงิน" value={money(totals.withdrawals)} tone="red" />
+          </div>
+        )}
+        {closedReport ? (
+          <div className="space-y-3">
+            <div className="rounded border bg-emerald-50 p-3 text-sm">
+              ✓ ตัดยอดเรียบร้อย {formatThaiDate(closedReport.closedAt)} · โดย {closedReport.closedBy ?? "—"}
+            </div>
+            <Button variant="outline" className="w-full" onClick={() => setClosedReport(null)}>
+              <CalendarClock className="size-4" /> เริ่มรอบใหม่
+            </Button>
+          </div>
+        ) : (
+          <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+            <AlertDialogTrigger asChild>
+              <Button variant="default" className="w-full bg-emerald-600 hover:bg-emerald-700">
+                <CalendarClock className="size-4" /> ตัดยอดรอบนี้
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>ยืนยันตัดยอดรอบนี้?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  สรุปยอดตั้งแต่ {period ? formatThaiDate(period.periodStart) : "ต้นรอบ"} จนถึงตอนนี้ แล้วเริ่มรอบใหม่ทันที · ยอดขายรอบนี้ {totals ? money(totals.revenue) : "—"} ({totals?.bills ?? 0} บิล)
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>ยกเลิก</AlertDialogCancel>
+                <AlertDialogAction onClick={closeDay} className="bg-emerald-600 hover:bg-emerald-700">
+                  ตัดยอดรอบนี้
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function Stat({ label, value, tone = "default" }: { label: string; value: string; tone?: "default" | "emerald" | "red" }) {
+  const toneClass = { default: "text-foreground", emerald: "text-emerald-600", red: "text-red-600" }[tone];
+  return (
+    <div className="rounded border bg-card p-3">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className={`text-lg font-semibold tabular-nums ${toneClass}`}>{value}</div>
     </div>
   );
 }
