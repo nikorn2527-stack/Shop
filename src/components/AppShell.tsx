@@ -294,7 +294,7 @@ export default function AppShell({ user }: AppShellProps) {
   return (
     <div className="min-h-screen flex bg-background text-foreground">
       {/* Desktop sidebar — hidden on <lg */}
-      <aside className="hidden lg:flex w-64 shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground">
+      <aside className="hidden lg:flex w-[266px] shrink-0 flex-col border-r bg-sidebar text-sidebar-foreground">
         <SidebarContent
           appName={appName}
           user={user}
@@ -336,7 +336,7 @@ export default function AppShell({ user }: AppShellProps) {
       {/* Main column */}
       <div className="flex-1 flex flex-col min-w-0">
         <header className="sticky top-0 z-30 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-          <div className="flex h-14 items-center gap-3 px-4 sm:px-6">
+          <div className="flex h-[72px] items-center gap-3 px-4 sm:px-[38px]">
             <Button
               type="button"
               variant="ghost"
@@ -519,14 +519,14 @@ export default function AppShell({ user }: AppShellProps) {
           </div>
         </header>
 
-        <main className="flex-1 px-4 sm:px-6 py-6">
-          <div key={safeView} className="mx-auto max-w-7xl">
+        <main className="flex-1 px-4 sm:px-[38px] py-[30px]">
+          <div key={safeView}>
             {renderView()}
           </div>
         </main>
 
         <footer className="mt-auto border-t bg-card">
-          <div className="mx-auto max-w-7xl px-4 sm:px-6 py-3 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
+          <div className="px-4 sm:px-[38px] py-3 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
             <span className="flex items-center gap-2">
               <span className="font-medium text-foreground">{appName}</span>
               <span>· ระบบร้านค้าสวัสดิการ</span>
