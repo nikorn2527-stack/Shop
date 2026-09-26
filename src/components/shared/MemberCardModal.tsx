@@ -10,6 +10,7 @@ import { MemberAvatar } from "./MemberAvatar";
 import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api-client";
 import { brandInitial } from "@/lib/theme";
 import { PrintPreviewModal } from "./PrintPreviewModal";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 /** Fields the wallet card actually renders (subset of the member record). */
 export type MemberCardData = {
@@ -72,7 +73,7 @@ export function MemberCardModal({
   const [busy, setBusy] = useState(false);
   const [qrDataUrl, setQrDataUrl] = useState("");
   // Round 43 — แบรนด์ตามที่ผู้บริหารตั้งใน ตั้งค่า → ชื่อร้านและโลโก้ (เหมือนใบเสร็จ)
-  const settingsQuery = trpc.settings.get.useQuery(undefined);
+  const settingsQuery = useQuery({ queryKey: ["settings"], queryFn: () => apiGet("/api/settings") });
   const brandName = (settingsQuery.data?.appName ?? "").trim() || "ร้านค้าสวัสดิการ";
   const brandLogo = settingsQuery.data?.appLogo ?? "";
   const barcodeDataUrl = code128DataUrl(member.memberNumber, { height: 54, moduleWidth: 2, padding: 10 });

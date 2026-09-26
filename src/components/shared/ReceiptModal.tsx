@@ -8,6 +8,7 @@ import type { CheckoutReceipt } from "@/lib/types";
 import { money } from "@/lib/pageData";
 import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api-client";
 import { PrintPreviewModal } from "./PrintPreviewModal";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 /** "2026-09-18 14:42:33" → "18 ก.ย. 2569 · 14:42 น." */
 function formatReceiptDateTime(value: string) {
@@ -42,7 +43,7 @@ export function ReceiptModal({ receipt, onClose, onNewSale, onPrinted, mode = "n
   mode?: "new" | "reprint";
 }) {
   const [receiptBusy, setReceiptBusy] = useState("");
-  const settingsQuery = trpc.settings.get.useQuery(undefined);
+  const settingsQuery = useQuery({ queryKey: ["settings"], queryFn: () => apiGet("/api/settings") });
   const showBalance = settingsQuery.data?.showBalanceOnReceipt !== false;
   // ROUND 25 — แบรนด์ที่ผู้บริหารปรับเอง แสดงบนหัวใบเสร็จด้วย
   const receiptName = (settingsQuery.data?.appName ?? "").trim() || "ร้านค้าสวัสดิการ";

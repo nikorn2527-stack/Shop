@@ -3,6 +3,7 @@
 import { Check, Download, FileImage, Printer, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api-client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 /**
  * ROUND 63 (user) — หน้าต่างดูรูปหลักฐาน (สลิปโอนเงิน / หลักฐานการชำระบิล QR)
@@ -90,8 +91,8 @@ export function SlipViewModal({ open, title, subtitle, slipUrl, loading, onClose
  */
 export function SlipViewButton({ kind, id, title, subtitle, label }: { kind: "sale" | "tx"; id: number; title: string; subtitle?: string; label?: string }) {
   const [open, setOpen] = useState(false);
-  const saleSlipQuery = trpc.sales.slip.useQuery({ id }, { enabled: open && kind === "sale" });
-  const txSlipQuery = trpc.member.transactionSlip.useQuery({ id }, { enabled: open && kind === "tx" });
+  const saleSlipQuery = useQuery({ queryKey: ["sales", id, "slip"], queryFn: () => apiGet(`/api/sales/${id}/slip`), enabled: open && kind === "sale" });
+  const txSlipQuery = useQuery({ queryKey: ["member-tx", id, "slip"], queryFn: () => apiGet(`/api/members/transactions/${id}/slip`), enabled: open && kind === "tx" });
   const slipUrl = kind === "sale" ? (saleSlipQuery.data?.slipUrl ?? "") : (txSlipQuery.data?.slipUrl ?? "");
   const loading = kind === "sale" ? saleSlipQuery.isLoading : txSlipQuery.isLoading;
   return <>

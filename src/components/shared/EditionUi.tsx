@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { Check, CircleAlert, Crown, Gift, KeyRound, Lock, RefreshCw, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
 import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api-client";
-import { getErrorMessage } from "@/pages/viewFormat";
+import { getErrorMessage } from "@/lib/viewFormat";
 import type { EditionStatus } from "@/lib/license";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   EDITIONS,
   EDITION_COMPARE_ROWS,
@@ -30,7 +31,7 @@ export type EditionStatusPlus = EditionStatus & { has: (feature: EditionFeatureK
 
 /** ดึงสถานะเวอร์ชันจากเซิร์ฟเวอร์ + helper ตรวจสิทธิ์ฝั่งหน้าจอ (เร็ว — ไม่ต้องรอ refetch) */
 export function useEditionStatus() {
-  const query = trpc.edition.status.useQuery(undefined);
+  const query = useQuery({ queryKey: ["edition","status"], queryFn: () => apiGet("/api/edition/status") });
   const status: EditionStatusPlus | null = query.data
     ? {
         ...query.data,
@@ -103,7 +104,7 @@ export function DevKeygenTool() {
   const [editionChoice, setEditionChoice] = useState<Edition>("proplus");
   const [monthsText, setMonthsText] = useState("");
   const [result, setResult] = useState("");
-  const generateMutation = trpc.edition.generateKey.useMutation({
+  const generateMutation = useMutation({
     onSuccess: (data) => {
       setResult(data.key);
       toast.success("ออกรหัสลิขสิทธิ์เรียบร้อย", { description: "คัดลอกส่งให้ลูกค้าได้เลย — ใช้ได้กับระบบที่ยังไม่เคยใส่รหัสนี้" });
@@ -147,24 +148,24 @@ export function DevKeygenTool() {
 
 /** โมดัลอัปเกรดเวอร์ชัน: สรุปสถานะ + ตารางเทียบ + ใส่รหัสลิขสิทธิ์ / เริ่มทดลองใช้ */
 export function EditionUpgradeModal({ open, onClose, status, focusFeature, onApplied }: { open: boolean; onClose: () => void; status: EditionStatusPlus | null; focusFeature?: EditionFeatureKey | null; onApplied?: (next: EditionStatus) => void }) {
-  const utils = trpc.useUtils();
+  const utils = useQueryClient();
   const [keyText, setKeyText] = useState("");
   const [licenseName, setLicenseName] = useState("");
-  const applyMutation = trpc.edition.applyLicense.useMutation({
+  const applyMutation = useMutation({
     onSuccess: (next) => {
       toast.success(`เปิดใช้${EDITIONS[next.edition].label}เรียบร้อย`, { description: next.licenseExpiresAt ? `ลิขสิทธิ์ถึง ${next.licenseExpiresAt}` : "ลิขสิทธิ์ถาวร" });
       setKeyText("");
-      void utils.edition.status.invalidate();
+      void utils.invalidateQueries({ queryKey: ["edition","status"] });
       void utils.settings.get.invalidate();
       onApplied?.(next);
       onClose();
     },
     onError: (mutationError) => toast.error("ใช้รหัสลิขสิทธิ์ไม่สำเร็จ", { description: getErrorMessage(mutationError) }),
   });
-  const trialMutation = trpc.edition.startTrial.useMutation({
+  const trialMutation = useMutation({
     onSuccess: (next) => {
       toast.success(`เริ่มทดลองใช้โปรพลัส ${EDITION_TRIAL_DAYS} วันแล้ว`, { description: "ทุกฟีเจอร์เปิดใช้งานทันที — เมื่อครบกำหนดจะกลับเป็นเวอร์ชันทั่วไป" });
-      void utils.edition.status.invalidate();
+      void utils.invalidateQueries({ queryKey: ["edition","status"] });
       onApplied?.(next);
       onClose();
     },

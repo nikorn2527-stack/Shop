@@ -3,8 +3,9 @@ import { useEffect, useMemo, useState } from "react";
 import { ApiError } from "@/lib/api-client";
 import { Check, CircleAlert, Coins, Percent, RotateCcw, Search, SlidersHorizontal, X } from "lucide-react";
 import type { SqliteProduct } from "@/lib/types";
-import { money } from "@/pages/pageData";
+import { money } from "@/lib/pageData";
 import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api-client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 /**
  * ROUND 64 (user) — ปรับราคาขาย/ต้นทุนหลายรายการพร้อมกัน
@@ -49,15 +50,15 @@ export function BulkPriceModal({ open, products, actor, actorRole, onClose, onDo
   const [term, setTerm] = useState("");
   const [markup, setMarkup] = useState("25");
   const [error, setError] = useState("");
-  const utils = trpc.useUtils();
-  const bulkMutation = trpc.product.bulkUpdatePrices.useMutation({
+  const utils = useQueryClient();
+  const bulkMutation = useMutation({
     onSuccess: (result) => {
       setDrafts({});
       setChecked(new Set());
       setError("");
       const sample = result.sampleNames.length > 0 ? ` · เช่น ${result.sampleNames.slice(0, 2).join(", ")}` : "";
       onDone(`ปรับราคา/ต้นทุนแล้ว ${result.updated} รายการ · แก้ราคาขาย ${result.priceChanges} · แก้ต้นทุน ${result.costChanges}${result.skipped > 0 ? ` · ค่าเท่าเดิม ${result.skipped} รายการ` : ""}${sample}`);
-      void utils.product.list.invalidate();
+      void utils.invalidateQueries({ queryKey: ["products"] });
       void utils.stock.rows.invalidate();
       void utils.dashboard.stats.invalidate();
     },

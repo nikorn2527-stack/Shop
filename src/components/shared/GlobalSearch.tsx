@@ -16,10 +16,11 @@ import {
   UsersRound,
 } from "lucide-react";
 
-import type { Role, View } from "@/pages/pageData";
-import { canAccessView, isAdminRole, money, navItems } from "@/pages/pageData";
-import { formatLastActivity } from "@/pages/viewFormat";
+import type { Role, View } from "@/lib/pageData";
+import { canAccessView, isAdminRole, money, navItems } from "@/lib/pageData";
+import { formatLastActivity } from "@/lib/viewFormat";
 import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api-client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 /**
  * Global ⌘K command palette. Searches quick actions, menus, members,
@@ -53,13 +54,13 @@ export function GlobalSearch({ role, open, onClose, onNavigate, onOpenMember, on
   const [highlighted, setHighlighted] = useState(0);
   const resultsRef = useRef<HTMLDivElement | null>(null);
   // Data is only fetched while the palette is open.
-  const productsQuery = trpc.product.list.useQuery(undefined, { enabled: open });
-  const membersQuery = trpc.member.list.useQuery(undefined, { enabled: open });
+  const productsQuery = useQuery({ queryKey: ["products"], queryFn: () => apiGet("/api/products"), enabled: open });
+  const membersQuery = useQuery({ queryKey: ["members"], queryFn: () => apiGet("/api/members"), enabled: open });
   const trimmed = query.trim();
   const needle = trimmed.toLowerCase();
   // Bills are searched server-side (order number OR member number) once the
   // query is long enough to be meaningful.
-  const billsQuery = trpc.sales.list.useQuery({ search: trimmed, limit: 6 }, { enabled: open && trimmed.length >= 2, placeholderData: (previous) => previous });
+  const billsQuery = useQuery({ queryKey: ["sales", trimmed, 6], queryFn: () => apiGet(`/api/sales?search=${trimmed}&limit=6`), enabled: open && trimmed.length >= 2, placeholderData: (previous) => previous });
   const loading = trimmed !== "" && (productsQuery.isFetching || membersQuery.isFetching || billsQuery.isFetching);
 
   useEffect(() => {

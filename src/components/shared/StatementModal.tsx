@@ -8,6 +8,7 @@ import { money } from "@/lib/pageData";
 import { WALLET_TX_META } from "@/lib/viewFormat";
 import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api-client";
 import { PrintPreviewModal } from "./PrintPreviewModal";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 /** A wallet transaction row as returned by member.detail (DESC order, ≤50). */
 export type StatementTx = {
@@ -62,7 +63,7 @@ function formatStatementTime(value: string) {
 export function StatementModal({ member, transactions, onClose }: { member: StatementMember; transactions: StatementTx[]; onClose: () => void }) {
   const [busy, setBusy] = useState(false);
   // Round 43 — แบรนด์ตามที่ผู้บริหารตั้งใน ตั้งค่า → ชื่อร้านและโลโก้ (เหมือนใบเสร็จ)
-  const settingsQuery = trpc.settings.get.useQuery(undefined);
+  const settingsQuery = useQuery({ queryKey: ["settings"], queryFn: () => apiGet("/api/settings") });
   const brandName = (settingsQuery.data?.appName ?? "").trim() || "ร้านค้าสวัสดิการ";
   const displayName = [member.prename?.trim() || "", member.firstName, member.lastName].filter(Boolean).join(" ");
   const generatedAt = useMemo(() => new Date(), []);

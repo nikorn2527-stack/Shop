@@ -60,7 +60,7 @@ import { ProductEditModal, type CategoryOption, type ProductEditProduct } from "
 import { ReceiveForm, type ReceiveFormProduct } from "./ReceiveForm";
 import { CountForm, type CountFormProduct } from "./CountForm";
 import { BulkPriceModal } from "./BulkPriceModal";
-import { StockCountSheet } from "./StockCountSheet";
+import { StockCountSheet } from "@/components/shared/StockCountSheet";
 
 // ----- Types -----
 

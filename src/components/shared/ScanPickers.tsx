@@ -3,10 +3,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Camera, PackageSearch, ScanLine, X } from "lucide-react";
 import { toast } from "sonner";
-import { blocker } from "@/components/BlockerAlert";
+import { blocker } from "@/components/shared/BlockerAlert";
 import type { SqliteProduct } from "@/lib/types";
-import type { MemberLite } from "@/pages/pageData";
-import { money, memberFullName, scanMatches, smartMatchScore } from "@/pages/pageData";
+import type { MemberLite } from "@/lib/pageData";
+import { money, memberFullName, scanMatches, smartMatchScore } from "@/lib/pageData";
 import { SCAN_LAYOUT_TOAST, useScanLayout } from "@/lib/scanLayout";
 import { MemberAvatar } from "./MemberAvatar";
 import { MemberCardModal } from "./MemberCardModal";
