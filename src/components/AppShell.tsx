@@ -105,6 +105,7 @@ import { PosPage as Pos } from "@/components/pos/PosPage";
 import { StockPage as Stock } from "@/components/stock/StockPage";
 import { UsersPage as Users } from "@/components/users/UsersPage";
 import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api-client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { applyFontScale, FONT_SCALES, readFontScale, type FontScaleId } from "../fontScale";
 import { applyBrand, applyCachedBrand, applyPaperWidth, applyThemeColor, applyUiStyle, brandInitial, PAPER_WIDTHS, resolvePaperWidth, resolveThemeColor, THEME_PRESETS, UI_STYLE_PRESETS, type BrandSettings } from "../theme";
 import {
@@ -232,10 +233,10 @@ const POS_RAIL_BUTTONS: { key: string; label: string; kbd: string; detail: strin
 ];
 
 function MemberDetail({ member, onBack, role, userName, onDeleted }: { member: MemberLite; onBack: () => void; role: Role; userName: string; onDeleted: (message: string) => void }) {
-  const utils = trpc.useUtils();
-  const detailQuery = trpc.member.detail.useQuery({ memberNumber: member.memberNumber });
+  const utils = useQueryClient();
+  const detailQuery = useQuery({ queryKey: ["members", member.memberNumber], queryFn: () => apiGet(`/api/members/${member.memberNumber}`) });
   // Enhancement panel — real spending stats from sales (hidden silently on error).
-  const statsQuery = trpc.member.stats.useQuery({ memberNumber: member.memberNumber }, { enabled: Boolean(member.memberNumber) });
+  const statsQuery = useQuery({ queryKey: ["members", member.memberNumber, "stats"], queryFn: () => apiGet(`/api/members/${member.memberNumber}`), enabled: Boolean(member.memberNumber) });
   const [tab, setTab] = useState<"ทั้งหมด" | "ซื้อสินค้า" | "เติมเงิน" | "ถอนเงิน" | "เปิดใช้บัตร" | "คืนบัตรเงินสด">("ทั้งหมด");
   const [confirmStatus, setConfirmStatus] = useState(false);
   const [walletOpen, setWalletOpen] = useState<"deposit" | "withdrawal" | "refund" | null>(null);
@@ -277,7 +278,7 @@ function MemberDetail({ member, onBack, role, userName, onDeleted }: { member: M
   const balanceAfterWallet = walletOpen === "deposit" ? profile.balance + walletPreviewAmount : profile.balance - walletPreviewAmount;
   // ROUND 65 — ป้ายประเภทการเติม/ถอน/คืนบัตร ใช้ร่วมกันทั้งโมดัล
   const walletModeLabel = walletOpen === "deposit" ? "เติมเงิน" : walletOpen === "refund" ? "คืนบัตรเงินสด" : "ถอนเงิน";
-  const walletMutation = trpc.member.wallet.useMutation({
+  const walletMutation = useMutation({
     onSuccess: (result) => {
       // ROUND 77 — ไม่ปิดโมดัลทันที: เปลี่ยนเป็นหน้าสลิกให้พิมพ์/ดาวน์โหลดก่อน
       setWalletResult(result);
@@ -287,7 +288,7 @@ function MemberDetail({ member, onBack, role, userName, onDeleted }: { member: M
       setWalletNote("");
       setError("");
       setNotice(`${result.type === "deposit" ? "เติมเงิน" : result.type === "refund" ? "คืนบัตรเงินสด" : "ถอนเงิน"} ${result.memberName} (${result.memberNumber}) สำเร็จ · ยอดคงเหลือ ${money(result.balanceAfter)}`);
-      void utils.member.list.invalidate();
+      void utils.invalidateQueries({ queryKey: ["members"] });
       void utils.member.detail.invalidate();
     },
     // ROUND 78 — เติม/ถอน/คืนบัตรไม่สำเร็จ (เช่น "ยอดเงินคงเหลือไม่พอ") — เด้งกลางจอ
@@ -313,28 +314,28 @@ function MemberDetail({ member, onBack, role, userName, onDeleted }: { member: M
       await downloadSlipFile("member-wallet-slip", `สลิป${kindLabel}-${walletResult.memberNumber}-${stamp}`, format);
     } finally { setWalletSlipBusy(""); }
   };
-  const statusMutation = trpc.member.setStatus.useMutation({
+  const statusMutation = useMutation({
     onSuccess: (result) => {
       const member = result?.member;
       if (!member) return;
       setNotice(`${member.status === "suspended" ? "ระงับการใช้งาน" : "คืนสถานะการใช้งาน"} ${memberFullName(member)} แล้ว`);
-      void utils.member.list.invalidate();
+      void utils.invalidateQueries({ queryKey: ["members"] });
       void utils.member.detail.invalidate();
     },
     onError: (mutationError) => setError(getErrorMessage(mutationError)),
   });
-  const updateMutation = trpc.member.update.useMutation({
+  const updateMutation = useMutation({
     onSuccess: (result) => {
       setEditOpen(false);
       setError("");
       setNotice(`บันทึกการแก้ไขข้อมูลสมาชิกเรียบร้อยแล้ว · ${memberFullName(result)}`);
       void utils.member.detail.invalidate({ memberNumber: member.memberNumber });
-      void utils.member.list.invalidate();
+      void utils.invalidateQueries({ queryKey: ["members"] });
     },
     onError: (mutationError) => setError(getErrorMessage(mutationError)),
   });
   // ROUND 34 (req 23.2) — ยื่นคำขอลดวงเงิน: เจ้าหน้าที่ทุกคนทำได้ คำขอเข้าสถานะรอพิจารณา
-  const limitRequestMutation = trpc.member.requestLimitReduction.useMutation({
+  const limitRequestMutation = useMutation({
     onSuccess: () => {
       setLimitOpen(false);
       setLimitStep("form");
@@ -342,15 +343,15 @@ function MemberDetail({ member, onBack, role, userName, onDeleted }: { member: M
       setLimitReason("");
       setError("");
       setNotice("ส่งคำขอลดวงเงินเรียบร้อย · รอผู้บริหารพิจารณา");
-      void utils.member.list.invalidate();
+      void utils.invalidateQueries({ queryKey: ["members"] });
       void utils.member.detail.invalidate();
       void utils.reports.memberTransactions.invalidate();
     },
     onError: (mutationError) => setError(getErrorMessage(mutationError)),
   });
-  const deleteMutation = trpc.member.delete.useMutation({
+  const deleteMutation = useMutation({
     onSuccess: (result) => {
-      void utils.member.list.invalidate();
+      void utils.invalidateQueries({ queryKey: ["members"] });
       void utils.dashboard.stats.invalidate();
       onDeleted(`ลบสมาชิก ${result.memberName} (${result.memberNumber}) ออกจากระบบแล้ว`);
     },
@@ -426,7 +427,7 @@ function MemberDetail({ member, onBack, role, userName, onDeleted }: { member: M
 }
 
 function Members({ role, userName, focusMemberNumber, onFocusMemberConsumed }: { role: Role; userName: string; focusMemberNumber: string | null; onFocusMemberConsumed: () => void }) {
-  const utils = trpc.useUtils();
+  const utils = useQueryClient();
   const [query, setQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ทั้งหมด");
@@ -441,10 +442,10 @@ function Members({ role, userName, focusMemberNumber, onFocusMemberConsumed }: {
     const timer = setTimeout(() => setDebouncedSearch(scanCandidates(query.trim()).pop() ?? query.trim()), 350);
     return () => clearTimeout(timer);
   }, [query]);
-  const allMembersQuery = trpc.member.list.useQuery();
+  const allMembersQuery = useQuery({ queryKey: ["members"], queryFn: () => apiGet<{ members: MemberLite[] }>("/api/members") });
   const statusParam = statusFilter === "ใช้งาน" ? "active" : statusFilter === "ระงับ" ? "suspended" : undefined;
   const hasFilter = Boolean(debouncedSearch) || statusParam !== undefined;
-  const filteredQuery = trpc.member.list.useQuery(hasFilter ? { search: debouncedSearch || undefined, status: statusParam } : undefined, { placeholderData: (previous) => previous });
+  const filteredQuery = useQuery({ queryKey: ["members", debouncedSearch, statusParam], queryFn: () => apiGet(`/api/members${hasFilter ? `?search=${debouncedSearch || ""}&status=${statusParam || ""}` : ""}`), placeholderData: (previous) => previous });
   const allMembers = allMembersQuery.data ?? [];
   useEffect(() => {
     if (!focusMemberNumber || allMembersQuery.isLoading || !allMembersQuery.isSuccess) return;
@@ -485,7 +486,7 @@ type TimelineRow = { label: string; date: string; end: string; orders: number; i
  * กดแถวในมุมมองภาพรวมตามช่วงเวลา → ขยายดูรายการสินค้าที่ขายในช่วงนั้นทันที
  */
 function TimelineDrilldown({ from, to, cashiers }: { from: string; to: string; cashiers?: string[] }) {
-  const query = trpc.reports.byProduct.useQuery({ from, to, cashiers: cashiers && cashiers.length > 0 ? cashiers : undefined }, { placeholderData: (previous) => previous });
+  const query = useQuery({ queryKey: ["reports","by-product", from, to, cashiers], queryFn: () => apiGet(`/api/reports/by-product?from=${from || ""}&to=${to || ""}`), placeholderData: (previous) => previous });
   if (query.isLoading) return <div className="timeline-drill-loading"><FileBarChart size={15} /> กำลังรวบรวมรายการสินค้าในช่วงนี้…</div>;
   if (query.isError) return <div className="timeline-drill-loading error"><FileBarChart size={15} /> โหลดรายการไม่สำเร็จ — {getErrorMessage(query.error)}</div>;
   const rows = query.data ?? [];
@@ -511,8 +512,8 @@ const REPORT_GROUPBY_CHIPS: { value: ReportGroupBy; label: string }[] = [
 ];
 
 function Reports({ focusBill, onFocusBillConsumed, role, userName }: { focusBill: string | null; onFocusBillConsumed: () => void; role: Role; userName: string }) {
-  const utils = trpc.useUtils();
-  const logsQuery = trpc.logs.list.useQuery({ limit: 1000 });
+  const utils = useQueryClient();
+  const logsQuery = useQuery({ queryKey: ["logs", 1000], queryFn: () => apiGet("/api/logs?limit=1000") });
   // ROUND 61 (user) — เวอร์ชัน: มุมมอง “แยกตามสินค้า / รายการในบิล / พนักงานขาย” เป็นรายงานขั้นสูง (เวอร์ชันโปรขึ้นไป)
   const edition = useEditionStatus();
   const hasAdvancedReports = edition.status?.has("reportsAdvanced") ?? false;
@@ -592,35 +593,35 @@ function Reports({ focusBill, onFocusBillConsumed, role, userName }: { focusBill
   // ROUND 51 — ป้ายกำกับตัวกรองพนักงาน สำหรับสถานะ/การ์ดสรุป/หัวเอกสารส่งออก
   const staffSuffix = staffFilters.length > 0 ? ` · พนักงาน: ${staffFilters.length === 1 ? staffFilters[0] : `${staffFilters.length} คน`}` : "";
   // ทุกมุมมอง (ภาพรวม/สินค้า/รายการในบิล/ชนิดสินค้า/พนักงาน) ใช้ช่วงเวลาและพนักงานเดียวกันเสมอ
-  const dailyQuery = trpc.reports.daily.useQuery({ from: effectiveFrom, to: effectiveTo, cashiers: staffFilters.length > 0 ? staffFilters : undefined }, { placeholderData: (previous) => previous });
+  const dailyQuery = useQuery({ queryKey: ["reports","daily", effectiveFrom, effectiveTo, staffFilters], queryFn: () => apiGet(`/api/reports/daily?from=${effectiveFrom || ""}&to=${effectiveTo || ""}`), placeholderData: (previous) => previous });
   // ROUND 27 — รายงานเป็น tab workspace: สรุปยอดขาย / ประวัติบิล / การส่งออก
   const [reportTab, setReportTab] = useState<"sales" | "bills" | "transactions" | "stock" | "balances" | "export">("sales");
   // Round 32-21 — แท็บย่อยในส่งออกข้อมูล: ไม่ต้องเลื่อนลงไปให้หัวข้อท้ายหลุดจอ
   const [exportTopic, setExportTopic] = useState<"sales" | "bills" | "transactions">("sales");
   // ROUND 51 — รายชื่อพนักงานขายจากบิลจริง (ตัวเลือกในดรอปดาวน์ พร้อมจำนวนบิลให้เทียบว่าใครขายเยอะ)
-  const cashiersQuery = trpc.reports.cashiers.useQuery(undefined, { enabled: reportTab === "sales" });
+  const cashiersQuery = useQuery({ queryKey: ["reports","cashiers"], queryFn: () => apiGet("/api/reports/cashiers"), enabled: reportTab === "sales" });
   const cashierOptions = cashiersQuery.data ?? [];
   // ROUND 79 — กดทับถอนออก / กดเพิ่มเข้า — สไตล์เดียวกับชิปหลายประเภทธุรกรรม (r77)
   const toggleStaffFilter = (name: string) => setStaffFilters((current) => (current.includes(name) ? current.filter((entry) => entry !== name) : [...current, name]));
   const resetReportFilters = () => { setRangeMode("7d"); setRangeFrom(""); setRangeTo(""); setGroupBy("day"); setStaffFilters([]); setSalesView("timeline"); setTxMember(null); setTxTypes([]); setTxFrom(""); setTxTo(""); setBalanceSearch(""); setStockSearch(""); setReportTab("sales"); };
-  const membersQuery = trpc.member.list.useQuery();
+  const membersQuery = useQuery({ queryKey: ["members"], queryFn: () => apiGet<{ members: MemberLite[] }>("/api/members") });
   const members = membersQuery.data ?? [];
   // Round 32-23 — การ์ดสมาชิก (สมาชิกใหม่/เปิดใช้งาน + ยอดเงินคงเหลือ) แทนการ์ดเติม/ถอน
   // ที่ย้ายไปอยู่ในแท็บประวัติธุรกรรมสมาชิกแล้ว
   const memberActiveCount = members.filter((member) => member.status === "active").length;
   const memberNewThisMonth = members.filter((member) => isSameMonth(parseStoreDate(member.createdAt), new Date())).length;
   const memberWalletTotal = members.reduce((sum, member) => sum + member.balance, 0);
-  const categoryQuery = trpc.reports.byCategory.useQuery({ from: effectiveFrom, to: effectiveTo, cashiers: staffFilters.length > 0 ? staffFilters : undefined }, { enabled: reportTab === "sales" && salesView === "category", placeholderData: (previous) => previous });
-  const cashierQuery = trpc.reports.byCashier.useQuery({ from: effectiveFrom, to: effectiveTo, cashiers: staffFilters.length > 0 ? staffFilters : undefined }, { enabled: reportTab === "sales" && salesView === "cashier", placeholderData: (previous) => previous });
-  const productQuery = trpc.reports.byProduct.useQuery({ from: effectiveFrom, to: effectiveTo, cashiers: staffFilters.length > 0 ? staffFilters : undefined }, { enabled: reportTab === "sales" && salesView === "product", placeholderData: (previous) => previous });
+  const categoryQuery = useQuery({ queryKey: ["reports","by-category", effectiveFrom, effectiveTo, staffFilters], queryFn: () => apiGet(`/api/reports/by-category?from=${effectiveFrom || ""}&to=${effectiveTo || ""}`), enabled: reportTab === "sales" && salesView === "category", placeholderData: (previous) => previous });
+  const cashierQuery = useQuery({ queryKey: ["reports","by-cashier", effectiveFrom, effectiveTo, staffFilters], queryFn: () => apiGet(`/api/reports/by-cashier?from=${effectiveFrom || ""}&to=${effectiveTo || ""}`), enabled: reportTab === "sales" && salesView === "cashier", placeholderData: (previous) => previous });
+  const productQuery = useQuery({ queryKey: ["reports","by-product", effectiveFrom, effectiveTo, staffFilters], queryFn: () => apiGet(`/api/reports/by-product?from=${effectiveFrom || ""}&to=${effectiveTo || ""}`), enabled: reportTab === "sales" && salesView === "product", placeholderData: (previous) => previous });
   // ROUND 48 — มุมมอง "แยกตามรายการในบิล": ทุกบรรทัดสินค้าจากทุกบิลในช่วงเวลา
-  const lineItemsQuery = trpc.reports.lineItems.useQuery({ from: effectiveFrom, to: effectiveTo, cashiers: staffFilters.length > 0 ? staffFilters : undefined }, { enabled: reportTab === "sales" && salesView === "items", placeholderData: (previous) => previous });
-  const txQuery = trpc.reports.memberTransactions.useQuery({ memberNumber: txMember?.memberNumber, types: txTypes.length > 0 ? txTypes : undefined, from: txFrom || undefined, to: txTo || undefined, limit: 300 });
+  const lineItemsQuery = useQuery({ queryKey: ["reports","line-items", effectiveFrom, effectiveTo, staffFilters], queryFn: () => apiGet(`/api/reports/line-items?from=${effectiveFrom || ""}&to=${effectiveTo || ""}`), enabled: reportTab === "sales" && salesView === "items", placeholderData: (previous) => previous });
+  const txQuery = useQuery({ queryKey: ["reports","member-transactions", txMember?.memberNumber, txTypes, txFrom, txTo], queryFn: () => apiGet(`/api/reports/member-transactions?memberNumber=${txMember?.memberNumber || ""}&from=${txFrom || ""}&to=${txTo || ""}&limit=300`) });
   const txRows = txQuery.data ?? [];
   // ROUND 65 — รายงานใหม่: ยอดเงินในบัตรทุกใบ + สินค้าคงคลังตามช่วงเวลา (ยอดยกมา/ยอดขาย/คงเหลือ)
-  const balancesQuery = trpc.reports.memberBalances.useQuery({ search: debouncedBalanceSearch || undefined }, { enabled: reportTab === "balances" });
+  const balancesQuery = useQuery({ queryKey: ["reports","member-balances", debouncedBalanceSearch], queryFn: () => apiGet(`/api/reports/member-balances?search=${debouncedBalanceSearch || ""}`), enabled: reportTab === "balances" });
   const balanceRows = balancesQuery.data ?? [];
-  const stockBalanceQuery = trpc.reports.stockBalance.useQuery({ from: effectiveFrom, to: effectiveTo, search: debouncedStockSearch || undefined }, { enabled: reportTab === "stock" });
+  const stockBalanceQuery = useQuery({ queryKey: ["reports","stock-balance", effectiveFrom, effectiveTo, debouncedStockSearch], queryFn: () => apiGet(`/api/reports/stock-balance?from=${effectiveFrom || ""}&to=${effectiveTo || ""}&search=${debouncedStockSearch || ""}`), enabled: reportTab === "stock" });
   const stockBalanceRows = stockBalanceQuery.data ?? [];
   const balanceTotals = useMemo(() => ({
     members: balanceRows.length,
@@ -644,10 +645,10 @@ function Reports({ focusBill, onFocusBillConsumed, role, userName }: { focusBill
     return () => clearTimeout(timer);
   }, [stockSearch]);
   // ROUND 34 (req 23.2) — คำขอลดวงเงินค้างพิจารณา (ข้อมูลน้อย ดึงตลอดเพื่อการ์ดสรุปและ badge)
-  const limitRequestsQuery = trpc.reports.limitRequests.useQuery({ status: "pending", limit: 200 });
+  const limitRequestsQuery = useQuery({ queryKey: ["reports","limit-requests","pending"], queryFn: () => apiGet("/api/reports/limit-requests?status=pending&limit=200") });
   const pendingLimitCount = limitRequestsQuery.data?.pendingCount ?? 0;
   // ผู้บริหารอนุมัติ/ปฏิเสธคำขอจากแถวรอพิจารณาในตาราง (approve = ตั้งวงเงินเป็นค่าที่ขอ)
-  const decideLimitMutation = trpc.member.decideLimitRequest.useMutation({
+  const decideLimitMutation = useMutation({
     onSuccess: (result) => {
       const name = result.memberName ?? result.memberNumber;
       setLimitDecision(null);
@@ -657,7 +658,7 @@ function Reports({ focusBill, onFocusBillConsumed, role, userName }: { focusBill
         : `ปฏิเสธคำขอลดวงเงิน ${name} แล้ว · วงเงินคงเดิม ${result.currentLimit != null ? money(result.currentLimit) : "ไม่จำกัด"}`);
       void utils.reports.memberTransactions.invalidate();
       void utils.reports.limitRequests.invalidate();
-      void utils.member.list.invalidate();
+      void utils.invalidateQueries({ queryKey: ["members"] });
     },
     onError: (mutationError) => setLimitError(getErrorMessage(mutationError)),
   });
@@ -671,7 +672,7 @@ function Reports({ focusBill, onFocusBillConsumed, role, userName }: { focusBill
   // Render caps (round 15): bills history starts collapsed (ยอดขายเห็นครบในกรอบเลื่อนแล้ว).
   const [billsVisible, setBillsVisible] = useState(15);
   const [viewedReceipt, setViewedReceipt] = useState<SaleHistoryEntry | null>(null);
-  const salesHistoryQuery = trpc.sales.list.useQuery(billMember ? { search: billMember.memberNumber, limit: 200 } : debouncedBillSearch ? { search: debouncedBillSearch } : undefined, { placeholderData: (previous) => previous });
+  const salesHistoryQuery = useQuery({ queryKey: ["sales", billMember?.memberNumber, debouncedBillSearch], queryFn: () => apiGet(`/api/sales?search=${billMember ? billMember.memberNumber : debouncedBillSearch || ""}&limit=200`), placeholderData: (previous) => previous });
   const salesHistory = salesHistoryQuery.data ?? [];
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedBillSearch(scanCandidates(billSearch.trim()).pop() ?? billSearch.trim()), 350);
@@ -1155,14 +1156,14 @@ const GO_LIVE_CHECKLIST: { id: string; label: string; hint: string; action?: "im
 ];
 
 function Settings({ setView, role, initialTab }: { setView: (view: View) => void; role: Role; initialTab?: SettingsTab }) {
-  const utils = trpc.useUtils();
-  const settingsQuery = trpc.settings.get.useQuery(undefined);
+  const utils = useQueryClient();
+  const settingsQuery = useQuery({ queryKey: ["settings"], queryFn: () => apiGet("/api/settings") });
   // ROUND 61 — สถานะเวอร์ชัน 3 แบบ (แท็บเวอร์ชันและลิขสิทธิ์ + ปุ่มล็อกตามจุดต่าง ๆ)
   const edition = useEditionStatus();
   const canImportExport = edition.status?.has("importExport") ?? false;
   const [upgradeOpen, setUpgradeOpen] = useState(false);
-  const membersQuery = trpc.member.list.useQuery();
-  const logsStatsQuery = trpc.logs.list.useQuery({ limit: 200 });
+  const membersQuery = useQuery({ queryKey: ["members"], queryFn: () => apiGet<{ members: MemberLite[] }>("/api/members") });
+  const logsStatsQuery = useQuery({ queryKey: ["logs", 200], queryFn: () => apiGet("/api/logs?limit=200") });
   const [tab, setTab] = useState<SettingsTab>("receipt");
   // ROUND 61 — ป้ายเวอร์ชันที่ sidebar กดแล้วพามาแท็บเวอร์ชันโดยตรง
   useEffect(() => {
@@ -1184,16 +1185,16 @@ function Settings({ setView, role, initialTab }: { setView: (view: View) => void
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
   // ROUND 36 (ข้อ 31) — จำนวนบัญชี dev + โมดัลยืนยันตอนเปิด Dev Access
-  const usersQuery = trpc.user.list.useQuery(undefined);
+  const usersQuery = useQuery({ queryKey: ["users"], queryFn: () => apiGet("/api/users") });
   const [devAccessConfirm, setDevAccessConfirm] = useState(false);
   const devAccounts = (usersQuery.data ?? []).filter((user) => user.role === "dev" && user.active === 1);
   // ROUND 42 (ข้อ 32 ตอนที่ 2) — แท็บการเชื่อมต่อ: ข้อมูล LAN จากเซิร์ฟเวอร์ + วัดความหน่วง
   // + สถานะออนไลน์ของเบราว์เซอร์ (โหลดเฉพาะตอนเปิดแท็บนี้ — ไม่วุ่นวายตอนอยู่แท็บอื่น)
   // ROUND 56 — ใช้ร่วมกับแท็บเครื่องมือติดตั้ง (โซนผู้พัฒนา) ด้วย
-  const lanInfoQuery = trpc.system.lanInfo.useQuery(undefined, { enabled: tab === "network" || (tab === "install" && isDevRole) });
+  const lanInfoQuery = useQuery({ queryKey: ["system","lanInfo"], queryFn: () => apiGet("/api/system/version"), enabled: tab === "network" || (tab === "install" && isDevRole) });
   const lanInfo = lanInfoQuery.data ?? null;
   // ROUND 56 — ภาพรวมตรวจรับข้อมูลวันขึ้นระบบ (โซนผู้พัฒนา): จำนวนบัญชี/สมาชิก/สินค้า/บิลวันนี้/ขนาด DB
-  const installOverviewQuery = trpc.install.overview.useQuery(undefined, { enabled: tab === "install" && isDevRole, retry: false });
+  const installOverviewQuery = useQuery({ queryKey: ["install","overview"], queryFn: () => apiGet("/api/system/version"), enabled: tab === "install" && isDevRole, retry: false });
   const installOverview = installOverviewQuery.data ?? null;
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
   const [latencyAt, setLatencyAt] = useState("");
@@ -1224,17 +1225,17 @@ function Settings({ setView, role, initialTab }: { setView: (view: View) => void
   };
   // ROUND 38 (ข้อ 39) — ระบบสำรองข้อมูล: รายการไฟล์ + สร้าง/ดาวน์โหลด/กู้คืน (admin เท่านั้น — เมนูตั้งค่าเข้าได้ admin อยู่แล้ว)
   // ROUND 56 — ดึงด้วยเมื่ออยู่แท็บเครื่องมือติดตั้ง (แสดงไฟล์สำรองล่าสุดให้ช่าง)
-  const backupQuery = trpc.backup.list.useQuery(undefined, { enabled: tab === "backup" || (tab === "install" && isDevRole) });
+  const backupQuery = useQuery({ queryKey: ["backup","list"], queryFn: () => apiGet("/api/backup"), enabled: tab === "backup" || (tab === "install" && isDevRole) });
   const lastBackupFile = (backupQuery.data?.backups ?? [])[0] ?? null;
   const [restoreTarget, setRestoreTarget] = useState<string | null>(null);
-  const createBackupMutation = trpc.backup.create.useMutation({
+  const createBackupMutation = useMutation({
     onSuccess: (data) => {
       toast.success("สำรองข้อมูลเรียบร้อย", { description: `${data.file} · ${formatFileSize(data.sizeBytes)} · ตรวจสอบความถูกต้องผ่าน (เก็บตามจำนวนที่ตั้งไว้ ${data.keepCount} ไฟล์)`, duration: 5000 });
       void backupQuery.refetch();
     },
     onError: (mutationError) => toast.error("สำรองข้อมูลไม่สำเร็จ", { description: getErrorMessage(mutationError) }),
   });
-  const downloadBackupMutation = trpc.backup.download.useMutation({
+  const downloadBackupMutation = useMutation({
     onSuccess: (data) => {
       try {
         const binary = atob(data.base64);
@@ -1252,7 +1253,7 @@ function Settings({ setView, role, initialTab }: { setView: (view: View) => void
     },
     onError: (mutationError) => toast.error("ดาวน์โหลดไม่สำเร็จ", { description: getErrorMessage(mutationError) }),
   });
-  const restoreBackupMutation = trpc.backup.restore.useMutation({
+  const restoreBackupMutation = useMutation({
     onSuccess: async (data) => {
       setRestoreTarget(null);
       toast.success("กู้คืนข้อมูลเรียบร้อย", { description: `ระบบสำรองไฟล์ป้องกันไว้ก่อน (${data.safetyBackupFile}) แล้วเปลี่ยนฐานข้อมูลเป็นไฟล์ที่เลือก — ข้อมูลทั้งระบบกลับมาเป็นช่วงเวลาของไฟล์สำรองนั้น`, duration: 6500 });
@@ -1263,7 +1264,7 @@ function Settings({ setView, role, initialTab }: { setView: (view: View) => void
   });
   // r87 — อัปโหลดไฟล์ฐานข้อมูล .sqlite จากเครื่องอื่น (ย้ายร้าน/ขึ้นคลาวด์): ตรวจก่อนเข้ารายการสำรอง แล้วกดกู้คืนได้เลย
   const uploadBackupInputRef = useRef<HTMLInputElement | null>(null);
-  const uploadBackupMutation = trpc.backup.upload.useMutation({
+  const uploadBackupMutation = useMutation({
     onSuccess: async (data) => {
       toast.success("อัปโหลดไฟล์สำเร็จ — ตรวจความถูกต้องผ่านแล้ว", { description: `${data.file} · ${formatFileSize(data.sizeBytes)} — อยู่ใน “ไฟล์สำรองทั้งหมด” ด้านล่างแล้ว กด “กู้คืน” เพื่อนำข้อมูลชุดนี้กลับมาใช้งานทั้งระบบ`, duration: 9000 });
       await utils.invalidate();
@@ -1314,7 +1315,7 @@ function Settings({ setView, role, initialTab }: { setView: (view: View) => void
       setImportMapping({ ...sheet.suggestedMapping });
     }
   };
-  const importPreviewMutation = trpc.importData.preview.useMutation({
+  const importPreviewMutation = useMutation({
     onSuccess: (data) => {
       applySheetPreview(data.sheets);
       setImportResult(null);
@@ -1326,7 +1327,7 @@ function Settings({ setView, role, initialTab }: { setView: (view: View) => void
       toast.error("อ่านไฟล์ไม่สำเร็จ", { description: getErrorMessage(mutationError), duration: 5000 });
     },
   });
-  const importExecuteMutation = trpc.importData.execute.useMutation({
+  const importExecuteMutation = useMutation({
     onSuccess: async (data) => {
       setImportConfirm(false);
       setImportResult(data);
@@ -1342,7 +1343,7 @@ function Settings({ setView, role, initialTab }: { setView: (view: View) => void
       toast.error("นำเข้าข้อมูลไม่สำเร็จ", { description: getErrorMessage(mutationError), duration: 6000 });
     },
   });
-  const importTemplateMutation = trpc.importData.template.useMutation({
+  const importTemplateMutation = useMutation({
     onSuccess: (data) => {
       try {
         const binary = atob(data.base64);
@@ -1515,7 +1516,7 @@ function Settings({ setView, role, initialTab }: { setView: (view: View) => void
     applyUiStyle(serverSettings.appStyle); // ROUND 38 — ยกเลิกพรีวิวสไตล์ด้วย
     applyPaperWidth(serverSettings.receiptPaperWidth); // ROUND 42 — ยกเลิกพรีวิวขนาดกระดาษด้วย
   };
-  const saveMutation = trpc.settings.set.useMutation({
+  const saveMutation = useMutation({
     onSuccess: () => {
       setSaved(true);
       setError("");
@@ -1659,7 +1660,7 @@ function Settings({ setView, role, initialTab }: { setView: (view: View) => void
   };
   // Round 31 — รอบตัดยอด: live view of the CURRENT business period so the admin
   // sees what the cut-off setting actually does before saving it.
-  const periodQuery = trpc.reports.businessPeriod.useQuery(undefined, { refetchInterval: 60_000 });
+  const periodQuery = useQuery({ queryKey: ["reports","business-period"], queryFn: () => apiGet("/api/reports/business-period"), refetchInterval: 60_000 });
   const period = periodQuery.data;
   return <><SectionHeader eyebrow="ระบบและการกำหนดค่า" title="ตั้งค่า" description={`ตั้งค่าร้านค้าแบ่งเป็น ${settingsCategories.length} หมวดหลัก — เลือกหมวดด้านบน แล้วเลือกแท็บย่อยของหมวดนั้นต่อได้เลย`} action={<button className="primary-button" disabled={!form || saveMutation.isPending} onClick={saveSettings}><Check size={16} /> {saveMutation.isPending ? "กำลังบันทึก…" : dirtyCount > 0 ? `บันทึกการตั้งค่า · ${dirtyCount} รายการ` : "บันทึกการตั้งค่า"}</button>} /><div className="settings-layout"><div className="settings-cat-row" role="group" aria-label="หมวดหลักของการตั้งค่า">{settingsCategories.map((group, index) => { const CatIcon = group.icon; return <button key={group.label} type="button" className={`settings-cat${group.dev ? " dev-zone" : ""}${index === activeCategoryIndex ? " active" : ""}`} aria-pressed={index === activeCategoryIndex} onClick={() => setTab(group.tabs[0].id)} title={group.label}><span className="cat-ico" aria-hidden="true"><CatIcon size={17} /></span><span className="cat-text"><b>{group.label}</b><small>{group.tabs.length} แท็บ</small></span></button>; })}</div><div className="settings-nav" role="tablist" aria-label={`แท็บย่อยของหมวด${activeCategory.label}`}>{activeCategory.tabs.map(({ id, label, icon: Icon }) => <button key={id} role="tab" aria-selected={tab === id} className={tab === id ? "active" : ""} onClick={() => setTab(id)}><Icon size={17} /> {label}</button>)}</div><div className="settings-content">{tab === "install" && isDevRole && <><section className="panel settings-card install-hero"><div className="settings-heading"><div><h2>เครื่องมือติดตั้งระบบ</h2><p>รวมทุกอย่างที่ช่างต้องใช้ในวันขึ้นระบบที่หน้างาน — ข้อมูลเครื่อง ตรวจรับข้อมูลลูกค้า ทดสอบเครื่องพิมพ์ และเช็คลิสต์ส่งมอบ</p></div><Wrench size={20} className="muted-icon" /></div><div className="install-chip-row"><span className="install-chip"><HardDriveDownload size={13} /> ฐานข้อมูล {formatFileSize(installOverview?.dbSizeBytes ?? 0)}</span><span className="install-chip"><Activity size={13} /> เปิดมาแล้ว {uptimeLabel(lanInfo?.uptimeSeconds ?? 0)}</span><span className="install-chip"><Wifi size={13} /> พอร์ต {lanInfo?.port ?? "—"}</span><span className="install-chip dev">โซนผู้พัฒนา — มองเห็นเฉพาะบัญชี dev</span></div></section><div className="install-grid"><section className="panel settings-card"><div className="settings-heading"><div><h2>เครื่องเซิร์ฟเวอร์และ URL ของร้าน</h2><p>URL ที่เครื่องอื่นในวงแลนใช้เข้าระบบ — กดคัดลอกแล้วส่งให้ทุกจุดขาย</p></div><Terminal size={20} className="muted-icon" /></div><div className="install-info-rows"><div><span>ชื่อเครื่อง</span><b>{lanInfo?.hostname ?? "…"}</b></div><div><span>ระบบปฏิบัติการ</span><b>{lanInfo?.platform ?? "…"}</b></div><div><span>หน่วยความจำ</span><b>{lanInfo ? `${lanInfo.totalMemoryMb.toLocaleString("th-TH")} MB` : "…"}</b></div><div><span>เวลาที่เปิดมาแล้ว</span><b>{lanInfo ? uptimeLabel(lanInfo.uptimeSeconds) : "…"}</b></div></div><div className="install-lan-urls">{(lanInfo?.addresses ?? []).length > 0 ? lanInfo!.addresses.map((address) => <button key={address} type="button" className="install-url-row" onClick={() => copyLanUrl(`${lanInfo!.https ? "https" : "http"}://${address}:${lanInfo!.port}`)} title="กดเพื่อคัดลอก URL นี้"><Globe size={14} /><b>{lanInfo!.https ? "https" : "http"}://{address}:{lanInfo!.port}</b><Copy size={13} /></button>) : <div className="install-url-empty"><Wifi size={15} /> ไม่พบไอพีวงแลน — เครื่องอาจออฟไลน์อยู่ หรือเข้าผ่าน localhost</div>}</div></section><section className="panel settings-card"><div className="settings-heading"><div><h2>ตรวจรับข้อมูลก่อนส่งมอบ</h2><p>ตัวเลขปัจจุบันในระบบ — เทียบกับข้อมูลลูกค้าที่เตรียมมาวันนี้</p></div><ShieldCheck size={20} className="muted-icon" /></div><div className="install-stat-grid"><div><span>บัญชีผู้ใช้</span><b>{installOverview ? `${installOverview.users.active}/${installOverview.users.total} ใช้งาน` : "…"}</b><small>บัญชี dev {installOverview?.users.devAccounts ?? "…"} รายการ</small></div><div><span>สมาชิก</span><b>{installOverview ? `${installOverview.members.active.toLocaleString("th-TH")}/${installOverview.members.total.toLocaleString("th-TH")}` : "…"}</b><small>เงินในบัญชีรวม {money(installOverview?.members.walletTotal ?? 0)}</small></div><div><span>สินค้า</span><b>{installOverview ? `${installOverview.products.active}/${installOverview.products.total}` : "…"}</b><small>ถึงจุดสั่งซื้อ {installOverview?.products.lowStock ?? "…"} รายการ</small></div><div><span>บิลวันนี้</span><b>{installOverview?.sales.todayBills ?? "…"} บิล</b><small>ยอดขาย {money(installOverview?.sales.todayRevenue ?? 0)}</small></div></div>{(installOverview?.products.zeroPrice ?? 0) > 0 && <div className="notice-bar error install-warn"><CircleAlert size={15} /> มีสินค้า {installOverview!.products.zeroPrice} รายการที่ยังไม่ได้ตั้งราคา (฿0) — ตั้งราคาให้ครบก่อนวันขึ้นระบบ ที่หน้าสต็อกสินค้า</div>}<div className="install-action-row"><button type="button" className="outline-button compact" onClick={() => setTab("import")}><FileSpreadsheet size={14} /> นำเข้าสมาชิก/สินค้า</button><button type="button" className="outline-button compact" onClick={() => setView("users")}><UserCog size={14} /> จัดบัญชีผู้ใช้</button></div></section><section className="panel settings-card"><div className="settings-heading"><div><h2>ทดสอบเครื่องพิมพ์สลิป</h2><p>พิมพ์สลิปทดสอบที่เครื่องจริง — ตรวจว่าไทยอ่านชัด ครบทุกบรรทัด ขนาดกระดาษตรง</p></div><Printer size={20} className="muted-icon" /></div><div className="install-action-row"><span className="install-chip">กระดาษ {paperWidth} มม. — เปลี่ยนได้ที่แท็บใบเสร็จ</span><button type="button" className="primary-button compact" onClick={testPrintReceipt}><Printer size={15} /> พิมพ์สลิปทดสอบ</button></div></section><section className="panel settings-card"><div className="settings-heading"><div><h2>สำรองข้อมูลก่อนส่งมอบ</h2><p>สำรองตัวเลขไว้ก่อนวันขึ้นระบบเสมอ — และดาวน์โหลดเก็บนอกเครื่อง</p></div><DatabaseBackup size={20} className="muted-icon" /></div>{lastBackupFile ? <div className="install-last-backup"><Check size={14} /> ล่าสุด: <b>{lastBackupFile.file}</b> · {formatFileSize(lastBackupFile.sizeBytes)} · {formatLogDateTime(lastBackupFile.createdAt)}</div> : <div className="install-last-backup none"><CircleAlert size={14} /> ยังไม่มีไฟล์สำรองเลย — สร้างไฟล์แรกก่อนส่งมอบ</div>}<div className="install-action-row"><button type="button" className="primary-button compact" disabled={createBackupMutation.isPending} onClick={() => createBackupMutation.mutate()}><DatabaseBackup size={15} /> {createBackupMutation.isPending ? "กำลังสำรอง…" : "สำรองข้อมูลเดี๋ยวนี้"}</button><button type="button" className="outline-button compact" onClick={() => setTab("backup")}>ดูไฟล์สำรองทั้งหมด</button></div></section></div><section className="panel settings-card"><div className="settings-heading"><div><h2>เช็คลิสต์วันขึ้นระบบ</h2><p>ติ๊กทำเสร็จทีละข้อ — บันทึกไว้กลางระบบ ทีมงานเห็นตรงกันทุกเครื่อง · บางข้อระบบตรวจให้อัตโนมัติจากตัวเลขจริง</p></div><ListChecks size={20} className="muted-icon" /></div><div className="golive-progress"><div className="golive-progress-bar"><i style={{ width: `${Math.round((goliveDone / GO_LIVE_CHECKLIST.length) * 100)}%` }} /></div><b>{goliveDone}/{GO_LIVE_CHECKLIST.length} ข้อ</b></div><div className="golive-list">{GO_LIVE_CHECKLIST.map((item) => { const checked = goliveCheckedIds.includes(item.id); const autoPass = item.auto && installOverview ? item.auto(installOverview) : null; return <label key={item.id} className={`golive-item${checked ? " checked" : ""}`}><input type="checkbox" checked={checked} onChange={() => toggleGoliveCheck(item.id)} aria-label={item.label} /><span className="golive-item-body"><b>{item.label}</b><small>{item.hint}</small></span>{autoPass != null && <span className={`golive-auto ${autoPass ? "pass" : "warn"}`}><ShieldCheck size={12} /> {autoPass ? "ตรวจแล้ว" : "ยังไม่ครบ"}</span>}</label>; })}</div><div className="install-action-row"><button type="button" className="danger-outline-button compact" onClick={resetGoliveChecks} disabled={!form || saveMutation.isPending}><RotateCcw size={14} /> ล้างเช็คลิสต์ (เริ่มรอบใหม่)</button></div></section><section className="panel settings-card"><div className="settings-heading"><div><h2>ส่งมอบและปิดงาน</h2><p>ทำตามลำดับนี้ก่อนจากหน้างาน — แล้วร้านใช้งานต่อได้เองโดยไม่ต้องมีช่างอยู่</p></div><LogOut size={20} className="muted-icon" /></div><div className="install-handover-steps"><div className="install-handover-step"><b>1</b><div><b>ให้ผู้บริหารเปลี่ยนรหัสผ่านของตัวเอง</b><small>เมนูผู้ใช้ระบบ → แก้ไข → เปลี่ยนรหัสผ่าน — ช่างไม่ควรรู้รหัสของลูกค้า</small></div></div><div className="install-handover-step"><b>2</b><div><b>ปิดประตูผู้พัฒนา (Dev Access)</b><small>ปัจจุบัน{form?.devAccess ? "เปิดอยู่ — ปิดที่แท็บสิทธิ์และความปลอดภัยก่อนจาก" : "ปิดอยู่แล้ว"} · บัญชี dev จะเข้าไม่ได้จนกว่าร้านจะเปิดใหม่ (โทรติดต่อช่าง)</small></div></div><div className="install-handover-step"><b>3</b><div><b>สรุปวิธีใช้หลักให้ทีมร้าน</b><small>ขายหน้าร้าน · เติม/ถอนเงิน (F2/F3) · ลงทะเบียนสมาชิก (F6) · ดูรายงานประจำวัน · สำรองข้อมูลเป็นระยะ</small></div></div></div><div className="install-action-row"><button type="button" className="outline-button compact" onClick={() => setTab("roles")}><ShieldCheck size={14} /> ไปแท็บสิทธิ์และความปลอดภัย</button><button type="button" className="outline-button compact" onClick={() => setView("users")}><UserCog size={14} /> ไปเมนูผู้ใช้ระบบ</button></div></section></>}{tab === "brand" && <><section className="panel settings-card"><div className="settings-heading"><div><h2>ชื่อร้านและโลโก้</h2><p>ชื่อและโลโก้จะแสดงบนหน้าจอ แถบเมนู หน้าเข้าสู่ระบบ และหัวใบเสร็จ</p></div><Palette size={20} className="muted-icon" /></div><div className="form-grid"><label className="wide">ชื่อแอป / ร้านค้า<input value={form?.appName ?? ""} onChange={(event) => updateForm({ appName: event.target.value })} placeholder="เช่น ร้านค้าสวัสดิการ" disabled={!form} maxLength={80} /></label><label className="wide">โลโก้ร้านค้า<div className="logo-uploader">{form?.appLogo ? <img className="logo-preview" src={form.appLogo} alt="โลโก้ปัจจุบัน" /> : <span className="logo-empty"><ImageIcon size={20} /></span>}<div className="logo-actions"><div className="logo-button-row"><button type="button" className="outline-button compact" disabled={!form} onClick={() => logoInputRef.current?.click()}><ImagePlus size={15} /> {form?.appLogo ? "เปลี่ยนรูป" : "เลือกรูปโลโก้"}</button>{form?.appLogo && <button type="button" className="danger-outline-button compact" disabled={!form} onClick={() => updateForm({ appLogo: "" })}><Trash2 size={15} /> ลบโลโก้</button>}</div><small>รองรับ PNG JPG WEBP SVG · ระบบย่อเป็น 256px อัตโนมัติ · ไม่ใส่ก็ได้ จะใช้อักษรย่อแทน</small></div><input ref={logoInputRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" hidden onChange={onLogoPick} /></div></label><label className="wide">เบอรโทรศูนย์ช่วยเหลือร้าน (021234567 หรือ 0812345678)<input value={form?.helpPhone ?? ""} onChange={(event) => updateForm({ helpPhone: event.target.value })} placeholder="เช่น 023456789 หรือ 0812345678 — ใส่แล้วจะขึ้นท้ายหน้าจอทุกหน้า" disabled={!form} maxLength={32} inputMode="tel" title="เบอรติดต่อภายในร้าน แสดงที่แถบล่างของทุกหน้าจอ — ไม่กรอกจะไม่แสดง" /></label></div><div className="brand-live-preview" aria-label="ตัวอย่างหน้าจอ"><span className="eyebrow">ตัวอย่างการแสดงผล</span><div className="brand-preview-card">{(form?.appLogo ?? "") ? <img src={form?.appLogo ?? ""} alt="" /> : <div className="brand-mark"><span>{brandInitial(form?.appName || "ร้านค้าสวัสดิการ")}</span></div>}<div><b>{(form?.appName ?? "").trim() || "ร้านค้าสวัสดิการ"}</b><small>Welfare Store</small></div></div></div></section><section className="panel settings-card"><div className="settings-heading"><div><h2>สีธีมของแอป</h2><p>สีหลักของระบบ — ปุ่ม แถบเมนู จุดเน้นทั้งแอป · เห็นพรีวิวทันที กดบันทึกเพื่อใช้กับทุกเครื่อง</p></div><Palette size={20} className="muted-icon" /></div><div className="theme-swatches">{THEME_PRESETS.map((preset) => <button type="button" key={preset.id} className={`theme-swatch${(form?.appTheme ?? "") === preset.id ? " active" : ""}`} onClick={() => chooseTheme(preset.id)}><span className="swatch-dot" style={{ background: preset.base }} /><b>{preset.label}</b><small>{preset.base.toUpperCase()}</small></button>)}</div><div className="theme-custom-row"><span>สีกำหนดเอง</span><input type="color" value={customThemeHex} onChange={(event) => chooseTheme(event.target.value)} aria-label="เลือกสีธีมกำหนดเอง" /><code>{customThemeHex.toUpperCase()}</code><small>เลือกจากพาเลตต์ด้านบน หรือกำหนดโค้ดสีเอง</small></div></section><section className="panel settings-card"><div className="settings-heading"><div><h2>สไตล์หน้าตาแอป (Design Style)</h2><p>บุคลิกการออกแบบทั้งระบบ — ฟอนต์ ความมนของปุ่ม พื้นหลัง · เลือกแล้วเห็นทันทีบนหน้าจอนี้ กดบันทึกเพื่อใช้กับทุกเครื่อง</p></div><Sparkles size={20} className="muted-icon" /></div><div className="ui-style-grid">{UI_STYLE_PRESETS.map((style) => <button type="button" key={style.id} className={`ui-style-card${(form?.appStyle ?? "shop") === style.id ? " active" : ""}`} onClick={() => chooseStyle(style.id)} disabled={!form} aria-pressed={(form?.appStyle ?? "shop") === style.id}><span className="ui-style-preview" data-preview={style.id} aria-hidden="true"><i className="pv-side" /><span className="pv-body"><b className="pv-title" /><b className="pv-chip" /><b className="pv-btn" /></span></span><b>{style.label}</b><small>{style.detail}</small><small className="style-font-hint">ฟอนต์: {style.fontFamily}</small></button>)}</div><div className="settings-inline-note style-note-row"><Sparkles size={16} /><span>สไตล์จะพาสีเน้นของแพลตฟอร์มนั้นมาด้วย (เช่น Apple = น้ำเงิน) — ปรับสีเน้นแยกได้ที่พาเลตต์ด้านบน · กลับ “ร้านค้า” = คืนเขียวมรกตมาตรฐาน</span></div></section></>}{tab === "receipt" && <><section className="panel settings-card"><div className="settings-heading"><div><h2>ข้อมูลร้านบนใบเสร็จ</h2><p>ชื่อ รหัส และที่อยู่ — แสดงที่หัวใบเสร็จและรายงาน</p></div><ShoppingBag size={20} className="muted-icon" /></div><div className="form-grid"><label>ชื่อร้านค้า<input value={form?.storeName ?? ""} onChange={(event) => updateForm({ storeName: event.target.value })} placeholder="ชื่อร้านค้า" disabled={!form} /></label><label>รหัสร้านค้า<input value={form?.storeCode ?? ""} onChange={(event) => updateForm({ storeCode: event.target.value })} placeholder="รหัสร้านค้า" disabled={!form} /></label><label className="wide">ที่อยู่<input value={form?.storeAddress ?? ""} onChange={(event) => updateForm({ storeAddress: event.target.value })} placeholder="ที่อยู่" disabled={!form} /></label></div></section><section className="panel settings-card"><div className="settings-heading"><div><h2>ใบเสร็จรับเงิน</h2><p>กำหนดรายละเอียดที่ต้องการแสดงบนใบเสร็จ</p></div><ReceiptText size={20} className="muted-icon" /></div><div className="toggle-row"><div><b>พิมพ์ใบเสร็จหลังชำระเงิน</b><small>ชำระเสร็จแล้วระบบแสดงหน้าใบเสร็จพร้อมปุ่ม พิมพ์ · บันทึกรูป · ดาวน์โหลด PDF — ไม่เด้งไปหน้าสั่งพิมพ์ด้วยตัวเอง (รอบ 75)</small></div><span className="pos-rail-locked-pill">พร้อมใช้</span></div><div className="toggle-row"><div><b>แสดงยอดคงเหลือสมาชิกบนใบเสร็จ</b><small>แสดงยอดคงเหลือล่าสุดบนทุกใบเสร็จที่ระบุสมาชิก พร้อมชื่อผู้ทำรายการ</small></div><button className={`toggle ${form?.showBalanceOnReceipt ? "on" : ""}`} onClick={() => updateForm({ showBalanceOnReceipt: !form?.showBalanceOnReceipt })} disabled={!form} aria-label="แสดงยอดคงเหลือบนใบเสร็จ"><span /></button></div></section><section className="panel settings-card printer-card"><div className="settings-heading"><div><h2>เครื่องพิมพ์หน้าร้าน</h2><p>ระบบส่งงานพิมพ์ทันทีที่กดยืนยัน — ที่เครื่องพิมพ์เริ่มต้นของเครื่องนี้โดยตรง</p></div><Printer size={20} className="muted-icon" /></div><div className="printer-flow-steps"><div className="printer-step"><b>1</b><div><b>ตั้งเครื่องพิมพ์เริ่มต้นที่เครื่องคอมพิวเตอร์</b><small>Windows: การตั้งค่า → อุปกรณ์ → เครื่องพิมพ์และสแกนเนอร์ → กด “ตั้งเป็นค่าเริ่มต้น” · macOS: การตั้งค่าระบบ → เครื่องพิมพ์และสแกนเนอร์ → เครื่องพิมพ์เริ่มต้น · ตั้งครั้งเดียว ทุกใบเสร็จ/สลิป/บัตรจะวิ่งไปเครื่องนี้</small></div></div><div className="printer-step"><b>2</b><div><b>กด “พิมพ์ใบเสร็จ” ที่หน้าสำเร็จหลังชำระเงิน</b><small>ชำระเสร็จแล้วระบบแสดงหน้าใบเสร็จให้เลือกเอง — พิมพ์ (ผ่านพรีวิว) · บันทึกรูป PNG · ดาวน์โหลด PDF · แล้วเริ่มรายการขายใหม่ได้ทันที ไม่มีการเด้งไปหน้าสั่งพิมพ์ระหว่างทาง</small></div></div><div className="printer-step"><b>3</b><div><b>อยากให้พิมพ์เงียบ ๆ ไม่ต้องกด</b><small>เปิด Chrome ด้วยคำสั่ง --kiosk-printing (เมนู Start → Chrome → Properties → เพิ่มท้าย Target) — สลิปจะออกจากเครื่องพิมพ์ทันทีที่ยืนยัน ไม่มีหน้าต่าง · ตั้งครั้งเดียวโดยผู้ดูแลระบบ</small></div></div><div className="printer-step"><b>4</b><div><b>กระดาษออกมายาวเกินหลังท้ายรายการ?</b><small>ระบบจัดความยาวสลิปตามจำนวนรายการให้แล้ว (ไม่มีขอบกระดาษ) — ส่วนที่เกินมาจากขนาดกระดาษในไดรเวอร์เครื่องพิมพ์: หน้าต่างพิมพ์ของ Chrome → ขอบกระดาษ “ไม่มี” + ปิดหัว-ท้ายกระดาษ และตั้งความสูงกระดาษที่ Windows การตั้งค่า → อุปกรณ์ → เครื่องพิมพ์ → ปรับแต่งการพิมพ์ ให้ใกล้ความยาวสลิปจริง (ดูวิธีทีละขั้นได้ที่ปุ่ม “ข้อแนะนำ” ในหน้าต่างพรีวิวก่อนพิมพ์)</small></div></div></div><div className="paper-width-block"><div className="paper-width-head"><b>ขนาดกระดาษสลิปของเครื่องพิมพ์</b><small>เลือกตามความกว้างกระดาษจริงในเครื่องพิมพ์หน้าร้าน — ใบเสร็จ สลิปเติม/ถอนเงิน และสลิปทดสอบจะจัดหน้าตามขนาดนี้เวลาพิมพ์ (หน้าจอยังเหมือนเดิม) · เลือกแล้วลอง “พิมพ์ทดสอบ” ได้เลยก่อนบันทึก</small></div><div className="number-mode-grid paper-width-grid">{PAPER_WIDTHS.map((option) => <button className={paperWidth === option.id ? "selected" : ""} key={option.id} onClick={() => updateForm({ receiptPaperWidth: option.id })} disabled={!form} aria-pressed={paperWidth === option.id} title={`พิมพ์สลิปกว้าง ${option.label}`}><span className="number-radio">{paperWidth === option.id && <i />}</span><span><b>{option.label}</b><small>{option.detail}</small></span></button>)}</div></div><div className="printer-test-row"><div><b>ทดสอบการพิมพ์</b><small>พรีวิวสลิปตัวอย่างก่อน แล้วส่งไปเครื่องพิมพ์เริ่มต้น — เช็คกระดาษ/หมึก/ความชัดก่อนเปิดร้าน</small></div><button type="button" className="outline-button" onClick={testPrintReceipt}><Printer size={16} /> พิมพ์ทดสอบ</button></div><div className="printer-tips"><span className="eyebrow">ขนาดกระดาษที่ระบบออกแบบไว้</span><div className="printer-tip-pills"><span>ใบเสร็จ / สลิปเติม–ถอน / สรุปรอบตัดยอด · เลือกได้ด้านบน (58–80 มม.)</span><span>บัตรสมาชิก · 85.6 × 54 มม. (CR80)</span><span>รายงาน PDF · A4</span></div></div>{printerTestOpen && <div className="receipt-paper printer-test-slip" id="printer-test-slip"><div className="receipt-brand"><div><b>{form?.storeName || "ร้านค้าสวัสดิการ"}</b><small>ทดสอบการพิมพ์</small></div></div><div className="receipt-divider" /><div className="receipt-meta"><span>สลิปทดสอบเครื่องพิมพ์</span><b>{formatThaiDate(new Date())}</b></div><div className="receipt-line"><span>ตัวอักษรไทย</span><b>กขคง ๑๒๓</b></div><div className="receipt-line"><span>ตัวเลข</span><b>฿1,234.56</b></div><div className="receipt-total"><span>ถ้าอ่านชัดทุกบรรทัด</span><b>เครื่องพิมพ์พร้อม</b></div><div className="receipt-thanks">สลิปนี้พิมพ์จากเครื่องพิมพ์เริ่มต้นของเครื่อง<br /><small>ปรับกระดาษหรือหัวพิมพ์ถ้าตัวอักษรจาง</small></div></div>}{printerPreviewOpen && <PrintPreviewModal targetId="printer-test-slip" title="พรีวิวก่อนพิมพ์สลิปทดสอบ" subtitle="สลิปตัวอย่างสำหรับเช็คเครื่องพิมพ์ — ตัวอักษรไทย ตัวเลข และจุดตัดบรรทัด" paper="thermal" chips={["สลิปทดสอบเครื่องพิมพ์", formatThaiDate(new Date())]} onClose={() => { setPrinterPreviewOpen(false); setPrinterTestOpen(false); }} onPrint={() => { toast.success("ส่งสลิปทดสอบไปเครื่องพิมพ์แล้ว", { description: "ถ้าไม่มีอะไรออกมา ตรวจกระดาษ / สาย USB / เครื่องพิมพ์เริ่มต้นของเครื่อง" }); }} />}</section></>}{tab === "member" && <div className="settings-single"><section className="panel settings-card"><div className="settings-heading"><div><h2>การออกเลขสมาชิกใหม่</h2><p>เลือกวิธีออกหมายเลขให้สมาชิกที่ลงทะเบียนใหม่</p></div><CreditCard size={20} className="muted-icon" /></div><div className="number-mode-grid">{[["running", "รันเลขต่อเนื่อง", "M-000001, M-000002, ..."], ["year", "ขึ้นต้นด้วยปี", "69-00001, 69-00002, ..."], ["manual", "กำหนดเอง", "เจ้าหน้าที่กรอกหมายเลขเอง"]].map(([value, title, detail]) => <button className={numberMode === value ? "selected" : ""} key={value} onClick={() => updateForm({ memberNumberMode: value as SettingsForm["memberNumberMode"] })} disabled={!form}><span className="number-radio">{numberMode === value && <i />}</span><span><b>{title}</b><small>{detail}</small></span></button>)}</div><div className="member-number-format-grid"><label>คำนำหน้าเลขสมาชิก<input value={form?.memberNumberPrefix ?? ""} onChange={(event) => updateForm({ memberNumberPrefix: event.target.value })} maxLength={20} placeholder="เช่น M หรือ WEL" disabled={!form || numberMode === "manual"} /></label><label>จำนวนหลักเลขรัน<select value={form?.memberNumberSequenceDigits ?? 6} onChange={(event) => updateForm({ memberNumberSequenceDigits: Number(event.target.value) })} disabled={!form || numberMode === "manual"}>{[3, 4, 5, 6, 7, 8, 9, 10].map((digits) => <option value={digits} key={digits}>{digits} หลัก</option>)}</select></label><label>รูปแบบปี<select value={form?.memberNumberYearMode ?? "none"} onChange={(event) => updateForm({ memberNumberYearMode: event.target.value as SettingsForm["memberNumberYearMode"] })} disabled={!form || numberMode === "manual"}><option value="none">ไม่ใช้ปี</option><option value="buddhist">พ.ศ.</option><option value="gregorian">ค.ศ.</option></select></label>{(form?.memberNumberYearMode ?? "none") !== "none" && <><label>จำนวนหลักปี<select value={form?.memberNumberYearDigits ?? 2} onChange={(event) => updateForm({ memberNumberYearDigits: Number(event.target.value) as 2 | 4 })} disabled={!form}><option value={2}>2 หลัก เช่น 69</option><option value={4}>4 หลัก เช่น 2569</option></select></label><label>ตัวคั่นระหว่างส่วน<select value={form?.memberNumberSeparator ?? "-"} onChange={(event) => updateForm({ memberNumberSeparator: event.target.value as SettingsForm["memberNumberSeparator"] })} disabled={!form}><option value="-">ขีดกลาง (-)</option><option value="/">ทับ (/)</option><option value="_">ขีดล่าง (_)</option><option value="">ไม่ใช้ตัวคั่น</option></select></label><label>เดือนเริ่มรอบเลข<select value={form?.memberNumberResetMonth ?? 1} onChange={(event) => updateForm({ memberNumberResetMonth: Number(event.target.value) })} disabled={!form}>{[1,2,3,4,5,6,7,8,9,10,11,12].map((month) => <option value={month} key={month}>{new Date(2000, month - 1, 1).toLocaleString("th-TH", { month: "long" })}</option>)}</select></label></>}</div><div className="member-number-presets"><b>รูปแบบสำเร็จรูป</b><button type="button" className="outline-button compact" onClick={() => updateForm({ memberNumberMode: "year", memberNumberPrefix: "", memberNumberYearMode: "buddhist", memberNumberYearDigits: 2, memberNumberSeparator: "", memberNumberSequenceDigits: 5 })} disabled={!form}>ปี พ.ศ. 2 หลัก + เลข 5 หลัก · 6900001</button><small>ปีจะเปลี่ยนอัตโนมัติตาม “เดือนเริ่มรอบเลข” ที่กำหนดไว้ด้านบน</small></div><div className="settings-inline-note"><ShieldCheck size={16} /><span>รูปแบบตัวอย่าง: คำนำหน้า + ปี + เลขรัน · เช่น WEL-69-00001, WEL/69/00001 หรือ 6900001 ตามตัวคั่นที่เลือก · เมื่อถึงเดือนเริ่มรอบ ระบบจะเริ่มเลขรันชุดใหม่ของปีนั้น</span></div><div className="number-preview"><span>ตัวอย่างสมาชิกถัดไป</span><b>{nextNumber}</b></div></section></div>}{tab === "payment" && <div className="settings-single"><section className="panel settings-card"><div className="settings-heading"><div><h2>รูปแบบการชำระเงินที่รองรับ</h2><p>วิธีชำระเงินที่เจ้าหน้าที่สามารถใช้ได้ที่หน้าร้าน / POS</p></div><WalletCards size={20} className="muted-icon" /></div><div className="payment-method-list"><div className="payment-method-row"><span className="pay-icon cash"><WalletCards size={19} /></span><div><b>เงินสด</b><small>รับเงินสดที่เคาน์เตอร์ · เหมาะกับบุคคลทั่วไปที่ไม่ได้เป็นสมาชิก</small></div><StatusPill tone="green">ใช้งานได้</StatusPill></div><div className="payment-method-row"><span className="pay-icon qr"><CreditCard size={19} /></span><div><b>QR / สแกน</b><small>ลูกค้าสแกนจ่ายผ่านแอปธนาคาร แล้วเจ้าหน้าที่กดยืนยันบิล</small></div><StatusPill tone="blue">ใช้งานได้</StatusPill></div><div className="payment-method-row"><span className="pay-icon member"><UsersRound size={19} /></span><div><b>หักบัญชีสมาชิก</b><small>หักยอดจากบัญชีสวัสดิการทันที · ต้องเลือกสมาชิกในบิลก่อนกดชำระ และสมาชิกต้องไม่ถูกระงับ</small></div><StatusPill tone="purple">ใช้งานได้</StatusPill></div></div><div className="settings-inline-note"><ShieldCheck size={16} /><span>การเติมเงินและถอนเงินสมาชิก ทำที่หน้าร้านผ่านทางลัด F2 / F3 · สมาชิกใช้จ่ายที่เคาน์เตอร์ด้วยหมายเลขสมาชิกเท่านั้น</span></div><div className="settings-jump"><button className="outline-button" onClick={() => setView("pos")}><ArrowRight size={16} /> ไปที่หน้าร้าน / POS</button></div></section><section className="panel settings-card"><div className="settings-heading"><div><h2>บัญชีพร้อมเพย์ร้าน (QR รับเงิน)</h2><p>ใส่ครั้งเดียว — หน้ายืนยันชำระเงินจะขึ้นคิวอาร์ให้ลูกค้าสแกนจ่ายตามยอดบิลอัตโนมัติ</p></div><QrCode size={20} className="muted-icon" /></div><div className="form-grid"><label className="wide">เบอร์โทรศัพท์หรือเลขบัตรประชาชนของบัญชีพร้อมเพย์ร้าน<input value={form?.promptpayId ?? ""} onChange={(event) => updateForm({ promptpayId: event.target.value })} placeholder="เช่น 0812345678 หรือ 1234567890123" disabled={!form} maxLength={20} inputMode="numeric" title="ใช้เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก ของบัญชีพร้อมเพย์ที่รับเงินของร้าน" /></label></div>{(form?.promptpayId ?? "").trim() === "" ? <div className="settings-inline-note amber"><CircleAlert size={16} /><span>ยังไม่ได้ตั้ง — หน้า POS ยังยืนยันบิล QR ได้ตามปกติ แต่จะไม่มีคิวอาร์ให้ลูกค้าสแกน และเก็บหลักฐานสลิปเอง</span></div> : !isValidPromptPayId(form?.promptpayId ?? "") ? <div className="notice-bar error"><CircleAlert size={16} /> รูปแบบไม่ถูกต้อง — ต้องเป็นเบอร์โทร 9–10 หลัก หรือเลขบัตรประชาชน 13 หลัก (ตัวเลขเท่านั้น)</div> : <div className="settings-inline-note"><ShieldCheck size={16} /><span>พร้อมใช้ — คิวอาร์ที่ขึ้นหน้า POS เป็นแบบระบุยอดตามบิล (พร้อมเพย์มาตรฐานธนาคาร) ลูกค้าสแกนแล้วโอนได้เลย</span></div>}<div className="settings-inline-note"><ShieldCheck size={16} /><span>ตอนขายด้วยวิธี “QR / สแกน” เจ้าหน้าที่ยังถ่ายรูปหรือแนบสลิปการโอนไว้กับบิลได้ — เปิดดูย้อนหลังได้ที่รายงาน → ประวัติบิล</span></div></section></div>}{tab === "posmenu" && <div className="settings-single"><section className="panel settings-card"><div className="settings-heading"><div><h2>เมนูลัดหน้าร้าน (POS)</h2><p>เพิ่มหรือปิดปุ่มบนรางซ้ายหน้า POS ได้ตามการใช้งานจริงของร้าน — ปุ่มที่ปิดจะซ่อนจากรางทันที และคีย์ลัด F ของปุ่มนั้นหยุดทำงานด้วย (กันกดพลาดจากคีย์ลัด) บันทึกแล้วทุกเครื่องเห็นเหมือนกัน</p></div><LayoutDashboard size={20} className="muted-icon" /></div><div className="pos-rail-manage-list">{POS_RAIL_BUTTONS.map((button) => { const hidden = railHiddenFormSet.has(button.key); const Icon = button.icon; return <div className={`pos-rail-manage-row${hidden ? " off" : ""}`} key={button.key}><span className="pos-rail-manage-ico"><Icon size={17} /></span><div><b>{button.label} <kbd>{button.kbd}</kbd></b><small>{button.detail}</small></div><div className="pos-rail-key-control"><button type="button" className="pos-rail-key-input" aria-label={`ปุ่มลัด${button.label}`} onKeyDown={(event) => captureShortcutKey(button.key, event)} disabled={!form || hidden} title="กดปุ่มนี้ แล้วกดคีย์บนคีย์บอร์ดที่ต้องการ">{shortcutKeyMap[button.key] ?? button.kbd}</button><button className={`toggle ${!hidden ? "on" : ""}`} onClick={() => toggleRailButton(button.key)} disabled={!form} aria-label={`${hidden ? "เพิ่มกลับ" : "ปิดใช้งาน"}ปุ่ม${button.label} บนราง POS`} title={hidden ? "กดเพื่อเพิ่มปุ่มนี้กลับเข้าราง POS" : "กดเพื่อปิดปุ่มนี้ — ซ่อนจากรางและคีย์ลัดหยุดทำงาน"}><span /></button></div></div>; })}<div className="pos-rail-manage-row locked"><span className="pos-rail-manage-ico"><LayoutDashboard size={17} /></span><div><b>เมนู <kbd>Esc</kbd></b><small>กลับสู่เมนูหลัก · ภาพรวมระบบ — ปุ่มทางออกของหน้า POS ใช้งานเสมอ (รอบ 75: ใช้ Esc แทน F9 เพราะมือถือไม่มีปุ่ม F9 แต่มี Esc บนคีย์บอร์ดเสมือน)</small></div><span className="pos-rail-locked-pill">ใช้งานเสมอ</span></div></div><div className="settings-inline-note"><ShieldCheck size={16} /><span>เปิด/ปิดปุ่มและกำหนดคีย์ลัดได้ในแถวเดียวกัน · ปุ่มที่ปิดจะซ่อนจาก POS และปุ่มลัดจะหยุดทำงาน · กดปุ่มช่องคีย์ลัดแล้วกด F1–F12, Home หรือปุ่มตัวอักษรบนคีย์บอร์ด (ห้ามใช้ Esc)</span></div><div className="settings-jump"><button className="outline-button" onClick={() => setView("pos")}><ArrowRight size={16} /> ไปดูผลที่หน้าร้าน / POS</button></div></section></div>}{tab === "cutoff" && <><section className="panel settings-card"><div className="settings-heading"><div><h2>รอบตัดยอดประจำวัน</h2><p>กำหนดว่าสรุปยอดขายและธุรกรรมของ “หนึ่งวัน” จะถูกตัดเมื่อไร — ให้ระบบตัดให้เองตามเวลา หรือให้เจ้าหน้าที่กดตัดยอดเอง</p></div><CalendarClock size={20} className="muted-icon" /></div><div className="number-mode-grid">{[["auto", "ระบบตัดยอดให้อัตโนมัติ", `รอบวิ่งตามเวลาที่กำหนด เช่น ${(form?.dailyCutOffTime ?? "00:00")} ทุกวัน`], ["manual", "เจ้าหน้าที่ตัดยอดเอง", "กดปุ่ม “ตัดยอดรอบนี้” ที่หน้าภาพรวมเมื่อพร้อม"]].map(([value, title, detail]) => <button className={(form?.dailyCutOffMode ?? "auto") === value ? "selected" : ""} key={value} onClick={() => updateForm({ dailyCutOffMode: value as SettingsForm["dailyCutOffMode"] })} disabled={!form}><span className="number-radio">{(form?.dailyCutOffMode ?? "auto") === value && <i />}</span><span><b>{title}</b><small>{detail}</small></span></button>)}</div>{(form?.dailyCutOffMode ?? "auto") === "auto" && <div className="cutoff-time-row"><label>เวลาตัดยอดของรอบอัตโนมัติ<input type="time" value={form?.dailyCutOffTime ?? "00:00"} onChange={(event) => updateForm({ dailyCutOffTime: event.target.value })} disabled={!form} aria-label="เวลาตัดยอด (ชั่วโมง:นาที)" /></label><div className="cutoff-time-hint"><CalendarClock size={15} /><span>รอบการขาย 1 วัน จะเริ่ม–จบตามเวลานี้ เช่น 02:00 = รอบวิ่ง 02:00 ของวันนี้ ถึง 02:00 ของวันถัดไป · เหมาะกับร้านที่ปิดหลังเที่ยงคืน แล้วให้ยอดข้ามคืนไปรวมกับวันเดียวกัน</span></div></div>}</section><section className="panel settings-card"><div className="settings-heading"><div><h2>รอบปัจจุบัน (สดจากระบบ)</h2><p>ตามการตั้งค่าที่บันทึกไว้ในขณะนี้ — ไม่ใช่ค่าที่ยังแก้ไม่ได้บันทึก</p></div><Activity size={20} className="muted-icon" /></div>{periodQuery.isLoading ? <div className="cutoff-period-loading">กำลังโหลดข้อมูลรอบปัจจุบัน…</div> : period ? <div className="cutoff-period"><div className="cutoff-period-head"><StatusPill tone={period.mode === "auto" ? "blue" : "purple"}>{period.mode === "auto" ? `ระบบตัดอัตโนมัติ · ${period.cutOffTime} ทุกวัน` : "เจ้าหน้าที่ตัดยอดเอง"}</StatusPill><small>รอบเริ่ม {formatLogDateTime(period.periodStart)}{period.nextCutOffAt ? ` · รอบถัดไป ${formatLogDateTime(period.nextCutOffAt)}` : ""}</small></div><div className="cutoff-period-stats"><div><small>บิลในรอบ</small><strong>{period.totals.bills.toLocaleString("th-TH")}</strong></div><div><small>ชิ้นที่ขาย</small><strong>{period.totals.pieces.toLocaleString("th-TH")}</strong></div><div><small>ยอดขายรอบนี้</small><strong>{money(period.totals.revenue)}</strong></div><div><small>เงินสด / QR</small><strong>{money(period.totals.cashTotal)} / {money(period.totals.qrTotal)}</strong></div><div><small>หักบัญชีสมาชิก</small><strong>{money(period.totals.walletTotal)}</strong></div><div><small>เติม / ถอน</small><strong>{money(period.totals.deposits)} / {money(period.totals.withdrawals)}</strong></div></div>{period.lastClosure && <div className="cutoff-last"><CalendarDays size={15} /><div><b>ตัดยอดล่าสุด {formatLogDateTime(period.lastClosure.closedAt)}</b><small>โดย {period.lastClosure.closedBy ?? "—"} · รอบ {formatLogDateTime(period.lastClosure.periodStart)} → {formatLogDateTime(period.lastClosure.closedAt)} · {period.lastClosure.bills} บิล · {money(period.lastClosure.revenue)}</small></div></div>}<div className="settings-inline-note"><ShieldCheck size={16} /><span>ปุ่ม “ตัดยอดรอบนี้” อยู่ที่หน้าภาพรวม — ทั้งเจ้าหน้าที่และผู้บริหารกดได้ · ทุกครั้งที่ตัดยอด ระบบสร้างสรุปรอบใหม่และบันทึกลง Log ทันที</span></div><div className="settings-jump"><button className="outline-button" onClick={() => setView("dashboard")}><ArrowRight size={16} /> ไปที่หน้าภาพรวมเพื่อตัดยอด</button></div></div> : <div className="cutoff-period-loading">ยังไม่มีข้อมูลรอบปัจจุบัน</div>}</section></>}{tab === "edition" && <>
           <section className="settings-section edition-section">
@@ -1693,7 +1694,7 @@ function Settings({ setView, role, initialTab }: { setView: (view: View) => void
 }
 
 function Logs() {
-  const logsQuery = trpc.logs.list.useQuery({ limit: 200 });
+  const logsQuery = useQuery({ queryKey: ["logs", 200], queryFn: () => apiGet("/api/logs?limit=200") });
   const [query, setQuery] = useState("");
   const [notice, setNotice] = useState("");
   // Render cap (round 15): 30 rows up front, +30 per show-more click.
@@ -1755,11 +1756,11 @@ function AppShell({ user, brand, onLogout }: { user: User; brand?: BrandSettings
   // ของ POS เปิดโมดัลที่หน้าขายสินค้าเอง ไม่ต้องออกจากหน้าร้านอีกต่อไป
   const [notifOpen, setNotifOpen] = useState(false);
   const notifRef = useRef<HTMLDivElement | null>(null);
-  const logoutMutation = trpc.auth.logout.useMutation({ onSuccess: () => onLogout() });
+  const logoutMutation = useMutation({ mutationFn: () => apiPost("/api/auth/logout"), onSuccess: () => onLogout() });
   // Stock rows feed both the bell dropdown and the sidebar nav badge.
   // Server statuses (listStockRows): "สต็อกต่ำ" = product stock ≤ reorder
   // point, "ใกล้หมดอายุ" = lot expiry within 30 days ("ปิดการขาย" excluded).
-  const stockRowsQuery = trpc.stock.rows.useQuery(undefined, { refetchInterval: 60_000 });
+  const stockRowsQuery = useQuery({ queryKey: ["stock"], queryFn: () => apiGet("/api/stock"), refetchInterval: 60_000 });
   const lowStock = useMemo(() => {
     const rows = (stockRowsQuery.data ?? []).filter((row) => row.active && row.status === "สต็อกต่ำ");
     // One alert per product (a product with several lots shares the same stock).
@@ -1770,8 +1771,8 @@ function AppShell({ user, brand, onLogout }: { user: User; brand?: BrandSettings
   // lowBalanceAlert + lowBalanceThreshold) and the member list. Mirrors the stock
   // poll cadence so the bell stays fresh after wallet top-ups/withdrawals too.
   // Same no-input query as the Members view, so both share one cache entry.
-  const settingsQuery = trpc.settings.get.useQuery(undefined);
-  const memberRowsQuery = trpc.member.list.useQuery(undefined, { refetchInterval: 60_000 });
+  const settingsQuery = useQuery({ queryKey: ["settings"], queryFn: () => apiGet("/api/settings") });
+  const memberRowsQuery = useQuery({ queryKey: ["members"], queryFn: () => apiGet<{ members: MemberLite[] }>("/api/members"), refetchInterval: 60_000 });
   // ROUND 42 (ข้อ 4) — ขนาดกระดาษสลิปจาก settings มีผลทันทีทุกครั้งที่เข้าแอป
   // (ทุก view — พิมพ์ใบเสร็จ/สลิปได้โดยไม่ต้องเปิดหน้าตั้งค่าก่อน)
   useEffect(() => { applyPaperWidth(settingsQuery.data?.receiptPaperWidth); }, [settingsQuery.data?.receiptPaperWidth]);
@@ -1882,12 +1883,12 @@ function AppShell({ user, brand, onLogout }: { user: User; brand?: BrandSettings
 
 /** Auth gate: session check (auth.me) → splash → first-time setup → login view → forced password change → app shell. */
 export default function Home() {
-  const authQuery = trpc.auth.me.useQuery();
+  const authQuery = useQuery({ queryKey: ["auth","me"], queryFn: () => apiGet<{ user: User | null }>("/api/auth/me") });
   // ROUND 25 — แบรนด์ (ชื่อ/โลโก้/สี) โหลดจาก settings สาธารณะ ใช้ทั้งก่อน/หลัง login
-  const brandQuery = trpc.settings.get.useQuery(undefined);
+  const brandQuery = useQuery({ queryKey: ["settings"], queryFn: () => apiGet("/api/settings") });
   // ROUND 36 (ข้อ 31) — สถานะลงทะเบียนครั้งแรก (ฐานข้อมูลยังไม่มีบัญชีผู้ใช้เลย)
   // ถามเฉพาะตอนยังไม่มีเซสชัน เพื่อไม่ให้ทุก request ไปนับตาราง app_users
-  const setupStatusQuery = trpc.auth.setupStatus.useQuery(undefined, { enabled: !authQuery.data });
+  const setupStatusQuery = useQuery({ queryKey: ["auth","setup-status"], queryFn: () => apiGet<{ needsSetup: boolean }>("/api/auth/setup-status"), enabled: !authQuery.data });
   useEffect(() => {
     applyCachedBrand(); // ธีมที่จำไว้ ใช้ทันทีตอนบูต กันกระพริบ
   }, []);
