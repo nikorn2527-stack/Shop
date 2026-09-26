@@ -106,8 +106,8 @@ import { StockPage as Stock } from "@/components/stock/StockPage";
 import { UsersPage as Users } from "@/components/users/UsersPage";
 import { apiGet, apiPost, apiPatch, apiDelete } from "@/lib/api-client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { applyFontScale, FONT_SCALES, readFontScale, type FontScaleId } from "../fontScale";
-import { applyBrand, applyCachedBrand, applyPaperWidth, applyThemeColor, applyUiStyle, brandInitial, PAPER_WIDTHS, resolvePaperWidth, resolveThemeColor, THEME_PRESETS, UI_STYLE_PRESETS, type BrandSettings } from "../theme";
+import { applyFontScale, FONT_SCALES, readFontScale, type FontScaleId } from "@/lib/fontScale";
+import { applyBrand, applyCachedBrand, applyPaperWidth, applyThemeColor, applyUiStyle, brandInitial, PAPER_WIDTHS, resolvePaperWidth, resolveThemeColor, THEME_PRESETS, UI_STYLE_PRESETS, type BrandSettings } from "@/lib/theme";
 import {
   getErrorMessage,
   isSameDay,
