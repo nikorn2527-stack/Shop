@@ -80,7 +80,7 @@ import type { EditionStatus } from "@/lib/license";
 
 import type { MemberLite, Role, View } from "@/lib/pageData";
 import type { InstallOverview, MemberTransactionRow, SaleHistoryEntry } from "@/lib/types";
-import type { User } from "../../../drizzle/schema";
+import type { User } from "@prisma/client";
 import { PRENAME_OPTIONS, canAccessView, compressImageToDataUrl, formatMemberNumber, isAdminRole, loadHeldBills, memberFullName, money, navItems, roleThaiLabel, scanCandidates } from "@/lib/pageData";
 import { ConfirmDialog, SectionHeader, StatusPill, formEnterNav } from "@/components/shared/PagePrimitives";
 import { HelpDisclosure } from "@/components/shared/HelpDisclosure";
