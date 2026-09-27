@@ -91,9 +91,9 @@ import { downloadReportPdf, printReportDoc, type ReportDocConfig } from "@/lib/r
 import { ExportPreviewModal, type ExportFormat, type ExportPreviewState } from "@/components/shared/ExportPreviewModal";
 import { downloadCsvFile, downloadSlipFile, downloadXlsxFile, exportCount, exportNumber } from "@/lib/exportUtils";
 import { MemberScanPicker } from "@/components/shared/ScanPickers";
-import { LoginView } from "@/components/auth/LoginView";
-import { SetupView } from "@/components/auth/SetupView";
-import { ForceChangeView } from "@/components/auth/ForceChangeView";
+import LoginView from "@/components/auth/LoginView";
+import SetupView from "@/components/auth/SetupView";
+import ForceChangeView from "@/components/auth/ForceChangeView";
 import { MemberCardModal } from "@/components/shared/MemberCardModal";
 import { StatementModal } from "@/components/shared/StatementModal";
 import { CameraCaptureModal } from "@/components/shared/CameraCaptureModal";

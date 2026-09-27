@@ -1,4 +1,4 @@
-import { TRPCClientError } from "@trpc/client";
+
 
 /**
  * Shared formatting helpers for the store views (Dashboard/Home). The backend
@@ -9,7 +9,7 @@ import { TRPCClientError } from "@trpc/client";
 
 /** Extracts the Thai user-facing message from a tRPC error. */
 export function getErrorMessage(error: unknown) {
-  if (error instanceof TRPCClientError) return error.message;
+  if (error instanceof Error) return error.message;
   return "เกิดข้อผิดพลาดในการเชื่อมต่อระบบ กรุณาลองอีกครั้ง";
 }
 
