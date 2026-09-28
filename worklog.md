@@ -118,3 +118,38 @@ Stage Summary:
 - กล่องทดลอง manual กระชับขึ้น: input เดียว + status inline (✓ ใช้ได้ / ✗ หมายเลขซ้ำ) แสดงเฉพาะตอนพิมพ์ — ลบ label row และ verbose hint 3-state ออก
 - `pnpm run check` ผ่าน 0 errors, dev server HTTP 200 ผ่าน
 - commit hash: `c318aa4` บน origin/main-v2 — รอเจ้าของงาน pull ไปเทส UI บนเครื่อง
+
+---
+Task ID: UI-4
+Agent: full-stack-developer (sliding segmented control)
+Task: อัปเกรด member-number mode segmented control ให้เป็น iOS-style ที่ตัวเลือก active จะ **เลื่อน (slide)** ไปที่ตำแหน่งที่เลือกแทนการสลับสีแบบจุด และลบเส้นคั่น (│) ระหว่าง segments — เจ้าของงานบ่นว่า "ทำไมไม่เลื่อน ตัวคั่นมันยังมีอยู่ ตัวเลือกต่างๆ ปรับมันให้ทันสมัยได้ไหม"
+
+Work Log:
+- อ่าน worklog เข้าใจ context ของ UI-1, UI-2, UI-3 (UI-3 คือตัวที่เปลื่ยน selectable cards เป็น segmented pill text-only แบบ static — ตัว active ใช้สีพื้นขาว + shadow แบบ toggle ไม่ slide)
+- ใช้ Grep tool หา byte offset ของ `.member-mode-segmented` ใน Home.tsx (offset 271706) และ extract บริบทด้วย `dd` (ไฟล์เป็นบรรทัดยาว ๆ minified)
+- อ่านบริบท declaration ของ `numberMode` ที่ line 1465 (`const numberMode = form?.memberNumberMode ?? "running";`)
+- อ่าน CSS เดิมของ `.member-mode-segmented` / `.member-mode-seg` ที่ index.css line 5355–5359 (UI-3) — มี `flex-wrap: wrap; gap: 2px;` และ active ใช้ `background: #fff` แบบ toggle ไม่มี sliding element
+- JSX edits ใน `client/src/pages/Home.tsx` (2 จุด):
+  1. เพิ่ม helper `const memberModeIndex = numberMode === "year" ? 1 : numberMode === "manual" ? 2 : 0;` หลังบรรทัด `const numberMode` — map ค่า numberMode → index 0/1/2 สำหรับ translateX ของ slider
+  2. เพิ่ม slider element เป็น **first child** ของ `.member-mode-segmented`: `<span className="member-mode-slider" aria-hidden="true" style={{ transform: \`translateX(${memberModeIndex * 100}%)\` }} />` — ตัว white pill ที่จะเลื่อนไปที่ segment ที่ active
+- CSS edits ใน `client/src/index.css` (ที่ block เดิมของ UI-3 บรรทัด 5351–5359):
+  - `.member-mode-segmented`: เปลื่ยนเป็น `position: relative; display: inline-flex;` (รองรับ absolute slider), ลบ `flex-wrap: wrap` (ถ้า wrap slider math พัง), ลด `gap` จาก 2px → 0 (ลบช่องว่าง = ลบความรู้สึกมีเส้นคั่น), padding คืน 3px, รักษา track muted + border + radius 9999px
+  - `.member-mode-slider` (ใหม่): `position: absolute; top: 3px; left: 3px; height: calc(100% - 6px); width: calc((100% - 6px) / 3);` — width = 1 ใน 3 ของ inner track (padding 3px แต่ละด้าน), พื้นขาว + radius 9999 + shadow `0 1px 3px rgba(0,0,0,0.08)`, **transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1)** (iOS ease), `z-index: 0; pointer-events: none;` (ปุ่มด้านบนกดได้)
+  - `.member-mode-seg`: เพิ่ม `position: relative; z-index: 1; flex: 1 1 0;` (เนื้อปุ่มอยู่เหนือ slider), padding 6/14 → **7/16** (hit area ใหญ่ขึ้น), font 12.5 → **13px**, weight **500** normal / **600** active, ลด transition เหลือแค่ `color 0.15s` (ไม่ transition all ตอน hover เพราะ slider เป็นคนจัดพื้นหลัง), min-height 30 → **32px**
+  - `.member-mode-seg.active`: ลบ `background: #fff` + `box-shadow` ออก (slider เป็นคนให้พื้นขาว + shadow ตอนนี้) เหลือแค่ `font-weight: 600; color: #4a5240;`
+  - `.member-mode-seg:not(.active):hover` คงไว้ (color smooth slide ตอน hover)
+  - `.member-mode-seg:disabled` คงไว้
+- คงค่าสีโทนเขียวมรกต/earthy ของโปรเจกต์ (`#eef2ec` track, `#fff` slider, `#838a78` text, `#4a5240` active) แทน slate/blue ที่ task template แนะนำ — รักษา visual consistency กับสีเดิมของแอป
+- ไม่แตะ tRPC contract, state logic (`numberMode`, `manualDemoNumber`, validation), `.member-manual-demo`, `.number-preview`, หรือ type ของ `memberNumberMode` (ค่า "running"|"year"|"manual" เหมือนเดิม)
+- `pnpm run check` (tsc --noEmit) → 0 errors
+- บูต dev server (`./start-dev.sh`) → curl `/` HTTP 200 ผ่าน (มีแค่ warning OAuth env var ที่เป็น sandbox issue ไม่เกี่ยว)
+- commit `bda0900` push ขึ้น origin/main-v2 สำเร็จ (c318aa4..bda0900, no rebase ต้องทำเพราะ no new commits บน remote)
+
+Stage Summary:
+- ไฟล์ที่เปลื่ยน: `client/src/pages/Home.tsx` (+3 บรรทัด: helper const memberModeIndex + 1 JSX slider span), `client/src/index.css` (+6 บรรทัด CSS ใหม่ + ปรับ 5 rules ของ .member-mode-segmented / .member-mode-seg)
+- พฤติกรรมใหม่: ตอนนี้คลิก "ลำดับรัน" → "ตามปี" → "กำหนดเอง" จะเห็นตัว white pill **เลื่อน slide** ไปที่ตำแหน่งนั้นด้วย cubic-bezier ease 0.22s (iOS feel) — ไม่ใช่สลับสีแบบจุดเหมือนเดิม; ไม่มีเส้นคั่น (│) ระหว่าง segments เลย — รู้สึก clean ทันสมัยเหมือน iOS/Stripe/Linear
+- เลือกใช้ dedicated `<span className="member-mode-slider" />` แทน `::before` pseudo-element เพราะ React inline-style กำหนด transform ได้สด ไม่ต้องเขียน CSS variable / data-attribute workaround
+- ค่าสีโทน earthy (`#eef2ec` muted track + `#fff` slider + `#4a5240`/`#838a78` text) สอดคล้องกับ palette โปรเจกต์ (เขียวมรกต) — ไม่ slip ไป blue/slate ตาม task fallback default
+- ไม่แตะ tRPC contract หรือ backend auth logic; ไม่เปลื่ยน type ของ `memberNumberMode`; เป็น CSS + JSX เท่านั้น
+- `pnpm run check` ผ่าน 0 errors, dev server HTTP 200 ผ่าน
+- commit hash: `bda0900` บน origin/main-v2 — รอเจ้าของงาน pull ไปเทส UI บนเครื่อง
