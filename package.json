@@ -15,6 +15,7 @@
     "backup:sqlite:verify": "tsx scripts/sqlite-backup.ts verify",
     "backup:sqlite:restore": "tsx scripts/sqlite-backup.ts restore",
     "promote:admin": "tsx scripts/promote-admin.ts",
+    "check:db": "tsx scripts/check-db.ts",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
   },
   "dependencies": {
