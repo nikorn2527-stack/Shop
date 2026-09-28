@@ -5277,3 +5277,22 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
   body:has(#member-wallet-slip) .receipt-thanks,
   body:has(#printer-test-slip) .receipt-thanks { margin-top: 5px; padding-top: 5px; }
 }
+
+/* ROUND 81 (user) — compact UI: ให้หน้าจอเน้นหัวข้อ ข้อมูล และปุ่ม
+   ซ่อนคำอธิบายรองที่ซ้ำกับภาพ/เมนู โดยคงคำเตือนและข้อความยืนยันไว้ */
+.section-header > div > p,
+.panel-heading > div > p,
+.table-toolbar > div > p,
+.settings-heading > div > p {
+  display: none;
+}
+
+/* หน้า Settings เคยมีขั้นตอนอธิบายยาวจนกลบตัวเลือกหลัก */
+.printer-flow-steps .printer-step > div > small {
+  display: none;
+}
+
+/* โน้ตประกอบหน้า Settings ที่ไม่ใช่สถานะผิดพลาด/คำเตือน */
+.settings-inline-note:not(.amber) {
+  display: none;
+}
