@@ -5236,56 +5236,6 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
   .report-cards-dense .report-card-facts i { font-size: 9px; }
 }
 
-/* ROUND 83 preview — report controls are one clear horizontal workspace bar.
-   Nothing is hidden: long groups scroll within their own row instead of wrapping
-   over the next control or making the table disappear. */
-.report-header-actions { display: inline-flex; align-items: center; gap: 6px; }
-.report-control-bar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  margin-top: 10px;
-  padding: 8px 10px;
-  border: 1px solid #dfeae5;
-  border-radius: 10px;
-  background: #fbfdfc;
-  overflow-x: auto;
-  scrollbar-width: thin;
-}
-.report-control-bar > .report-view-pills,
-.report-control-bar > .report-range-row,
-.report-control-bar > .report-custom-picker,
-.report-control-bar > .report-range-status { flex: 0 0 auto; margin: 0; }
-.report-control-bar > .report-view-pills { display: flex; flex-wrap: nowrap; gap: 4px; border: 0; overflow: visible; }
-.report-control-bar > .report-view-pills button { flex: 0 0 auto; white-space: nowrap; padding: 6px 10px; font-size: 11px; }
-.report-control-bar > .report-range-row { display: flex; flex-wrap: nowrap; gap: 6px; padding: 0; border: 0; background: transparent; }
-.report-control-bar .report-period-pills,
-.report-control-bar .report-staff-pills { display: flex; flex-wrap: nowrap; gap: 4px; overflow: visible; }
-.report-control-bar .report-period-pills button,
-.report-control-bar .report-staff-pills button { flex: 0 0 auto; white-space: nowrap; padding: 5px 9px; font-size: 10.5px; }
-.report-control-bar .report-staff-pills { max-width: 330px; }
-.report-control-bar .report-groupby { flex: 0 0 auto; margin-left: 0; white-space: nowrap; }
-.report-control-bar .report-groupby > span { font-size: 10px; }
-.report-control-bar .report-groupby button { padding: 4px 8px; font-size: 10px; }
-.report-control-bar > .report-custom-picker { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
-.report-control-bar > .report-custom-picker .range-hint { display: none; }
-.report-control-bar > .report-range-status { padding: 5px 9px; font-size: 10.5px; white-space: nowrap; }
-.report-control-bar + .category-report { margin-top: 8px; }
-@media (max-width: 900px) {
-  .report-control-bar { align-items: stretch; }
-  .report-control-bar > .report-range-row { flex-direction: column; align-items: flex-start; }
-  .report-control-bar .report-staff-pills { max-width: none; }
-}
-@media (max-width: 560px) {
-  .report-header-actions { gap: 4px; }
-  .report-header-actions .outline-button:first-child { display: none; }
-  .report-control-bar { align-items: stretch; padding: 7px; }
-  .report-control-bar > .report-view-pills { flex-direction: column; }
-  .report-control-bar > .report-range-row { min-width: 184px; }
-  .report-control-bar > .report-range-status { white-space: normal; min-width: 180px; }
-}
-
 
 /* ═══════════════════════════════════════════════════════════════════════
    ROUND 80 (user) — อุปกรณ์ต่อพ่วงและความสะดวกการใช้งานหน้าร้าน
