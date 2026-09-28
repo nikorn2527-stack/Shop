@@ -340,7 +340,7 @@ Stage Summary:
 - MemberDetail extracted สำเร็จ — ไฟล์ตั้งอยู่ข้าง Members.tsx ใน `pages/members/` directory; circular ESM (Members ↔ Home.tsx) ที่ V2-C1 introduce ไว้ถูกแทนที่ด้วย direct local import — Members.tsx ไม่ import อะไรจาก Home.tsx อีกต่อไป
 - Home.tsx ลดลงจาก 9895 → 8298 บรรทัด; ฟังก์ชันใหญ่ ๆ ที่เหลือ: Reports (line 2051, ~3627 บรรทัด), Settings (line 5915, ~3914 บรรทัด), Home (line 9829, ~66 บรรทัด) — scheduled for V2-D / V2-E
 - TypeScript: 0 errors, dev server: HTTP 200 ผ่าน (root + 3 module transforms)
-- commit hash: <ดูด้านล่าง> บน origin/main-v2
+- commit hash: `cfb3db1` บน origin/main-v2
 
 ---
 Task ID: V2-C3
@@ -451,7 +451,7 @@ Work Log:
 - `pnpm run check` (tsc --noEmit) → **0 errors** ✅
 - บูต dev server (`./node_modules/.bin/tsx server/_core/index.ts` ผ่าน nohup detached) → curl `/` 3 ครั้ง stable HTTP 200/200/200 ✅ + curl Vite transform สำหรับ 6 ไฟล์ (Home.tsx, Settings.tsx, AppShell.tsx, Members.tsx, Logs.tsx, Reports.tsx) ทั้งหมด HTTP 200 ✅ — modules transform ผ่าน Vite/tsx pipeline ไม่มี parse/transform error ใหม่; dev server stable หลัง curl หลายครั้ง (process ยัง alive)
 - pre-existing tailwind "Missing opening {" CSS pre-transform warning (จาก V2-A's `@import tokens.css` split) ยังคงมี — V2-B/C1/C2/C3 note ระบุไว้ว่า "out of scope สำหรับ V2-C", ไม่ใช่ regression
-- commit <hash> push ขึ้น origin/main-v2 สำเร็จ — <rebase note>
+- commit `cfb3db1` push ขึ้น origin/main-v2 สำเร็จ (0203737..cfb3db1, rebase ไม่สำเร็จเพราะมี unstaged tool-results deletions แต่ push สำเร็จเพราะ origin/main-v2 ยังอยู่ที่ 0203737 จาก V2-C3 — no remote changes ตอน pull)
 
 Stage Summary:
 - ไฟล์ที่เปลี่ยน:
@@ -460,4 +460,4 @@ Stage Summary:
 - Settings extracted สำเร็จ — ไฟล์ตั้งอยู่ข้าง Logs.tsx ใน `pages/settings/` directory; AppShell.tsx ไม่ถูกแตะ — viewComponents prop type คงเดิม (Members/Reports/Settings/Logs ComponentType) — Home() ยังส่ง viewComponents={{ Members, Reports, Settings, Logs }} เหมือนเดิม เพียงแต่ Settings ตอนนี้มาจาก import ไม่ใช่ local function declaration
 - Home.tsx ลดลงจาก 4610 → 95 บรรทัด — เป็น thin auth-gate ที่ V2-A ตั้งในไว้ตั้งแต่ต้น (auth.me → splash → setup → login → force-change → AppShell); ฟังก์ชันใหญ่ ๆ ทั้งหมด (MemberDetail/Members/TimelineDrilldown/Logs/Reports/Settings/AppShell) แยกไฟล์เรียบร้อย — V2 refactor ครบ ถือว่า Step C สมบูรณ์
 - TypeScript: 0 errors, dev server: HTTP 200 ผ่าน (3 ครั้ง stable + 6 module transforms ผ่าน — รวม Settings.tsx ไฟล์ใหม่)
-- commit hash: <ดูด้านล่าง> บน origin/main-v2 — รอเจ้าของงาน pull ไปเทส settings view (brand/receipt/member-number/payment/pos-menu/cutoff/roles/edition/backup/import/install/dev-tools/go-live) บนเครื่อง
+- commit hash: `cfb3db1` บน origin/main-v2 — รอเจ้าของงาน pull ไปเทส settings view (brand/receipt/member-number/payment/pos-menu/cutoff/roles/edition/backup/import/install/dev-tools/go-live) บนเครื่อง
