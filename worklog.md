@@ -262,4 +262,4 @@ Stage Summary:
 - AppShell extraction สำเร็จ — Home.tsx ตอนนี้เป็น thin auth-gate (SetupView/LoginView/ForceChangeView แล้ว delegate ไป AppShell) เหมือนที่ V2-A ตั้งในไว้
 - View components ที่ AppShell ใช้ (Members/Reports/Settings/Logs) ยังอยู่ใน Home.tsx — ส่งเป็น props ผ่าน `viewComponents` เพื่อหลีก circular import; V2-C ถึง V2-E จะย้าย views เหล่านี้ออกเป็นไฟล์ต่างหากแล้ว AppShell import โดยตรง + ลบ `viewComponents` prop ได้
 - TypeScript: 0 errors, dev server: HTTP 200 ผ่าน
-- commit hash: (จะกรอกหลัง push) บน origin/main-v2
+- commit hash: `f3d3cf1` บน origin/main-v2 (rebase: "Current branch main is up to date" — no new commits บน remote ตอน pull)
