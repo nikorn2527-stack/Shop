@@ -748,12 +748,26 @@ nav button:active:not(:disabled),
   body:has(#receipt-paper) .sidebar,
   body:has(#receipt-paper) .topbar,
   body:has(#receipt-paper) .app-footer,
-  body:has(#receipt-paper) .page-content > *:not(.modal-backdrop) { display: none !important; }
-  body:has(#receipt-paper) .app-shell { display: block; min-height: 0; }
-  body:has(#receipt-paper) .main-shell { min-width: 0; }
-  body:has(#receipt-paper) .page-content { max-width: none; margin: 0; padding: 0; animation: none; }
-  body:has(#receipt-paper) .modal-backdrop { position: static; display: block; padding: 0; background: none; backdrop-filter: none; }
-  body:has(#receipt-paper) .receipt-modal { width: 72mm; max-height: none; overflow: visible; background: #fff; border: 0; border-radius: 0; box-shadow: none; padding: 0; animation: none; }
+  body:has(#receipt-paper) .page-content > *:not(.modal-backdrop),
+  body.printing-receipt .sidebar,
+  body.printing-receipt .topbar,
+  body.printing-receipt .app-footer,
+  body.printing-receipt .page-content > *:not(.modal-backdrop) { display: none !important; }
+  body:has(#receipt-paper) .app-shell,
+  body.printing-receipt .app-shell { display: block; min-height: 0; }
+  body:has(#receipt-paper) .main-shell,
+  body.printing-receipt .main-shell { min-width: 0; }
+  body:has(#receipt-paper) .page-content,
+  body.printing-receipt .page-content { max-width: none; margin: 0; padding: 0; animation: none; }
+  body:has(#receipt-paper) .modal-backdrop,
+  body.printing-receipt .modal-backdrop { position: static; display: block; padding: 0; background: none; backdrop-filter: none; }
+  body:has(#receipt-paper) .receipt-modal,
+  body.printing-receipt .receipt-modal { width: 72mm; max-height: none; overflow: visible; background: #fff; border: 0; border-radius: 0; box-shadow: none; padding: 0; animation: none; }
+  /* กระดาษต่อเนื่อง: กันแบ่งหน้า + ตัดกระดาษอัตโนมัติหลังเนื้อหาสุดท้าย */
+  body:has(#receipt-paper) .receipt-paper,
+  body.printing-receipt .receipt-paper { break-inside: avoid; page-break-inside: avoid; }
+  body:has(#receipt-paper) .receipt-line,
+  body.printing-receipt .receipt-line { break-inside: avoid; page-break-inside: avoid; }
   body:has(#receipt-paper) .receipt-success,
   body:has(#receipt-paper) .receipt-actions { display: none !important; }
   body:has(#receipt-paper) .receipt-paper { border: 0; box-shadow: none; padding: 0 1.5mm; background: #fff; font-family: "Sarabun", system-ui, sans-serif; }

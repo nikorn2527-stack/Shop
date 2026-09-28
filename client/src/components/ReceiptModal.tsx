@@ -52,7 +52,19 @@ export function ReceiptModal({ receipt, onClose, onNewSale, onPrinted, mode = "n
     if (!element) return;
     setReceiptBusy(format);
     try {
-      const canvas = await html2canvas(element, { scale: 2.5, backgroundColor: "#ffffff" });
+      // รอ Sarabun font load ก่อน html2canvas (กันตัวอักษรเพี้ยนใน PDF)
+      if (document.fonts) {
+        try {
+          await Promise.all([
+            document.fonts.load("400 16px Sarabun", "กาabc"),
+            document.fonts.load("600 16px Sarabun", "กาabc"),
+            document.fonts.load("700 16px Sarabun", "กาabc"),
+          ]);
+          await document.fonts.ready;
+        } catch {}
+      }
+      // scale 2.0 พอ — สูงกว่านี้ไฟล์ใหญ่ + บางเครื่อง render เพี้ยน
+      const canvas = await html2canvas(element, { scale: 2.0, backgroundColor: "#ffffff", useCORS: true });
       const filename = `${receipt.orderNumber}.${format === "pdf" ? "pdf" : "png"}`;
       if (format === "image") {
         const link = document.createElement("a");
@@ -60,14 +72,14 @@ export function ReceiptModal({ receipt, onClose, onNewSale, onPrinted, mode = "n
         link.href = canvas.toDataURL("image/png");
         link.click();
       } else {
-        // ROUND 73 — เดิมตั้งหน้ากระดาษด้วยหน่วย px เท่า canvas (scale 2 → หน้ากว้าง
-        // 8 นิ้วกว่า) พอพิมพ์ลงกระดาษจริงตัวอักษรถูกย่อ ~50% เล็กและบางผิดปกติ
-        // ตอนนี้ยึดความกว้างกระดาษต่อเนื่อง 80 มม. (226.77pt) — สลิปออกมาขนาด
-        // พอดีกับหัวระบาย 58–80 มม. ที่ร้านใช้ ตัวอักษรคมชัดระดับ 240 DPI
-        const WIDTH_MM = 80;
+        // ใช้ความกว้างกระดาษจาก settings (58/72/80 มม.) แทนค่าตายตัว 80
+        const paperWidth = settingsQuery.data?.receiptPaperWidth ?? "72";
+        const WIDTH_MM = paperWidth === "58" ? 58 : paperWidth === "80" ? 80 : 72;
         const pageHeightMm = (canvas.height / canvas.width) * WIDTH_MM;
         const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: [WIDTH_MM, pageHeightMm] });
-        pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, WIDTH_MM, pageHeightMm);
+        // ใช้ JPEG quality สูงแทน PNG ลดขนาดไฟล์ + ไม่เพี้ยนสี
+        const imgData = canvas.toDataURL("image/jpeg", 0.92);
+        pdf.addImage(imgData, "JPEG", 0, 0, WIDTH_MM, pageHeightMm);
         pdf.save(filename);
       }
     } finally { setReceiptBusy(""); }

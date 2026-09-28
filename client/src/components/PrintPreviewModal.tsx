@@ -126,20 +126,24 @@ export function PrintPreviewModal({
       // +10 มม. กันขาดท้าย (เบราว์เซอร์ที่อ่าน @page size จะได้ไม่ตัดเนื้อหา)
       const heightMm = contentMm != null ? Math.max(60, contentMm + 10) : 0;
       styleEl.textContent = heightMm > 0
-        ? `@media print { @page { margin: 0; size: ${widthMm}mm ${heightMm}mm; } }`
-        : `@media print { @page { margin: 0; } }`;
+        ? `@media print { @page { margin: 0; size: ${widthMm}mm ${heightMm}mm; } .receipt-paper, .receipt-line, .receipt-total, .receipt-meta, .receipt-customer, .receipt-payment, .receipt-balance, .receipt-thanks, .receipt-brand, .receipt-divider { break-inside: avoid; page-break-inside: avoid; } body { margin: 0; padding: 0; } }`
+        : `@media print { @page { margin: 0; } .receipt-paper, .receipt-line, .receipt-total, .receipt-meta, .receipt-customer, .receipt-payment, .receipt-balance, .receipt-thanks, .receipt-brand, .receipt-divider { break-inside: avoid; page-break-inside: avoid; } body { margin: 0; padding: 0; } }`;
     } else {
       styleEl.textContent = `@media print { @page { margin: 8mm; } }`;
     }
     const cleanup = () => {
       styleEl?.remove();
+      document.body.classList.remove("printing-receipt");
       window.removeEventListener("afterprint", cleanup);
     };
     window.addEventListener("afterprint", cleanup);
     // ปีกไฟล์ Chrome บางรุ่นไม่ยิง afterprint — เผื่อไว้ถอดเอง
     window.setTimeout(cleanup, 4000);
 
+    // เพิ่ม class เพื่อซ่อนส่วนอื่นขณะพิมพ์ (รองรับเบราว์เซอร์ที่ไม่มี :has)
+    document.body.classList.add("printing-receipt");
     window.print();
+    document.body.classList.remove("printing-receipt");
     onPrint?.();
   };
 
