@@ -3066,9 +3066,14 @@ export function ensureRbacSeed(db: SqliteDb): void {
       db.prepare(`INSERT OR IGNORE INTO role_permissions (role_name, permission_key) VALUES (?, ?)`).run(role.name, perm);
     }
   }
-  // Migrate existing users: staff → cashier, admin → administrator, dev → administrator
-  db.prepare(`UPDATE app_users SET role = 'cashier' WHERE role = 'staff'`).run();
-  db.prepare(`UPDATE app_users SET role = 'administrator' WHERE role IN ('admin', 'dev')`).run();
+  // Migrate existing users ONLY ONCE — when roles table was just created.
+  // Check if any user still has old role values (staff/admin/dev) AND
+  // the new RBAC roles exist. If yes, migrate. If no (already migrated), skip.
+  const needsMigration = db.prepare(`SELECT COUNT(*) as c FROM app_users WHERE role IN ('staff', 'admin', 'dev')`).get() as { c: number };
+  if (needsMigration.c > 0) {
+    db.prepare(`UPDATE app_users SET role = 'cashier' WHERE role = 'staff'`).run();
+    db.prepare(`UPDATE app_users SET role = 'administrator' WHERE role IN ('admin', 'dev')`).run();
+  }
 }
 
 /** Get all permissions for a user's role. */
