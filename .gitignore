@@ -113,3 +113,19 @@ data/
 # Manus version file (auto-generated, not part of source)
 client/public/__manus__/version.json
 .project-config.json
+
+# ===== Sandbox environment (not part of Shop project) =====
+# These are managed by the cloud sandbox, not the Shop repo.
+.zscripts/
+Caddyfile
+examples/
+mini-services/
+skills/
+tests/
+download/
+upload/
+agent-ctx/
+start-dev.sh
+dev.log
+dev.pid
+.zscripts-*.log
