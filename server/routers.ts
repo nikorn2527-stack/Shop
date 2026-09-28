@@ -687,7 +687,8 @@ export const appRouter = router({
         console.warn("[Auth] Session delete on logout failed:", String(error));
       }
       const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
+      // Express 5: clearCookie auto-expires — passing maxAge is deprecated
+      ctx.res.clearCookie(COOKIE_NAME, cookieOptions);
       return {
         success: true,
       } as const;
