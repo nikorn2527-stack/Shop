@@ -88,3 +88,33 @@ Stage Summary:
 - Issue 4 ✅: Section "ติดตั้งเป็นแอปบนเดสก์ท็อป (Windows)" ชัดขึ้น — Download icon + heading + 1-line purpose explanation (ตาม issue แนะนำ) + verbose 3 ขั้นตอนพับเก็บใน HelpDisclosure (default collapse, กดเปิดได้)
 - ไม่แตะ tRPC contract หรือ backend auth logic; ไม่แก้ type ของ `memberNumberMode` (ค่า "running"|"year"|"manual" เหมือนเดิม); เป็น CSS + JSX เท่านั้น
 - commit hash: `7901cb2` บน origin/main-v2 — รอเจ้าของงาน pull ไปเทส UI บนเครื่อง
+
+---
+Task ID: UI-3
+Agent: full-stack-developer (member number segmented control)
+Task: เปลื่ยนตัวเลือก "รูปแบบเลขสมาชิก" จาก selectable cards (3 การ์ด icon Hash/CalendarDays/Pencil ที่ UI-2 ทำไว้) เป็น segmented control กระทัดรัดแบบ iOS/Stripe/Linear และเบาลง — เจ้าของงานบอกการ์ดเดิม "เหมือนเลือกดรอปดาวน์ Excel ไม่ใช่แอปทันสมัย"
+
+Work Log:
+- อ่าน worklog เข้าใจ context UI-1 และ UI-2 (cards ที่ถูกแทนถูกเพิ่มโดย UI-2)
+- ตรวจ byte offsets ของ `.member-mode-grid` / `.member-mode-card` / `.member-manual-demo` / `.number-preview` ใน Home.tsx (ไฟล์บรรทัดยาว ๆ — ใช้ dd extract เพราะ Read tool truncate บรรทัดที่ 2000 ตัวอักษร)
+- ตรวจสอบการใช้งาน icons Hash/Pencil ทั้งไฟล์ — ใช้เฉพาะใน member-mode section เท่านั้น → ลบ imports ออกด้วย (CalendarDays ยังใช้ที่อื่น คงไว้)
+- JSX edits ใน `client/src/pages/Home.tsx` (3 จุด):
+  1. ลดบรรทัด import: ลบ `  Pencil,\n` และ `  Hash,\n` ออกจาก lucide-react import block
+  2. แทน `<div className="number-mode-grid member-mode-grid">` + 3 `<button className="member-mode-card">` (มี icon + body + radio) → `<div className="member-mode-segmented" role="tablist" aria-label="รูปแบบเลขสมาชิก">` + 3 `<button role="tab" className="member-mode-seg ...">` แบบ text-only (ลำดับรัน / ตามปี / กำหนดเอง) — `aria-selected={numberMode === value}`, className active ตาม state
+  3. แทนกล่อง `.member-manual-demo` (มี row + label + input + icon + verbose hint small) → กล่องเดียวมี input + inline `<span className="member-manual-status ok|err">` (✓ ใช้ได้ / ✗ หมายเลขซ้ำ) แสดงเฉพาะตอนกรอกแล้ว — ลบ label row, verbose 3-state hint, hint-ico/ok-ico/err-ico icons ออก
+- CSS edits ใน `client/src/index.css` (2 จุด, ท้ายไฟล์):
+  1. ลบ `.member-mode-grid` / `.member-mode-card` (10 rules + media query) → เพิ่ม `.member-mode-segmented` (inline-flex pill พื้น muted, border radius 9999, padding 3px, gap 2px), `.member-mode-seg` (text-only, 12.5px, transparent bg, transition .15s), `.member-mode-seg.active` (white pill, foreground text, font-weight 600, shadow 0 1px 2px), `:not(.active):hover` (foreground color), `:disabled` (opacity .55)
+  2. ลด `.member-manual-demo` padding 11/12 → 8/10 + ใช้ flex row inline, ลด input height 34 → 32, ลบ `.member-manual-demo-row` / `.member-manual-demo-label` / `.member-manual-demo-hint` / `.hint-ico` / `.ok-ico` / `.err-ico` (ไม่ใช้แล้ว), เพิ่ม `.member-manual-status` (inline-flex pill, 11px bold, whitespace nowrap) + `.ok` (เขียวเข้ม #2f6f57) / `.err` (แดงเข้ม #a85050) variants
+- เก็บ state logic ทั้งหมดไว้ (`numberMode`, `manualDemoNumber`, `setManualDemoNumber`, `manualDemoTrim`, `manualDemoTaken`, `manualDemoValid`) — ไม่แตะ logic แค่เปลื่ยน rendering
+- เก็บ `.number-preview` ("สมาชิกใหม่คนถัดไปจะได้เลข: {nextNumber}") ไว้เหมือนเดิม — label ถูกปรับโดย UI-2 แล้ว
+- ไม่แตะ tRPC contract หรือ backend auth logic; ไม่เปลื่ยน type ของ `memberNumberMode` (ค่า "running"|"year"|"manual" เหมือนเดิม); เป็น CSS + JSX เท่านั้น
+- `pnpm run check` (tsc --noEmit) → 0 errors
+- บูต dev server (./start-dev.sh) → curl `/` HTTP 200 ผ่าน (มีแค่ warning OAuth env var ที่เป็น sandbox issue ไม่เกี่ยว)
+- commit `c318aa4` push ขึ้น origin/main-v2 สำเร็จ (7901cb2..c318aa4, no rebase ต้องทำเพราะ no new commits บน remote)
+
+Stage Summary:
+- ไฟล์ที่เปลื่ยน: `client/src/pages/Home.tsx` (ลบ imports 2 บรรทัด + JSX 2 จุด: segmented control + manual demo กระชับ), `client/src/index.css` (ลด 31 บรรทัด CSS เดิม + เพิ่ม 19 บรรทัด CSS ใหม่)
+- UI ใหม่: ตัวเลือก "รูปแบบเลขสมาชิก" เป็น segmented pill สะอาด text-only (ลำดับรัน / ตามปี / กำหนดเอง) — selected = ิมขาวบน track muted, ไม่มี icon รก — ทันสมัยเหมือน iOS/Stripe/Linear ตามที่เจ้าของงานขอ
+- กล่องทดลอง manual กระชับขึ้น: input เดียว + status inline (✓ ใช้ได้ / ✗ หมายเลขซ้ำ) แสดงเฉพาะตอนพิมพ์ — ลบ label row และ verbose hint 3-state ออก
+- `pnpm run check` ผ่าน 0 errors, dev server HTTP 200 ผ่าน
+- commit hash: `c318aa4` บน origin/main-v2 — รอเจ้าของงาน pull ไปเทส UI บนเครื่อง
