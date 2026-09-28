@@ -115,20 +115,44 @@ function isSecureRequest(req: TrpcContext["req"]) {
   return protoList.some((proto) => proto.trim().toLowerCase() === "https");
 }
 
-/** Session-priority actor: a signed-in user overrides client-sent actor/role. */
-function resolveActor(ctx: TrpcContext, input: { actor?: string; actorRole?: string }) {
+/** Session-priority actor: a signed-in user overrides client-sent actor/role.
+ *  Anonymous requests are flagged as "ไม่ระบุตัวตน" — client-sent actor/role
+ *  is NEVER trusted for auth decisions (CVE-class bypass fix P1-a).
+ *  The client-sent actor/actorRole fields remain in zod inputs only for
+ *  backward-compatible shape; they are ignored when there is no session. */
+function resolveActor(ctx: TrpcContext, _input: { actor?: string; actorRole?: string }) {
   if (ctx.user) {
     return {
       actor: ctx.user.name ?? "ผู้ใช้ระบบ",
       actorRole: ctx.user.role === "admin" ? (ctx.user.appRole === "dev" ? "ผู้พัฒนา" : "ผู้บริหาร") : "เจ้าหน้าที่",
     };
   }
-  return { actor: input.actor, actorRole: input.actorRole };
+  // Anonymous: do NOT trust client-sent actor/role. Used only for audit trail
+  // so logs clearly show the request was unauthenticated.
+  return { actor: "ไม่ระบุตัวตน", actorRole: "ผู้ใช้ไม่ล็อกอิน" };
 }
 
-/** Admin gate: session role wins; only anonymous requests fall back to input. */
-function isAdminCtx(ctx: TrpcContext, input: { actorRole?: string }) {
-  return ctx.user ? ctx.user.role === "admin" : (input.actorRole ?? "").trim() === "ผู้บริหาร";
+/** Admin gate: requires a signed-in admin (or dev) session.
+ *  Anonymous requests are NEVER admin — the previous input.actorRole fallback
+ *  was a critical bypass that let any anonymous client claim "ผู้บริหาร". */
+function isAdminCtx(ctx: TrpcContext, _input?: { actorRole?: string }) {
+  return ctx.user ? ctx.user.role === "admin" : false;
+}
+
+/** P1-a — require a signed-in session. Throws UNAUTHORIZED for anonymous.
+ *  Use at the top of any procedure that reads or mutates business data. */
+function requireLogin(ctx: TrpcContext) {
+  if (!ctx.user) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: "กรุณาเข้าสู่ระบบเพื่อใช้งานฟังก์ชันนี้" });
+  }
+}
+
+/** P1-a — require an admin (or dev) session. Throws FORBIDDEN for non-admin.
+ *  Centralizes the admin gate so it can't be forgotten on new procedures. */
+function requireAdmin(ctx: TrpcContext, message = "การดำเนินการนี้ต้องใช้สิทธิ์ผู้บริหาร") {
+  if (!isAdminCtx(ctx)) {
+    throw new TRPCError({ code: "FORBIDDEN", message });
+  }
 }
 
 /** ROUND 56 (user) — ประตูโซนผู้พัฒนา (เครื่องมือติดตั้งระบบ): บัญชีที่เป็น dev เท่านั้น
@@ -817,18 +841,27 @@ export const appRouter = router({
   product: router({
     list: publicProcedure
       .input(productListInput)
-      .query(({ input }) => withStoreErrors(() => listProducts(getWelfareDb(), input?.includeInactive ?? false))),
+      .query(({ ctx, input }) => withStoreErrors(() => {
+        requireLogin(ctx);
+        return listProducts(getWelfareDb(), input?.includeInactive ?? false);
+      })),
     create: publicProcedure
       .input(productCreateInput)
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input);
-        return withStoreErrors(() => createProduct(getWelfareDb(), { ...input, actor, actorRole }));
+        return withStoreErrors(() => {
+          requireAdmin(ctx, "การสร้างสินค้าต้องใช้สิทธิ์ผู้บริหาร");
+          return createProduct(getWelfareDb(), { ...input, actor, actorRole });
+        });
       }),
     update: publicProcedure
       .input(productUpdateInput)
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input);
-        return withStoreErrors(() => updateProduct(getWelfareDb(), { ...input, actor, actorRole }));
+        return withStoreErrors(() => {
+          requireAdmin(ctx, "การแก้ไขสินค้าต้องใช้สิทธิ์ผู้บริหาร");
+          return updateProduct(getWelfareDb(), { ...input, actor, actorRole });
+        });
       }),
     bulkUpdatePrices: publicProcedure
       .input(productBulkUpdatePricesInput)
@@ -868,17 +901,26 @@ export const appRouter = router({
   sales: router({
     list: publicProcedure
       .input(salesListInput)
-      .query(({ input }) => withStoreErrors(() => salesList(getWelfareDb(), input ?? {}))),
+      .query(({ ctx, input }) => withStoreErrors(() => {
+        requireLogin(ctx);
+        return salesList(getWelfareDb(), input ?? {});
+      })),
     // ROUND 63 (user) — ดึงรูปหลักฐานการชำระของบิล (สลิป QR / สแกน) แยกจากลิสต์กัน payload หนัก
     slip: publicProcedure
       .input(z.object({ id: z.number().int().min(1) }))
-      .query(({ input }) => withStoreErrors(() => getSaleSlip(getWelfareDb(), input.id))),
+      .query(({ ctx, input }) => withStoreErrors(() => {
+        requireLogin(ctx);
+        return getSaleSlip(getWelfareDb(), input.id);
+      })),
   }),
 
   stock: router({
     rows: publicProcedure
       .input(z.unknown().optional())
-      .query(() => withStoreErrors(() => listStockRows(getWelfareDb()))),
+      .query(({ ctx }) => withStoreErrors(() => {
+        requireLogin(ctx);
+        return listStockRows(getWelfareDb());
+      })),
     receive: publicProcedure
       .input(stockReceiveInput)
       .mutation(({ ctx, input }) => {
@@ -890,8 +932,9 @@ export const appRouter = router({
               ...(input.freeQty && input.freeQty > 0 ? [{ qty: input.freeQty, cost: 0 }] : []),
             ]
           : input.lines ?? (input.qty !== undefined ? [{ qty: input.qty, cost: input.cost }] : []);
-        return withStoreErrors(() =>
-          receiveStockLines(
+        return withStoreErrors(() => {
+          requireLogin(ctx); // P1-c — รับสินค้าเข้าสต็อกต้องมีเซสชัน เพื่อติดตามผู้รับ
+          return receiveStockLines(
             getWelfareDb(),
             {
               productId: input.productId,
@@ -901,14 +944,15 @@ export const appRouter = router({
               actor,
               actorRole,
             },
-          ),
-        );
+          );
+        });
       }),
     count: publicProcedure
       .input(stockCountInput)
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input);
         return withStoreErrors(() => {
+          requireLogin(ctx); // P1-c — นับสต็อกต้องมีเซสชัน
           requireEdition("stockCount"); // ROUND 61 — งานนับสต๊อกเป็นฟีเจอร์เวอร์ชันโปรพลัส
           return stockCount(getWelfareDb(), { ...input, actor, actorRole });
         });
@@ -918,6 +962,7 @@ export const appRouter = router({
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input);
         return withStoreErrors(() => {
+          requireLogin(ctx); // P1-c — นับสต็อกแยกล็อตต้องมีเซสชัน
           requireEdition("stockCount"); // ROUND 61 — นับแยกล็อตรวมอยู่ในงานนับสต๊อก (โปรพลัส)
           return stockCountLots(getWelfareDb(), { ...input, actor, actorRole });
         });
@@ -925,30 +970,45 @@ export const appRouter = router({
     // Round 32-15 — รายการสั่งซื้อ: สะสมรายการที่จะสั่งเข้า เพื่อกันตกหล่นก่อนสั่งจริง
     orderList: publicProcedure
       .input(z.unknown().optional())
-      .query(() => withStoreErrors(() => listOrderItems(getWelfareDb()))),
+      .query(({ ctx }) => withStoreErrors(() => {
+        requireLogin(ctx);
+        return listOrderItems(getWelfareDb());
+      })),
     orderAdd: publicProcedure
       .input(orderAddInput)
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input);
-        return withStoreErrors(() => addOrderItem(getWelfareDb(), { ...input, actor, actorRole }));
+        return withStoreErrors(() => {
+          requireLogin(ctx);
+          return addOrderItem(getWelfareDb(), { ...input, actor, actorRole });
+        });
       }),
     orderUpdate: publicProcedure
       .input(orderUpdateInput)
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input);
-        return withStoreErrors(() => updateOrderItem(getWelfareDb(), { ...input, actor, actorRole }));
+        return withStoreErrors(() => {
+          requireLogin(ctx);
+          return updateOrderItem(getWelfareDb(), { ...input, actor, actorRole });
+        });
       }),
     orderRemove: publicProcedure
       .input(z.object({ id: z.number().int().min(1), actor: z.string().optional(), actorRole: z.string().optional() }))
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input);
-        return withStoreErrors(() => removeOrderItem(getWelfareDb(), { ...input, actor, actorRole }));
+        return withStoreErrors(() => {
+          requireLogin(ctx);
+          return removeOrderItem(getWelfareDb(), { ...input, actor, actorRole });
+        });
       }),
     orderClear: publicProcedure
       .input(z.object({ actor: z.string().optional(), actorRole: z.string().optional() }).optional())
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input ?? {});
-        return withStoreErrors(() => clearOrderList(getWelfareDb(), { actor, actorRole }));
+        return withStoreErrors(() => {
+          requireLogin(ctx);
+          return clearOrderList(getWelfareDb(), { actor, actorRole });
+        });
       }),
     card: publicProcedure.input(z.object({ productId: z.number().int(), from: z.string().optional(), to: z.string().optional() })).query(({ input }) => {
       return stockCard(getWelfareDb(), input.productId, input.from, input.to);
@@ -961,6 +1021,8 @@ export const appRouter = router({
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input);
         return withStoreErrors(() => {
+          // P1-c — การขายต้องมีเซสชันเจ้าหน้าที่ เพื่อให้ติดตามตัวผู้ขายได้
+          requireLogin(ctx);
           // ROUND 61 — รายการพิเศษ/ของสั่ง (บรรทัดไม่มี productId) เป็นฟีเจอร์เวอร์ชันโปรพลัส
           if (input.items.some((item) => !("productId" in item))) requireEdition("specialOrders");
           return checkout(getWelfareDb(), { ...input, cashier: input.cashier ?? actor, actorRole });
@@ -978,11 +1040,15 @@ export const appRouter = router({
   member: router({
     list: publicProcedure
       .input(memberListInput)
-      .query(({ input }) => withStoreErrors(() => listMembers(getWelfareDb(), input?.search, input?.status))),
+      .query(({ ctx, input }) => withStoreErrors(() => {
+        requireLogin(ctx);
+        return listMembers(getWelfareDb(), input?.search, input?.status);
+      })),
     detail: publicProcedure
       .input(memberDetailInput)
-      .query(({ input }) =>
+      .query(({ ctx, input }) =>
         withStoreErrors(() => {
+          requireLogin(ctx);
           const detail = getMemberDetail(getWelfareDb(), input.memberNumber);
           if (!detail) {
             throw new TRPCError({ code: "NOT_FOUND", message: `ไม่พบสมาชิก ${input.memberNumber} ในระบบ` });
@@ -992,41 +1058,62 @@ export const appRouter = router({
       ),
     stats: publicProcedure
       .input(memberDetailInput)
-      .query(({ input }) => withStoreErrors(() => memberSpendingStats(getWelfareDb(), input.memberNumber))),
+      .query(({ ctx, input }) => withStoreErrors(() => {
+        requireLogin(ctx);
+        return memberSpendingStats(getWelfareDb(), input.memberNumber);
+      })),
     register: publicProcedure
       .input(memberRegisterInput)
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input);
-        return withStoreErrors(() => registerMember(getWelfareDb(), { ...input, actor, actorRole }));
+        return withStoreErrors(() => {
+          requireLogin(ctx); // P1-c — ลงทะเบียนสมาชิกต้องมีเซสชันเจ้าหน้าที่
+          return registerMember(getWelfareDb(), { ...input, actor, actorRole });
+        });
       }),
     setStatus: publicProcedure
       .input(memberSetStatusInput)
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input);
-        return withStoreErrors(() => setMemberStatus(getWelfareDb(), input.memberNumber, input.suspended, actor, actorRole));
+        return withStoreErrors(() => {
+          requireLogin(ctx); // P1-c — ระงับ/ปลดระงับสมาชิกต้องมีเซสชัน
+          return setMemberStatus(getWelfareDb(), input.memberNumber, input.suspended, actor, actorRole);
+        });
       }),
     wallet: publicProcedure
       .input(memberWalletInput)
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input);
-        return withStoreErrors(() => walletTx(getWelfareDb(), { ...input, actor, actorRole }));
+        return withStoreErrors(() => {
+          requireLogin(ctx); // P1-c — เติม/ถอนเงินสมาชิกต้องมีเซสชัน (CRITICAL — เกี่ยวกับเงิน)
+          return walletTx(getWelfareDb(), { ...input, actor, actorRole });
+        });
       }),
     // ROUND 63 (user) — ดึงรูปหลักฐานของรายการเติม/ถอนเงินสมาชิก (แนบตอนทำรายการที่ POS)
     transactionSlip: publicProcedure
       .input(z.object({ id: z.number().int().min(1) }))
-      .query(({ input }) => withStoreErrors(() => getTransactionSlip(getWelfareDb(), input.id))),
+      .query(({ ctx, input }) => withStoreErrors(() => {
+        requireLogin(ctx);
+        return getTransactionSlip(getWelfareDb(), input.id);
+      })),
     update: publicProcedure
       .input(memberUpdateInput)
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input);
-        return withStoreErrors(() => updateMember(getWelfareDb(), { ...input, actor, actorRole }));
+        return withStoreErrors(() => {
+          requireLogin(ctx); // P1-c — แก้ไขข้อมูลสมาชิกต้องมีเซสชัน
+          return updateMember(getWelfareDb(), { ...input, actor, actorRole });
+        });
       }),
     // Req 23.2 — การขอลดวงเงิน: เจ้าหน้าที่ที่ล็อกอินยื่นคำขอได้ (คำขอเข้าสถานะ pending)
     requestLimitReduction: publicProcedure
       .input(memberLimitRequestInput)
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input);
-        return withStoreErrors(() => requestLimitReduction(getWelfareDb(), { ...input, actor, actorRole }));
+        return withStoreErrors(() => {
+          requireLogin(ctx); // P1-c — ยื่นคำขอลดวงเงินต้องมีเซสชันเจ้าหน้าที่
+          return requestLimitReduction(getWelfareDb(), { ...input, actor, actorRole });
+        });
       }),
     // Req 23.2 — พิจารณาคำขอลดวงเงิน: ผู้บริหารเท่านั้น (approve = ตั้งวงเงินใหม่ / reject = คงเดิม)
     decideLimitRequest: publicProcedure
@@ -1056,42 +1143,58 @@ export const appRouter = router({
   dashboard: router({
     stats: publicProcedure
       .input(dashboardStatsInput)
-      .query(({ input }) => withStoreErrors(() => dashboardStats(getWelfareDb(), input?.rangeDays ?? 30))),
+      .query(({ ctx, input }) => withStoreErrors(() => {
+        requireLogin(ctx);
+        return dashboardStats(getWelfareDb(), input?.rangeDays ?? 30);
+      })),
   }),
 
   reports: router({
     daily: publicProcedure
       .input(reportsDailyInput)
-      .query(({ input }) => withStoreErrors(() => dailySalesRows(getWelfareDb(), input ?? {}))),
+      .query(({ ctx, input }) => withStoreErrors(() => {
+        requireLogin(ctx);
+        return dailySalesRows(getWelfareDb(), input ?? {});
+      })),
     byCategory: publicProcedure
       .input(reportRangeInput)
-      .query(({ input }) => withStoreErrors(() => salesByCategory(getWelfareDb(), input ?? {}))),
+      .query(({ ctx, input }) => withStoreErrors(() => {
+        requireLogin(ctx);
+        return salesByCategory(getWelfareDb(), input ?? {});
+      })),
     byProduct: publicProcedure
       .input(reportRangeInput)
-      .query(({ input }) => withStoreErrors(() => {
+      .query(({ ctx, input }) => withStoreErrors(() => {
+        requireLogin(ctx);
         requireEdition("reportsAdvanced"); // ROUND 61 — มุมมองตามสินค้า = เวอร์ชันโปรขึ้นไป
         return salesByProduct(getWelfareDb(), input ?? {});
       })),
     /** ROUND 48 — รายการสินค้าทุกบรรทัดจากทุกบิลในช่วงเวลา (แยกตามรายการในบิล) */
     lineItems: publicProcedure
       .input(reportRangeInput)
-      .query(({ input }) => withStoreErrors(() => {
+      .query(({ ctx, input }) => withStoreErrors(() => {
+        requireLogin(ctx);
         requireEdition("reportsAdvanced"); // ROUND 61 — รายการในบิล = เวอร์ชันโปรขึ้นไป
         return salesLineItems(getWelfareDb(), input ?? {});
       })),
     byCashier: publicProcedure
       .input(reportRangeInput)
-      .query(({ input }) => withStoreErrors(() => {
+      .query(({ ctx, input }) => withStoreErrors(() => {
+        requireLogin(ctx);
         requireEdition("reportsAdvanced"); // ROUND 61 — มุมมองตามพนักงานขาย = เวอร์ชันโปรขึ้นไป
         return salesByCashier(getWelfareDb(), input ?? {});
       })),
     /** ROUND 51 — รายชื่อพนักงานขายทั้งหมดจากบิลจริง (ตัวเลือกตัวกรองเจาะจงในรายงาน) */
     cashiers: publicProcedure
       .input(z.unknown().optional())
-      .query(() => withStoreErrors(() => salesCashierOptions(getWelfareDb()))),
+      .query(({ ctx }) => withStoreErrors(() => {
+        requireLogin(ctx);
+        return salesCashierOptions(getWelfareDb());
+      })),
     memberTransactions: publicProcedure
       .input(memberTransactionsInput)
-      .query(({ input }) => withStoreErrors(() => {
+      .query(({ ctx, input }) => withStoreErrors(() => {
+        requireLogin(ctx);
         requireEdition("reportsAdvanced"); // ROUND 61 — ธุรกรรมสมาชิกทั้งระบบ = เวอร์ชันโปรขึ้นไป (สเตตเมนต์รายคนยังใช้ได้ทุกเวอร์ชัน)
         return memberTransactions(getWelfareDb(), input ?? {});
       })),
@@ -1099,40 +1202,61 @@ export const appRouter = router({
      * คงเหลือ · วันที่เปิดใช้บัตร · รหัสผู้ป่วย · ชื่อ (ตรงกับชีทรายงานโรงพยาบาล) */
     memberBalances: publicProcedure
       .input(memberBalancesInput)
-      .query(({ input }) => withStoreErrors(() => memberBalances(getWelfareDb(), input ?? {}))),
+      .query(({ ctx, input }) => withStoreErrors(() => {
+        requireLogin(ctx);
+        return memberBalances(getWelfareDb(), input ?? {});
+      })),
     /** ROUND 65 (user) — รายงานสินค้าคงคลังตามช่วงเวลา: รหัสสินค้า · ยอดยกมา · ยอดขาย ·
      * คงเหลือ (ตรงกับชีทรายงานสินค้าคงคลังของโรงพยาบาล) */
     stockBalance: publicProcedure
       .input(stockBalanceInput)
-      .query(({ input }) => withStoreErrors(() => stockBalanceReport(getWelfareDb(), input ?? {}))),
+      .query(({ ctx, input }) => withStoreErrors(() => {
+        requireLogin(ctx);
+        return stockBalanceReport(getWelfareDb(), input ?? {});
+      })),
     // Req 23.2 — คำขอลดวงเงินทั้งหมด (รอพิจารณาขึ้นก่อน) + จำนวนค้างพิจารณาสำหรับ badge
     limitRequests: publicProcedure
       .input(z.object({ status: z.enum(["pending", "approved", "rejected"]).optional(), limit: z.number().int().min(1).max(200).optional() }).optional())
-      .query(({ input }) =>
-        withStoreErrors(() => ({
-          items: listLimitRequests(getWelfareDb(), input ?? {}),
-          pendingCount: countPendingLimitRequests(getWelfareDb()),
-        })),
+      .query(({ ctx, input }) =>
+        withStoreErrors(() => {
+          requireLogin(ctx);
+          return {
+            items: listLimitRequests(getWelfareDb(), input ?? {}),
+            pendingCount: countPendingLimitRequests(getWelfareDb()),
+          };
+        }),
       ),
     businessPeriod: publicProcedure
       .input(z.unknown().optional())
-      .query(() => withStoreErrors(() => businessPeriodStatus(getWelfareDb()))),
+      .query(({ ctx }) => withStoreErrors(() => {
+        requireLogin(ctx);
+        return businessPeriodStatus(getWelfareDb());
+      })),
     closeDay: publicProcedure
       .input(z.object({ note: z.string().max(300).optional(), actor: z.string().optional(), actorRole: z.string().optional() }).nullish())
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input ?? {});
-        return withStoreErrors(() => closeBusinessDay(getWelfareDb(), { ...(input ?? {}), actor, actorRole }));
+        return withStoreErrors(() => {
+          requireAdmin(ctx, "การปิดยอดรอบวันต้องใช้สิทธิ์ผู้บริหาร");
+          return closeBusinessDay(getWelfareDb(), { ...(input ?? {}), actor, actorRole });
+        });
       }),
     /** ประวัติการตัดยอดรอบขาย (ล่าสุดขึ้นก่อน) */
     closures: publicProcedure
       .input(z.number().int().min(1).max(90).nullish())
-      .query(({ input }) => withStoreErrors(() => listDayClosures(getWelfareDb(), input ?? 30))),
+      .query(({ ctx, input }) => withStoreErrors(() => {
+        requireLogin(ctx);
+        return listDayClosures(getWelfareDb(), input ?? 30);
+      })),
   }),
 
   settings: router({
     get: publicProcedure
       .input(z.unknown().optional())
-      .query(() => withStoreErrors(() => getSettings(getWelfareDb()))),
+      .query(({ ctx }) => withStoreErrors(() => {
+        requireLogin(ctx);
+        return getSettings(getWelfareDb());
+      })),
     set: publicProcedure
       .input(settingsPatchInput)
       .mutation(({ ctx, input }) => {
@@ -1505,7 +1629,10 @@ export const appRouter = router({
   logs: router({
     list: publicProcedure
       .input(logsListInput)
-      .query(({ input }) => withStoreErrors(() => listAuditLogs(getWelfareDb(), input?.limit ?? 200))),
+      .query(({ ctx, input }) => withStoreErrors(() => {
+        requireLogin(ctx); // P1-b — audit logs สำหรับผู้บริหาร/เจ้าหน้าที่เท่านั้น
+        return listAuditLogs(getWelfareDb(), input?.limit ?? 200);
+      })),
   }),
 
   // === Cashier Shift ===
