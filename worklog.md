@@ -263,3 +263,81 @@ Stage Summary:
 - View components ที่ AppShell ใช้ (Members/Reports/Settings/Logs) ยังอยู่ใน Home.tsx — ส่งเป็น props ผ่าน `viewComponents` เพื่อหลีก circular import; V2-C ถึง V2-E จะย้าย views เหล่านี้ออกเป็นไฟล์ต่างหากแล้ว AppShell import โดยตรง + ลบ `viewComponents` prop ได้
 - TypeScript: 0 errors, dev server: HTTP 200 ผ่าน
 - commit hash: `f3d3cf1` บน origin/main-v2 (rebase: "Current branch main is up to date" — no new commits บน remote ตอน pull)
+
+---
+Task ID: V2-C1
+Agent: full-stack-developer (extract small views)
+Task: V2 refactor — Step C-1: Extract 3 small view functions (TimelineDrilldown, Logs, Members) from Home.tsx into separate page files
+
+Work Log:
+- อ่าน worklog เข้าใจ context V2-A + V2-B (CSS tokens split done, AppShell extracted to layouts/AppShell.tsx — Home.tsx 10499 lines, ~9 functions ยังอยู่ในไฟล์เดียว)
+- อ่าน imports header ของ Home.tsx (lines 1-370) เพื่อเข้าใจ dependency map — lucide icons 66 ตัว, trpc, pageData/viewFormat/PagePrimitives, theme/fontScale, EditionUi, modal components, AppShell/SettingsTab (V2-B)
+- ระบุตำแหน่ง 3 functions ที่จะ extract (line numbers ใน Home.tsx ก่อนแก้):
+  - `Members` ที่ line 1968 — 295 บรรทัด (props: role/userName/focusMemberNumber/onFocusMemberConsumed; ใช้ MemberDetail, trpc.member.list, scanCandidates, isSameMonth, parseStoreDate, memberFullName, money, formatLastActivity, getErrorMessage, MEMBER_STATUS_META, SectionHeader, StatusPill, HelpDisclosure + icons IdCard/WalletCards/UsersRound/ArrowDownToLine/Search/ShieldCheck/ArrowRight/Check/X)
+  - `TimelineDrilldown` ที่ line 2328 — 70 บรรทัด (props: from/to/cashiers?; ใช้ trpc.reports.byProduct, FileBarChart icon, getErrorMessage, money)
+  - `Logs` ที่ line 10193 — 238 บรรทัด (no props; ใช้ trpc.logs.list, useState/useEffect, downloadCsvFile, formatLogDateTime, isSameDay, parseStoreDate, getErrorMessage, SectionHeader + icons Activity/CalendarDays/Check/ChevronDown/Download/ReceiptText/Search/ShieldCheck/X)
+- สร้าง 3 ไฟล์ใหม่ (each named export + imports เฉพาะที่ใช้ + JSDoc อธิบาย origin + V2-C1 tag):
+  1. `client/src/pages/reports/TimelineDrilldown.tsx` (~85 บรรทัด) — imports: FileBarChart, trpc, money, getErrorMessage
+  2. `client/src/pages/members/Members.tsx` (~310 บรรทัด) — imports: react hooks, 9 icons, trpc, HelpDisclosure, MemberLite/Role types + memberFullName/money/roleThaiLabel/scanCandidates from pageData, MEMBER_STATUS_META/formatLastActivity/getErrorMessage/isSameMonth/parseStoreDate from viewFormat, SectionHeader/StatusPill from PagePrimitives, และ `MemberDetail` from "../Home" (circular — ดูข้อ 5)
+  3. `client/src/pages/settings/Logs.tsx` (~250 บรรทัด) — imports: react hooks, 9 icons, trpc, downloadCsvFile, formatLogDateTime/getErrorMessage/isSameDay/parseStoreDate from viewFormat, SectionHeader from PagePrimitives
+- **Circular dependency ระหว่าง Members ↔ MemberDetail**: MemberDetail (~1596 บรรทัด, scheduled for V2-D หรือ V2-E) ยังอยู่ใน Home.tsx — เลือกทาง "circular import via ESM" เพราะ:
+  - ไม่ต้องแตะ layouts/AppShell.tsx (AppShellViewComponents type คงเดิม — Members prop type คงเป็น { role, userName, focusMemberNumber, onFocusMemberConsumed })
+  - dependency เป็น natural: Members ใช้ MemberDetail ไม่ใช่ AppShell ใช้ MemberDetail
+  - ESM live bindings จัดการ circular ได้: Members.tsx imports MemberDetail binding จาก Home.tsx — ในกราบ evaluation Home.tsx imports Members จาก Members.tsx ก่อน ทำให้ Members.tsx evaluate ก่อน, Members.tsx รับ "live binding" ของ MemberDetail (ยังไม่ initialized ตอนนั้น), แต่ Members.tsx ใช้ MemberDetail เฉพาะตอน render (runtime) ไม่ใช่ตอน module-eval, ตอน render Home.tsx evaluate จบและ binding initialized แล้ว → ใช้ได้
+  - เพิ่ม `export` keyword ที่ `function MemberDetail(...)` ใน Home.tsx (จาก `function MemberDetail({` → `export function MemberDetail({`) — 1-character edit
+- แก้ Home.tsx 3 จุด:
+  1. เพิ่ม 3 imports หลัง `import { Users } from "./Users";` (line 153): `import { TimelineDrilldown } from "./reports/TimelineDrilldown";`, `import { Members } from "./members/Members";`, `import { Logs } from "./settings/Logs";` + 2 บรรทัด comment อธิบาย
+  2. เปลี่ยน `function MemberDetail({` → `export function MemberDetail({` (line 377 หลังเพิ่ม imports)
+  3. ลบ 3 function bodies ออกจาก Home.tsx (sed ครั้งเดียว 3 ranges ใน original line numbering): 1968-2263 (Members + trailing blank), 2324-2398 (TimelineDrilldown JSDoc + function + trailing blank), 10193-10431 (Logs + trailing blank) — รวม 610 บรรทัดที่ลบ
+- ตรวจ boundaries หลัง sed: MemberDetail → blank → `const TX_TYPE_LABEL` (สะอาด), `};` ของ TimelineRow type → blank → `// ROUND 49 — ...` comment (สะอาด), `}` ของ Settings → blank → JSDoc ของ Home (สะอาด)
+- รักษา business logic ทั้งหมด — pure move/extract, ไม่แตะ tRPC contract หรือ backend, ไม่ลบ state/props แม้แต่ unused (`error`/`setError` ใน Members ที่ไม่ได้ใช้ก็ยังคงไว้เพื่อ match original)
+- `pnpm run check` (tsc --noEmit) → **0 errors** ✅
+- บูต dev server (`pnpm run dev` ผ่าน setsid detached bash) → curl `/` 6 ครั้งติด HTTP 200/200/200/200/200/200 ✅ + curl Vite transform สำหรับ 4 ไฟล์ (main.tsx, Home.tsx, Members.tsx, TimelineDrilldown.tsx, Logs.tsx) ทั้งหมด HTTP 200 ✅ — modules transform ผ่าน Vite pipeline ไม่มี parse/transform error ใหม่
+- pre-existing tailwind "Missing opening {" CSS pre-transform warning (จาก V2-A's `@import tokens.css` split) ยังคงมี — V2-B note ระบุไว้น "out of scope สำหรับ V2-C", ไม่ใช่ regression
+- commit `ff0d0cd` push ขึ้น origin/main-v2 สำเร็จ (8c4aa16..ff0d0cd, rebase: "Current branch main is up to date" — no new commits บน remote ตอน pull)
+
+Stage Summary:
+- ไฟล์ที่เปลี่ยน:
+  - `client/src/pages/Home.tsx` (10499 → 9888 บรรทัด, ลด 611 บรรทัด): เพิ่ม 3 imports (TimelineDrilldown/Members/Logs) + เพิ่ม `export` keyword ที่ MemberDetail + ลบ 3 function bodies (Members 296 บรรทัด, TimelineDrilldown 75 บรรทัดรวม JSDoc, Logs 239 บรรทัด)
+  - `client/src/pages/reports/TimelineDrilldown.tsx` (ใหม่ — 85 บรรทัด): named export `TimelineDrilldown` + JSDoc อ้างอิง ROUND 48
+  - `client/src/pages/members/Members.tsx` (ใหม่ — 310 บรรทัด): named export `Members` + JSDoc อธิบาย Round 32-16 + comment อธิบาย circular import กับ MemberDetail
+  - `client/src/pages/settings/Logs.tsx` (ใหม่ — 250 บรรทัด): named export `Logs` + JSDoc อ้างอิง round 15 (render cap + real date-range filter)
+- 3 ฟังก์ชัน extracted สำเร็จ — TimelineDrilldown/Logs/Members แยกไฟล์เรียบร้อย, Home.tsx ลดขนาดลง ~6% (10499 → 9888 บรรทัด)
+- MemberDetail (1596 บรรทัด) ยังอยู่ใน Home.tsx — ตอนนี้ `export function MemberDetail` เพื่อให้ Members.tsx import ผ่าน ESM circular binding ได้ (safe เพราะใช้ที่ render-time ไม่ใช่ module-eval-time); จะย้ายออกเป็นไฟล์ต่างหากใน V2-D หรือ V2-E
+- View components ที่ AppShell ใช้ตอนนี้: Members และ Logs จากไฟล์ใหม่ของตัวเอง + Reports และ Settings ยังอยู่ใน Home.tsx (scheduled for V2-D/V2-E)
+- AppShell.tsx ไม่ถูกแตะ — viewComponents prop type คงเดิม (Members/Reports/Settings/Logs ComponentType) — Home() ยังส่ง viewComponents={{ Members, Reports, Settings, Logs }} เหมือนเดิม เพียงแต่ Members/Logs ตอนนี้มาจาก import ไม่ใช่ local function declaration
+- TypeScript: 0 errors, dev server: HTTP 200 ผ่าน (6 ครั้ง stable + 4 module transforms ผ่าน)
+- commit hash: `ff0d0cd` บน origin/main-v2 — รอเจ้าของงาน pull ไปเทส UI บนเครื่อง (members list, members drilldown, reports timeline drilldown, ประวัติระบบ tab)
+
+---
+Task ID: V2-C2
+Agent: full-stack-developer (MemberDetail extraction)
+Task: V2 refactor — Step C-2: Extract MemberDetail (~1596 lines, member detail page) from Home.tsx into its own file `client/src/pages/members/MemberDetail.tsx` and repoint Members.tsx to import from the new location.
+
+Work Log:
+- อ่าน `/agent-ctx/V2-C1-extract-small-views.md` + worklog เข้าใจ context V2-A/B/C1 (CSS tokens split done, AppShell extracted to layouts/, TimelineDrilldown+Members+Logs extracted; MemberDetail ยังอยู่ใน Home.tsx เป็น `export function` สำหรับ circular ESM กับ Members.tsx)
+- grep `export function MemberDetail` ใน Home.tsx → พบที่ line 377; หา end โดยดู top-level declarations ถัดไป → พบ `const TX_TYPE_LABEL` ที่ line 1974 → MemberDetail ครอบ lines 377-1972 (function body), มี blank ที่ 376 ก่อนหน้าและ 1973 หลัง
+- อ่านไฟล์ Home.tsx imports header (lines 1-210) เพื่อ map dependencies: lucide icons (66 ชื่อ), trpc (@/lib/trpc), pageData (PRENAME_OPTIONS/compressImageToDataUrl/isAdminRole/memberFullName/money/roleThaiLabel + types MemberLite/Role), viewFormat (MEMBER_STATUS_META/WALLET_TX_META/formatHistoryDate/formatLastActivity/formatThaiDate/getErrorMessage/isSameMonth/parseStoreDate), PagePrimitives (ConfirmDialog/SectionHeader/StatusPill/formEnterNav), exportUtils (downloadSlipFile), BlockerAlert (blocker), และ modal components (MemberCardModal/StatementModal/CameraCaptureModal/PrintPreviewModal/SlipViewButton)
+- grep JSX tags ในช่วง 377-1972 ของ Home.tsx → list 24 lucide icons ที่ใช้จริง: ArrowDownToLine/ArrowUpFromLine/CalendarDays/Camera/Check/CircleHelp/Download/FileImage/FileText/IdCard/ImagePlus/LockKeyhole/Printer/ReceiptText/RotateCcw/Settings2/ShieldCheck/ShoppingBag/ShoppingCart/Star/Trash2/TrendingDown/WalletCards/X; และ 8 components: CameraCaptureModal/ConfirmDialog/MemberCardModal/PrintPreviewModal/SectionHeader/SlipViewButton/StatementModal/StatusPill
+- grep `React.ChangeEvent` ใน function body → พบ 1 จุด (onEditPhotoPick handler); `@types/react` ประกาศ global `React` namespace จึงใช้ได้โดยไม่ต้อง import — คง `React.ChangeEvent<HTMLInputElement>` ตามต้นฉบับ
+- สร้าง `client/src/pages/members/MemberDetail.tsx` (1672 บรรทัด = 76 imports/JSDoc header + 1596 function body):
+  - imports: `useState` from react, 24 lucide icons, blocker/CameraCaptureModal/MemberCardModal/PrintPreviewModal/SlipViewButton/StatementModal from @/components/*, trpc from @/lib/trpc, downloadSlipFile from @/exportUtils, ConfirmDialog/SectionHeader/StatusPill/formEnterNav from ../PagePrimitives, PRENAME_OPTIONS/compressImageToDataUrl/isAdminRole/memberFullName/money/roleThaiLabel + type MemberLite/Role from ../pageData, MEMBER_STATUS_META/WALLET_TX_META/formatHistoryDate/formatLastActivity/formatThaiDate/getErrorMessage/isSameMonth/parseStoreDate from ../viewFormat
+  - JSDoc อธิบาย origin (extracted from Home.tsx V2-C2 — pure move) + cite ROUND 77 (wallet slip), Round 31 (2-step deposit/withdrawal), ROUND 34 (req 23.2 — limit-reduction request), ROUND 38 (ข้อ 37 — camera photo upload)
+  - วาง `export function MemberDetail({...}) { ... }` ตรง จาก awk extract ของ Home.tsx lines 377-1972 (เช็ค tail แล้วสะอาด — จบท `</>` + `);` + `}`)
+- แก้ Home.tsx: `sed -i -e '377,1973d'` ลบ function body (377-1972) + trailing blank (1973) — รวม 1597 บรรทัดที่ลบ; ผลคือ Home.tsx 9895 → 8298 บรรทัด (−1597, ~16%)
+- ตรวจ boundaries หลัง sed: `];` (POS_RAIL_BUTTONS ปิด) → blank → `const TX_TYPE_LABEL` (สะอาด, 1 blank line separator — ตรงตาม original convention)
+- ไม่ต้องลบ `export` keyword เพราะลบ function ทั้งหมด; ไม่ต้องแตะ imports ของ Home.tsx เพราะ imports เหล่านั้นยังใช้กับ functions อื่นในไฟล์ (Reports, Settings, Home)
+- แก้ `client/src/pages/members/Members.tsx`: เปลี่ยน `import { MemberDetail } from "../Home";` → `import { MemberDetail } from "./MemberDetail";` พร้อมแทน comment block (V2-C1 circular-import warning) ด้วย V2-C2 note ("MemberDetail now lives in its own file next to Members — circular ESM ถูกแทนด้วย direct import")
+- รักษา business logic ทั้งหมด — pure move/extract: ไม่แตะ tRPC contract, ไม่ลบ state/props/handlers แม้แต่ unused, ไม่เปลี่ยน `React.ChangeEvent` → `ChangeEvent`
+- `pnpm run check` (tsc --noEmit) → **0 errors** ✅
+- บูต dev server (`setsid bash -c './node_modules/.bin/tsx server/_core/index.ts >> dev.log 2>&1'` detached) → curl `/` HTTP 200 + curl Vite transform สำหรับ 4 ไฟล์ที่กระทบ (Home.tsx, MemberDetail.tsx, Members.tsx, และ /) ทั้งหมด HTTP 200 ✅ — modules transform ผ่าน Vite pipeline ไม่มี parse/transform error ใหม่
+
+Stage Summary:
+- ไฟล์ที่เปลี่ยน:
+  - `client/src/pages/members/MemberDetail.tsx` (ใหม่ — 1672 บรรทัด): named export `MemberDetail` + imports เฉพาะที่ใช้ (24 icons + 7 components + trpc + exportUtils + blocker + PagePrimitives/pageData/viewFormat) + JSDoc อ้างอิง ROUND 77/31/34/38
+  - `client/src/pages/Home.tsx` (9895 → 8298 บรรทัด, ลด 1597 บรรทัด ~16%): ลบ `export function MemberDetail` ทั้งหมด; imports ที่ยังใช้กับ Reports/Settings/Home คงไว้
+  - `client/src/pages/members/Members.tsx` (336 → 336 บรรทัด, +3/-3 สุทธิ): เปลี่ยน import path ของ MemberDetail จาก `../Home` → `./MemberDetail`; แทน V2-C1 circular-import comment ด้วย V2-C2 note
+- MemberDetail extracted สำเร็จ — ไฟล์ตั้งอยู่ข้าง Members.tsx ใน `pages/members/` directory; circular ESM (Members ↔ Home.tsx) ที่ V2-C1 introduce ไว้ถูกแทนที่ด้วย direct local import — Members.tsx ไม่ import อะไรจาก Home.tsx อีกต่อไป
+- Home.tsx ลดลงจาก 9895 → 8298 บรรทัด; ฟังก์ชันใหญ่ ๆ ที่เหลือ: Reports (line 2051, ~3627 บรรทัด), Settings (line 5915, ~3914 บรรทัด), Home (line 9829, ~66 บรรทัด) — scheduled for V2-D / V2-E
+- TypeScript: 0 errors, dev server: HTTP 200 ผ่าน (root + 3 module transforms)
+- commit hash: <ดูด้านล่าง> บน origin/main-v2

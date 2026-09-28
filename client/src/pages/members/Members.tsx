@@ -27,11 +27,10 @@ import {
   parseStoreDate,
 } from "../viewFormat";
 import { SectionHeader, StatusPill } from "../PagePrimitives";
-// Circular import: Members renders MemberDetail which still lives inside Home.tsx
-// (MemberDetail is ~1596 lines and is scheduled for its own V2 step). ESM handles
-// this safely — Members only invokes MemberDetail at component-render time, by
-// which point Home.tsx has finished evaluating and `MemberDetail` binding is set.
-import { MemberDetail } from "../Home";
+// V2-C2 — MemberDetail now lives in its own file next to Members.
+// The old circular ESM via "../Home" is gone; MemberDetail is now imported
+// directly from "./MemberDetail". Safe at module-eval time and render time.
+import { MemberDetail } from "./MemberDetail";
 
 /**
  * Members — list view with search + status filter + per-row drilldown to
