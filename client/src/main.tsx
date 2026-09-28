@@ -11,7 +11,6 @@ import { applyFontScale, readFontScale } from "./fontScale";
 applyFontScale(readFontScale());
 import App from "./App";
 import { startLogin } from "./const";
-import "./styles/tokens.css";
 import "./index.css";
 
 const queryClient = new QueryClient();
