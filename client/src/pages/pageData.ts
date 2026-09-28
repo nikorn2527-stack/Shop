@@ -135,7 +135,7 @@ export function formatMemberNumber(mode: "running" | "year" | "manual", sequence
   const separator = format.separator ?? "-";
   const head = [prefix.trim(), yearText].filter(Boolean).join(separator);
   const digits = Math.min(10, Math.max(1, format.sequenceDigits ?? (mode === "year" ? 5 : 6)));
-  return `${head ? `${head}-` : ""}${String(sequence).padStart(digits, "0")}`;
+  return `${head ? `${head}${separator}` : ""}${String(sequence).padStart(digits, "0")}`;
 }
 
 export const navItems: { id: View; label: string; caption: string; icon: LucideIcon }[] = [
