@@ -5236,6 +5236,61 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
   .report-cards-dense .report-card-facts i { font-size: 9px; }
 }
 
+/* ROUND 82 (user) — รายงานแบบ professional compact
+   ลดคำอธิบายและพื้นที่ว่าง แต่ยังคงแท็บ ตัวกรอง และรายละเอียดข้อมูลทั้งหมด */
+.report-quick-guide {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 5px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.report-quick-guide > div { display: none; }
+.report-quick-guide .outline-button { height: 28px; padding: 0 9px; font-size: 10px; }
+.report-workbench .dash-tabbar { margin-top: 0; }
+.report-workbench .dash-tab { padding: 7px 11px; }
+.report-cards-dense { gap: 8px; margin-bottom: 8px; }
+.report-cards-dense .report-card { min-height: 0; padding: 8px 11px; }
+.report-cards-dense .report-card strong { font-size: 17px; margin-top: 2px; }
+.report-cards-dense .report-card-facts { margin-top: 2px; }
+.report-cards-dense .report-card-facts i { font-size: 9px; }
+.report-view-pills { margin-top: 8px; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: thin; }
+.report-view-pills button { flex: 0 0 auto; padding: 5px 11px; font-size: 11px; }
+.report-range-row {
+  justify-content: flex-start;
+  gap: 7px;
+  margin-top: 7px;
+  padding: 6px 8px;
+  border: 1px solid #e4ece8;
+  border-radius: 9px;
+  background: #fbfdfc;
+}
+.report-range-row .report-period-pills,
+.report-range-row .report-staff-pills {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.report-range-row .report-period-pills { flex: 0 0 auto; }
+.report-range-row .report-staff-pills { flex: 1 1 auto; min-width: 120px; }
+.report-range-row .report-period-pills button,
+.report-range-row .report-staff-pills button { padding: 5px 10px; font-size: 10.5px; white-space: nowrap; }
+.report-groupby { flex: 0 0 auto; margin-left: auto; }
+.report-groupby > span { font-size: 10px; }
+.report-groupby button { padding: 4px 9px; font-size: 10px; }
+.report-range-status { margin-top: 6px; padding: 4px 10px; font-size: 10.5px; }
+@media (max-width: 900px) {
+  .report-range-row .report-staff-pills { flex-basis: 100%; order: 3; }
+  .report-groupby { margin-left: 0; }
+}
+@media (max-width: 560px) {
+  .report-quick-guide { margin-bottom: 3px; }
+  .report-cards-dense { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .report-range-row { align-items: center; }
+  .report-range-row .report-staff-pills { flex-basis: 100%; }
+}
+
 
 /* ═══════════════════════════════════════════════════════════════════════
    ROUND 80 (user) — อุปกรณ์ต่อพ่วงและความสะดวกการใช้งานหน้าร้าน
