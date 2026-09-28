@@ -179,3 +179,26 @@ Stage Summary:
 - ฟิลด์ขั้นสูงทั้ง 7 ซ่อนใน collapsible (กด "แสดงตัวเลือกขั้นสูง" ขยายออก)
 - ลบคำอธิบายยาว ใช้พรีวิวตัวเลขเป็นตัวบอกผลแทน
 - ฟังก์ชันเดิมครบ: field bindings ไม่เปลี่ยน, memberNumberMode type ไม่เปลี่ยน, tRPC API ไม่เปลี่ยน
+
+---
+Task ID: UI-6
+Agent: main (orchestrator)
+Task: รายงาน → ประวัติธุรกรรมสมาชิก — 2 บรรทัด/รายการ + แก้ truncation
+
+Work Log:
+- เจ้าของบอก: ตาราง on-screen ข้อมูล detail ยาว อ่านยาก อยากให้เป็น 2 บรรทัด/รายการ จัดช่องตามที่ export
+- พบสาเหตุ: CSS `.tx-detail` truncate (`max-width: 380px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis`) → ข้อความ detail ยาวถูกตัด
+- แก้: เปลี่ยนแต่ละ transaction จาก `<tr>` เดียว เป็น array ของ 2 `<tr>`:
+  - บรรทัด 1 (main): date | member | type | amount | balance | actor | (admin: พิจารณา)
+  - บรรทัด 2 (detail): `<td colSpan>` แสดง detail เต็ม width (ไม่ truncate, wrap ตามธรรมชาติ)
+- คอลัมน์ตรงกับ export (8 ช่อง: date, member, type, detail, amount, balance, actor, พิจารณา)
+- แก้ typo header "ยอดเคลือน" → "ยอดเคลื่อน"
+- CSS: ลบ truncation (max-width/nowrap/ellipsis), เพิ่ม `.tx-detail-row` (subtle background, padding, border-top 0)
+- `pnpm run check` ผ่าน 0 errors
+- server boot HTTP 200
+- commit `7789a25` push ขึ้น origin/main-v2
+
+Stage Summary:
+- ตาราง tx report ใช้ 2 บรรทัด/รายการ → detail ยาวอ่านได้ครบ ไม่โดนตัด
+- คอลัมนงตรง export ทั้ง on-screen + ไฟล์
+- typo แก้แล้ว
