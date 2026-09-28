@@ -185,6 +185,7 @@ export type DailySalesRow = {
   revenue: number;
   cogs: number;
   profit: number;
+  marginPct: number;
 };
 
 export type DashboardStats = {
@@ -2308,14 +2309,15 @@ export function dailySalesRows(db: SqliteDb, input: number | DailyRangeInput = 3
     const items = itemsByDay.get(key);
     const revenue = sales?.revenue ?? 0;
     const cogs = items?.cogs ?? 0;
-    rows.push({ date: key, orders: sales?.orders ?? 0, items: items?.items ?? 0, revenue, cogs, profit: round2(revenue - cogs) });
+    const profit = round2(revenue - cogs);
+    rows.push({ date: key, orders: sales?.orders ?? 0, items: items?.items ?? 0, revenue, cogs, profit, marginPct: revenue > 0 ? round2((profit / revenue) * 100) : 0 });
   }
   return rows;
 }
 
 // --- report breakdowns (round 30): by product category & by cashier ---------
 
-export type SalesByCategoryRow = { category: string; orders: number; qty: number; revenue: number; cogs: number; profit: number };
+export type SalesByCategoryRow = { category: string; orders: number; qty: number; revenue: number; cogs: number; profit: number; marginPct: number };
 
 /** Sales grouped by product category — special (no-product) lines land in "รายการพิเศษ". */
 export function salesByCategory(db: SqliteDb, input: DailyRangeInput = {}): SalesByCategoryRow[] {
@@ -2324,7 +2326,7 @@ export function salesByCategory(db: SqliteDb, input: DailyRangeInput = {}): Sale
   const until = `${formatDate(toDate)} 23:59:59`;
   const filter = cashierWhere("s", input);
   const rows = db.prepare(`SELECT COALESCE(NULLIF(TRIM(p.category), ''), 'ไม่ระบุหมวด') AS category, COUNT(DISTINCT si.sale_id) AS orders, COALESCE(SUM(si.qty), 0) AS qty, ROUND(COALESCE(SUM(si.qty * si.price), 0), 2) AS revenue, ROUND(COALESCE(SUM(si.qty * si.cost), 0), 2) AS cogs FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id WHERE s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY category ORDER BY revenue DESC`).all(since, until, ...filter.params) as unknown as { category: string; orders: number; qty: number; revenue: number; cogs: number }[];
-  return rows.map((row) => ({ ...row, qty: Number(row.qty), profit: round2(row.revenue - row.cogs) }));
+  return rows.map((row) => { const profit = round2(row.revenue - row.cogs); return { ...row, qty: Number(row.qty), cogs: round2(row.cogs), profit, marginPct: row.revenue > 0 ? round2((profit / row.revenue) * 100) : 0 }; });
 }
 
 export type SalesByProductRow = {
@@ -2338,6 +2340,7 @@ export type SalesByProductRow = {
   revenue: number;
   cogs: number;
   profit: number;
+  marginPct: number;
 };
 
 /**
@@ -2352,7 +2355,7 @@ export function salesByProduct(db: SqliteDb, input: DailyRangeInput = {}): Sales
   const until = `${formatDate(toDate)} 23:59:59`;
   const filter = cashierWhere("s", input);
   const rows = db.prepare(`SELECT si.product_id AS productId, CASE WHEN si.product_id IS NULL THEN 'รายการพิเศษ' ELSE COALESCE(p.name, si.name) END AS name, p.sku AS sku, p.barcode AS barcode, NULLIF(TRIM(p.category), '') AS category, COUNT(DISTINCT si.sale_id) AS bills, COALESCE(SUM(si.qty), 0) AS qty, ROUND(COALESCE(SUM(si.qty * si.price), 0), 2) AS revenue, ROUND(COALESCE(SUM(si.qty * si.cost), 0), 2) AS cogs FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id WHERE s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY si.product_id ORDER BY revenue DESC`).all(since, until, ...filter.params) as unknown as { productId: number | null; name: string; sku: string | null; barcode: string | null; category: string | null; bills: number; qty: number; revenue: number; cogs: number }[];
-  return rows.map((row) => ({ ...row, bills: Number(row.bills), qty: Number(row.qty), profit: round2(row.revenue - row.cogs) }));
+  return rows.map((row) => { const profit = round2(row.revenue - row.cogs); return { ...row, bills: Number(row.bills), qty: Number(row.qty), cogs: round2(row.cogs), profit, marginPct: row.revenue > 0 ? round2((profit / row.revenue) * 100) : 0 }; });
 }
 
 /**
@@ -2383,7 +2386,7 @@ export function salesLineItems(db: SqliteDb, input: DailyRangeInput = {}): Sales
   return db.prepare(`SELECT s.order_number AS orderNumber, s.created_at AS createdAt, si.name AS productName, COALESCE(si.unit, p.unit, 'ชิ้น') AS unit, si.qty, si.price, ROUND(si.qty * si.price, 2) AS amount, s.payment_method AS paymentMethod, COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, s.member_number AS memberNumber, CASE WHEN m.member_number IS NULL THEN NULL WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id LEFT JOIN members m ON m.member_number = s.member_number WHERE s.created_at >= ? AND s.created_at <= ?${filter.sql} ORDER BY s.created_at DESC, s.id DESC, si.id ASC LIMIT 1000`).all(since, until, ...filter.params) as unknown as SalesLineItemRow[];
 }
 
-export type SalesByCashierRow = { cashier: string; orders: number; items: number; memberBills: number; discount: number; total: number };
+export type SalesByCashierRow = { cashier: string; orders: number; items: number; memberBills: number; discount: number; total: number; cogs: number; profit: number };
 
 /** Sales grouped by the staff member (cashier) who closed each bill. */
 export function salesByCashier(db: SqliteDb, input: DailyRangeInput = {}): SalesByCashierRow[] {
@@ -2391,12 +2394,12 @@ export function salesByCashier(db: SqliteDb, input: DailyRangeInput = {}): Sales
   const since = `${formatDate(fromDate)} 00:00:00`;
   const until = `${formatDate(toDate)} 23:59:59`;
   const filter = cashierWhere("s", input);
-  const base = db.prepare(`SELECT COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, COUNT(*) AS orders, ROUND(COALESCE(SUM(s.discount), 0), 2) AS discount, ROUND(COALESCE(SUM(s.total), 0), 2) AS total, SUM(CASE WHEN s.member_number IS NOT NULL AND s.member_number != '' THEN 1 ELSE 0 END) AS memberBills FROM sales s WHERE s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY cashier ORDER BY total DESC`).all(since, until, ...filter.params) as unknown as { cashier: string; orders: number; discount: number; total: number; memberBills: number }[];
+  const base = db.prepare(`SELECT COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, COUNT(*) AS orders, ROUND(COALESCE(SUM(s.discount), 0), 2) AS discount, ROUND(COALESCE(SUM(s.total), 0), 2) AS total, SUM(CASE WHEN s.member_number IS NOT NULL AND s.member_number != '' THEN 1 ELSE 0 END) AS memberBills, ROUND(COALESCE(SUM(si.qty * si.cost), 0), 2) AS cogs FROM sales s LEFT JOIN sale_items si ON si.sale_id = s.id WHERE s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY cashier ORDER BY total DESC`).all(since, until, ...filter.params) as unknown as { cashier: string; orders: number; discount: number; total: number; memberBills: number; cogs: number }[];
   const itemsByCashier = new Map<string, number>();
   for (const row of db.prepare(`SELECT COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, COALESCE(SUM(si.qty), 0) AS items FROM sales s JOIN sale_items si ON si.sale_id = s.id WHERE s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY cashier`).all(since, until, ...filter.params) as unknown as { cashier: string; items: number }[]) {
     itemsByCashier.set(row.cashier, Number(row.items));
   }
-  return base.map((row) => ({ cashier: row.cashier, orders: row.orders, items: itemsByCashier.get(row.cashier) ?? 0, memberBills: Number(row.memberBills), discount: round2(row.discount), total: round2(row.total) }));
+  return base.map((row) => { const cogs = round2(row.cogs); const profit = round2(row.total - cogs); return { cashier: row.cashier, orders: row.orders, items: itemsByCashier.get(row.cashier) ?? 0, memberBills: Number(row.memberBills), discount: round2(row.discount), total: round2(row.total), cogs, profit }; });
 }
 
 /** ROUND 51 (user) — รายชื่อพนักงานขายจากบิลจริงทั้งหมด (สำหรับตัวกรองเจาะจงในรายงาน) */
