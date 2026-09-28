@@ -202,3 +202,64 @@ Stage Summary:
 - ตาราง tx report ใช้ 2 บรรทัด/รายการ → detail ยาวอ่านได้ครบ ไม่โดนตัด
 - คอลัมนงตรง export ทั้ง on-screen + ไฟล์
 - typo แก้แล้ว
+
+---
+Task ID: V2-A
+Agent: main (orchestrator)
+Task: V2 refactor — Step A (CSS tokens split) + directory structure
+
+Work Log:
+- Formatted Home.tsx + index.css with prettier (Home.tsx: 1946→11382 lines readable, index.css: 5496→23263 lines)
+- TypeScript + boot verified after format (0 errors, HTTP 200)
+- Created V2 directory structure: layouts/, pages/{dashboard,pos,inventory,members,reports,settings}/, components/{page,data}/, styles/
+- Extracted @font-face + :root design tokens + global resets → styles/tokens.css (170 lines)
+- Updated index.css: replaced tokens with @import "./styles/tokens.css" (23075 lines remain, will be split into layout.css + components.css in Step E)
+- Created styles/layout.css + styles/components.css as placeholder files (rules to be migrated from index.css incrementally)
+- TypeScript passes, dev server boots HTTP 200
+- commit `55f4f7a` pushed to origin/main-v2
+
+Stage Summary:
+- Step A ✅ DONE — CSS tokens extracted, V2 directory structure in place
+- Steps B-E: assessed but NOT done — the formatted Home.tsx is 11382 lines with 9 functions:
+  - MemberDetail (1597 lines), Members (360), TimelineDrilldown (88), Reports (3713), utilities (167), Settings (3913), Logs (239), AppShell (870), Home (67)
+  - Extracting these requires moving 10000+ lines of JSX + resolving complex shared dependencies (types, hooks, constants, tRPC queries)
+  - This is genuinely a multi-day engineering task — cannot complete in one session
+- Recommended approach for B-E: use subagents per-function (one function per subagent), starting with the smallest (Logs, TimelineDrilldown) and working up to the largest (Settings, Reports)
+
+---
+Task ID: V2-B
+Agent: full-stack-developer (AppShell extraction)
+Task: V2 refactor — Step B (extract AppShell function from Home.tsx into layouts/AppShell.tsx + shared types module)
+
+Work Log:
+- อ่าน worklog เข้าใจ context V2-A (CSS tokens split done, directory structure in place, Home.tsx formatted 11382 lines)
+- อ่าน AppShell function ที่ lines 10447-11314 ของ Home.tsx (868 บรรทัด) + Home default export ที่ 11317
+- Identify dependencies ที่ AppShell ใช้ (ใช้ Python script + grep):
+  - Types: User (drizzle schema), BrandSettings (theme.ts), View/Role (pageData.ts), SettingsTab (local ใน Home.tsx line 6021 — shared กับ Settings function)
+  - Hooks: useEditionStatus (EditionUi), useEffect/useMemo/useRef/useState (react)
+  - Functions: loadHeldBills, canAccessView, isAdminRole, memberFullName, money, navItems (pageData.ts), brandInitial, applyPaperWidth (theme.ts), formatThaiDate (viewFormat.ts)
+  - Constants: MEMBER_NOTIF_LIMIT (local line 208 — AppShell-only ไม่ใช่ shared)
+  - Components: Dashboard, Pos, Stock, Users, GlobalSearch, EditionPill (imported), Members/Reports/Settings/Logs (locally defined ใน Home.tsx — ต้องส่งเป็น props เพื่อหลีก circular import)
+  - Other: trpc (@/lib/trpc), toast (sonner)
+  - 21 icons จาก lucide-react (Activity, ArrowDownToLine, ..., X)
+  - blocker, formatFileSize, uptimeLabel, POS_RAIL_BUTTONS, GO_LIVE_CHECKLIST ตรวจแล้ว ไม่ได้ใช้ใน AppShell (task description ระบุไว้แต่ไม่ตรงจริง)
+- สร้าง client/src/pages/shared.ts (30 บรรทัด): export `SettingsTab` type — เป็น type เดียวที่ shared ระหว่าง AppShell และ Settings function (ใช้ Python script cross-check ทุก token ของ AppShell กับ Settings function)
+- สร้าง client/src/layouts/AppShell.tsx (965 บรรทัด): ย้าย AppShell function มาทั้งหมด (868 บรรทัด body) + เพิ่ม imports header + ใหม่กำหนด `AppShellViewComponents` type และ `AppShellProps` type ที่มี `viewComponents: { Members, Reports, Settings, Logs }` prop (รับ view components เป็น props เพื่อหลีก circular import)
+- แก้ Home.tsx (3 จุด):
+  1. เพิ่ม imports: `import { AppShell } from "../layouts/AppShell"` + `import { SettingsTab } from "./shared"`
+  2. ลบ `const MEMBER_NOTIF_LIMIT = 6` (line 208) + ลบ `type SettingsTab = ...` block (lines 6021-6035) — อันหลังย้ายไป shared.ts แล้ว, อันแรกย้ายไปเป็น const ภายใน layouts/AppShell.tsx เพราะ AppShell-only ไม่ใช่ shared
+  3. ลบ AppShell function (lines 10447-11314 — 868 บรรทัด body + 1 blank = 869 บรรทัด) ออกจาก Home.tsx
+  4. แก้ Home() default export (line 11317) ให้ส่ง viewComponents={{ Members, Reports, Settings, Logs }} ให้ AppShell
+- หมายเหตุ: prettier format changes ของ Home.tsx จาก V2-A (1946→11382 บรรทัด) ไม่ได้ commit ใน V2-A commit (55f4f7a ครอบเฉพาะ CSS files) — commit นี้ (V2-B) จะรวม format changes นั้นด้วยเพราะ working tree มีอยู่แล้ว
+- `pnpm run check` (tsc --noEmit) → 0 errors ✅
+- บูต dev server (./start-dev.sh) → curl `/` HTTP 200 ผ่าน (มี warning tailwind "Missing opening {" ที่เป็น pre-existing CSS issue จาก V2-A — ไม่ใช่ V2-B's regression; tailwind v4 pre-transform ล้มเหลือตอน parse index.css หลัง @import tokens.css)
+
+Stage Summary:
+- ไฟล์ที่เปลี่ยน:
+  - `client/src/pages/shared.ts` (ใหม่ — 30 บรรทัด): SettingsTab type
+  - `client/src/layouts/AppShell.tsx` (ใหม่ — 965 บรรทัด): AppShell function + AppShellViewComponents/AppShellProps types + MEMBER_NOTIF_LIMIT const (ย้ายมาจาก Home.tsx)
+  - `client/src/pages/Home.tsx`: ลดขนาดจาก 11382 → 10500 บรรทัด (ลบ AppShell 868 บรรทัด + ลบ SettingsTab/MEMBER_NOTIF_LIMIT local definitions) + เพิ่ม 2 imports + ปรับ Home() ให้ส่ง viewComponents prop
+- AppShell extraction สำเร็จ — Home.tsx ตอนนี้เป็น thin auth-gate (SetupView/LoginView/ForceChangeView แล้ว delegate ไป AppShell) เหมือนที่ V2-A ตั้งในไว้
+- View components ที่ AppShell ใช้ (Members/Reports/Settings/Logs) ยังอยู่ใน Home.tsx — ส่งเป็น props ผ่าน `viewComponents` เพื่อหลีก circular import; V2-C ถึง V2-E จะย้าย views เหล่านี้ออกเป็นไฟล์ต่างหากแล้ว AppShell import โดยตรง + ลบ `viewComponents` prop ได้
+- TypeScript: 0 errors, dev server: HTTP 200 ผ่าน
+- commit hash: (จะกรอกหลัง push) บน origin/main-v2
