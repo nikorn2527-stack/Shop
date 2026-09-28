@@ -461,3 +461,42 @@ Stage Summary:
 - Home.tsx ลดลงจาก 4610 → 95 บรรทัด — เป็น thin auth-gate ที่ V2-A ตั้งในไว้ตั้งแต่ต้น (auth.me → splash → setup → login → force-change → AppShell); ฟังก์ชันใหญ่ ๆ ทั้งหมด (MemberDetail/Members/TimelineDrilldown/Logs/Reports/Settings/AppShell) แยกไฟล์เรียบร้อย — V2 refactor ครบ ถือว่า Step C สมบูรณ์
 - TypeScript: 0 errors, dev server: HTTP 200 ผ่าน (3 ครั้ง stable + 6 module transforms ผ่าน — รวม Settings.tsx ไฟล์ใหม่)
 - commit hash: `cfb3db1` บน origin/main-v2 — รอเจ้าของงาน pull ไปเทส settings view (brand/receipt/member-number/payment/pos-menu/cutoff/roles/edition/backup/import/install/dev-tools/go-live) บนเครื่อง
+
+---
+Task ID: V2-D+E
+Agent: main (orchestrator)
+Task: V2 refactor — Step D (shared components) + Step E (CSS fix)
+
+Work Log:
+- Step D: created 5 shared component files:
+  - components/page/PageHeader.tsx (re-export SectionHeader from PagePrimitives)
+  - components/page/EmptyState.tsx (icon + title + hint, variants: neutral/error/loading)
+  - components/data/DataTable.tsx (table-wrap + entity-table wrapper)
+  - components/data/FilterBar.tsx (filter chips container)
+  - components/data/StatusBadge.tsx (re-export StatusPill from PagePrimitives)
+- Step E: fixed Vite "Missing opening {" pre-transform error
+  - Root cause: @import "./styles/tokens.css" in index.css confused Tailwind v4's CSS processor
+  - Fix: moved tokens.css import from CSS @import to JS import in main.tsx
+  - main.tsx now: import "./styles/tokens.css" then import "./index.css"
+  - index.css: only @import "tailwindcss" + rules (no @import tokens)
+- Fixed .gitignore: data/ → /data/ (was matching client/src/components/data/ by accident)
+- TypeScript: 0 errors
+- Boot: HTTP 200, "Missing opening {" errors = 0
+- commit `996436b` pushed to origin/main-v2
+
+Stage Summary:
+- V2 refactor A-E COMPLETE
+- Home.tsx: 11382 → 95 lines (99.2% reduction) — thin auth-gate router
+- 11,808 lines extracted across 9 modular files:
+  - layouts/AppShell.tsx (965)
+  - pages/members/MemberDetail.tsx (1672)
+  - pages/members/Members.tsx (335)
+  - pages/reports/Reports.tsx (3776)
+  - pages/reports/TimelineDrilldown.tsx (83)
+  - pages/settings/Settings.tsx (4467)
+  - pages/settings/Logs.tsx (268)
+  - pages/shared.ts (30)
+  - styles/tokens.css (212)
+- 5 shared component abstractions created
+- CSS @import warning resolved
+- All TypeScript checks pass, server boots HTTP 200
