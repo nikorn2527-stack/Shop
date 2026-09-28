@@ -341,3 +341,123 @@ Stage Summary:
 - Home.tsx ลดลงจาก 9895 → 8298 บรรทัด; ฟังก์ชันใหญ่ ๆ ที่เหลือ: Reports (line 2051, ~3627 บรรทัด), Settings (line 5915, ~3914 บรรทัด), Home (line 9829, ~66 บรรทัด) — scheduled for V2-D / V2-E
 - TypeScript: 0 errors, dev server: HTTP 200 ผ่าน (root + 3 module transforms)
 - commit hash: <ดูด้านล่าง> บน origin/main-v2
+
+---
+Task ID: V2-C3
+Agent: full-stack-developer (Reports extraction)
+Task: V2 refactor — Step C-3: Extract Reports function (~3605 lines, sales summary + bills + member tx + stock balance + member balances view) from Home.tsx into `client/src/pages/reports/Reports.tsx` (its own file next to TimelineDrilldown.tsx) and repoint Home.tsx to import Reports from the new file.
+
+Work Log:
+- อ่าน worklog เข้าใจ context V2-A/B/C1/C2 (CSS tokens split done, AppShell extracted to layouts/, TimelineDrilldown+Members+Logs+MemberDetail extracted; Home.tsx ยังมี Reports/Settings/Home อยู่ข้างใน)
+- grep `^function Reports` ใน Home.tsx → พบที่ line 454; หา end โดยดู top-level declarations ถัดไป → พบ `const MEMBER_IMPORT_FIELDS` ที่ line 4081 → Reports ครอบ lines 454-4058 (function body) + 1 blank (4059) = 3605 บรรทัด function body
+- awk extract lines 454-4058 → `/tmp/reports_fn.tsx` (3605 บรรทัด) สำหรับ analyze dependencies
+- Identify imports โดย grep ชื่อ import แต่ละตัวในช่วง function body:
+  - React hooks (5): Fragment (2), useEffect (5), useMemo (5), useRef (2), useState (27)
+  - lucide icons (21): Activity, ArrowRight, CalendarDays, Check, ChevronDown, Download, FileBarChart, FileSpreadsheet, FileText, Lock, PackageSearch, Printer, ReceiptText, RotateCcw, Search, ShieldCheck, ShoppingBag, TrendingDown, UsersRound, WalletCards, X
+  - @shared/editions: EditionFeatureKey (1)
+  - @/components/EditionUi: EditionUpgradeModal (1), useEditionStatus (1)
+  - ../pageData (types): MemberLite (2), Role (1)
+  - server/sqliteStore (types): MemberTransactionRow (1), SaleHistoryEntry (1)
+  - ../pageData (funcs): isAdminRole (3), memberFullName (3), money (62), scanCandidates (1)
+  - ../PagePrimitives: SectionHeader (1), StatusPill (8)
+  - @/components/ThaiDatePicker: ThaiDatePicker (6)
+  - @/reportDoc: downloadReportPdf (1), printReportDoc (1), ReportDocConfig (5, type)
+  - @/components/ExportPreviewModal: ExportPreviewModal (1), ExportFormat (6, type), ExportPreviewState (1, type)
+  - @/exportUtils: downloadCsvFile (1), downloadXlsxFile (1), exportCount (74), exportNumber (75)
+  - @/components/ScanPickers: MemberScanPicker (2)
+  - @/components/SlipViewModal: SlipViewButton (1)
+  - @/components/ReceiptModal: ReceiptModal (1)
+  - ./TimelineDrilldown: TimelineDrilldown (1) — V2-C1 sibling file
+  - @/lib/trpc: trpc (15)
+  - ../viewFormat: formatLogDateTime (10), formatShortDay (3), formatThaiDate (10), formatThaiMonthYear (1), getErrorMessage (10), isSameMonth (1), parseBahtFromDetail (1), parseStoreDate (1)
+- Cross-check 10 pre-Reports constants/types ใน Home.tsx (lines 210-452) ว่าใช้เฉพาะใน Reports หรือไม่ (grep ชื่อทั้งไฟล์ Home.tsx):
+  - **MOVE ไป Reports.tsx** (Reports-only): PAYMENT_PILL_TONE (use ใน 2971), TX_TYPE_LABEL (1577,1598,1623,3325,3333), TX_TYPE_TONE (3324,3332), LIMIT_STATUS_META (3299), LIMIT_ROW_ID_OFFSET (829), TimelineRow (920,937), ReportRangeMode (473,528,540,568,592), ReportGroupBy (474), REPORT_RANGE_CHIPS (543,628,2150,3126,3490), REPORT_GROUPBY_CHIPS (2214) — ทุก usage อยู่ในช่วง 454-4058 (Reports function body)
+  - **STAY ใน Home.tsx** (used by Settings หลัง line 4318): SETTINGS_FIELD_LABELS (4864), POS_RAIL_BUTTONS (6348), SettingsForm (4350+)
+  - ไม่ใช้ใน Reports: SETTINGS_FIELD_LABELS, POS_RAIL_BUTTONS, SettingsForm, MEMBER_IMPORT_FIELDS, PRODUCT_IMPORT_FIELDS, ROLE_MATRIX, DEV_SETTINGS_TAB_IDS, GO_LIVE_CHECKLIST, formatFileSize, uptimeLabel, shrinkLogoToDataUrl, parseGoliveChecks, importColumnLabel, isSameDay — ทั้งหมด confirmed ไม่ใช้ใน Reports function body
+- สร้าง `client/src/pages/reports/Reports.tsx` (3776 บรรทัด = 172 header + 3604 function body):
+  - imports: เฉพาะที่ใช้ (5 React hooks + 21 lucide icons + EditionFeatureKey type + EditionUpgradeModal/useEditionStatus + MemberLite/Role types + MemberTransactionRow/SaleHistoryEntry types + isAdminRole/memberFullName/money/scanCandidates + SectionHeader/StatusPill + ThaiDatePicker + downloadReportPdf/printReportDoc/ReportDocConfig + ExportPreviewModal/ExportFormat/ExportPreviewState + downloadCsvFile/downloadXlsxFile/exportCount/exportNumber + MemberScanPicker + SlipViewButton + ReceiptModal + TimelineDrilldown + trpc + formatLogDateTime/formatShortDay/formatThaiDate/formatThaiMonthYear/getErrorMessage/isSameMonth/parseBahtFromDetail/parseStoreDate)
+  - JSDoc header อธิบาย origin (extracted from Home.tsx V2-C3 — pure move/extract) + cite ROUND 30 (ข้อ 25), ROUND 48 (timeline row), ROUND 49 (range picker), ROUND 51 (staff filter), ROUND 61 (advanced reports), ROUND 77 (multi-tx-type), ROUND 79 (multi-cashier), ROUND 34 (req 23.2 limit status), UI-9 (tx range chips)
+  - วาง 10 constants/types ที่ Reports-only ก่อน function: PAYMENT_PILL_TONE, TX_TYPE_LABEL, TX_TYPE_TONE, LIMIT_STATUS_META, LIMIT_ROW_ID_OFFSET, TimelineRow, ReportRangeMode, ReportGroupBy, REPORT_RANGE_CHIPS, REPORT_GROUPBY_CHIPS
+  - วาง `export function Reports({...}) { ... }` ตรง จาก awk extract ของ Home.tsx lines 454-4058 (skip บรรทัดแรก `function Reports({` เพราะ header มี `export function Reports({` อยู่แล้ว)
+- แก้ Home.tsx 3 จุด:
+  1. Edit imports block: แทน V2-C1 comment "TimelineDrilldown is consumed by Reports (still in Home.tsx)." ด้วยบรรทัด import ใหม่ `import { Reports } from "./reports/Reports";` พร้อม V2-C3 comment block (3 บรรทัด)
+  2. `sed -i -e '212,218d' -e '379,4061d' client/src/pages/Home.tsx` — ลบ PAYMENT_PILL_TONE block (lines 212-218 = comment + const + trailing blank) + ลบ TX_TYPE_LABEL → end of Reports function + trailing blank (lines 379-4061)
+  3. (ไม่ต้องแก้ imports อื่นของ Home.tsx เพราะ imports เหล่านั้นยังใช้กับ Settings/Home ที่เหลืออยู่)
+- ตรวจ boundaries หลัง sed: `} from "./pageData";` (210) → blank (211) → `type SettingsForm = {` (212, clean) และ `];` (370, POS_RAIL_BUTTONS close) → blank (371) → `// ROUND 40 (ข้อ 32)...` (372, clean)
+- รักษา business logic ทั้งหมด — pure move/extract: ไม่แตะ tRPC contract, ไม่ลบ state/props/handlers/toggle handlers/pickRangeChip/pickTxRangeChip helpers (ทั้งหมดอยู่ใน function body ที่ย้ายไป Reports.tsx), ไม่เปลื่ยน `role`/`userName`/`focusBill`/`onFocusBillConsumed` props
+- `pnpm run check` (tsc --noEmit) → **0 errors** ✅
+- บูต dev server (`setsid bash -c './node_modules/.bin/tsx server/_core/index.ts >> dev.log 2>&1'` detached) → curl `/` 3 ครั้ง stable HTTP 200/200/200 ✅ — modules transform ผ่าน Vite/tsx pipeline ไม่มี parse/transform error ใหม่
+- commit `0203737` push ขึ้น origin/main-v2 สำเร็จ (b19075c..0203737, rebase: "Current branch main is up to date" — no new commits บน remote ตอน pull)
+
+Stage Summary:
+- ไฟล์ที่เปลี่ยน:
+  - `client/src/pages/reports/Reports.tsx` (ใหม่ — 3776 บรรทัด): named export `Reports` + 10 Reports-only constants/types ย้ายมาจาก Home.tsx + imports เฉพาะที่ใช้ + JSDoc อ้างอิง ROUND 30/48/49/51/61/77/79/34/UI-9
+  - `client/src/pages/Home.tsx` (8300 → 4610 บรรทัด, ลด 3690 บรรทัด ~44%): ลบ PAYMENT_PILL_TONE block + ลบ TX_TYPE_LABEL/TX_TYPE_TONE/LIMIT_STATUS_META/LIMIT_ROW_ID_OFFSET/TimelineRow/ReportRangeMode/ReportGroupBy/REPORT_RANGE_CHIPS/REPORT_GROUPBY_CHIPS + ลบ Reports function (3605 บรรทัด) + เพิ่ม V2-C3 import `import { Reports } from "./reports/Reports";`; imports ที่ยังใช้กับ Settings/Home คงไว้ทั้งหมด
+- Reports extracted สำเร็จ — ไฟล์ตั้งอยู่ข้าง TimelineDrilldown.tsx ใน `pages/reports/` directory; Reports ใช้ TimelineDrilldown ผ่าน sibling import (`./TimelineDrilldown`) ไม่ต้องผ่าน Home.tsx อีก
+- AppShell.tsx ไม่ถูกแตะ — viewComponents prop type คงเดิม (Members/Reports/Settings/Logs ComponentType) — Home() ยังส่ง viewComponents={{ Members, Reports, Settings, Logs }} เหมือนเดิม เพียงแต่ Reports ตอนนี้มาจาก import ไม่ใช่ local function declaration
+- Home.tsx ลดลงจาก 8300 → 4610 บรรทัด; ฟังก์ชันใหญ่ ๆ ที่เหลือ: Settings (~3914 บรรทัด, line ~440 หลังลด), Home (~66 บรรทัด) — scheduled for V2-D / V2-E
+- TypeScript: 0 errors, dev server: HTTP 200 ผ่าน (3 ครั้ง stable)
+- commit hash: `0203737` บน origin/main-v2 — รอเจ้าของงาน pull ไปเทส reports view (sales summary timeline/category/product/items/cashier, bills history, member tx, stock balance, member balances, timeline drilldown, CSV/PDF export) บนเครื่อง
+
+---
+Task ID: V2-C4
+Agent: full-stack-developer (Settings extraction)
+Task: V2 refactor — Step C-4: Extract Settings function (~3914 lines, brand/receipt/member-number/payment/POS-menu/cutoff/roles/edition/license/backup/import/install/dev-tools/go-live) from Home.tsx into `client/src/pages/settings/Settings.tsx` (its own file next to Logs.tsx) and repoint Home.tsx to import Settings from the new file.
+
+Work Log:
+- อ่าน worklog เข้าใจ context V2-A/B/C1/C2/C3 (CSS tokens split done, AppShell extracted to layouts/, TimelineDrilldown+Members+Logs+MemberDetail+Reports extracted; Home.tsx ยังมี Settings + Home default เหลืออยู่)
+- grep `^function Settings` ใน Home.tsx → พบที่ line 630; หา end โดยดู top-level declarations ถัดไป → พบ `export default function Home()` ที่ line 4544 → Settings ครอบ lines 630-4541 (function body) + blank (4542) + JSDoc (4543) — รวม 3912 บรรทัด function body
+- Identify imports โดย grep ชื่อ import แต่ละตัวในช่วง function body (Python script with `\b` word boundaries):
+  - React hooks (4 + 2 type): useEffect (6), useMemo (3), useRef (3), useState (27), ChangeEvent (1, type), ReactKeyboardEvent (1, type) — Fragment=0 (skip)
+  - lucide icons (55): Activity, ArchiveRestore, ArrowDownToLine, ArrowRight, ArrowUpFromLine, Bell, CalendarClock, CalendarDays, Camera, Check, ChevronDown, CircleHelp, Cloud, Copy, CreditCard, Crown, DatabaseBackup, Download, FileSpreadsheet, FileUp, Globe, HardDriveDownload, Image (as ImageIcon), ImagePlus, LockKeyhole, LogOut, KeyRound, LayoutDashboard, ListChecks, Monitor, Network, PackageSearch, Palette, Pause, Plus, Printer, QrCode, ReceiptText, RefreshCw, RotateCcw, ScanLine, ShieldCheck, ShoppingBag, ShoppingCart, Sparkles, Star, Table2, Terminal, Trash2, UserCog, UserPlus, UsersRound, WalletCards, Wifi, Wrench, X, CircleAlert — ทุก icon settings>0 home=0 (Settings-only); 11 icons จาก Home.tsx header ไม่ใช้ใน Settings (FileBarChart, FileText, IdCard, Lock, Menu, MoreHorizontal, Search, Settings2, TrendingDown, FileImage) — ไม่ import
+  - sonner: toast (27) — Settings-only, blocker=0 (Home.tsx เดิม import แต่ไม่ได้ใช้จริง)
+  - @shared/editions: EDITIONS (2), editionStatusLabel (1) — Settings-only (EditionFeatureKey/EDITION_COMPARE_ROWS/EDITION_FEATURE_INFO/EDITION_TRIAL_DAYS/Edition ใช้ใน AppShell ไม่ใช่ Settings)
+  - @/components/EditionUi: DevKeygenTool (1), EditionCompareTable (1), EditionUpgradeModal (1), useEditionStatus (1) — Settings-only (EditionPill ใช้ใน AppShell)
+  - type Role/View from "../pageData" — Settings-only (MemberLite=0)
+  - type InstallOverview from server/sqliteStore (1) — Settings-only (MemberTransactionRow/SaleHistoryEntry ใช้ใน Reports; User ใช้ใน AppShell)
+  - canAccessView (1), formatMemberNumber (1), isAdminRole (2), money (10) from "../pageData" — Settings-only (PRENAME_OPTIONS/compressImageToDataUrl/loadHeldBills/memberFullName/navItems/roleThaiLabel/scanCandidates ใช้ใน Reports/Members/AppShell)
+  - ConfirmDialog (3), SectionHeader (1), StatusPill (2) from "../PagePrimitives" — Settings-only (formEnterNav ใช้ใน MemberDetail)
+  - HelpDisclosure (4) — Settings-only
+  - isValidPromptPayId (1) — Settings-only
+  - PrintPreviewModal (1) — Settings-only (ReceiptModal/MemberCardModal/StatementModal/CameraCaptureModal/SlipViewModal/SlipViewButton ใช้ใน MemberDetail/Reports)
+  - trpc (17) from "@/lib/trpc"
+  - SettingsTab (8) from "../shared" — shared กับ AppShell
+  - applyFontScale (1), FONT_SCALES (1), readFontScale (1), FontScaleId (2) from "../../fontScale"
+  - applyPaperWidth (2), applyThemeColor (3), applyUiStyle (2), brandInitial (1), PAPER_WIDTHS (1), resolvePaperWidth (1), resolveThemeColor (1), THEME_PRESETS (1), UI_STYLE_PRESETS (2) from "../../theme" (BrandSettings=0, applyBrand/applyCachedBrand ใช้ใน Home default)
+  - getErrorMessage (9), formatLogDateTime (8), formatThaiDate (2), nextMemberSequence (1) from "../viewFormat" — ที่เหลือ (isSameDay/isSameMonth/MEMBER_STATUS_META/formatHistoryDate/formatLastActivity/formatShortDay/formatThaiMonthYear/parseBahtFromDetail/parseStoreDate/WALLET_TX_META) ใช้ใน MemberDetail/Reports/Logs
+- Cross-check 16 constants/types ที่ประกาศเหนือ Settings function ใน Home.tsx (lines 212-628) ว่าใช้เฉพาะใน Settings หรือไม่ (grep ชื่อทั้งไฟล์ Home.tsx):
+  - SettingsForm (line 212) — ใช้ที่ 256, 4350+ (Settings function body), ไม่ใช่ใน Home default → **MOVE ไป Settings.tsx**
+  - SETTINGS_FIELD_LABELS (256) — Settings-only → **MOVE**
+  - POS_RAIL_BUTTONS (293) — Settings-only (typeof Bell/ScanLine/UsersRound/etc.) → **MOVE**
+  - ImportKindId (373), ImportSheetLite (374), ImportResultLite (382) — Settings-only → **MOVE**
+  - MEMBER_IMPORT_FIELDS (393), PRODUCT_IMPORT_FIELDS (429), importColumnLabel (452) — Settings-only → **MOVE**
+  - shrinkLogoToDataUrl (463) — Settings-only (ใช้ใน brand tab upload logo) → **MOVE**
+  - ROLE_MATRIX (491) — Settings-only (roles tab) → **MOVE**
+  - formatFileSize (524), uptimeLabel (532) — Settings-only (backup tab + install tab) → **MOVE**
+  - DEV_SETTINGS_TAB_IDS (543) — Settings-only (type SettingsTab[] = ["install","network"]) → **MOVE**
+  - parseGoliveChecks (546) — Settings-only (อ่าน JSON checks จาก settings) → **MOVE**
+  - GO_LIVE_CHECKLIST (559) — Settings-only (install tab) → **MOVE**
+  - ทุก const/type Settings-only → ย้ายทั้งหมดไป Settings.tsx (ไม่มี shared ระหว่าง Settings และ Home default)
+- สร้าง `client/src/pages/settings/Settings.tsx` (4467 บรรทัด = 137 header + 417 consts + 1 blank + 3912 function body):
+  - imports header (137 บรรทัด): JSDoc อธิบาย origin (extracted from Home.tsx V2-C4 — pure move) + cite ROUND 17/36/38/40/42/56/61/63/68/75/UI-2/UI-5; imports เฉพาะที่ใช้ (4 React hooks + 2 types + 55 lucide icons + toast + EDITIONS/editionStatusLabel + DevKeygenTool/EditionCompareTable/EditionUpgradeModal/useEditionStatus + Role/View types + InstallOverview type + canAccessView/formatMemberNumber/isAdminRole/money + ConfirmDialog/SectionHeader/StatusPill + HelpDisclosure + isValidPromptPayId + PrintPreviewModal + trpc + SettingsTab + applyFontScale/FONT_SCALES/readFontScale/FontScaleId + applyPaperWidth/applyThemeColor/applyUiStyle/brandInitial/PAPER_WIDTHS/resolvePaperWidth/resolveThemeColor/THEME_PRESETS/UI_STYLE_PRESETS + getErrorMessage/formatLogDateTime/formatThaiDate/nextMemberSequence)
+  - ปรับ relative import paths สำหรับ new location (`client/src/pages/settings/`): `../../../server/sqliteStore` → `../../../../server/sqliteStore`, `./pageData` → `../pageData`, `./PagePrimitives` → `../PagePrimitives`, `./shared` → `../shared`, `../fontScale` → `../../fontScale`, `../theme` → `../../theme`, `./viewFormat` → `../viewFormat`; `@/...` และ `@shared/...` aliases คงเดิม
+  - constants block (417 บรรทัด): 16 const/type ที่ Settings-only ย้ายมาจาก Home.tsx lines 212-628 ตรง ๆ (copy-paste) — เรียงเหมือนเดิม (SettingsForm → SETTINGS_FIELD_LABELS → POS_RAIL_BUTTONS → ImportKindId → ImportSheetLite → ImportResultLite → MEMBER_IMPORT_FIELDS → PRODUCT_IMPORT_FIELDS → importColumnLabel → shrinkLogoToDataUrl → ROLE_MATRIX → formatFileSize → uptimeLabel → DEV_SETTINGS_TAB_IDS → parseGoliveChecks → GO_LIVE_CHECKLIST)
+  - function body (3912 บรรทัด): `export function Settings({...}) { ... }` จาก awk extract ของ Home.tsx lines 630-4541 ด้วย `sed '1s/^function Settings/export function Settings/'` — เปลี่ยน declaration line เดียวจาก `function Settings({` → `export function Settings({`, body อื่น ๆ คงเดิมทั้งหมด (state, useEffect, useMemo, handlers, JSX)
+- แก้ Home.tsx (เขียนใหม่ทั้งไฟล์ผ่าน write_file — 95 บรรทัด จาก 4610 บรรทัด, ลด 4515 บรรทัด ~98%):
+  - imports header (38 บรรทัด): เฉพาะที่ Home default function ใช้ — `useEffect` from react, `LoginView`/`SetupView`/`ForceChangeView` from @/components/*, `trpc` from @/lib/trpc, `AppShell` from ../layouts/AppShell, `applyBrand`/`applyCachedBrand` from ../theme, `Reports`/`Members`/`Logs`/`Settings` (ใหม่) from ./reports/Reports, ./members/Members, ./settings/Logs, ./settings/Settings — ลบ imports ที่ Settings-only ออกทั้งหมด (66 lucide icons, toast, blocker, 5 Edition symbols, 4 EditionUi components, Role/View/InstallOverview/User types, 7 pageData funcs, 4 PagePrimitives, HelpDisclosure, Dashboard/GlobalSearch/ThaiDatePicker, downloadReportPdf/printReportDoc/ReportDocConfig, ExportPreviewModal/ExportFormat/ExportPreviewState, 5 exportUtils funcs, MemberScanPicker, 7 modal components, isValidPromptPayId, ReceiptModal, PrintPreviewModal, Pos/Stock/Users, TimelineDrilldown, SettingsTab, 4 fontScale symbols, 12 theme symbols, 14 viewFormat symbols)
+  - คง re-export block (`export { addScannedItem, calculateCartSubtotal, canAccessView, formatMemberNumber, isStockAlert } from "./pageData"`) — re-export block นี้จำเป็นเพราะ `client/src/pages/Home.test.ts` import names เหล่านี้จาก "./Home" (tsconfig exclude `*.test.ts` แต่ไฟล์ test ยังมีอยู่ — คง re-export เพื่อไม่ให้พัง)
+  - JSDoc + Home default function (57 บรรทัด): คงเดิมทั้งหมด — auth.me → splash → SetupView → LoginView → ForceChangeView → AppShell (ส่ง viewComponents={{ Members, Reports, Settings, Logs }}); Settings ตอนนี้มาจาก import
+- รักษา business logic ทั้งหมด — pure move/extract: ไม่แตะ tRPC contract, ไม่ลบ state/props/handlers/useEffect/JSX แม้แต่บรรทัดเดียวใน Settings function body; ไม่เปลื่ยน SettingsForm/POS_RAIL_BUTTONS/GO_LIVE_CHECKLIST/ROLE_MATRIX/MEMBER_IMPORT_FIELDS/PRODUCT_IMPORT_FIELDS data ตามต้นฉบับ; ไม่เปลี่ยน SettingsTab type (ใน shared.ts) — Settings import จาก shared ตามที่ V2-B ตั้งในไว้
+- `pnpm run check` (tsc --noEmit) → **0 errors** ✅
+- บูต dev server (`./node_modules/.bin/tsx server/_core/index.ts` ผ่าน nohup detached) → curl `/` 3 ครั้ง stable HTTP 200/200/200 ✅ + curl Vite transform สำหรับ 6 ไฟล์ (Home.tsx, Settings.tsx, AppShell.tsx, Members.tsx, Logs.tsx, Reports.tsx) ทั้งหมด HTTP 200 ✅ — modules transform ผ่าน Vite/tsx pipeline ไม่มี parse/transform error ใหม่; dev server stable หลัง curl หลายครั้ง (process ยัง alive)
+- pre-existing tailwind "Missing opening {" CSS pre-transform warning (จาก V2-A's `@import tokens.css` split) ยังคงมี — V2-B/C1/C2/C3 note ระบุไว้ว่า "out of scope สำหรับ V2-C", ไม่ใช่ regression
+- commit <hash> push ขึ้น origin/main-v2 สำเร็จ — <rebase note>
+
+Stage Summary:
+- ไฟล์ที่เปลี่ยน:
+  - `client/src/pages/settings/Settings.tsx` (ใหม่ — 4467 บรรทัด): named export `Settings` + 16 Settings-only const/type ย้ายมาจาก Home.tsx + imports เฉพาะที่ใช้ + JSDoc อ้างอิง ROUND 17/36/38/40/42/56/61/63/68/75/UI-2/UI-5
+  - `client/src/pages/Home.tsx` (4610 → 95 บรรทัด, ลด 4515 บรรทัด ~98%): เหลือเพียง 38 บรรทัด imports (useEffect + LoginView/SetupView/ForceChangeView + trpc + AppShell + applyBrand/applyCachedBrand + Reports/Members/Logs/Settings) + 6 บรรทัด re-export block + 57 บรรทัด Home default function; ลบ Settings-only imports ทั้งหมดออกจาก header (66 lucide icons + toast + blocker + Edition symbols + EditionUi components + 5 types + 7 pageData funcs + 4 PagePrimitives + HelpDisclosure + Dashboard/GlobalSearch/ThaiDatePicker + reportDoc + ExportPreviewModal + 5 exportUtils + MemberScanPicker + 7 modal components + isValidPromptPayId + Pos/Stock/Users + TimelineDrilldown + SettingsTab + 4 fontScale + 12 theme + 14 viewFormat) — Settings-only imports ถูกลบทั้งหมดเพราะเหลือเพียง Home default function ที่ใช้ imports เพียง 6 ตัว
+- Settings extracted สำเร็จ — ไฟล์ตั้งอยู่ข้าง Logs.tsx ใน `pages/settings/` directory; AppShell.tsx ไม่ถูกแตะ — viewComponents prop type คงเดิม (Members/Reports/Settings/Logs ComponentType) — Home() ยังส่ง viewComponents={{ Members, Reports, Settings, Logs }} เหมือนเดิม เพียงแต่ Settings ตอนนี้มาจาก import ไม่ใช่ local function declaration
+- Home.tsx ลดลงจาก 4610 → 95 บรรทัด — เป็น thin auth-gate ที่ V2-A ตั้งในไว้ตั้งแต่ต้น (auth.me → splash → setup → login → force-change → AppShell); ฟังก์ชันใหญ่ ๆ ทั้งหมด (MemberDetail/Members/TimelineDrilldown/Logs/Reports/Settings/AppShell) แยกไฟล์เรียบร้อย — V2 refactor ครบ ถือว่า Step C สมบูรณ์
+- TypeScript: 0 errors, dev server: HTTP 200 ผ่าน (3 ครั้ง stable + 6 module transforms ผ่าน — รวม Settings.tsx ไฟล์ใหม่)
+- commit hash: <ดูด้านล่าง> บน origin/main-v2 — รอเจ้าของงาน pull ไปเทส settings view (brand/receipt/member-number/payment/pos-menu/cutoff/roles/edition/backup/import/install/dev-tools/go-live) บนเครื่อง
