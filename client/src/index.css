@@ -5277,3 +5277,73 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
   body:has(#member-wallet-slip) .receipt-thanks,
   body:has(#printer-test-slip) .receipt-thanks { margin-top: 5px; padding-top: 5px; }
 }
+
+/* ============================================================
+   UI-1 — stock table scroll, reports compact, printer guide disclosure
+   ============================================================ */
+
+/* Issue 1: stock table vertically scrollable on tablet/desktop.
+   The .stock-page wrapper must propagate the flex + min-height chain from
+   .page-content down through .dash-workbench → .dash-tab-body → .table-panel
+   → .table-wrap, so the table body scrolls inside a fixed-height frame
+   (sticky thead already in place via .entity-table th; custom scrollbar
+   already styled via .table-wrap::-webkit-scrollbar). */
+@media (min-width: 561px) {
+  .app-shell:not(.pos-terminal) .page-content > .stock-page {
+    flex: 1 1 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  /* belt-and-suspenders: explicit max-height so the wrap still scrolls even
+     outside the strict flex chain (unusual viewports / embedded contexts) */
+  .stock-page .dash-tab-body .table-panel > .table-wrap,
+  .stock-page .table-panel > .table-wrap {
+    max-height: 65vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+/* Issue 2a: compact report cards + quick-guide + panel/section headings so
+   more data fits above the fold. */
+.report-quick-guide { padding: 5px 10px; margin: 0 0 8px; gap: 6px; }
+.report-quick-guide > div { padding: 1px 8px; }
+.report-quick-guide b { font-size: 10.5px; }
+.report-quick-guide span { font-size: 9.5px; line-height: 1.3; margin-top: 1px; }
+
+.report-cards-dense { gap: 7px; margin-bottom: 8px; }
+.report-cards-dense .report-card { padding: 5px 11px 6px; gap: 1px; }
+.report-cards-dense .report-card > span { font-size: 9px; }
+.report-cards-dense .report-card strong { font-size: 15.5px; margin-top: 1px; }
+.report-cards-dense .report-card-facts { margin-top: 2px; column-gap: 4px; row-gap: 1px; }
+.report-cards-dense .report-card-facts i { font-size: 9px; }
+
+.report-workbench .panel-heading { gap: 10px; }
+.report-workbench .panel-heading h2 { font-size: 13.5px; }
+.report-workbench .panel-heading p { font-size: 10.5px; margin-top: 2px; }
+
+.app-shell:not(.pos-terminal) .page-content:has(.report-workbench) .section-header { margin-bottom: 8px; gap: 10px; }
+.app-shell:not(.pos-terminal) .page-content:has(.report-workbench) .section-header p { font-size: 10.5px; margin-top: 2px; }
+
+/* Issue 2b: flatten + compact filter chips, tighten rows. Selected vs
+   unselected stays obvious (teal fill + white text + bolder weight; staff
+   pills already add a ✓ check pill). */
+.report-view-pills { margin: 8px 0 0; gap: 4px; }
+.report-view-pills button { padding: 4px 11px; font-size: 11px; }
+
+.report-range-row { margin-top: 7px; gap: 8px; }
+.report-range-row .report-period-pills button { padding: 4px 11px; font-size: 11px; }
+.report-range-row .tx-type-pills { gap: 4px; }
+.report-range-row .tx-type-pills button { padding: 4px 11px; font-size: 11px; }
+.report-range-row .report-groupby button { padding: 3px 10px; font-size: 10.5px; }
+
+.report-custom-picker { margin-top: 6px; }
+.report-range-status { margin-top: 6px; padding: 4px 11px; font-size: 11px; }
+
+/* Issue 3: printer flow steps now collapse into a HelpDisclosure so the
+   settings card looks clean by default; user taps to expand the guide. */
+.printer-flow-disclosure { margin-top: 4px; }
+.printer-flow-disclosure .help-disclosure-toggle { border-style: solid; border-color: #cfe4db; background: #f1f9f5; color: #2f6f57; }
+.printer-flow-disclosure .help-disclosure-toggle:hover { background: #e8f4ed; border-color: #9bcdba; }
+.printer-flow-disclosure .help-disclosure-body { background: #fff; border-style: solid; border-color: #d8e8df; padding: 10px 12px; }
