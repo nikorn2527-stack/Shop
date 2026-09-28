@@ -5494,3 +5494,510 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
     grid-template-columns: 1fr;
   }
 }
+
+
+/* ============================================================
+   MAIN V2 — calm operational interface
+   Shared visual language for a hospital welfare-store workflow.
+   Business behavior and data contracts intentionally stay unchanged.
+   ============================================================ */
+.app-v2 {
+  --v2-ink: #172b26;
+  --v2-muted: #68766f;
+  --v2-brand: #087a5b;
+  --v2-brand-strong: #075e48;
+  --v2-brand-soft: #e9f5f0;
+  --v2-canvas: #f4f7f6;
+  --v2-surface: #ffffff;
+  --v2-line: #dfe8e4;
+  --v2-radius: 14px;
+  --v2-shadow:
+    0 1px 2px rgba(18, 45, 36, 0.04), 0 10px 30px rgba(18, 45, 36, 0.055);
+  background: var(--v2-canvas);
+  color: var(--v2-ink);
+}
+.app-v2 .sidebar {
+  width: 252px;
+  flex-basis: 252px;
+  padding: 18px 12px 14px;
+  background: #fbfcfc;
+  border-right: 1px solid var(--v2-line);
+}
+.app-v2 .brand {
+  padding: 0 8px 15px;
+}
+.app-v2 .brand-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+}
+.app-v2 .brand b {
+  color: var(--v2-ink);
+  font-size: 15px;
+}
+.app-v2 .brand small {
+  margin-top: 2px;
+  color: var(--v2-muted);
+  font-size: 11px;
+}
+.app-v2 .role-card {
+  margin: 0 0 18px;
+  padding: 9px 10px;
+  background: #f3f6f5;
+  border: 1px solid var(--v2-line);
+  box-shadow: none;
+}
+.app-v2 .nav-group-label {
+  margin: 5px 0 6px;
+  padding: 0 10px;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: #87938d;
+}
+.app-v2 nav {
+  gap: 4px;
+}
+.app-v2 nav button {
+  min-height: 44px;
+  padding: 0 11px;
+  color: #46544d;
+  border-radius: 10px;
+  font-weight: 500;
+}
+.app-v2 nav button b {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.app-v2 nav button:hover {
+  background: #eef3f1;
+  color: var(--v2-brand-strong);
+}
+.app-v2 nav button.active {
+  color: var(--v2-brand-strong);
+  background: var(--v2-brand-soft);
+  border-color: #c8e3d8;
+  box-shadow: inset 3px 0 0 var(--v2-brand);
+}
+.app-v2 nav button.active b,
+.app-v2 nav button.active svg {
+  color: var(--v2-brand-strong);
+}
+.app-v2 .nav-badge {
+  background: #f3a23b;
+  box-shadow: none;
+}
+.app-v2 nav button.active .nav-badge {
+  color: #fff;
+  background: #d77b16;
+}
+.app-v2 .sidebar-footer {
+  border-top-color: var(--v2-line);
+}
+.app-v2 .sidebar-powered {
+  display: none;
+}
+
+.app-v2 .topbar {
+  height: 64px;
+  padding: 0 28px;
+  background: rgba(255, 255, 255, 0.94);
+  border-bottom-color: var(--v2-line);
+  backdrop-filter: blur(16px);
+}
+.app-v2 .breadcrumb {
+  color: #8a958f;
+}
+.app-v2 .breadcrumb strong {
+  color: var(--v2-ink);
+}
+.app-v2 .global-search {
+  width: min(320px, 30vw);
+  height: 40px;
+  background: #f5f8f7;
+  border-color: var(--v2-line);
+}
+.app-v2 .topbar-actions {
+  gap: 9px;
+}
+.app-v2 .top-icon {
+  border-color: transparent;
+  box-shadow: none;
+}
+.app-v2 .profile-pill {
+  border-color: var(--v2-line);
+  box-shadow: none;
+}
+
+.app-v2 .main-shell {
+  background: var(--v2-canvas);
+}
+.app-v2 .page-content {
+  max-width: 1500px;
+  padding: 24px 30px 20px;
+}
+.app-v2 .section-header {
+  align-items: center;
+  margin-bottom: 18px;
+}
+.app-v2 .section-header h1 {
+  color: var(--v2-ink);
+  font-size: clamp(22px, 1.6vw, 27px);
+  line-height: 1.2;
+  letter-spacing: -0.55px;
+}
+.app-v2 .section-header p {
+  max-width: 760px;
+  color: var(--v2-muted);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+.app-v2 .eyebrow {
+  color: var(--v2-brand);
+  font-family: inherit;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.app-v2 .panel,
+.app-v2 .stock-stat,
+.app-v2 .report-card,
+.app-v2 .member-mini-card,
+.app-v2 .settings-card,
+.app-v2 .log-summary > div {
+  border-color: var(--v2-line);
+  border-radius: var(--v2-radius);
+  box-shadow: var(--v2-shadow);
+}
+.app-v2 .panel {
+  background: var(--v2-surface);
+}
+.app-v2 .panel-heading h2,
+.app-v2 .table-toolbar h2,
+.app-v2 .settings-heading h2 {
+  color: var(--v2-ink);
+  font-size: 15px;
+}
+.app-v2 .panel-heading p,
+.app-v2 .table-toolbar p,
+.app-v2 .settings-heading p {
+  color: var(--v2-muted);
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+.app-v2 .stock-overview,
+.app-v2 .report-cards,
+.app-v2 .log-summary {
+  gap: 12px;
+}
+.app-v2 .stock-stat {
+  min-height: 72px;
+  padding: 13px 15px;
+  background: #fff;
+}
+.app-v2 .stock-stat small {
+  color: var(--v2-muted);
+  font-size: 11.5px;
+}
+.app-v2 .stock-stat strong {
+  color: var(--v2-ink);
+  font-size: 18px;
+}
+.app-v2 .stat-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: 11px;
+}
+
+.app-v2 .primary-button {
+  background: var(--v2-brand);
+  box-shadow: 0 5px 14px rgba(8, 122, 91, 0.16);
+}
+.app-v2 .primary-button:hover {
+  background: var(--v2-brand-strong);
+}
+.app-v2 .outline-button {
+  background: #fff;
+  border-color: #d8e3de;
+  color: #405049;
+}
+.app-v2 .outline-button:hover {
+  border-color: #91c3af;
+  color: var(--v2-brand-strong);
+  background: #f7fbf9;
+}
+.app-v2 .primary-button,
+.app-v2 .outline-button,
+.app-v2 .scan-button {
+  min-height: 40px;
+}
+.app-v2 .search-field {
+  border-color: #dbe5e1;
+  background: #fff;
+}
+.app-v2 .search-field:focus-within {
+  border-color: #7cb79f;
+  box-shadow: 0 0 0 3px rgba(8, 122, 91, 0.1);
+}
+.app-v2 .search-field input {
+  color: var(--v2-ink);
+}
+
+.app-v2 .dash-workbench {
+  background: #fff;
+  border: 1px solid var(--v2-line);
+  border-radius: var(--v2-radius);
+  box-shadow: var(--v2-shadow);
+  overflow: hidden;
+}
+.app-v2 .dash-tabbar {
+  padding: 7px 9px;
+  background: #fbfcfc;
+  border-bottom-color: var(--v2-line);
+}
+.app-v2 .dash-tab {
+  min-height: 38px;
+  border-radius: 9px;
+}
+.app-v2 .dash-tab.active {
+  background: var(--v2-brand-soft);
+  box-shadow: none;
+}
+.app-v2 .dash-tab-body {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.app-v2 .table-panel {
+  padding: 18px;
+}
+.app-v2 .table-wrap {
+  border: 1px solid #e8eeeb;
+  border-radius: 11px;
+}
+.app-v2 table {
+  font-size: 12px;
+}
+.app-v2 th {
+  padding: 11px 12px;
+  color: #617069;
+  background: #f7f9f8;
+  font-size: 11px;
+  font-weight: 700;
+}
+.app-v2 td {
+  padding: 12px;
+  color: #536159;
+}
+.app-v2 tbody tr:hover {
+  background: #f7fbf9;
+}
+.app-v2 .table-filter-summary {
+  color: var(--v2-muted);
+  background: #f8faf9;
+}
+
+/* POS is a focused workspace: quiet rail, products and bill receive equal weight. */
+.app-v2.pos-terminal {
+  background: #eef3f1;
+}
+.app-v2.pos-terminal .sidebar {
+  display: none;
+}
+.app-v2 .pos-rail {
+  width: 82px;
+  flex-basis: 82px;
+  padding: 10px 8px;
+  gap: 6px;
+  background: #123d32;
+  border-right: 0;
+}
+.app-v2 .pos-rail .rail-brand {
+  margin-bottom: 6px;
+}
+.app-v2 .pos-rail .rail-btn {
+  min-height: 53px;
+  padding: 7px 3px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #dce9e4;
+}
+.app-v2 .pos-rail .rail-btn b {
+  color: inherit;
+  font-size: 10.5px;
+}
+.app-v2 .pos-rail .rail-btn kbd {
+  top: 3px;
+  right: 3px;
+  opacity: 0.72;
+}
+.app-v2 .pos-rail .rail-btn:hover,
+.app-v2 .pos-rail .rail-btn.active {
+  background: rgba(255, 255, 255, 0.13);
+  border-color: transparent;
+  color: #fff;
+}
+.app-v2.pos-terminal .topbar {
+  height: 58px;
+}
+.app-v2.pos-terminal .page-content {
+  padding: 18px 20px 14px;
+}
+.app-v2 .pos-layout {
+  grid-template-columns: minmax(0, 1.45fr) minmax(330px, 0.72fr);
+  gap: 14px;
+}
+.app-v2 .product-panel,
+.app-v2 .cart-panel {
+  border-radius: 16px;
+  border-color: var(--v2-line);
+  box-shadow: var(--v2-shadow);
+}
+.app-v2 .product-card {
+  border-color: #dfe9e5;
+  border-radius: 12px;
+  box-shadow: none;
+}
+.app-v2 .product-card:hover {
+  border-color: #75b69c;
+  box-shadow: 0 8px 20px rgba(28, 77, 60, 0.1);
+}
+.app-v2 .pay-button {
+  min-height: 44px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+.app-v2 .pay-split button {
+  min-height: 42px;
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+/* Reports and settings: clearer hierarchy, fewer decorative layers. */
+.app-v2 .report-quick-guide {
+  border-color: var(--v2-line);
+  background: #f8faf9;
+}
+.app-v2 .report-cards-dense .report-card {
+  min-height: 76px;
+  padding: 12px 14px;
+}
+.app-v2 .report-cards-dense .report-card > span {
+  font-size: 11px;
+}
+.app-v2 .report-cards-dense .report-card strong {
+  color: var(--v2-ink);
+  font-size: 18px;
+}
+.app-v2 .settings-layout {
+  gap: 14px;
+}
+.app-v2 .settings-group-tabs {
+  gap: 10px;
+}
+.app-v2 .settings-card {
+  padding: 20px;
+}
+.app-v2 .settings-save-bar {
+  border-color: #b8d9cc;
+  box-shadow: 0 -8px 28px rgba(18, 45, 36, 0.1);
+}
+.app-v2 .log-summary > div {
+  min-height: 70px;
+  padding: 13px 16px;
+}
+.app-v2 .log-summary strong {
+  color: var(--v2-ink);
+  font-size: 18px;
+}
+.app-v2 .app-footer {
+  min-height: 34px;
+  padding: 8px 30px;
+  border-top: 1px solid var(--v2-line);
+  background: rgba(255, 255, 255, 0.8);
+}
+
+@media (max-width: 1120px) {
+  .app-v2 .sidebar {
+    width: 224px;
+    flex-basis: 224px;
+  }
+  .app-v2 .page-content {
+    padding-inline: 22px;
+  }
+  .app-v2 .stock-overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .app-v2 .pos-layout {
+    grid-template-columns: minmax(0, 1fr) 340px;
+  }
+}
+@media (max-width: 820px) {
+  .app-v2 .sidebar {
+    width: min(300px, 88vw);
+  }
+  .app-v2 .topbar {
+    padding-inline: 16px;
+  }
+  .app-v2 .global-search {
+    width: 42px;
+  }
+  .app-v2 .global-search span,
+  .app-v2 .global-search kbd {
+    display: none;
+  }
+  .app-v2 .page-content {
+    padding: 18px 16px;
+  }
+  .app-v2 .section-header {
+    align-items: flex-start;
+  }
+  .app-v2 .report-cards,
+  .app-v2 .log-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 560px) {
+  .app-v2 .topbar {
+    height: 58px;
+  }
+  .app-v2 .profile-pill > div {
+    display: none;
+  }
+  .app-v2 .profile-pill {
+    padding-right: 4px;
+  }
+  .app-v2 .section-header {
+    flex-direction: column;
+    gap: 12px;
+  }
+  .app-v2 .section-header > :last-child {
+    width: 100%;
+  }
+  .app-v2 .stock-overview,
+  .app-v2 .report-cards,
+  .app-v2 .log-summary {
+    grid-template-columns: 1fr;
+  }
+  .app-v2 .toolbar-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .app-v2 .toolbar-actions .search-field {
+    flex: 1 1 100%;
+  }
+  .app-v2 .pos-rail {
+    display: none;
+  }
+  .app-v2.pos-terminal .page-content {
+    padding: 14px 12px 120px;
+  }
+  .app-v2 .pos-layout {
+    grid-template-columns: 1fr;
+  }
+  .app-v2 .app-footer {
+    display: none;
+  }
+}

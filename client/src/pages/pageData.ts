@@ -141,9 +141,9 @@ export function formatMemberNumber(mode: "running" | "year" | "manual", sequence
 export const navItems: { id: View; label: string; caption: string; icon: LucideIcon }[] = [
   { id: "dashboard", label: "ภาพรวม", caption: "สรุปการดำเนินงาน", icon: LayoutDashboard },
   { id: "pos", label: "หน้าร้าน / POS", caption: "ขายสินค้าและรับชำระ", icon: ShoppingCart },
-  { id: "stock", label: "สต็อกสินค้า", caption: "รับเข้าและนับสต็อก", icon: PackageSearch },
+  { id: "stock", label: "สินค้าและสต็อก", caption: "สินค้า รับเข้า และตรวจนับ", icon: PackageSearch },
   { id: "members", label: "สมาชิกและบัญชี", caption: "สมาชิกและเจ้าหน้าที่", icon: UsersRound },
-  { id: "reports", label: "รายงาน", caption: "วิเคราะห์และส่งออก", icon: BarChart3 },
+  { id: "reports", label: "รายงานและวิเคราะห์", caption: "ติดตามผลและส่งออกข้อมูล", icon: BarChart3 },
 ];
 
 // NOTE (OLD-2-b): mock exports `products` + `stockRows` were DELETED — Pos.tsx and
