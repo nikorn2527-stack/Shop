@@ -132,9 +132,12 @@ function isAdminCtx(ctx: TrpcContext, input: { actorRole?: string }) {
 }
 
 /** ROUND 56 (user) — ประตูโซนผู้พัฒนา (เครื่องมือติดตั้งระบบ): บัญชีที่เป็น dev เท่านั้น
- *  ใช้บทบาทจากเซสชันฝั่งเซิร์ฟเวอร์ (appRole จากฐานข้อมูล) ไม่เชื่อค่าที่ client ส่งมา */
+ *  ใช้บทบาทจากเซสชันฝั่งเซิร์ฟเวอร์ (appRole จากฐานข้อมูล) ไม่เชื่อค่าที่ client ส่งมา
+ *  หลัง RBAC migration: role 'dev' เดิม → 'administrator' (appRole='administrator')
+ *  dev accounts ที่สร้างหลัง RBAC อาจมี appRole='dev' โดยตรง */
 function isDevCtx(ctx: TrpcContext) {
-  return Boolean(ctx.user && ctx.user.role === "admin" && ctx.user.appRole === "dev");
+  if (!ctx.user || ctx.user.role !== "admin") return false;
+  return ctx.user.appRole === "dev" || ctx.user.appRole === "administrator";
 }
 
 /** ROUND 40 (ข้อ 32) — แปลง mapping ที่ client ส่ง (อาจมี -1 = ไม่นำเข้า) ให้เป็น undefined ตาม contract ของ importTool */

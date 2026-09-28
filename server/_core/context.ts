@@ -1,7 +1,7 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import { COOKIE_NAME } from "@shared/const";
 import type { User } from "../../drizzle/schema";
-import { authenticateAppSession } from "../sqliteStore";
+import { authenticateAppSession, isAdminRole } from "../sqliteStore";
 import { getWelfareDb } from "../welfareStore";
 import { sdk } from "./sdk";
 
@@ -30,7 +30,7 @@ function toDrizzleUser(user: {
   id: number;
   username: string;
   displayName: string;
-  role: "staff" | "admin" | "dev";
+  role: string;
   mustChangePassword?: number | boolean;
   createdAt: string;
 }): User {
@@ -43,8 +43,9 @@ function toDrizzleUser(user: {
     name: user.displayName,
     email: null,
     loginMethod: "local",
-    // dev accounts get admin-level access; appRole keeps the real identity.
-    role: user.role === "admin" || user.role === "dev" ? "admin" : "user",
+    // RBAC: admin-level roles (administrator/manager/admin/dev) get "admin" in ctx.user.role
+    // so isAdminCtx() passes. appRole keeps the real DB role for finer checks.
+    role: isAdminRole(user.role) ? "admin" : "user",
     appRole: user.role,
     mustChangePassword: Boolean(user.mustChangePassword),
     createdAt,
