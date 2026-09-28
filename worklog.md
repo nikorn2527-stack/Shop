@@ -153,3 +153,29 @@ Stage Summary:
 - ไม่แตะ tRPC contract หรือ backend auth logic; ไม่เปลื่ยน type ของ `memberNumberMode`; เป็น CSS + JSX เท่านั้น
 - `pnpm run check` ผ่าน 0 errors, dev server HTTP 200 ผ่าน
 - commit hash: `bda0900` บน origin/main-v2 — รอเจ้าของงาน pull ไปเทส UI บนเครื่อง
+
+---
+Task ID: UI-5
+Agent: main (orchestrator)
+Task: ปรับ panel เลขสมาชิกให้เป็น preset-first + collapsible advanced (หลังเจ้าของบอกทั้ง panel "ห่วย")
+
+Work Log:
+- เจ้าของบอก: ไม่ใช่แค่ toggle แต่ทั้ง panel ที่มี 7+ ฟิลด์ (คำนำหน้า, หลักเลขรัน, รูปแบบปี, หลักปี, ตัวคั่น, เดือนเริ่มรอบ, สำเร็จรูป) + คำอธิบายยาว = ดูเหมือนฟอร์ม Excel
+- ออกแบบใหม่: preset-first + collapsible advanced
+  - default view: sliding segmented control (UI-4) + BIG preview card (28px monospace)
+  - manual demo input ยังอยู่ inline (เมื่อเลือก manual)
+  - 7 ฟิลด์ขั้นสูงทั้งหมด ซ่อนใน disclosure "แสดงตัวเลือกขั้นสูง" (default พับ)
+  - ลบ paragraph อธิบายยาวออก (พรีวิวตัวเลขสดๆ แสดงผลอยู่แล้ว)
+- เพิ่ม state `memberAdvancedOpen` ใกล้ `manualDemoNumber`
+- แก้ JSX: แทรก preview card + toggle + advanced-wrap (ห่อ format-grid + presets)
+- ลบ duplicate member-manual-demo + settings-inline-note + number-preview ที่เดิมอยู่ท้าย
+- เพิ่ม CSS: .member-preview-card, .member-advanced-toggle, .member-advanced-wrap (2-col grid desktop / 1-col mobile)
+- `pnpm run check` ผ่าน 0 errors
+- server boot HTTP 200
+- commit `e04add1` push ขึ้น origin/main-v2 สำเร็จ
+
+Stage Summary:
+- Panel เลขสมาชิกสะอาด default — เห็นเเค่ toggle + preview ตัวเลขใหญ่
+- ฟิลด์ขั้นสูงทั้ง 7 ซ่อนใน collapsible (กด "แสดงตัวเลือกขั้นสูง" ขยายออก)
+- ลบคำอธิบายยาว ใช้พรีวิวตัวเลขเป็นตัวบอกผลแทน
+- ฟังก์ชันเดิมครบ: field bindings ไม่เปลี่ยน, memberNumberMode type ไม่เปลี่ยน, tRPC API ไม่เปลี่ยน
