@@ -386,7 +386,26 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
       id TEXT PRIMARY KEY,
       user_id INTEGER NOT NULL REFERENCES app_users(id) ON DELETE CASCADE,
       expires_at TEXT NOT NULL,
-      created_at TEXT NOT NULL
+      created_at TEXT NOT NULL,
+      last_seen_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS roles (
+      name TEXT PRIMARY KEY,
+      label TEXT NOT NULL,
+      description TEXT,
+      is_system INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS permissions (
+      key TEXT PRIMARY KEY,
+      group_name TEXT NOT NULL,
+      description TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS role_permissions (
+      role_name TEXT NOT NULL REFERENCES roles(name) ON DELETE CASCADE,
+      permission_key TEXT NOT NULL REFERENCES permissions(key) ON DELETE CASCADE,
+      PRIMARY KEY (role_name, permission_key)
     );
     CREATE TABLE IF NOT EXISTS order_list_items (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -448,6 +467,9 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
     ORDER BY a.id DESC LIMIT 1
   ) WHERE actor IS NULL AND type IN ('deposit', 'withdrawal')`).run();
   ensureColumn(db, "app_users", "locked_until", "TEXT");
+  // Session security — idle timeout tracking
+  ensureColumn(db, "app_sessions", "last_seen_at", "TEXT");
+  db.prepare("UPDATE app_sessions SET last_seen_at = created_at WHERE last_seen_at IS NULL").run();
   // ROUND 63 (user) — หลักฐานการชำระเงิน: รูปสลิปที่แนบมากับบิลขาย (QR/สแกน) และ
   // รายการเติม/ถอนเงินสมาชิก เก็บเป็น data-URL JPEG (ย่อ ~800px ฝั่ง client ก่อนส่ง)
   ensureColumn(db, "sales", "slip_url", "TEXT");
@@ -464,6 +486,8 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
   db.prepare("UPDATE stock_lots SET received_qty = qty WHERE received_qty IS NULL").run();
   // Backfill units for sale_items rows written before the column existed (idempotent).
   db.prepare("UPDATE sale_items SET unit = (SELECT p.unit FROM products p WHERE p.id = sale_items.product_id) WHERE unit IS NULL").run();
+  // RBAC — seed roles + permissions (idempotent)
+  ensureRbacSeed(db);
   return db;
 }
 
@@ -2888,6 +2912,138 @@ export function setEditionSettings(db: SqliteDb, patch: Partial<Pick<StoreSettin
 /** Login account role for the welfare store app itself (local session auth). */
 export type AppUserRole = "staff" | "admin" | "dev";
 
+// ============================================================================
+// RBAC — Role-Based Access Control with granular permissions
+// ============================================================================
+
+export type PermissionKey =
+  | "POS.SELL" | "POS.VOID" | "POS.REFUND" | "POS.DISCOUNT" | "POS.SPECIAL"
+  | "STOCK.VIEW" | "STOCK.RECEIVE" | "STOCK.ADJUST" | "STOCK.COUNT" | "STOCK.TRANSFER"
+  | "REPORT.SALES" | "REPORT.PROFIT" | "REPORT.INVENTORY" | "REPORT.AUDIT" | "REPORT.ADVANCED"
+  | "MEMBER.VIEW" | "MEMBER.EDIT" | "MEMBER.WALLET" | "MEMBER.DELETE" | "MEMBER.LIMIT_APPROVE"
+  | "SYSTEM.USER_MANAGE" | "SYSTEM.ROLE_MANAGE" | "SYSTEM.BACKUP" | "SYSTEM.RESTORE"
+  | "SYSTEM.SETTING" | "SYSTEM.LICENSE" | "SYSTEM.UPDATE" | "SYSTEM.SESSION_REVOKE";
+
+export const PERMISSION_CATALOG: { key: PermissionKey; group: string; description: string }[] = [
+  { key: "POS.SELL", group: "POS", description: "ขายสินค้าและรับชำระ" },
+  { key: "POS.VOID", group: "POS", description: "ยกเลิกบิล" },
+  { key: "POS.REFUND", group: "POS", description: "คืนเงิน / คืนบัตรเงินสด" },
+  { key: "POS.DISCOUNT", group: "POS", description: "ให้ส่วนลดบิล" },
+  { key: "POS.SPECIAL", group: "POS", description: "เปิดรายการพิเศษ" },
+  { key: "STOCK.VIEW", group: "STOCK", description: "ดูสต็อก" },
+  { key: "STOCK.RECEIVE", group: "STOCK", description: "รับสินค้าเข้า" },
+  { key: "STOCK.ADJUST", group: "STOCK", description: "ปรับยอดสต็อก" },
+  { key: "STOCK.COUNT", group: "STOCK", description: "นับสต็อก" },
+  { key: "STOCK.TRANSFER", group: "STOCK", description: "โอนสินค้าระหว่างคลัง" },
+  { key: "REPORT.SALES", group: "REPORT", description: "ดูรายงานยอดขาย" },
+  { key: "REPORT.PROFIT", group: "REPORT", description: "ดูรายงานกำไร/ต้นทุน" },
+  { key: "REPORT.INVENTORY", group: "REPORT", description: "ดูรายงานสินค้าคงคลัง" },
+  { key: "REPORT.AUDIT", group: "REPORT", description: "ดู audit log" },
+  { key: "REPORT.ADVANCED", group: "REPORT", description: "รายงานขั้นสูง" },
+  { key: "MEMBER.VIEW", group: "MEMBER", description: "ดูข้อมูลสมาชิก" },
+  { key: "MEMBER.EDIT", group: "MEMBER", description: "แก้ข้อมูลสมาชิก" },
+  { key: "MEMBER.WALLET", group: "MEMBER", description: "เติม/ถอนเงินสมาชิก" },
+  { key: "MEMBER.DELETE", group: "MEMBER", description: "ลบสมาชิก" },
+  { key: "MEMBER.LIMIT_APPROVE", group: "MEMBER", description: "พิจารณาคำขอลดวงเงินสมาชิก" },
+  { key: "SYSTEM.USER_MANAGE", group: "SYSTEM", description: "จัดการบัญชีผู้ใช้" },
+  { key: "SYSTEM.ROLE_MANAGE", group: "SYSTEM", description: "จัดการ Role/Permission" },
+  { key: "SYSTEM.BACKUP", group: "SYSTEM", description: "สำรองข้อมูล" },
+  { key: "SYSTEM.RESTORE", group: "SYSTEM", description: "กู้คืนข้อมูล" },
+  { key: "SYSTEM.SETTING", group: "SYSTEM", description: "ตั้งค่าระบบ" },
+  { key: "SYSTEM.LICENSE", group: "SYSTEM", description: "จัดการลิขสิทธิ์" },
+  { key: "SYSTEM.UPDATE", group: "SYSTEM", description: "อัปเดตระบบ" },
+  { key: "SYSTEM.SESSION_REVOKE", group: "SYSTEM", description: "ยกเลิก session" },
+];
+
+interface RoleDef {
+  name: string;
+  label: string;
+  description: string;
+  isSystem: boolean;
+  permissions: PermissionKey[];
+}
+
+export const SYSTEM_ROLES: RoleDef[] = [
+  {
+    name: "cashier", label: "พนักงานขายหน้าร้าน",
+    description: "เจ้าหน้าที่หน้า POS — ขาย พักบิล รับเงิน",
+    isSystem: true,
+    permissions: ["POS.SELL", "POS.DISCOUNT", "POS.SPECIAL", "STOCK.VIEW", "REPORT.SALES", "MEMBER.VIEW", "MEMBER.WALLET"],
+  },
+  {
+    name: "stock_officer", label: "เจ้าหน้าที่คลังสินค้า",
+    description: "ดูแลรับเข้า ปรับยอด นับสต็อก",
+    isSystem: true,
+    permissions: ["STOCK.VIEW", "STOCK.RECEIVE", "STOCK.ADJUST", "STOCK.COUNT", "REPORT.INVENTORY", "MEMBER.VIEW"],
+  },
+  {
+    name: "supervisor", label: "หัวหน้างาน",
+    description: "ดูแลหน้าร้าน + อนุมัติการเงินสำคัญ",
+    isSystem: true,
+    permissions: ["POS.SELL", "POS.VOID", "POS.REFUND", "POS.DISCOUNT", "POS.SPECIAL", "STOCK.VIEW", "STOCK.RECEIVE", "STOCK.ADJUST", "STOCK.COUNT", "REPORT.SALES", "REPORT.INVENTORY", "MEMBER.VIEW", "MEMBER.EDIT", "MEMBER.WALLET", "MEMBER.LIMIT_APPROVE"],
+  },
+  {
+    name: "manager", label: "ผู้จัดการ",
+    description: "ดูรายงานครบ + อนุมัติคำขอลดวงเงิน + จัดการผู้ใช้บางส่วน",
+    isSystem: true,
+    permissions: ["POS.SELL", "POS.VOID", "POS.REFUND", "POS.DISCOUNT", "POS.SPECIAL", "STOCK.VIEW", "STOCK.RECEIVE", "STOCK.ADJUST", "STOCK.COUNT", "STOCK.TRANSFER", "REPORT.SALES", "REPORT.PROFIT", "REPORT.INVENTORY", "REPORT.AUDIT", "MEMBER.VIEW", "MEMBER.EDIT", "MEMBER.WALLET", "MEMBER.DELETE", "MEMBER.LIMIT_APPROVE", "SYSTEM.USER_MANAGE", "SYSTEM.BACKUP"],
+  },
+  {
+    name: "auditor", label: "ผู้ตรวจสอบ",
+    description: "ดู audit log + รายงาน + ประวัติ แต่ไม่แก้ไข",
+    isSystem: true,
+    permissions: ["STOCK.VIEW", "REPORT.SALES", "REPORT.PROFIT", "REPORT.INVENTORY", "REPORT.AUDIT", "MEMBER.VIEW"],
+  },
+  {
+    name: "administrator", label: "ผู้ดูแลระบบ",
+    description: "สิทธิ์เต็ม — ตั้งค่า ลิขสิทธิ์ สำรองข้อมูล อัปเดตระบบ",
+    isSystem: true,
+    permissions: PERMISSION_CATALOG.map(p => p.key),
+  },
+];
+
+/** Seed roles + permissions into the DB (idempotent). */
+export function ensureRbacSeed(db: SqliteDb): void {
+  // Insert all permissions
+  for (const p of PERMISSION_CATALOG) {
+    db.prepare(`INSERT OR IGNORE INTO permissions (key, group_name, description) VALUES (?, ?, ?)`).run(p.key, p.group, p.description);
+  }
+  // Insert roles + role_permissions
+  for (const role of SYSTEM_ROLES) {
+    db.prepare(`INSERT OR IGNORE INTO roles (name, label, description, is_system) VALUES (?, ?, ?, ?)`).run(role.name, role.label, role.description, role.isSystem ? 1 : 0);
+    for (const perm of role.permissions) {
+      db.prepare(`INSERT OR IGNORE INTO role_permissions (role_name, permission_key) VALUES (?, ?)`).run(role.name, perm);
+    }
+  }
+  // Migrate existing users: staff → cashier, admin → administrator, dev → administrator
+  db.prepare(`UPDATE app_users SET role = 'cashier' WHERE role = 'staff'`).run();
+  db.prepare(`UPDATE app_users SET role = 'administrator' WHERE role IN ('admin', 'dev')`).run();
+}
+
+/** Get all permissions for a user's role. */
+export function getUserPermissions(db: SqliteDb, role: string): Set<string> {
+  const rows = db.prepare(`SELECT permission_key FROM role_permissions WHERE role_name = ?`).all(role) as { permission_key: string }[];
+  return new Set(rows.map(r => r.permission_key));
+}
+
+/** Check if a role has a specific permission. */
+export function hasPermission(db: SqliteDb, role: string, permission: PermissionKey): boolean {
+  const row = db.prepare(`SELECT 1 FROM role_permissions WHERE role_name = ? AND permission_key = ?`).get(role, permission);
+  return Boolean(row);
+}
+
+// Backward compat: map old roles to new for existing code
+export function roleToPermissions(role: string): string[] {
+  const found = SYSTEM_ROLES.find(r => r.name === role || (role === "staff" && r.name === "cashier") || ((role === "admin" || role === "dev") && r.name === "administrator"));
+  return found ? found.permissions : SYSTEM_ROLES[0].permissions;
+}
+
+export function isAdminRole(role: string): boolean {
+  return role === "administrator" || role === "manager" || role === "admin" || role === "dev";
+}
+
+
+
 /** Thai display label for an app user role (audit log actorRole / UI badges). */
 export function appRoleThai(role: AppUserRole): string {
   return role === "admin" ? "ผู้บริหาร" : role === "dev" ? "ผู้พัฒนา" : "เจ้าหน้าที่";
@@ -3047,7 +3203,7 @@ export function createAppSession(db: SqliteDb, userId: number): { sessionId: str
   const sessionId = randomUUID();
   const expiresAt = formatDateTime(addDays(now, APP_SESSION_TTL_DAYS));
   db.prepare(`DELETE FROM app_sessions WHERE expires_at < ?`).run(formatDateTime(now));
-  db.prepare(`INSERT INTO app_sessions (id, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)`).run(sessionId, userId, expiresAt, formatDateTime(now));
+  db.prepare(`INSERT INTO app_sessions (id, user_id, expires_at, created_at, last_seen_at) VALUES (?, ?, ?, ?, ?)`).run(sessionId, userId, expiresAt, formatDateTime(now), formatDateTime(now));
   return { sessionId, expiresAt };
 }
 

@@ -43,3 +43,28 @@ export const adminProcedure = t.procedure.use(
     });
   }),
 );
+
+
+import type { PermissionKey } from "../sqliteStore";
+import { hasPermission } from "../sqliteStore";
+import { getWelfareDb } from "../welfareStore";
+
+/** Permission middleware — requires the user's role to have the specified permission. */
+export function requirePermission(permission: PermissionKey) {
+  return t.middleware(async opts => {
+    const { ctx, next } = opts;
+    if (!ctx.user) {
+      throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
+    }
+    const db = getWelfareDb();
+    if (!hasPermission(db, ctx.user.role, permission)) {
+      throw new TRPCError({ code: "FORBIDDEN", message: `คุณไม่มีสิทธิ์ "${permission}" (10002)` });
+    }
+    return next({ ctx: { ...ctx, user: ctx.user } });
+  });
+}
+
+/** Helper: create a procedure that requires a specific permission. */
+export function permissionProcedure(permission: PermissionKey) {
+  return t.procedure.use(requirePermission(permission));
+}
