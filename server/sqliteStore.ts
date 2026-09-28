@@ -349,6 +349,47 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
       price REAL NOT NULL,
       cost REAL NOT NULL DEFAULT 0
     );
+    CREATE TABLE IF NOT EXISTS stock_movements (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+      type TEXT NOT NULL CHECK (type IN ('RECEIVE', 'SALE', 'ADJUST', 'TRANSFER', 'RETURN', 'VOID', 'COUNT')),
+      qty_delta INTEGER NOT NULL,
+      unit_cost REAL NOT NULL DEFAULT 0,
+      ref_type TEXT,
+      ref_id INTEGER,
+      reason TEXT,
+      actor TEXT,
+      actor_role TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS cashier_shifts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      cashier_name TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),
+      opening_cash REAL NOT NULL DEFAULT 0,
+      expected_cash REAL NOT NULL DEFAULT 0,
+      counted_cash REAL,
+      cash_difference REAL,
+      expected_qr REAL NOT NULL DEFAULT 0,
+      expected_wallet REAL NOT NULL DEFAULT 0,
+      bills_count INTEGER NOT NULL DEFAULT 0,
+      pieces INTEGER NOT NULL DEFAULT 0,
+      sales_total REAL NOT NULL DEFAULT 0,
+      note TEXT,
+      opened_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      closed_at TEXT
+    );
+    CREATE TABLE IF NOT EXISTS refunds (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      sale_id INTEGER NOT NULL REFERENCES sales(id) ON DELETE CASCADE,
+      amount REAL NOT NULL,
+      reason TEXT NOT NULL,
+      method TEXT,
+      actor TEXT,
+      approver TEXT,
+      status TEXT NOT NULL DEFAULT 'completed' CHECK (status IN ('pending', 'approved', 'rejected', 'completed')),
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
     CREATE TABLE IF NOT EXISTS day_closures (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       period_start TEXT NOT NULL,
@@ -473,6 +514,10 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
   // ROUND 63 (user) — หลักฐานการชำระเงิน: รูปสลิปที่แนบมากับบิลขาย (QR/สแกน) และ
   // รายการเติม/ถอนเงินสมาชิก เก็บเป็น data-URL JPEG (ย่อ ~800px ฝั่ง client ก่อนส่ง)
   ensureColumn(db, "sales", "slip_url", "TEXT");
+  ensureColumn(db, "sales", "voided", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "sales", "void_reason", "TEXT");
+  ensureColumn(db, "sales", "void_actor", "TEXT");
+  ensureColumn(db, "sales", "voided_at", "TEXT");
   ensureColumn(db, "member_transactions", "slip_url", "TEXT");
   // ROUND 65 (user) — รหัสบัตรเงินสด (23951…) และรหัสผู้ป่วย (HN) ของสมาชิกร้านค้าสวัสดิการ
   ensureColumn(db, "members", "card_number", "TEXT");
@@ -848,6 +893,7 @@ export function receiveStockLines(
       return { id: Number(result.lastInsertRowid), productId: input.productId, lot: lotLabel, expiry: input.expiryDate || null, qty: line.qty, cost: line.cost ?? previousCost, receivedAt: createdAt };
     });
     db.prepare(`UPDATE products SET stock = stock + ?, cost = ? WHERE id = ?`).run(totalQty, averageCost, input.productId);
+  recordMovement(db, { type: 'RECEIVE', productId: input.productId, qtyDelta: totalQty, unitCost: averageCost, refType: 'receive', reason: `รับเข้า Lot ${input.lot || ''}`, actor: input.actor?.trim() || undefined, actorRole: input.actorRole ?? undefined });
     // Log: บรรทัดเดียวไม่ใส่ต้นทุน = ข้อความเดิม · มีต้นทุน/หลายบรรทัด = สรุปทุกบรรทัด + ต้นทุนเฉลี่ยใหม่
     const anyCost = parsed.some((line) => line.cost !== undefined);
     const lineSummary = anyCost ? ` · ${parsed.map((line) => `${line.qty}×${money(line.cost ?? previousCost)}${line.cost === 0 ? " แถม" : ""}`).join(" + ")}` : "";
@@ -917,6 +963,7 @@ export function stockCount(db: SqliteDb, input: StockCountInput) {
   const tone = diff < 0 ? "red" : diff > 0 ? "green" : "blue";
   runInTransaction(db, () => {
     db.prepare(`UPDATE products SET stock = ? WHERE id = ?`).run(input.countedQty, input.productId);
+    recordMovement(db, { type: 'COUNT', productId: input.productId, qtyDelta: diff, unitCost: product.cost, refType: 'count', reason: `นับสต็อก: ระบบ ${product.stock} → นับ ${input.countedQty}`, actor: input.actor?.trim() || undefined, actorRole: input.actorRole ?? undefined });
     logAction(db, "นับสต็อก", input.actor?.trim() || "เจ้าหน้าที่ร้านค้า", detail, tone, input.actorRole ?? null, formatDateTime());
   });
   return {
@@ -1558,6 +1605,7 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
       insertItem.run(saleId, item.productId, item.name, item.qty, item.price, item.cost, item.unit);
       if (item.productId == null) continue; // รายการพิเศษ — no product/stock row behind it
       updateStock.run(item.qty, item.productId);
+        recordMovement(db, { type: 'SALE', productId: item.productId, qtyDelta: -item.qty, unitCost: item.cost, refType: 'sale', refId: saleId, reason: `บิล ${orderNumber}`, actor: input.cashier?.trim() || undefined, actorRole: input.actorRole ?? undefined });
       const shortfall = deductLotsFifo(db, item.productId, item.qty);
       if (shortfall > 0) lotShortfalls.push({ name: item.name, unit: item.unit, qty: shortfall });
     }
@@ -3031,6 +3079,165 @@ export function hasPermission(db: SqliteDb, role: string, permission: Permission
   const row = db.prepare(`SELECT 1 FROM role_permissions WHERE role_name = ? AND permission_key = ?`).get(role, permission);
   return Boolean(row);
 }
+
+
+// ============================================================================
+// Stock Movement Ledger — central truth of every stock change
+// ============================================================================
+
+export type StockMovementType = 'RECEIVE' | 'SALE' | 'ADJUST' | 'TRANSFER' | 'RETURN' | 'VOID' | 'COUNT';
+
+export interface StockMovementInput {
+  type: StockMovementType;
+  productId: number;
+  qtyDelta: number; // signed: +in / -out
+  unitCost?: number;
+  refType?: string;
+  refId?: number;
+  reason?: string;
+  actor?: string;
+  actorRole?: string;
+}
+
+/** Record a stock movement in the ledger (does NOT update products.stock — caller must do that). */
+export function recordMovement(db: SqliteDb, input: StockMovementInput): void {
+  db.prepare(`INSERT INTO stock_movements (product_id, type, qty_delta, unit_cost, ref_type, ref_id, reason, actor, actor_role, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    input.productId,
+    input.type,
+    Math.trunc(input.qtyDelta),
+    round2(input.unitCost ?? 0),
+    input.refType ?? null,
+    input.refId ?? null,
+    input.reason ?? null,
+    input.actor ?? null,
+    input.actorRole ?? null,
+    formatDateTime(),
+  );
+}
+
+/** Stock Card — query stock movements for a product within a date range. */
+export function stockCard(db: SqliteDb, productId: number, from?: string, to?: string): { id: number; type: string; qtyDelta: number; unitCost: number; reason: string | null; actor: string | null; createdAt: string }[] {
+  let sql = `SELECT id, type, qty_delta AS qtyDelta, ROUND(unit_cost, 2) AS unitCost, reason, actor, created_at AS createdAt FROM stock_movements WHERE product_id = ?`;
+  const params: (string | number)[] = [productId];
+  if (from) { sql += ` AND created_at >= ?`; params.push(from); }
+  if (to) { sql += ` AND created_at <= ?`; params.push(to); }
+  sql += ` ORDER BY created_at ASC`;
+  return db.prepare(sql).all(...params) as { id: number; type: string; qtyDelta: number; unitCost: number; reason: string | null; actor: string | null; createdAt: string }[];
+}
+
+// ============================================================================
+// Cashier Shift — open/close + cash count
+// ============================================================================
+
+export interface CashierShift {
+  id: number;
+  cashierName: string;
+  status: string;
+  openingCash: number;
+  expectedCash: number;
+  countedCash: number | null;
+  cashDifference: number | null;
+  expectedQr: number;
+  expectedWallet: number;
+  billsCount: number;
+  pieces: number;
+  salesTotal: number;
+  note: string | null;
+  openedAt: string;
+  closedAt: string | null;
+}
+
+export function openShift(db: SqliteDb, input: { cashierName: string; openingCash: number; note?: string }): CashierShift {
+  const existing = db.prepare(`SELECT id FROM cashier_shifts WHERE cashier_name = ? AND status = 'open'`).get(input.cashierName);
+  if (existing) throw new StoreError("คุณมีกะที่เปิดอยู่แล้ว · ปิดกะปัจจุบันก่อนเปิดใหม่");
+  const result = db.prepare(`INSERT INTO cashier_shifts (cashier_name, status, opening_cash, expected_cash, note, opened_at) VALUES (?, 'open', ?, ?, ?, ?)`).run(
+    input.cashierName, round2(input.openingCash), round2(input.openingCash), input.note ?? null, formatDateTime()
+  );
+  return getShiftById(db, Number(result.lastInsertRowid))!;
+}
+
+export function closeShift(db: SqliteDb, input: { shiftId: number; countedCash: number; note?: string }): CashierShift {
+  const shift = getShiftById(db, input.shiftId);
+  if (!shift) throw new StoreError("ไม่พบกะที่ระบุ");
+  if (shift.status !== 'open') throw new StoreError("กะนี้ถูกปิดไปแล้ว");
+  const expectedCash = round2(shift.openingCash + shift.expectedCash - shift.openingCash);
+  const cashDifference = round2(input.countedCash - shift.expectedCash);
+  db.prepare(`UPDATE cashier_shifts SET status = 'closed', counted_cash = ?, cash_difference = ?, note = ?, closed_at = ? WHERE id = ?`).run(
+    round2(input.countedCash), cashDifference, input.note ?? shift.note, formatDateTime(), input.shiftId
+  );
+  return getShiftById(db, input.shiftId)!;
+}
+
+export function getShiftById(db: SqliteDb, id: number): CashierShift | undefined {
+  const row = db.prepare(`SELECT id, cashier_name AS cashierName, status, ROUND(opening_cash, 2) AS openingCash, ROUND(expected_cash, 2) AS expectedCash, ROUND(counted_cash, 2) AS countedCash, ROUND(cash_difference, 2) AS cashDifference, ROUND(expected_qr, 2) AS expectedQr, ROUND(expected_wallet, 2) AS expectedWallet, bills_count AS billsCount, pieces, ROUND(sales_total, 2) AS salesTotal, note, opened_at AS openedAt, closed_at AS closedAt FROM cashier_shifts WHERE id = ?`).get(id) as CashierShift | undefined;
+  return row;
+}
+
+export function listShifts(db: SqliteDb, status?: string): CashierShift[] {
+  const sql = status
+    ? `SELECT id, cashier_name AS cashierName, status, ROUND(opening_cash, 2) AS openingCash, ROUND(expected_cash, 2) AS expectedCash, ROUND(counted_cash, 2) AS countedCash, ROUND(cash_difference, 2) AS cashDifference, ROUND(expected_qr, 2) AS expectedQr, ROUND(expected_wallet, 2) AS expectedWallet, bills_count AS billsCount, pieces, ROUND(sales_total, 2) AS salesTotal, note, opened_at AS openedAt, closed_at AS closedAt FROM cashier_shifts WHERE status = ? ORDER BY opened_at DESC`
+    : `SELECT id, cashier_name AS cashierName, status, ROUND(opening_cash, 2) AS openingCash, ROUND(expected_cash, 2) AS expectedCash, ROUND(counted_cash, 2) AS countedCash, ROUND(cash_difference, 2) AS cashDifference, ROUND(expected_qr, 2) AS expectedQr, ROUND(expected_wallet, 2) AS expectedWallet, bills_count AS billsCount, pieces, ROUND(sales_total, 2) AS salesTotal, note, opened_at AS openedAt, closed_at AS closedAt FROM cashier_shifts ORDER BY opened_at DESC LIMIT 50`;
+  return (status ? db.prepare(sql).all(status) : db.prepare(sql).all()) as unknown as CashierShift[];
+}
+
+// ============================================================================
+// Void Sale — reverse stock + wallet, mark sale as voided
+// ============================================================================
+
+export function voidSale(db: SqliteDb, input: { saleId: number; reason: string; actor?: string; actorRole?: string }): { reversed: boolean } {
+  const sale = db.prepare(`SELECT id, order_number AS orderNumber, total, payment_method AS paymentMethod, member_number AS memberNumber FROM sales WHERE id = ?`).get(input.saleId) as { id: number; orderNumber: string; total: number; paymentMethod: string; memberNumber: string | null } | undefined;
+  if (!sale) throw new StoreError("ไม่พบบิลนี้ในระบบ");
+  const existingVoid = db.prepare(`SELECT 1 FROM sales WHERE id = ? AND voided = 1`).get(input.saleId);
+  if (existingVoid) throw new StoreError("บิลนี้ถูกยกเลิกไปแล้ว");
+  if (!input.reason.trim()) throw new StoreError("ต้องระบุเหตุผลในการยกเลิก");
+  const items = db.prepare(`SELECT product_id AS productId, qty, cost FROM sale_items WHERE sale_id = ?`).all(input.saleId) as { productId: number; qty: number; cost: number }[];
+  runInTransaction(db, () => {
+    // Reverse stock for each catalog item
+    for (const item of items) {
+      if (!item.productId) continue;
+      recordMovement(db, {
+        type: 'VOID',
+        productId: item.productId,
+        qtyDelta: item.qty, // positive — restore
+        unitCost: item.cost,
+        refType: 'void',
+        refId: sale.id,
+        reason: `ยกเลิกบิล ${sale.orderNumber} · ${input.reason}`,
+        actor: input.actor,
+        actorRole: input.actorRole,
+      });
+      db.prepare(`UPDATE products SET stock = stock + ? WHERE id = ?`).run(item.qty, item.productId);
+    }
+    // Reverse wallet if wallet payment
+    if (sale.paymentMethod === "หักบัญชีสมาชิก" && sale.memberNumber) {
+      const member = db.prepare(`SELECT balance FROM members WHERE member_number = ?`).get(sale.memberNumber) as { balance: number } | undefined;
+      if (member) {
+        const newBalance = round2(member.balance + sale.total);
+        db.prepare(`UPDATE members SET balance = ? WHERE member_number = ?`).run(newBalance, sale.memberNumber);
+        db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, balance_after, payment_method, actor, created_at) VALUES (?, 'refund', ?, ?, ?, ?, ?, ?)`).run(
+          sale.memberNumber,
+          `ยกเลิกบิล ${sale.orderNumber} · คืนเงิน ฿${sale.total.toFixed(2)} · ${input.reason}`,
+          sale.total,
+          newBalance,
+          sale.paymentMethod,
+          input.actor ?? null,
+          formatDateTime(),
+        );
+      }
+    }
+    // Mark sale as voided
+    db.prepare(`UPDATE sales SET voided = 1, void_reason = ?, void_actor = ?, voided_at = ? WHERE id = ?`).run(
+      input.reason, input.actor ?? null, formatDateTime(), input.saleId
+    );
+    // Record refund
+    db.prepare(`INSERT INTO refunds (sale_id, amount, reason, method, actor, status, created_at) VALUES (?, ?, ?, ?, ?, 'completed', ?)`).run(
+      sale.id, sale.total, input.reason, sale.paymentMethod, input.actor ?? null, formatDateTime()
+    );
+    logAction(db, "ยกเลิกบิล", input.actor?.trim() || "เจ้าหน้าที่", `บิล ${sale.orderNumber} · ยอด ฿${sale.total.toFixed(2)} · ${input.reason}`, "red", input.actorRole ?? null, formatDateTime());
+  });
+  return { reversed: true };
+}
+
 
 // Backward compat: map old roles to new for existing code
 export function roleToPermissions(role: string): string[] {

@@ -20,6 +20,11 @@ import {
   LOGIN_MAX_FAILURES,
   StoreError,
   appRoleThai,
+  openShift,
+  closeShift,
+  listShifts,
+  voidSale,
+  stockCard,
   changeOwnPassword,
   checkout,
   clearLoginFailures,
@@ -941,6 +946,9 @@ export const appRouter = router({
         const { actor, actorRole } = resolveActor(ctx, input ?? {});
         return withStoreErrors(() => clearOrderList(getWelfareDb(), { actor, actorRole }));
       }),
+    card: publicProcedure.input(z.object({ productId: z.number().int(), from: z.string().optional(), to: z.string().optional() })).query(({ input }) => {
+      return stockCard(getWelfareDb(), input.productId, input.from, input.to);
+    }),
   }),
 
   pos: router({
@@ -953,6 +961,13 @@ export const appRouter = router({
           if (input.items.some((item) => !("productId" in item))) requireEdition("specialOrders");
           return checkout(getWelfareDb(), { ...input, cashier: input.cashier ?? actor, actorRole });
         });
+      }),
+    void: publicProcedure
+      .input(z.object({ saleId: z.number().int(), reason: z.string().min(1).max(500) }))
+      .mutation(({ input, ctx }) => {
+        const actor = ctx.user?.name ?? "เจ้าหน้าที่";
+        const actorRole = ctx.user?.role === "admin" ? (ctx.user?.appRole === "dev" ? "ผู้พัฒนา" : "ผู้บริหาร") : "เจ้าหน้าที่";
+        return withStoreErrors(() => voidSale(getWelfareDb(), { saleId: input.saleId, reason: input.reason, actor, actorRole }));
       }),
   }),
 
@@ -1488,6 +1503,26 @@ export const appRouter = router({
       .input(logsListInput)
       .query(({ input }) => withStoreErrors(() => listAuditLogs(getWelfareDb(), input?.limit ?? 200))),
   }),
+
+  // === Cashier Shift ===
+  shift: {
+    list: publicProcedure.input(z.object({ status: z.enum(["open", "closed"]).optional() }).optional()).query(({ input }) => {
+      return listShifts(getWelfareDb(), input?.status);
+    }),
+    open: publicProcedure.input(z.object({ cashierName: z.string().min(1), openingCash: z.number().min(0).default(0), note: z.string().max(500).optional() })).mutation(({ input, ctx }) => {
+      const actor = ctx.user?.name ?? input.cashierName;
+      const actorRole = ctx.user?.role === "admin" ? (ctx.user.appRole === "dev" ? "ผู้พัฒนา" : "ผู้บริหาร") : "เจ้าหน้าที่";
+      const shift = openShift(getWelfareDb(), { cashierName: actor, openingCash: input.openingCash, note: input.note });
+      return shift;
+    }),
+    close: publicProcedure.input(z.object({ shiftId: z.number().int(), countedCash: z.number().min(0), note: z.string().max(500).optional() })).mutation(({ input, ctx }) => {
+      const actor = ctx.user?.name ?? "เจ้าหน้าที่";
+      const actorRole = ctx.user?.role === "admin" ? (ctx.user.appRole === "dev" ? "ผู้พัฒนา" : "ผู้บริหาร") : "เจ้าหน้าที่";
+      const shift = closeShift(getWelfareDb(), { shiftId: input.shiftId, countedCash: input.countedCash, note: input.note });
+      return shift;
+    }),
+  },
+
 });
 
 export type AppRouter = typeof appRouter;
