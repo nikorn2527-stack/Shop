@@ -13,7 +13,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { readAppSessionCookie, type TrpcContext } from "./_core/context";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { backupSqliteDatabase, listSqliteBackups, pruneSqliteBackupsByCount, restoreSqliteBackup, verifySqliteBackup } from "./sqliteBackup";
+import { backupSqliteDatabase, listSqliteBackups, pruneSqliteBackupsByCount, restoreSqliteBackup, testRestore, verifySqliteBackup } from "./sqliteBackup";
 import { buildTemplateBase64, importMembers, importProducts, parseSpreadsheetBase64, readSheetRows, type MemberFieldMapping, type ProductFieldMapping } from "./importTool";
 import { closeWelfareDb, getBackupDir, getWelfareDb, getWelfareDbPath } from "./welfareStore";
 import {
@@ -537,7 +537,9 @@ const settingsPatchInput = z
 
 // ROUND 38 (ข้อ 39) — ชื่อไฟล์สำรองที่รับได้: welfare-store-YYYYMMDDTHHMMSSZ.sqlite เท่านั้น
 const backupFileInput = z.object({
-  file: z.string().regex(/^welfare-store-\d{8}T\d{6}Z\.sqlite$/, "ชื่อไฟล์สำรองไม่ถูกต้อง"),
+  // P3 — ยอมรับทั้ง .sqlite (plain) และ .sqlite.enc (AES-256-GCM) เพื่อให้ download/restore/testRestore
+  // ทำงานกับไฟล์สำรองที่เข้ารหัสได้ (รูปแบบชื่อเดิม + .enc ต่อท้าย)
+  file: z.string().regex(/^welfare-store-\d{8}T\d{6}Z\.sqlite(\.enc)?$/, "ชื่อไฟล์สำรองไม่ถูกต้อง"),
 });
 
 const authLoginInput = z.object({
@@ -1522,6 +1524,39 @@ export const appRouter = router({
             actorRole ?? null,
           );
           return { ok: true as const, safetyBackupFile };
+        });
+      }),
+    // P3 — Restore drill: ทดสอบกู้คืนโดยไม่แตะฐานข้อมูลจริง — ถอดรหัส (ถ้าเข้ารหัส) → เปิด read-only
+    // → PRAGMA integrity_check → รายชื่อตาราง → นับแถวในตารางหลัก (products/members/sales/sale_items)
+    // คืนสรุปผลให้ผู้บริหารยืนยันก่อนกดกู้คืนจริง พร้อม audit log สีฟ้า
+    testRestore: publicProcedure
+      .input(backupFileInput)
+      .mutation(({ ctx, input }) => {
+        const { actor, actorRole } = resolveActor(ctx, {});
+        return withStoreErrors(() => {
+          if (!isAdminCtx(ctx, {})) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "การทดสอบกู้คืนต้องใช้สิทธิ์ผู้บริหาร" });
+          }
+          requireEdition("backupRestore");
+          const backupPath = join(getBackupDir(), input.file);
+          if (!existsSync(backupPath)) {
+            throw new TRPCError({ code: "NOT_FOUND", message: `ไม่พบไฟล์สำรอง ${input.file}` });
+          }
+          let result;
+          try {
+            result = testRestore(backupPath);
+          } catch (error) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: `ทดสอบกู้คืนไม่สำเร็จ: ${error instanceof Error ? error.message : String(error)}` });
+          }
+          logAction(
+            getWelfareDb(),
+            "ทดสอบกู้คืน",
+            actor ?? "ผู้บริหาร",
+            `ทดสอบกู้คืนจากไฟล์สำรอง ${input.file} · ตาราง ${result.tables.length} ตาราง · แถวรวม ${result.rowCount} แถว`,
+            "blue",
+            actorRole ?? null,
+          );
+          return result;
         });
       }),
   }),
