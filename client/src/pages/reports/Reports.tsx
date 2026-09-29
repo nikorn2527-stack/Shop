@@ -52,6 +52,7 @@ import {
   scanCandidates,
 } from "../pageData";
 import { SectionHeader, StatusPill } from "../PagePrimitives";
+import { PageTemplate } from "@/components/page/PageTemplate";
 import { ThaiDatePicker } from "@/components/ThaiDatePicker";
 import {
   downloadReportPdf,
@@ -1619,44 +1620,34 @@ export function Reports({
     }
   };
   return (
-    <>
-      <div className="report-quick-guide" aria-label="ลำดับการออกรายงาน">
-        <div>
-          <b>1. เลือกรายงาน</b>
-          <span>ยอดขาย · บิล · ธุรกรรม · สมาชิก · สต็อก</span>
-        </div>
-        <div>
-          <b>2. กรองข้อมูล</b>
-          <span>ช่วงวันที่ · สมาชิก · พนักงาน · ประเภทธุรกรรม</span>
-        </div>
-        <div>
-          <b>3. ส่งออก</b>
-          <span>ดูตัวอย่างก่อนดาวน์โหลด PDF, Excel หรือ CSV</span>
-        </div>
-        <button
-          type="button"
-          className="outline-button compact"
-          onClick={resetReportFilters}
-        >
-          <RotateCcw size={14} /> ล้างตัวกรองทั้งหมด
-        </button>
-      </div>{" "}
+    <PageTemplate>
       <SectionHeader
         eyebrow="สรุปผลและวิเคราะห์ข้อมูล"
         title="รายงาน"
-        description="สลับมุมมองทีละแท็บ — แต่ละแท็บได้พื้นที่เต็มจอ เห็นข้อมูลครบทั้งชุด ไม่ต้องอัดหลายตารางไว้ในหน้าเดียว"
+        description="สลับมุมมองทีละแท็บ — 1. เลือกรายงาน (ยอดขาย/บิล/ธุรกรรม/สต็อก) → 2. กรองข้อมูล (ช่วงวันที่/พนักงาน/ประเภท) → 3. ส่งออก (ดูตัวอย่างก่อนดาวน์โหลด CSV/Excel/PDF)"
         action={
-          <button
-            className="outline-button"
-            title="สลับไปรายงานยอดขาย · แสดงเฉพาะวันนี้"
-            onClick={() => {
-              setReportTab("sales");
-              pickRangeChip("today");
-            }}
-          >
-            <CalendarDays size={16} /> {formatThaiDate(new Date())}{" "}
-            <ChevronDown size={15} />
-          </button>
+          <div className="page-template-action">
+            <button
+              type="button"
+              className="outline-button compact"
+              onClick={resetReportFilters}
+              title="ล้างตัวกรองทั้งหมด — คืนค่าเริ่มต้น"
+            >
+              <RotateCcw size={14} /> ล้างตัวกรอง
+            </button>
+            <button
+              type="button"
+              className="primary-button"
+              title="สลับไปรายงานยอดขาย · แสดงเฉพาะวันนี้"
+              onClick={() => {
+                setReportTab("sales");
+                pickRangeChip("today");
+              }}
+            >
+              <CalendarDays size={16} /> {formatThaiDate(new Date())}{" "}
+              <ChevronDown size={15} />
+            </button>
+          </div>
         }
       />
       {(reportTab === "sales" || reportTab === "bills") && (
@@ -3771,6 +3762,6 @@ export function Reports({
           </button>
         </div>
       )}
-    </>
+    </PageTemplate>
   );
 }

@@ -2833,7 +2833,7 @@ th { font-weight: 600; }
 /* (1) มุมมองรายงาน — แถบสลับ ภาพรวม / ชนิดสินค้า / พนักงานขาย */
 .report-view-pills { margin: 13px 0 0; }
 .report-view-pills button { border: 1px solid #e3ebe8; border-radius: 20px; padding: 6px 13px; background: #fff; }
-.report-view-pills button.active { background: var(--teal); border-color: var(--teal); color: #fff; }
+.report-view-pills button.active { background: var(--teal-mist); border-color: var(--teal); color: var(--teal-dark); font-weight: 600; }
 .report-view-pills button.active::after { display: none; }
 .report-view-pills + .report-period-pills { margin-top: 9px; }
 .report-breakdown .sales-bar { margin-top: 4px; height: 4px; }
@@ -2851,7 +2851,7 @@ th { font-weight: 600; }
 .tx-type-pills { display: flex; gap: 5px; flex-wrap: wrap; }
 .tx-type-pills button { border: 1px solid #e3ebe8; border-radius: 20px; padding: 7px 13px; background: #fff; color: #7c806f; font-size: 11.5px; font-weight: 500; display: inline-flex; align-items: center; gap: 5px; }
 .tx-type-pills button:hover { border-color: #b3d7c8; color: var(--teal-dark); }
-.tx-type-pills button.active { background: var(--teal); border-color: var(--teal); color: #fff; font-weight: 600; }
+.tx-type-pills button.active { background: var(--teal-mist); border-color: var(--teal); color: var(--teal-dark); font-weight: 600; }
 /* ROUND 77 — เครื่องหมาย ✓ ในปุ่มประเภทที่ถูกเลือก (เลือกได้หลาะประเภทพร้อมกัน) */
 .tx-type-pills .pill-check { font-style: normal; font-size: 10px; opacity: .9; }
 .tx-date-range { display: flex; align-items: center; gap: 6px; color: #848876; font-size: 11px; }
@@ -4259,7 +4259,7 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .report-range-row .report-period-pills { margin: 0; flex-wrap: wrap; gap: 6px; border-bottom: 0; }
 .report-range-row .report-period-pills button { border: 1px solid #e3ebe8; border-radius: 18px; padding: 6px 13px; background: #fff; font-size: 11.5px; }
 .report-range-row .report-period-pills button:hover { border-color: #b9d8cb; background: #f4faf7; }
-.report-range-row .report-period-pills button.active { background: var(--teal); border-color: var(--teal); color: #fff; font-weight: 600; }
+.report-range-row .report-period-pills button.active { background: var(--teal-mist); border-color: var(--teal); color: var(--teal-dark); font-weight: 600; }
 .report-range-row .report-period-pills button.active::after { display: none; }
 .report-groupby { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .report-groupby > span { color: #7d8172; font-size: 11px; font-weight: 600; white-space: nowrap; }
@@ -5494,3 +5494,19 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
     grid-template-columns: 1fr;
   }
 }
+
+/* ===== PT-1 (PageTemplate → Reports) — standard page structure =====
+   Re-added (was reverted in 64272a4 due to Tailwind v4 prettier parsing bug;
+   now in single-line format that Tailwind v4 can parse). */
+.page-template { display: flex; flex-direction: column; gap: 12px; padding: 0; }
+.page-template-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding: 0 0 4px; }
+.page-template-header h1 { font-size: 20px; font-weight: 700; margin: 2px 0 0; color: var(--ink, #29241b); }
+.page-template-header p { font-size: 12.5px; color: var(--muted, #6d6157); margin: 3px 0 0; line-height: 1.45; }
+.page-template-action { flex-shrink: 0; display: flex; gap: 8px; align-items: center; }
+.page-template-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 8px 0; }
+.page-template-content { flex: 1 1 0; min-height: 0; }
+.page-template-contextual { position: sticky; bottom: 0; display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 16px; background: var(--surface, #fff); border: 1px solid var(--line, #e5e2d8); border-radius: 10px; box-shadow: 0 -4px 14px rgba(64, 51, 24, .06); }
+/* Reports page — wrap SectionHeader's action area in a flex row so primary + outline buttons sit side-by-side cleanly */
+.report-workbench .page-template-action .outline-button.compact { height: 30px; }
+.app-shell:not(.pos-terminal) .page-content:has(.report-workbench) .page-template .section-header { margin-bottom: 8px; gap: 10px; }
+.app-shell:not(.pos-terminal) .page-content:has(.report-workbench) .page-template .section-header p { font-size: 10.5px; margin-top: 2px; }
