@@ -561,3 +561,88 @@ Stage Summary:
 - TypeScript: 0 errors, dev server: HTTP 200 ผ่าน (3 ครั้ง stable + no Tailwind v4 parse error)
 - commit hash: `8b0ce4c` บน origin/main-v2 — รอเจ้าของงาน pull ไปเทส reports view บนเครื่อง (เห็น primary green button + compact header + softened active chips + clean rhythm)
 
+
+---
+Task ID: PT-2
+Agent: full-stack-developer (sidebar restructure + Users cards)
+Task: Restructure sidebar (≤6 top-level items: 5 primary + 1 expandable "จัดการระบบ" group), add icon-only collapse toggle with tooltips, clean up sidebar badges (only action-needed), and fix Users page to show 5 stat cards in one row.
+
+Work Log:
+- อ่าน worklog เข้าใจ context V2-A→E + PT-1 (PageTemplate applied to Reports, CSS re-added in single-line format ที่ commit 8b0ce4c)
+- อ่าน `client/src/pages/pageData.ts` (303 บรรทัด) — `navItems` array มี 5 items (dashboard/pos/stock/members/reports); settings/users/logs ไม่อยู่ใน navItems แต่ถูก render แยกใน AppShell.tsx ภายใต้ `{isAdminRole(role) ? (...) : (...)}`
+- อ่าน `client/src/layouts/AppShell.tsx` (965 → 977 บรรทัด หลังแก้) — sidebar render section (lines 533-646 เดิม): `.brand` + `.role-card` + `.nav-group-label` "เมนูหลัก" + `<nav>` (5 primary) + admin section (`<div className="nav-group-label">สำหรับผู้บริหาร</div>` + `<nav className="secondary-nav">` 3 ปุ่ม: settings/users/logs) หรือ `.locked-nav` (staff) + `.sidebar-footer`; current badges: low-stock บน stock nav (action-needed — keep), ไม่มี member/bill data-count badges อยู่แล้ว — เพียงแค่เพิ่ม held-bills badge บน POS nav (action-needed: resume parked bill)
+- อ่าน `client/src/pages/Users.tsx` (191 บรรทัด) — บรรทัดเดียว JSX ใหญ่; stat cards ใช้ `<div className="stock-overview">` (4-col grid ที่ share กับ Stock.tsx) แต่มี 5 cards (admin/staff/dev/suspended/total) → บน desktop แสดง 4 แถว wrap ไม่สวย
+- Apply 4 changes:
+
+  **(1) Sidebar restructure — 5 primary + 1 expandable "จัดการระบบ" group (≤6 top-level)**
+  - เพิ่ม state hooks 2 ตัว: `sidebarCollapsed` (default false — desktop expanded) + `adminGroupOpen` (default false — group collapsed)
+  - ลบ `<div className="nav-group-label">สำหรับผู้บริหาร</div>` + `<nav className="secondary-nav">` block เดิม (3 buttons)
+  - แทนด้วย `<div className="nav-admin-section{sidebarCollapsed ? " collapsed" : ""}{adminGroupOpen ? " open" : ""}">` ที่มี:
+    - เมื่อ sidebar expanded: `<button className="nav-group-toggle">` (header: Settings2 icon + "จัดการระบบ" + ChevronDown) → click เพื่อ expand/collapse; sub-items render เฉพาะเมื่อ `adminGroupOpen === true`
+    - เมื่อ sidebar collapsed (icon-only): ข้าม toggle ไปเลย แสดง 3 icon buttons (Settings2/UserCog/Activity) ใน `<nav className="nav-group-children">` โดยตรง เพื่อให้ admin เข้า settings/users/logs ได้โดยไม่ต้อง expand sidebar
+  - ผล: 6 top-level (5 primary + 1 group header) = ≤6 ✅; primary items "ภาพรวม/หน้าร้าน POS/สต็อกสินค้า/สมาชิกและบัญชี/รายงาน" + group "จัดการระบบ" (settings/users/logs) collapsed by default
+
+  **(2) Sidebar collapse toggle — icon-only mode (~64px) + native tooltip**
+  - เพิ่ม `<button className="sidebar-collapse-btn">` (ChevronLeft/ChevronRight จาก lucide) ใน `.brand` block (ถัดจาก mobile-close)
+  - ปุ่มนี้ hidden by default; แสดงเฉพาะ desktop ผ่าน `@media (min-width: 821px) { ... }` (mobile drawer ใช้ mobile-close แทน)
+  - `<aside className="sidebar${mobileNav ? " open" : ""}${sidebarCollapsed ? " collapsed" : ""}${safeView === "pos" ? " pos-context" : ""}">` — `collapsed` class ถูก toggle
+  - เพิ่ม `title={label — caption}` attribute ให้ทุก primary nav button (จาก `navItems`) + `title` ในทุก admin sub-item button — native tooltip เด้งเมื่อ hover ใน icon-only mode
+  - CSS (single-line format): `.sidebar.collapsed` width 64px + ซ่อน `.brand-text` / `.role-card > div` / `.nav-group-label` / `nav button b` / `.sidebar-logout b` / `.sidebar-version` / `.sidebar-powered`; ทุก nav button จัดกึ่งกลาง (padding 11px 0, justify-content center); `.sidebar-collapse-btn` margin auto + mb 14px
+  - Visual indicator: ใช้ existing `nav button.active` (solid green bg + white text + box-shadow) ที่ถูกสไตล์อยู่แล้ว — เห็นชัดทั้ง expanded และ collapsed mode
+
+  **(3) Badge cleanup — action-needed only**
+  - KEEP: low-stock badge บน stock nav (`{id === "stock" && lowStock.length > 0 && <i className="nav-badge">{lowStock.length}</i>}`) — needs restocking
+  - ADD: held-bills badge บน POS nav (`{id === "pos" && posHeldCount > 0 && <i className="nav-badge">{posHeldCount}</i>}`) — needs to resume parked bill (POS rail มี rail-badge อยู่แล้ว แต่ sidebar nav ไม่เคยมี → เพิ่มตาม rule "✅ Held bills count (POS — needs to resume)")
+  - REMOVE: ไม่มี data-count badges (member total, bill total) อยู่ใน sidebar อยู่แล้ว — ไม่ต้องลบอะไร
+  - Pending limit requests badge: ไม่มีใน sidebar (limit approval flow อยู่ใน Reports table แล้ว) — skip ตาม rule "If a badge was showing a data count, remove it" (ไม่มี badge ให้ลบ ก็ไม่ต้องเพิ่ม)
+  - ผล: badge ใน sidebar มีเฉพาะ action-needed (low stock + held bills) — ไม่มี data-only badges
+
+  **(4) Users page — 5 stat cards in one row**
+  - เปลี่ยน `<div className="stock-overview">` → `<div className="users-overview">` ใน Users.tsx return JSX (5 cards: total/admin/staff/dev/suspended)
+  - CSS (single-line): `.users-overview { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 12px; }` (5-in-a-row on desktop)
+  - Responsive: `@media (max-width: 1280px) { ... repeat(3, 1fr); }` (mid) → `@media (max-width: 720px) { ... repeat(2, 1fr); }` (small) → `@media (max-width: 480px) { ... 1fr; }` (very small) — wraps ลงมา 3→2→1 ตาม breakpoint
+  - แยกจาก `.stock-overview` (4-col) ที่ Stock.tsx ยังใช้อยู่ — ไม่กระทบ Stock page
+
+- รักษา business logic ทั้งหมด — pure styling/restructuring:
+  - ไม่แตะ tRPC contracts (auth.logout, settings.get, stock.rows, member.list)
+  - ไม่ลด/เพิ่ม state หลัก (mobileNav/posShortcut/posHeldCount/notifOpen/pendingMemberNumber/pendingBillNumber/settingsFocusTab/activeView) — เพียงเพิ่ม 2 state ใหม่ (sidebarCollapsed/adminGroupOpen)
+  - ไม่แตะ POS rail (rail-btn, rail-scan, rail-customer, rail-deposit, rail-withdraw, rail-special, rail-hold, rail-register, rail-manage, rail-inventory, rail-add, rail-exit) — POS rail ยังเหมือนเดิม
+  - ไม่แตะ topbar (breadcrumb, global-search, top-icon notif-bell, profile-pill) — ยังเหมือนเดิม
+  - ไม่แตะ page-content view switching (Dashboard/Pos/Stock/Members/Reports/Settings/Users/Logs) — ยังเหมือนเดิม
+  - ไม่แตะ Users.tsx business logic (search/filter, CRUD mutations, modals, ConfirmDialog, session revoke, password reset) — เปลี่ยนเพียง className ของ overview grid
+- รักษา functionality ครบ: 8 views (dashboard/pos/stock/members/reports/settings/users/logs), 5 primary nav items, 3 admin sub-items, POS rail 10 buttons, topbar search + bell + profile, mobile drawer, role-based access control (staff ไม่เห็น admin section, dev/admin เห็น)
+
+- `npx tsc --noEmit` → **0 errors** ✅ (ChevronDown/ChevronLeft/ChevronRight imports เพิ่มเข้ามา ไม่มี unused; navItems มี caption field อยู่แล้วใน type — title template string ใช้ได้)
+- บูต dev server (`pkill -f tsx; nohup bash -c './start-dev.sh > dev.log 2>&1' &) → รอ 12s → curl `/` 3 ครั้ง stable HTTP 200/200/200 ✅ — process alive หลังครั้งสุดท้าย (PID 4073 + 4088)
+- dev.log: `grep -c "Missing opening" dev.log` = **0** ✅ — single-line CSS format แพสผ่าน Tailwind v4 pre-transform; มีเพียง pre-existing `[OAuth] OAUTH_SERVER_URL not configured` และ `[Auth] Missing session cookie` (curl ไม่มี session ปกติ) — ไม่มี parse/transform error ใหม่
+- commit `4a89602` push ขึ้น origin/main-v2 สำเร็จ (8b0ce4c..4a89602, rebase "Current branch main is up to date" — no remote changes ตอน pull)
+
+Stage Summary:
+- ไฟล์ที่เปลี่ยน:
+  - `client/src/layouts/AppShell.tsx` (965 → 977 บรรทัด, +124 -37): เพิ่ม 3 lucide imports (ChevronDown/ChevronLeft/ChevronRight) + 2 state hooks (sidebarCollapsed/adminGroupOpen) + `<button className="sidebar-collapse-btn">` toggle + ใส่ `collapsed` class บน `<aside>` + `title` attribute บนทุก nav button + เพิ่ม held-bills badge บน POS nav + ปรับ admin section จาก `<><div className="nav-group-label">สำหรับผู้บริหาร</div><nav className="secondary-nav">` → `<div className="nav-admin-section"><button className="nav-group-toggle">จัดการระบบ ChevronDown</button>{open && <nav className="nav-group-children">3 sub-items</nav>}</div>` (เมื่อ sidebar collapsed: ข้าม toggle แสดง 3 icon buttons ตรง ๆ) + แก้ sidebar-logout text จาก plain text → `<b>ออกจากระบบ</b>` (เพื่อซ่อนเฉพาะ text เมื่อ collapsed) + เปลี่ยน `<div>` text ใน brand เป็น `<div className="brand-text">`
+  - `client/src/pages/Users.tsx` (191 บรรทัด, +1 -1): เปลี่ยน `<div className="stock-overview">` → `<div className="users-overview">` (5 cards ใน 1 แถว แยกจาก Stock's 4-col grid)
+  - `client/src/index.css` (5512 → 5549 บรรทัด, +36 insertions): เพิ่ม block PT-2 — `.users-overview` (5-col grid + 3 responsive breakpoints) + `.sidebar-collapse-btn` (desktop-only via `@media (min-width: 821px)`) + `.sidebar.collapsed` (width 64px + ซ่อน text elements: brand-text/role-card > div/nav-group-label/nav button b/sidebar-logout b/sidebar-version/sidebar-powered) + `.nav-admin-section`/`.nav-group-toggle`/`.nav-group-children` styling (collapsible header + indented sub-items) + `.sidebar.collapsed .nav-group-children button` (icon-only mode สำหรับ admin sub-items เมื่อ sidebar collapsed)
+
+- Sidebar structure ตอนนี้:
+  ```
+  .brand (logo + name + mobile-close + sidebar-collapse-btn)
+  .role-card (avatar + name + role)
+  .nav-group-label "เมนูหลัก"
+  <nav> 5 primary:
+    - ภาพรวม (LayoutDashboard)
+    - หน้าร้าน / POS (ShoppingCart) [badge: held bills ถ้า posHeldCount > 0]
+    - สต็อกสินค้า (PackageSearch) [badge: low stock ถ้า lowStock.length > 0]
+    - สมาชิกและบัญชี (UsersRound)
+    - รายงาน (BarChart3)
+  .nav-admin-section (admin/dev only — staff sees .locked-nav)
+    [expanded sidebar]: .nav-group-toggle "จัดการระบบ" ChevronDown → click เปิด/ปิด
+      └─ .nav-group-children (3 sub-items, indented): ตั้งค่า / ผู้ใช้ระบบ / ประวัติระบบ
+    [collapsed sidebar]: 3 icon buttons ตรง ๆ ใน .nav-group-children (no toggle)
+  .sidebar-footer (EditionPill + logout button + version + powered)
+  ```
+
+- Top-level item count: 5 primary nav + 1 group header = **6** ✅ (≤6 rule satisfied); เมื่อ sidebar collapsed: 5 + 3 = 8 icon buttons แสดงในแนวตั้ง แต่ละตัวมี `title` tooltip
+- Badges ใน sidebar: เฉพาะ action-needed (low stock on "สต็อกสินค้า" + held bills on "หน้าร้าน / POS") — ไม่มี data-only badges
+- Users page: 5 stat cards ใน 1 แถวบน desktop (total/admin/staff/dev/suspended) พร้อม responsive wrap 3→2→1
+- TypeScript: 0 errors, dev server: HTTP 200 ผ่าน (3 ครั้ง stable + process alive หลัง curl), Tailwind v4: 0 "Missing opening" errors (single-line CSS format)
+- commit hash: `4a89602` บน origin/main-v2 — รอเจ้าของงาน pull ไปเทส sidebar (desktop collapse toggle + admin group expand/collapse + held-bills badge) และ Users page (5 cards ใน 1 แถว) บนเครื่อง
