@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
-import type { LucideIcon } from "lucide-react";
-import { BarChart3, LayoutDashboard, PackageSearch, ShoppingCart, UsersRound } from "lucide-react";
+import { SquaresFour, ShoppingCart, Package, Users, ChartBar } from "@phosphor-icons/react";
 
 export type View = "dashboard" | "pos" | "stock" | "members" | "reports" | "settings" | "logs" | "users";
 /** ROUND 36 (ข้อ 31) — เพิ่ม "dev": บัญชีผู้พัฒนา มีสิทธิ์ระดับผู้บริหารแต่แสดงตัวตนต่างกัน */
@@ -138,12 +137,12 @@ export function formatMemberNumber(mode: "running" | "year" | "manual", sequence
   return `${head ? `${head}${separator}` : ""}${String(sequence).padStart(digits, "0")}`;
 }
 
-export const navItems: { id: View; label: string; caption: string; icon: LucideIcon }[] = [
-  { id: "dashboard", label: "ภาพรวม", caption: "สรุปการดำเนินงาน", icon: LayoutDashboard },
+export const navItems: { id: View; label: string; caption: string; icon: React.ComponentType<any> }[] = [
+  { id: "dashboard", label: "ภาพรวม", caption: "สรุปการดำเนินงาน", icon: SquaresFour },
   { id: "pos", label: "หน้าร้าน / POS", caption: "ขายสินค้าและรับชำระ", icon: ShoppingCart },
-  { id: "stock", label: "สต็อกสินค้า", caption: "รับเข้าและนับสต็อก", icon: PackageSearch },
-  { id: "members", label: "สมาชิกและบัญชี", caption: "สมาชิกและเจ้าหน้าที่", icon: UsersRound },
-  { id: "reports", label: "รายงาน", caption: "วิเคราะห์และส่งออก", icon: BarChart3 },
+  { id: "stock", label: "สต็อกสินค้า", caption: "รับเข้าและนับสต็อก", icon: Package },
+  { id: "members", label: "สมาชิกและบัญชี", caption: "สมาชิกและเจ้าหน้าที่", icon: Users },
+  { id: "reports", label: "รายงาน", caption: "วิเคราะห์และส่งออก", icon: ChartBar },
 ];
 
 // NOTE (OLD-2-b): mock exports `products` + `stockRows` were DELETED — Pos.tsx and

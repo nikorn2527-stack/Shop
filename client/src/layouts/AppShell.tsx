@@ -601,7 +601,7 @@ export function AppShell({
                 setMobileNav(false);
               }}
             >
-              <Icon size={20} />
+              <Icon size={20} weight="fill" />
               <b>{label}</b>
               {/* PT-2 — badges show ONLY when the user must take action.
                   Low stock → needs restocking; held bills → needs to resume.

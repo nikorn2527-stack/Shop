@@ -1,5 +1,6 @@
+import type { ComponentType } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { LucideIcon } from "lucide-react";
+
 import {
   Activity,
   BarChart3,
@@ -31,7 +32,7 @@ type CommandSection = "การดำเนินการด่วน" | "เ�
 type CommandItem = {
   key: string;
   section: CommandSection;
-  icon: LucideIcon;
+  icon: ComponentType<any>;
   label: string;
   sub: string;
   select: () => void;
@@ -68,7 +69,7 @@ export function GlobalSearch({ role, open, onClose, onNavigate, onOpenMember, on
   }, [open]);
 
   const quickActions = useMemo(() => {
-    const actions: { key: string; label: string; icon: LucideIcon; view: View }[] = [
+    const actions: { key: string; label: string; icon: ComponentType<any>; view: View }[] = [
       { key: "quick-pos", label: "เปิดหน้าร้าน POS", icon: ShoppingCart, view: "pos" },
       { key: "quick-receive", label: "รับเข้าสินค้า", icon: PackageSearch, view: "stock" },
       { key: "quick-register", label: "ลงทะเบียนสมาชิก", icon: UserPlus, view: "members" },
@@ -82,7 +83,7 @@ export function GlobalSearch({ role, open, onClose, onNavigate, onOpenMember, on
   }, [role]);
 
   const menuEntries = useMemo(() => {
-    const extra: { id: View; label: string; caption: string; icon: LucideIcon }[] = [
+    const extra: { id: View; label: string; caption: string; icon: ComponentType<any> }[] = [
       { id: "settings", label: "ตั้งค่า", caption: "ระบบและใบเสร็จ", icon: Settings2 },
       { id: "users", label: "ผู้ใช้ระบบ", caption: "จัดการสิทธิ์และบัญชี", icon: UserCog },
       { id: "logs", label: "ระบบ Log", caption: "ประวัติการใช้งาน", icon: Activity },
