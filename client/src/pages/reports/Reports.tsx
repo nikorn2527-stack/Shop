@@ -1809,6 +1809,34 @@ export function Reports({
                     </button>
                   ))}
                 </div>
+                {rangeMode === "custom" && (
+                  <div
+                    className="range-picker report-custom-picker"
+                    role="group"
+                    aria-label="กำหนดช่วงวันที่"
+                  >
+                    <span>ช่วงวันที่</span>
+                    <ThaiDatePicker
+                      value={rangeFrom}
+                      onChange={pickCustomFrom}
+                      max={rangeTo || undefined}
+                      ariaLabel="วันเริ่มต้น — เลือกวันเดียวก็แค่กดวันนี้"
+                    />
+                    <span className="range-sep" aria-hidden="true">
+                      →
+                    </span>
+                    <ThaiDatePicker
+                      value={rangeTo}
+                      onChange={pickCustomTo}
+                      min={rangeFrom || undefined}
+                      ariaLabel="วันสิ้นสุด — เว้นว่างไว้คือวันเดียวกับวันเริ่มต้น"
+                    />
+                    <span className="range-hint">
+                      เลือกวันเดียว: กำหนดวันเริ่มต้นอย่างเดียวก็พอ ·
+                      ช่วงหลายวัน: กำหนดวันสิ้นสุดเพิ่ม
+                    </span>
+                  </div>
+                )}
                 <div
                   className="tx-type-pills report-staff-pills"
                   role="group"
@@ -1867,34 +1895,6 @@ export function Reports({
                         {chip.label}
                       </button>
                     ))}
-                  </div>
-                )}
-                {rangeMode === "custom" && (
-                  <div
-                    className="range-picker report-custom-picker"
-                    role="group"
-                    aria-label="กำหนดช่วงวันที่"
-                  >
-                    <span>ช่วงวันที่</span>
-                    <ThaiDatePicker
-                      value={rangeFrom}
-                      onChange={pickCustomFrom}
-                      max={rangeTo || undefined}
-                      ariaLabel="วันเริ่มต้น — เลือกวันเดียวก็แค่กดวันนี้"
-                    />
-                    <span className="range-sep" aria-hidden="true">
-                      →
-                    </span>
-                    <ThaiDatePicker
-                      value={rangeTo}
-                      onChange={pickCustomTo}
-                      min={rangeFrom || undefined}
-                      ariaLabel="วันสิ้นสุด — เว้นว่างไว้คือวันเดียวกับวันเริ่มต้น"
-                    />
-                    <span className="range-hint">
-                      เลือกวันเดียว: กำหนดวันเริ่มต้นอย่างเดียวก็พอ ·
-                      ช่วงหลายวัน: กำหนดวันสิ้นสุดเพิ่ม
-                    </span>
                   </div>
                 )}
               </div>
