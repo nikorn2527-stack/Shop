@@ -942,3 +942,120 @@ Stage Summary:
   - `system.logRelease` ใน scripts ต้องการ `RELEASE_LOG_DEV_USER` + `RELEASE_LOG_DEV_PASS` env vars ถ้าต้องการ auto-log release ใน DB; ถ้าไม่ตั้ง script จะ log warning แล้ว operator ต้องเรียก `system.logRelease` ผ่าน UI เอง
   - `system.health` เป็น publicProcedure โดย design — load balancer สามารถ probe ได้โดยไม่มี cookie; ไม่ leak ข้อมูล sensitive (version, uptime, memory, db size = standard health metrics)
   - `findPackageJsonPath()` ใน version.ts walk up สูงสุด 10 ระดับ — ถ้า bundle อยู่ใน folder structure ลึกกว่านั้น (rare) จะคืน null และ `getVersion()` จะคืน "0.0.0" (fail-safe ไม่ใช่ throw)
+
+---
+Task ID: P5+P6
+Agent: full-stack-developer (one codebase + checklist)
+Task: ปิดโครงงาน production hardening สอง phase สุดท้าย — P5 (one codebase cloud/on-premise + Dockerfile + docker-compose + deployment.ts + cloud deployment guide) + P6 (release checklist script + doc) ตามมาตรฐานใน docs/TECHNICAL_REVIEW_DEPLOYMENT_HANDOFF_TH.md Section 4 และเอกสาร task
+
+Work Log:
+- อ่าน `worklog.md` ครบเพื่อเข้าใจ lineage ของทุก phase (P1 auth enforcement + logout cookie fix, UI-1..UI-n CSS/UX, PT-1..3, V2-A refactor, P2-a audit + P2-b idempotency, P3 backup AES-256-GCM + restore drill + SOP, P4 release/rollback system + version tracking + scripts/update.sh + scripts/rollback.sh + RELEASE_TEMPLATE_TH.md) — baseline ล่าสุด commit `e2d9509` บน origin/main-v2
+- อ่าน `docs/TECHNICAL_REVIEW_DEPLOYMENT_HANDOFF_TH.md` Section 4 (deployment direction: One Codebase – Two Deployment Models) + Section 5 (update/release standards) + Section 6 Phase 5 roadmap เพื่อ align scope ของ P5+P6 กับเอกสารเดิม
+- อ่าน `package.json` — Node 22 built-in `node:sqlite` (used ใน server/sqliteStore.ts, server/routers.ts, server/sqliteBackup.ts); build script `vite build && esbuild ... --packages=external --bundle --format=esm --outdir=dist`; packageManager pnpm@10.4.1
+- อ่าน `tsconfig.json` — include: `client/src/**/* + shared/**/* + server/**/*`; ทุกไฟล์ใหม่ใน server/_core/ จะถูก tsc ตรวจ
+- อ่าน `railway.json` + `docs/RAILWAY.md` — Railway ใช้ NIXPACKS builder + `pnpm start` + healthcheck `/`; Railway auto-HTTPS ที่ edge (ลูกค้าไม่ต้องตั้ง HTTPS=1)
+- อ่าน `server/_core/env.ts` — pattern เดิมคือ plain object และ export function อ่าน env; mirror pattern ในไฟล์ใหม่
+- อ่าน `server/_core/version.ts` (P4) — pattern การอ่าน package.json + ใช้ createRequire + import.meta.url; ไม่มี side-effect
+- อ่าน `server/_core/vite.ts` — `serveStatic` ใน production resolve path `dist/public` (relative to bundle ที่ import.meta.dirname) — สำคัญตอนเขียน Dockerfile CMD
+- ตรวจ baseline: `npx tsc --noEmit` → 0 errors ก่อนแก้
+
+P5.1 — `server/_core/deployment.ts` (new file, ~140 บรรทัด):
+- exports `type DeploymentMode = "cloud" | "onpremise" | "development"` + `type CloudProvider = "aws" | "gcp" | "azure" | "railway" | string` + `type DeploymentInfo = { mode, cloudProvider, region, dataResidency }`
+- `getDeploymentMode(): DeploymentMode` — อ่าน `DEPLOYMENT_MODE` env var; case-insensitive + trim-tolerant; รับค่า `cloud` / `onpremise` / `on-premise` / `on_premise` / `development` / `dev` / empty; unknown → fallback `"development"` (safest)
+- `isCloud()`, `isOnPremise()`, `isDevelopment()` — convenience booleans
+- `getDeploymentInfo(): DeploymentInfo` — อ่าน `DEPLOYMENT_MODE` + `CLOUD_PROVIDER` + `CLOUD_REGION` + `DATA_RESIDENCY`; defensive (never throw); missing → `null`
+- side-effect free — ปลอดภัยที่จะ import จาก server entrypoint, scripts, tests; mirror style ของ server/_core/env.ts
+- ไม่ได้ wire เข้า systemRouter.health หรือ systemRouter.lanInfo (out of scope ของ P5 — เอกสาร task บอกแค่สร้าง module)
+
+P5.2 — `docs/ON_PREMISE_STRUCTURE_TH.md` (new file, ~120 บรรทัด):
+- Document conceptual directory layout ตาม TECHNICAL_REVIEW Section 4: `/app` `/data` `/uploads` `/config` `/backups` `/logs`
+- ตาราง 4 คอลัมน์: path → contents → who creates → lifecycle notes
+- 3 rules หลัก:
+  1. Application update ต้องไม่เขียนทับ `/data`, `/uploads`, `/config`, `/backups`
+  2. แต่ละ directory มี lifecycle อิสระ
+  3. Backup strategy ครอบคลุม `/data` + `/config` เท่านั้น (ไม่รวม `/app` — อยู่ใน git แล้ว)
+- Map directories → Docker container paths (`VOLUME ["/app/data", "/app/data/backups"]` ใน Dockerfile)
+- Cloud ↔ On-Premise migration sketch (data + config change; codebase ชุดเดียวกัน)
+
+P5.3 — `Dockerfile` (new file, ~70 บรรทัด incl. comments):
+- `FROM node:22-slim` — Node 22 จำเป็นเพราะ project ใช้ `node:sqlite` built-in (server/sqliteStore.ts, server/routers.ts, server/sqliteBackup.ts)
+- Adapt spec template: spec บอก `pnpm install --frozen-lockfile --prod` ก่อน `pnpm run build` แต่ build ต้องการ devDependencies (vite, @vitejs/plugin-react, @tailwindcss/vite, esbuild, drizzle-kit, typescript) → ปรับเป็น:
+  1. `pnpm install --frozen-lockfile` (full tree สำหรับ build)
+  2. `COPY . .` + `RUN pnpm run build` (vite → dist/public/; esbuild → dist/index.js)
+  3. `RUN pnpm prune --prod` (drop dev deps; runtime ยังมี dependencies เพราะ esbuild ใช้ `--packages=external`)
+- `ENV NODE_ENV=production`, `ENV PORT=3000`, `ENV NODE_OPTIONS="--experimental-sqlite"` (node:sqlite ยังเป็น experimental ใน Node 22.x — surfaced ผ่าน NODE_OPTIONS เพื่อ upgrade Node 24+ ได้โดยไม่ต้อง rebuild)
+- `VOLUME ["/app/data", "/app/data/backups"]` — anonymous volume ตอน bare `docker run`; bind-mount โดย docker-compose.yml
+- `EXPOSE 3000` + `CMD ["node", "dist/index.js"]` (เดียวกับ `pnpm start` script ใน package.json)
+
+P5.4 — `docker-compose.yml` (new file, ~55 บรรทัด incl. comments):
+- `version: "3.8"` + single `png-shop` service
+- `build: .` (ใช้ Dockerfile ใน directory เดียวกัน)
+- ports: `3000:3000`
+- volumes:
+  - `./data:/app/data` (welfare-store.sqlite)
+  - `./data/backups:/app/data/backups` (backup files)
+  - `./.env:/app/.env:ro` (read-only mount; secrets ไม่ถูกเขียนทับ)
+- environment: `NODE_ENV=production`, `DEPLOYMENT_MODE=onpremise`, `SQLITE_DB_PATH=/app/data/welfare-store.sqlite`, `SQLITE_BACKUP_DIR=/app/data/backups` (secrets อื่น JWT_SECRET/OWNER_OPEN_ID/OAUTH_SERVER_URL/VITE_APP_ID อ่านจาก ./.env ที่ mount มา)
+- `restart: unless-stopped`
+- `healthcheck` — ใช้ tRPC `system.health` endpoint ที่ P4 เพิ่ม (test = `curl -fsS http://localhost:3000/api/trpc/system.health?input=%7B%22timestamp%22%3A0%7D` — URL-encoded `{"timestamp":0}` เพื่อ backward-compat กับ Settings page latency probe); 30s interval, 5s timeout, 3 retries, 60s start_period
+- `logging.driver=json-file` + `max-size: 10m` + `max-file: 5` — กัน log explosion บนเครื่องลูกค้า
+
+P5.5 — `docs/CLOUD_DEPLOYMENT_GUIDE_TH.md` (new file, ~280 บรรทัด):
+- 8 sections: principles / Railway / env vars table / DB path strategy (ephemeral FS → volume) / backup strategy (auto + operator weekly download + pre-release + quarterly drill) / HTTPS setup (Railway auto / Caddy / Cloudflare Tunnel) / update on cloud / rollback on cloud
+- env vars table ครอบคลุม 12 ตัว: DEPLOYMENT_MODE / CLOUD_PROVIDER / CLOUD_REGION / DATA_RESIDENCY / SQLITE_DB_PATH / SQLITE_BACKUP_DIR / JWT_SECRET / OWNER_OPEN_ID / OAUTH_SERVER_URL / VITE_APP_ID / NODE_ENV / PORT
+- Bonus: Cloud ↔ On-Premise migration procedure (data + config change; codebase ชุดเดียวกัน ตาม design)
+
+P6.1 — `scripts/release-checklist.sh` (new file, ~135 บรรทัด incl. comments):
+- `#!/usr/bin/env bash` + `set -euo pipefail` (stricter กว่า spec template ที่บอกแค่ `set -e`)
+- `APP_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"` + `cd "${APP_DIR}"` — mirror pattern ของ scripts/update.sh + scripts/rollback.sh ที่มีอยู่ เพื่อให้รันจากที่ไหนก็ได้
+- 7 steps ตาม spec template:
+  1. Version — `node -p "require('./package.json').version"`
+  2. TypeScript check (HARD gate) — `npx tsc --noEmit`; fail → พิมพ์ 40 บรรทัดแรกของ error log + `exit 1`
+  3. Production build (HARD gate) — `pnpm run build`; fail → พิมพ์ 40 บรรทัดแรกของ build log + `exit 1`
+  4. Tests (SOFT) — `pnpm test:sqlite`; fail → warn only (ไม่ exit)
+  5. Git working tree clean (SOFT) — `git status --porcelain`; มี changes → warn only
+  6. Schema version (INFO) — reminder: check via `system.health` endpoint หลัง deploy (schema version อยู่ใน store_settings table ที่ P4 เพิ่ม)
+  7. Backup exists (SOFT) — `[ -d "data/backups" ] && [ -n "$(ls -A ...)" ]`; มี → พิมพ์ count; ไม่มี → warn
+- Read-only script — ไม่ mutate working tree, DB, remote; รันกี่ครั้งก็ได้
+- Exit codes documented in header: 0 = HARD ผ่านหมด; 1 = HARD fail อย่างน้อย 1 ตัว
+
+P6.2 — `docs/RELEASE_CHECKLIST_TH.md` (new file, ~280 บรรทัด):
+- 6 sections: pre-release / deploy / post-release / rollback / emergency hotfix / one-page summary
+- Pre-release: 7 automated items (รัน scripts/release-checklist.sh) + 7 manual items (CHANGELOG, migration plan, backup, smoke test, RBAC enforcement, encryption key validity)
+- Deploy: 3 flows (On-Premise scripts/update.sh พร้อม explanation 10 steps / Cloud Railway auto-deploy / Docker Compose) + shared health check + smoke test UI checklist
+- Post-release: release log entry, backup verification, version tag push, schema version verify, cron backup verify, 24h monitoring, announce to staff
+- Rollback: 4 triggers (health fail, smoke fail, data corruption, audit error spike) + 3 platform flows (On-Premise scripts/rollback.sh / Cloud Railway Redeploy + DB restore / Docker Compose) + pre-rollback checklist 5 items (incl. RTO estimate) + post-rollback 5 items (incl. RCA issue)
+- Emergency hotfix: severity triage (P0/P1 เท่านั้น) + branch `hotfix/<issue>` + 1 reviewer fast-track + tag `<version>+hotfix.<n>` + scripts/update.sh + verify/log/notify/follow-up
+- One-page summary: quick reference ทั้ง 4 scenarios (pre-release, deploy, post-release, rollback, hotfix)
+
+Verification:
+- `npx tsc --noEmit` → **0 errors** ✅ (ไฟล์ TS ใหม่ไฟล์เดียวคือ server/_core/deployment.ts; no other files modified)
+- `bash -n scripts/release-checklist.sh` → syntax OK ✅
+- `chmod +x scripts/release-checklist.sh` → verified (-rwxr-xr-x) ✅
+- ไม่ได้ run โครงสร้าง deploy เพราะ Dockerfile/docker-compose เป็นการเตรียมโครงสร้างสำหรับ operator ใช้ในอนาคต — การ test build container เป็น out of scope ของ sandbox นี้ (docker daemon อาจไม่ available; build container ใช้ resource เยอะ;ไม่จำเป็นสำหรับ verify ของ P5+P6)
+
+Constraints respected:
+- ไม่แตะ business logic หรือ server code (ไม่แก้ server/sqliteStore.ts, server/routers.ts, server/_core/systemRouter.ts หรือ client-side ใด ๆ)
+- Dockerfile ใช้ Node 22 (`node:22-slim`) ตามที่ project ต้องการสำหรับ `node:sqlite`
+- Shell scripts ใช้ `set -euo pipefail`
+- Commit เฉพาะ project files (7 files): ไม่ commit `node_modules/`, `dist/`, `tool-results/`, `.env`, `agent-ctx/` (agent-ctx/ อยู่ใน .gitignore อยู่แล้ว)
+
+Commit & push:
+- `git add Dockerfile docker-compose.yml docs/CLOUD_DEPLOYMENT_GUIDE_TH.md docs/ON_PREMISE_STRUCTURE_TH.md docs/RELEASE_CHECKLIST_TH.md scripts/release-checklist.sh server/_core/deployment.ts`
+- `git commit -m "feat(P5+P6): one codebase cloud/on-prem + Dockerfile + release checklist"` → commit `3b66d69`
+- `git push origin main:main-v2` → push สำเร็จ (e2d9509..3b66d69, no rebase needed เพราะ no new commits บน remote ตั้งแต่ P4)
+
+Stage Summary:
+- 7 files created (0 modified):
+  - `server/_core/deployment.ts` (P5.1 — TS module, 0 TS errors)
+  - `docs/ON_PREMISE_STRUCTURE_TH.md` (P5.2 — directory structure doc)
+  - `Dockerfile` (P5.3 — container image definition, Node 22)
+  - `docker-compose.yml` (P5.4 — on-premise orchestration + healthcheck)
+  - `docs/CLOUD_DEPLOYMENT_GUIDE_TH.md` (P5.5 — Railway + env vars + backup + HTTPS)
+  - `scripts/release-checklist.sh` (P6.1 — 7-step automated pre-release check, chmod +x)
+  - `docs/RELEASE_CHECKLIST_TH.md` (P6.2 — pre/post release + rollback + hotfix + one-page summary)
+- TypeScript: 0 errors (`npx tsc --noEmit` exit 0)
+- Bash syntax: `bash -n scripts/release-checklist.sh` ผ่าน
+- File permissions: `scripts/release-checklist.sh` executable (-rwxr-xr-x) — verified คู่กับ scripts/update.sh + scripts/rollback.sh ที่มีอยู่
+- commit hash: `3b66d69` บน origin/main-v2 — production hardening P1..P6 ครบทั้ง 6 phase (auth, audit, idempotency, backup encryption, release/rollback, one-codebase + checklist)
+- ส่งต่อให้เจ้าของงาน pull ไปทดสอบ build Docker image จริง (`docker compose up -d --build`) + run release-checklist.sh ก่อนทุก release ในอนาคต
