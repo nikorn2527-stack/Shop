@@ -601,9 +601,7 @@ export function AppShell({
                 setMobileNav(false);
               }}
             >
-              <span className="nav-icon-tile" style={{ background: `linear-gradient(135deg, ${tileColor}, ${tileColor}dd)`, boxShadow: `0 2px 8px ${tileColor}40, inset 0 1px 0 rgba(255,255,255,0.2)` }}>
-                <Icon size={18} weight="fill" color="#fff" />
-              </span>
+              <Icon size={20} weight="duotone" />
               <b>{label}</b>
               {/* PT-2 — badges show ONLY when the user must take action.
                   Low stock → needs restocking; held bills → needs to resume.
