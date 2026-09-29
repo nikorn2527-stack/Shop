@@ -37,7 +37,7 @@ import {
   UserPlus,
   UsersRound,
   X,
-} from "lucide-react";
+} from "@/lib/icons";
 import { toast } from "sonner";
 import { EditionPill, useEditionStatus } from "@/components/EditionUi";
 import { GlobalSearch } from "@/components/GlobalSearch";

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { TRPCClientError } from "@trpc/client";
-import { Check, CircleAlert, Coins, Percent, RotateCcw, Search, SlidersHorizontal, X } from "lucide-react";
+import { Check, CircleAlert, Coins, Percent, RotateCcw, Search, SlidersHorizontal, X } from "@/lib/icons";
 import type { SqliteProduct } from "../../../server/sqliteStore";
 import { money } from "@/pages/pageData";
 import { trpc } from "@/lib/trpc";

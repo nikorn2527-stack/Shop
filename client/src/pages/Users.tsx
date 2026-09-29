@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Check, ChevronDown, ChevronUp, CircleAlert, Crown, IdCard, KeyRound, LockKeyhole, LockOpen, LogOut, MonitorSmartphone, Search, Settings2, ShieldCheck, Terminal, UserPlus, UserRound, UsersRound, X,
-} from "lucide-react";
+} from "@/lib/icons";
 import type { AppSessionSummary, AppUserSummary } from "../../../server/sqliteStore";
 import { ConfirmDialog, SectionHeader, StatusPill, formEnterNav } from "./PagePrimitives";
 import { HelpDisclosure } from "@/components/HelpDisclosure";

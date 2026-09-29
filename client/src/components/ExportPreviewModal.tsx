@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { FileSpreadsheet, FileText, Printer, Table2, X } from "lucide-react";
+import { FileSpreadsheet, FileText, Printer, Table2, X } from "@/lib/icons";
 import type { ReportDocConfig } from "@/reportDoc";
 
 /**

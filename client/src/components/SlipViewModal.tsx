@@ -1,4 +1,4 @@
-import { Check, Download, FileImage, Printer, X } from "lucide-react";
+import { Check, Download, FileImage, Printer, X } from "@/lib/icons";
 import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
 

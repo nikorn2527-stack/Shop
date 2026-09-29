@@ -1,4 +1,4 @@
-import { FileBarChart } from "lucide-react";
+import { FileBarChart } from "@/lib/icons";
 import { trpc } from "@/lib/trpc";
 import { money } from "../pageData";
 import { getErrorMessage } from "../viewFormat";

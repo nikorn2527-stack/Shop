@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Check, CircleAlert, Crown, Gift, KeyRound, Lock, RefreshCw, Sparkles, X } from "lucide-react";
+import { Check, CircleAlert, Crown, Gift, KeyRound, Lock, RefreshCw, Sparkles, X } from "@/lib/icons";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc";
 import { getErrorMessage } from "@/pages/viewFormat";

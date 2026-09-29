@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Eye, EyeOff, IdCard, LogIn, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, IdCard, LogIn, ShieldCheck } from "@/lib/icons";
 import { trpc } from "@/lib/trpc";
 import { getErrorMessage } from "@/pages/viewFormat";
 import { brandInitial, type BrandSettings } from "@/theme";

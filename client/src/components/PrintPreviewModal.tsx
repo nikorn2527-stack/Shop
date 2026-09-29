@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Printer, X } from "lucide-react";
+import { Printer, X } from "@/lib/icons";
 import { toast } from "sonner";
 import { HelpDisclosure } from "./HelpDisclosure";
 

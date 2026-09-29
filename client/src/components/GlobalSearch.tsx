@@ -13,7 +13,7 @@ import {
   UserCog,
   UserPlus,
   UsersRound,
-} from "lucide-react";
+} from "@/lib/icons";
 
 import type { Role, View } from "@/pages/pageData";
 import { canAccessView, isAdminRole, money, navItems } from "@/pages/pageData";

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
-import { Download, FileText, Printer, X } from "lucide-react";
+import { Download, FileText, Printer, X } from "@/lib/icons";
 import { money } from "../pages/pageData";
 import { WALLET_TX_META } from "../pages/viewFormat";
 import { trpc } from "@/lib/trpc";

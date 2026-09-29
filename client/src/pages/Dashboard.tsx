@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   Activity, BarChart3, CalendarClock, CalendarDays, Check, CircleAlert, Crown, MoreHorizontal, PackageSearch, Printer, ReceiptText, ShieldCheck, ShoppingBag, Terminal, Wallet, X,
-} from "lucide-react";
+} from "@/lib/icons";
 import type { BusinessPeriodStatus, DayClosureRow } from "../../../server/sqliteStore";
 import type { Role, View } from "./pageData";
 import { isAdminRole, money, roleThaiLabel } from "./pageData";

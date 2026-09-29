@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import html2canvas from "html2canvas";
 import QRCode from "qrcode";
-import { Barcode, CreditCard, Download, Printer, QrCode as QrIcon, ScanLine, ShieldAlert, UserCheck, X } from "lucide-react";
+import { Barcode, CreditCard, Download, Printer, QrCode as QrIcon, ScanLine, ShieldAlert, UserCheck, X } from "@/lib/icons";
 import { money } from "../pages/pageData";
 import { code128DataUrl } from "../barcode";
 import { MemberAvatar } from "./MemberAvatar";

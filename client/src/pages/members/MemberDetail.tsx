@@ -24,7 +24,7 @@ import {
   TrendingDown,
   WalletCards,
   X,
-} from "lucide-react";
+} from "@/lib/icons";
 import { blocker } from "@/components/BlockerAlert";
 import { CameraCaptureModal } from "@/components/CameraCaptureModal";
 import { MemberCardModal } from "@/components/MemberCardModal";

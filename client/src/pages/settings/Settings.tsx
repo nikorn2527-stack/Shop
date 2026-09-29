@@ -80,7 +80,7 @@ import {
   Wrench,
   X,
   CircleAlert,
-} from "lucide-react";
+} from "@/lib/icons";
 import { toast } from "sonner";
 import {
   EDITIONS,

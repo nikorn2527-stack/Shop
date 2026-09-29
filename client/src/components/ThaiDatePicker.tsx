@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { CalendarDays, ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarDays, ChevronLeft, ChevronRight } from "@/lib/icons";
 
 /**
  * Round 31-8 — เลือกวันที่เป็นภาษาไทยล้วน (เดือนไทย · ปี พ.ศ. · สัปดาห์ อา–ส)

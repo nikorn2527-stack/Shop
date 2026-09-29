@@ -1,7 +1,7 @@
 import { useState } from "react";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
-import { Check, Download, FileImage, Plus, Printer, X } from "lucide-react";
+import { Check, Download, FileImage, Plus, Printer, X } from "@/lib/icons";
 import type { CheckoutReceipt } from "../../../server/sqliteStore";
 import { money } from "../pages/pageData";
 import { trpc } from "@/lib/trpc";

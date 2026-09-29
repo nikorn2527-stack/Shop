@@ -1,4 +1,4 @@
-import { Camera, CameraOff, Check, RefreshCw, Video, X } from "lucide-react";
+import { Camera, CameraOff, Check, RefreshCw, Video, X } from "@/lib/icons";
 import { useEffect, useRef, useState } from "react";
 
 /**

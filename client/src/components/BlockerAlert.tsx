@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { CircleAlert, TriangleAlert, Info, Check } from "lucide-react";
+import { CircleAlert, TriangleAlert, Info, Check } from "@/lib/icons";
 
 /**
  * ROUND 78 (user) — กล่องแจ้งเตือนกลางจอ (blocker alert)

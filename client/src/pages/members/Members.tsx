@@ -9,7 +9,7 @@ import {
   UsersRound,
   WalletCards,
   X,
-} from "lucide-react";
+} from "@/lib/icons";
 import { trpc } from "@/lib/trpc";
 import { HelpDisclosure } from "@/components/HelpDisclosure";
 import type { MemberLite, Role } from "../pageData";

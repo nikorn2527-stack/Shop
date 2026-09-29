@@ -1,4 +1,4 @@
-import { ShieldCheck, X } from "lucide-react";
+import { ShieldCheck, X } from "@/lib/icons";
 
 export function StatusPill({ tone, children }: { tone: string; children: React.ReactNode }) {
   return <span className={`status-pill ${tone}`}>{children}</span>;

@@ -40,7 +40,7 @@ import {
   UsersRound,
   WalletCards,
   X,
-} from "lucide-react";
+} from "@/lib/icons";
 import { type EditionFeatureKey } from "@shared/editions";
 import { EditionUpgradeModal, useEditionStatus } from "@/components/EditionUi";
 import type { MemberLite, Role } from "../pageData";

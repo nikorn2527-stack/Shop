@@ -3,7 +3,7 @@ import { TRPCClientError } from "@trpc/client";
 import QRCode from "qrcode";
 import {
   ArrowDownToLine, ArrowUpFromLine, Camera, Check, ChevronDown, CircleAlert, CircleHelp, CreditCard, Download, FileImage, History, IdCard, ImagePlus, LayoutGrid, Lock, Minus, PackageSearch, Pause, Plus, Printer, QrCode, RotateCcw, ScanLine, Search, ShieldCheck, Sparkles, Star, StarOff, ShoppingCart, Trash2, Upload, UserRound, WalletCards, X,
-} from "lucide-react";
+} from "@/lib/icons";
 import { toast } from "sonner";
 import { blocker } from "@/components/BlockerAlert";
 import type { CartItem, HeldBill, MemberLite, Product, Role } from "./pageData";

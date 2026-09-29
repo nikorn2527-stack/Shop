@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { FormEvent } from "react";
-import { Eye, EyeOff, KeyRound, LogOut, ShieldAlert, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, KeyRound, LogOut, ShieldAlert, ShieldCheck } from "@/lib/icons";
 import type { User } from "../../../drizzle/schema";
 import { trpc } from "@/lib/trpc";
 import { getErrorMessage } from "@/pages/viewFormat";

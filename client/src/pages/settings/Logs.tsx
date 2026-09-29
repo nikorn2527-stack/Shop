@@ -9,7 +9,7 @@ import {
   Search,
   ShieldCheck,
   X,
-} from "lucide-react";
+} from "@/lib/icons";
 import { trpc } from "@/lib/trpc";
 import { downloadCsvFile } from "@/exportUtils";
 import {

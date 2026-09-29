@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { TRPCClientError } from "@trpc/client";
 import {
   Activity, Ban, Boxes, Camera, Check, ChevronDown, ChevronRight, CircleAlert, ClipboardList, Download, FileBarChart, Gift, ImagePlus, Lock, MoreHorizontal, PackagePlus, PackageSearch, Plus, Printer, RotateCcw, Search, Settings2, ShieldCheck, ShoppingCart, SlidersHorizontal, Star, Trash2, X,
-} from "lucide-react";
+} from "@/lib/icons";
 import type { Role } from "./pageData";
 import { compressImageToDataUrl, isAdminRole, money, roleThaiLabel, scanCandidates, scanMatches } from "./pageData";
 import { CameraCaptureModal } from "@/components/CameraCaptureModal";
