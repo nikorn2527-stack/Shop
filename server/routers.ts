@@ -224,6 +224,10 @@ const memberWalletInput = z.object({
   actorRole: z.string().optional(),
   // ROUND 63 (user) — รูปหลักฐานการโอน/สลิป แนบไปกับรายการเติม/ถอน
   slipImage: z.string().max(600_000).nullish(),
+  // P2-b (idempotency) — client-generated key per wallet op. Retries with the
+  // same key return the original ledger row instead of double-debiting/crediting
+  // the member. Optional — frontend will be updated in a follow-up.
+  clientRequestId: z.string().max(200).nullish(),
 });
 
 const memberUpdateInput = z.object({
@@ -318,6 +322,11 @@ const checkoutInput = z.object({
   actorRole: z.string().optional(),
   // ROUND 63 (user) — รูปหลักฐานการชำระ (สลิป QR / สแกน) แนบไปกับบิล
   slipImage: z.string().max(600_000).nullish(),
+  // P2-b (idempotency) — client-generated key per checkout attempt. Retries
+  // with the same key return the original receipt instead of writing a second
+  // bill. Frontend will be updated to send a UUID per attempt in a follow-up;
+  // for now the field is optional so the existing UI keeps working.
+  clientRequestId: z.string().max(200).nullish(),
 });
 
 const productCreateInput = z.object({

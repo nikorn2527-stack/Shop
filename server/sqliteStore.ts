@@ -520,6 +520,14 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
   ensureColumn(db, "sales", "void_actor", "TEXT");
   ensureColumn(db, "sales", "voided_at", "TEXT");
   ensureColumn(db, "member_transactions", "slip_url", "TEXT");
+  // P2-b (idempotency) — client_request_id lets checkout() + walletTx()
+  // short-circuit a retried submit and return the original receipt/ledger row
+  // instead of double-charging the member or double-decrementing stock.
+  // NULL on legacy rows; only present on rows written through the idempotent path.
+  ensureColumn(db, "sales", "client_request_id", "TEXT");
+  ensureColumn(db, "member_transactions", "client_request_id", "TEXT");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_sales_client_req ON sales(client_request_id) WHERE client_request_id IS NOT NULL");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_member_tx_client_req ON member_transactions(client_request_id) WHERE client_request_id IS NOT NULL");
   // ROUND 65 (user) — รหัสบัตรเงินสด (23951…) และรหัสผู้ป่วย (HN) ของสมาชิกร้านค้าสวัสดิการ
   ensureColumn(db, "members", "card_number", "TEXT");
   ensureColumn(db, "members", "patient_code", "TEXT");
@@ -1500,9 +1508,52 @@ export type CheckoutInput = {
   actorRole?: string;
   /** ROUND 63 (user) — รูปหลักฐานการชำระ (สลิปโอน/สแกนจ่าย) data-URL · ไม่แนบ = ไม่ส่ง */
   slipImage?: string | null;
+  /**
+   * P2-b (idempotency) — client-generated key (UUID) sent once per checkout
+   * attempt. Retries with the SAME key return the original receipt instead
+   * of writing a second bill. Omitted on legacy clients → no idempotency.
+   */
+  clientRequestId?: string | null;
 };
 
 export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
+  // P2-b (idempotency) — short-circuit a retried submit BEFORE touching stock
+  // or wallet balance. The client is expected to send the SAME clientRequestId
+  // for every retry of one logical checkout. We replay the original receipt
+  // (items + totals + balanceAfter) so the UI shows the same slip again.
+  if (input.clientRequestId) {
+    const existing = db.prepare(`SELECT id, order_number AS orderNumber, created_at AS createdAt, subtotal, discount, total, payment_method AS paymentMethod, member_number AS memberNumber, cashier FROM sales WHERE client_request_id = ? LIMIT 1`).get(input.clientRequestId) as
+      | { id: number; orderNumber: string; createdAt: string; subtotal: number; discount: number; total: number; paymentMethod: string; memberNumber: string | null; cashier: string | null }
+      | undefined;
+    if (existing) {
+      const itemRows = db.prepare(`SELECT product_id AS productId, name, COALESCE(unit, 'ชิ้น') AS unit, qty, price, ROUND(qty * price, 2) AS amount FROM sale_items WHERE sale_id = ?`).all(existing.id) as { productId: number | null; name: string; unit: string; qty: number; price: number; amount: number }[];
+      // Replay memberName + balanceAfter the same way salesList() does so the
+      // reprinted slip is byte-identical to the original.
+      let memberName: string | null = null;
+      let balanceAfter: number | null = null;
+      if (existing.memberNumber) {
+        const memberRow = db.prepare(`SELECT prename, first_name, last_name FROM members WHERE member_number = ?`).get(existing.memberNumber) as { prename: string | null; first_name: string; last_name: string } | undefined;
+        if (memberRow) {
+          memberName = [memberRow.prename, memberRow.first_name, memberRow.last_name].filter(Boolean).join(" ").trim() || null;
+        }
+        const balanceRow = db.prepare(`SELECT balance_after AS balanceAfter FROM member_transactions WHERE member_number = ? AND detail LIKE ? ORDER BY id DESC LIMIT 1`).get(existing.memberNumber, `บิล #${existing.orderNumber} ·%`) as { balanceAfter: number | null } | undefined;
+        balanceAfter = balanceRow?.balanceAfter ?? null;
+      }
+      return {
+        orderNumber: existing.orderNumber,
+        createdAt: existing.createdAt,
+        items: itemRows,
+        subtotal: existing.subtotal,
+        discount: existing.discount,
+        total: existing.total,
+        paymentMethod: existing.paymentMethod,
+        memberNumber: existing.memberNumber,
+        memberName,
+        balanceAfter,
+        cashier: existing.cashier,
+      };
+    }
+  }
   if (!input.items?.length) throw new StoreError("ยังไม่มีสินค้าในบิล");
   if (!PAYMENT_METHODS.includes(input.paymentMethod)) throw new StoreError("วิธีชำระเงินไม่ถูกต้อง");
   // Catalog lines merge by productId+price+label (round 31-12: money-mode
@@ -1587,7 +1638,7 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
   const slipImage = typeof input.slipImage === "string" && input.slipImage.startsWith("data:image/") ? input.slipImage.slice(0, 600_000) : null;
 
   return runInTransaction(db, () => {
-    const saleResult = db.prepare(`INSERT INTO sales (order_number, payment_method, member_number, subtotal, discount, total, cashier, created_at, slip_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    const saleResult = db.prepare(`INSERT INTO sales (order_number, payment_method, member_number, subtotal, discount, total, cashier, created_at, slip_url, client_request_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
       orderNumber,
       input.paymentMethod,
       member?.memberNumber ?? (input.memberNumber?.trim() || null),
@@ -1597,6 +1648,7 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
       cashier,
       createdAt,
       slipImage,
+      input.clientRequestId ?? null,
     );
     const saleId = Number(saleResult.lastInsertRowid);
     const insertItem = db.prepare(`INSERT INTO sale_items (sale_id, product_id, name, qty, price, cost, unit) VALUES (?, ?, ?, ?, ?, ?, ?)`);
@@ -1882,9 +1934,48 @@ export type WalletTxInput = {
   actorRole?: string;
   /** ROUND 63 (user) — รูปหลักฐาน (สลิปโอน/ถอน) data-URL · ไม่แนบ = ไม่ส่ง */
   slipImage?: string | null;
+  /**
+   * P2-b (idempotency) — client-generated key (UUID) sent once per wallet
+   * operation. Retries with the SAME key return the original transaction row
+   * instead of double-debiting/crediting the member. Omitted on legacy clients
+   * → no idempotency.
+   */
+  clientRequestId?: string | null;
 };
 
 export function walletTx(db: SqliteDb, input: WalletTxInput) {
+  // P2-b (idempotency) — short-circuit a retried submit BEFORE touching the
+  // member's balance. The client is expected to send the SAME clientRequestId
+  // for every retry of one logical wallet operation. We replay the original
+  // ledger row so the UI shows the same slip/result again.
+  if (input.clientRequestId) {
+    const existing = db.prepare(`SELECT member_number AS memberNumber, type, amount, balance_after AS balanceAfter, detail FROM member_transactions WHERE client_request_id = ? LIMIT 1`).get(input.clientRequestId) as
+      | { memberNumber: string; type: "deposit" | "withdrawal" | "refund"; amount: number; balanceAfter: number | null; detail: string }
+      | undefined;
+    if (existing) {
+      const memberRow = db.prepare(`SELECT prename, first_name, last_name, balance FROM members WHERE member_number = ?`).get(existing.memberNumber) as { prename: string | null; first_name: string; last_name: string; balance: number } | undefined;
+      // Match the normal-path return shape so the inferred walletTx return
+      // type stays the strict `string`/`number` the UI consumers expect —
+      // existing.balanceAfter is only null on legacy rows that predate the
+      // balance_after column; we fall back to the live balance in that case.
+      const memberName = memberRow
+        ? [memberRow.prename, memberRow.first_name, memberRow.last_name].filter(Boolean).join(" ")
+        : "";
+      const balanceAfter = existing.balanceAfter ?? memberRow?.balance ?? 0;
+      const balanceBefore = existing.type === "deposit"
+        ? round2(balanceAfter - Math.abs(existing.amount))
+        : round2(balanceAfter + Math.abs(existing.amount));
+      return {
+        memberNumber: existing.memberNumber,
+        memberName,
+        type: existing.type,
+        amount: Math.abs(existing.amount),
+        balanceBefore,
+        balanceAfter,
+        detail: existing.detail,
+      };
+    }
+  }
   if (!(input.amount > 0)) throw new StoreError("จำนวนเงินต้องมากกว่า 0");
   const amount = round2(input.amount);
   const member = db.prepare(`SELECT id, member_number as memberNumber, prename, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, credit_limit as creditLimit, card_number as cardNumber, patient_code as patientCode FROM members WHERE member_number = ?`).get(input.memberNumber?.trim()) as SqliteMember | undefined;
@@ -1908,7 +1999,7 @@ export function walletTx(db: SqliteDb, input: WalletTxInput) {
   const slipImage = typeof input.slipImage === "string" && input.slipImage.startsWith("data:image/") ? input.slipImage.slice(0, 600_000) : null;
   runInTransaction(db, () => {
     db.prepare(`UPDATE members SET balance = ? WHERE member_number = ?`).run(balanceAfter, member.memberNumber);
-    db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, actor, created_at, slip_url) VALUES (?, ?, ?, ?, 'เงินสด', ?, ?, ?, ?)`).run(
+    db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, actor, created_at, slip_url, client_request_id) VALUES (?, ?, ?, ?, 'เงินสด', ?, ?, ?, ?, ?)`).run(
       member.memberNumber,
       input.type,
       detail,
@@ -1917,6 +2008,7 @@ export function walletTx(db: SqliteDb, input: WalletTxInput) {
       actor,
       createdAt,
       slipImage,
+      input.clientRequestId ?? null,
     );
     logAction(
       db,
@@ -2891,6 +2983,16 @@ export function closeBusinessDay(db: SqliteDb, input: CloseDayInput = {}): DayCl
   const actor = input.actor?.trim() || "เจ้าหน้าที่ร้านค้า";
   const totals = status.totals;
   runInTransaction(db, () => {
+    // P2-b (double-close guard) — once this period is already snapshotted,
+    // a second close must NOT insert a duplicate row. The early SELECT inside
+    // the transaction prevents the common double-submit (double-click /
+    // double-tap on the close button). Note: SQLite's default BEGIN DEFERRED
+    // does not take a write lock until the first write, so two truly
+    // concurrent closes could still both pass the SELECT — but the UI sends
+    // closes serially per user, and the SELECT guard handles the realistic
+    // double-submit race cleanly.
+    const alreadyClosed = db.prepare(`SELECT 1 FROM day_closures WHERE period_start = ?`).get(status.periodStart);
+    if (alreadyClosed) throw new StoreError("รอบขายนี้ถูกตัดยอดไปแล้ว — ไม่สามารถตัดซ้อนได้");
     db.prepare(`INSERT INTO day_closures (period_start, closed_at, bills, pieces, revenue, cash_total, qr_total, wallet_total, deposits, withdrawals, closed_by, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
       status.periodStart,
       closedAt,
@@ -3195,11 +3297,15 @@ export function listShifts(db: SqliteDb, status?: string): CashierShift[] {
 export function voidSale(db: SqliteDb, input: { saleId: number; reason: string; actor?: string; actorRole?: string }): { reversed: boolean } {
   const sale = db.prepare(`SELECT id, order_number AS orderNumber, total, payment_method AS paymentMethod, member_number AS memberNumber FROM sales WHERE id = ?`).get(input.saleId) as { id: number; orderNumber: string; total: number; paymentMethod: string; memberNumber: string | null } | undefined;
   if (!sale) throw new StoreError("ไม่พบบิลนี้ในระบบ");
-  const existingVoid = db.prepare(`SELECT 1 FROM sales WHERE id = ? AND voided = 1`).get(input.saleId);
-  if (existingVoid) throw new StoreError("บิลนี้ถูกยกเลิกไปแล้ว");
   if (!input.reason.trim()) throw new StoreError("ต้องระบุเหตุผลในการยกเลิก");
   const items = db.prepare(`SELECT product_id AS productId, qty, cost FROM sale_items WHERE sale_id = ?`).all(input.saleId) as { productId: number; qty: number; cost: number }[];
   runInTransaction(db, () => {
+    // P2-b (TOCTOU fix) — the "already voided" check MUST live INSIDE the
+    // transaction. Otherwise two concurrent void requests can both pass the
+    // outer SELECT (neither sees the other's UPDATE) and double-refund the
+    // wallet + double-restore the stock.
+    const existingVoid = db.prepare(`SELECT 1 FROM sales WHERE id = ? AND voided = 1`).get(input.saleId);
+    if (existingVoid) throw new StoreError("บิลนี้ถูกยกเลิกไปแล้ว");
     // Reverse stock for each catalog item
     for (const item of items) {
       if (!item.productId) continue;
