@@ -1,0 +1,1674 @@
+     1→import { useState } from "react";
+     2→import {
+     3→  ArrowDownToLine,
+     4→  ArrowUpFromLine,
+     5→  CalendarDays,
+     6→  Camera,
+     7→  Check,
+     8→  CircleHelp,
+     9→  Download,
+    10→  FileImage,
+    11→  FileText,
+    12→  IdCard,
+    13→  ImagePlus,
+    14→  LockKeyhole,
+    15→  Printer,
+    16→  ReceiptText,
+    17→  RotateCcw,
+    18→  Settings2,
+    19→  ShieldCheck,
+    20→  ShoppingBag,
+    21→  ShoppingCart,
+    22→  Star,
+    23→  Trash2,
+    24→  TrendingDown,
+    25→  WalletCards,
+    26→  X,
+    27→} from "@/lib/icons";
+    28→import { blocker } from "@/components/BlockerAlert";
+    29→import { CameraCaptureModal } from "@/components/CameraCaptureModal";
+    30→import { MemberCardModal } from "@/components/MemberCardModal";
+    31→import { PrintPreviewModal } from "@/components/PrintPreviewModal";
+    32→import { SlipViewButton } from "@/components/SlipViewModal";
+    33→import { StatementModal } from "@/components/StatementModal";
+    34→import { trpc } from "@/lib/trpc";
+    35→import { downloadSlipFile } from "@/exportUtils";
+    36→import {
+    37→  ConfirmDialog,
+    38→  SectionHeader,
+    39→  StatusPill,
+    40→  formEnterNav,
+    41→} from "../PagePrimitives";
+    42→import {
+    43→  PRENAME_OPTIONS,
+    44→  compressImageToDataUrl,
+    45→  isAdminRole,
+    46→  memberFullName,
+    47→  money,
+    48→  roleThaiLabel,
+    49→  type MemberLite,
+    50→  type Role,
+    51→} from "../pageData";
+    52→import {
+    53→  MEMBER_STATUS_META,
+    54→  WALLET_TX_META,
+    55→  formatHistoryDate,
+    56→  formatLastActivity,
+    57→  formatThaiDate,
+    58→  getErrorMessage,
+    59→  isSameMonth,
+    60→  parseStoreDate,
+    61→} from "../viewFormat";
+    62→
+    63→/**
+    64→ * MemberDetail — single-member view: profile, stats, transaction history,
+    65→ * wallet modals (deposit/withdrawal/refund) with slip print, edit modal,
+    66→ * limit-reduction request dialog, card print, and statement export.
+    67→ *
+    68→ * Extracted from Home.tsx (V2-C2) — pure move, no business-logic change.
+    69→ *
+    70→ * ROUND 77 (user) — wallet modal becomes a slip after success with the same
+    71→ * download/print buttons as receipts, instead of closing immediately.
+    72→ * Round 31 — deposit/withdrawal here also use a 2-step flow (form → confirm).
+    73→ * ROUND 34 (req 23.2) — limit-reduction request is a 2-step flow that lands
+    74→ * in "pending review" status until an admin approves it.
+    75→ * ROUND 38 (ข้อ 37) — member photo upload from camera in the edit dialog.
+    76→ */
+    77→export function MemberDetail({
+    78→  member,
+    79→  onBack,
+    80→  role,
+    81→  userName,
+    82→  onDeleted,
+    83→}: {
+    84→  member: MemberLite;
+    85→  onBack: () => void;
+    86→  role: Role;
+    87→  userName: string;
+    88→  onDeleted: (message: string) => void;
+    89→}) {
+    90→  const utils = trpc.useUtils();
+    91→  const detailQuery = trpc.member.detail.useQuery({
+    92→    memberNumber: member.memberNumber,
+    93→  });
+    94→  // Enhancement panel — real spending stats from sales (hidden silently on error).
+    95→  const statsQuery = trpc.member.stats.useQuery(
+    96→    { memberNumber: member.memberNumber },
+    97→    { enabled: Boolean(member.memberNumber) }
+    98→  );
+    99→  const [tab, setTab] = useState<
+   100→    | "ทั้งหมด"
+   101→    | "ซื้อสินค้า"
+   102→    | "เติมเงิน"
+   103→    | "ถอนเงิน"
+   104→    | "เปิดใช้บัตร"
+   105→    | "คืนบัตรเงินสด"
+   106→  >("ทั้งหมด");
+   107→  const [confirmStatus, setConfirmStatus] = useState(false);
+   108→  const [walletOpen, setWalletOpen] = useState<
+   109→    "deposit" | "withdrawal" | "refund" | null
+   110→  >(null);
+   111→  const [walletAmount, setWalletAmount] = useState("");
+   112→  const [walletNote, setWalletNote] = useState("");
+   113→  // ROUND 77 (user) — สลิปเติม/ถอน/คืนบัตรที่หน้าสมาชิก: หลังบันทึกโมดัลเปลี่ยนเป็นสลิป
+   114→  // พร้อมปุ่มเหมือนใบเสร็จ (ดาวน์โหลด PDF / ดาวน์โหลดรูป / พิมพ์ผ่านพรีวิว) แทนการปิดทันที
+   115→  const [walletResult, setWalletResult] = useState<{
+   116→    memberNumber: string;
+   117→    memberName: string;
+   118→    type: "deposit" | "withdrawal" | "refund";
+   119→    amount: number;
+   120→    balanceBefore: number;
+   121→    balanceAfter: number;
+   122→    detail: string;
+   123→  } | null>(null);
+   124→  const [walletDoneAt, setWalletDoneAt] = useState<Date | null>(null);
+   125→  const [walletSlipBusy, setWalletSlipBusy] = useState("");
+   126→  const [walletPrintPreview, setWalletPrintPreview] = useState(false);
+   127→  const [notice, setNotice] = useState("");
+   128→  const [error, setError] = useState("");
+   129→  const [editOpen, setEditOpen] = useState(false);
+   130→  const [editForm, setEditForm] = useState<{
+   131→    prename: string;
+   132→    firstName: string;
+   133→    lastName: string;
+   134→    type: string;
+   135→    phone: string;
+   136→    idCard: string;
+   137→    gender: "ชาย" | "หญิง" | "ไม่ระบุ";
+   138→    photoUrl: string;
+   139→    creditLimit: string;
+   140→    cardNumber: string;
+   141→    patientCode: string;
+   142→  } | null>(null);
+   143→  // ROUND 38 (ข้อ 37) — ถ่ายรูปสมาชิกจากกล้อง ในโมดัลแก้ไขข้อมูล
+   144→  const [editCameraOpen, setEditCameraOpen] = useState(false);
+   145→  // Round 31 — เติม/ถอนจากหน้ารายละเอียดก็เป็น 2 ขั้นเหมือน POS: กรอก → ยืนยัน → บันทึก
+   146→  const [walletConfirm, setWalletConfirm] = useState(false);
+   147→  const [confirmDelete, setConfirmDelete] = useState(false);
+   148→  const [cardOpen, setCardOpen] = useState(false);
+   149→  const [statementOpen, setStatementOpen] = useState(false);
+   150→  // ROUND 34 (req 23.2) — ขอลดวงเงินซื้อสินค้าต่อวัน: 2 ขั้นเหมือนเติม/ถอน (กรอก → ยืนยัน → ส่ง)
+   151→  const [limitOpen, setLimitOpen] = useState(false);
+   152→  const [limitStep, setLimitStep] = useState<"form" | "confirm">("form");
+   153→  const [limitValue, setLimitValue] = useState("");
+   154→  const [limitReason, setLimitReason] = useState("");
+   155→  const actor = userName || "ผู้ใช้ระบบ";
+   156→  const actorRole = roleThaiLabel(role);
+   157→  const profile = detailQuery.data?.member ?? member;
+   158→  const transactions = detailQuery.data?.transactions ?? [];
+   159→  const monthPurchase = transactions
+   160→    .filter(
+   161→      tx =>
+   162→        tx.type === "purchase" &&
+   163→        isSameMonth(parseStoreDate(tx.createdAt), new Date())
+   164→    )
+   165→    .reduce((sum, tx) => sum - tx.amount, 0);
+   166→  const totalDeposited = transactions
+   167→    .filter(tx => tx.type === "deposit" || tx.type === "activation")
+   168→    .reduce((sum, tx) => sum + tx.amount, 0);
+   169→  const lastActivity = formatLastActivity(
+   170→    transactions[0]?.createdAt ?? member.lastTransactionAt
+   171→  );
+   172→  const displayName = memberFullName(profile);
+   173→  const statusMeta = MEMBER_STATUS_META[profile.status];
+   174→  const filtered = transactions.filter(
+   175→    tx => tab === "ทั้งหมด" || WALLET_TX_META[tx.type]?.label === tab
+   176→  );
+   177→  const walletPreviewAmount = Number(walletAmount) || 0;
+   178→  const balanceAfterWallet =
+   179→    walletOpen === "deposit"
+   180→      ? profile.balance + walletPreviewAmount
+   181→      : profile.balance - walletPreviewAmount;
+   182→  // ROUND 65 — ป้ายประเภทการเติม/ถอน/คืนบัตร ใช้ร่วมกันทั้งโมดัล
+   183→  const walletModeLabel =
+   184→    walletOpen === "deposit"
+   185→      ? "เติมเงิน"
+   186→      : walletOpen === "refund"
+   187→        ? "คืนบัตรเงินสด"
+   188→        : "ถอนเงิน";
+   189→  const walletMutation = trpc.member.wallet.useMutation({
+   190→    onSuccess: result => {
+   191→      // ROUND 77 — ไม่ปิดโมดัลทันที: เปลี่ยนเป็นหน้าสลิกให้พิมพ์/ดาวน์โหลดก่อน
+   192→      setWalletResult(result);
+   193→      setWalletDoneAt(new Date());
+   194→      setWalletConfirm(false);
+   195→      setWalletAmount("");
+   196→      setWalletNote("");
+   197→      setError("");
+   198→      setNotice(
+   199→        `${result.type === "deposit" ? "เติมเงิน" : result.type === "refund" ? "คืนบัตรเงินสด" : "ถอนเงิน"} ${result.memberName} (${result.memberNumber}) สำเร็จ · ยอดคงเหลือ ${money(result.balanceAfter)}`
+   200→      );
+   201→      void utils.member.list.invalidate();
+   202→      void utils.member.detail.invalidate();
+   203→    },
+   204→    // ROUND 78 — เติม/ถอน/คืนบัตรไม่สำเร็จ (เช่น "ยอดเงินคงเหลือไม่พอ") — เด้งกลางจอ
+   205→    // ให้ชัด (notice-bar ในโมดัลยังอยู่เป็นหลักฐานหลังปิดกล่อง)
+   206→    onError: mutationError => {
+   207→      setError(getErrorMessage(mutationError));
+   208→      blocker.error("บันทึกรายการไม่สำเร็จ", getErrorMessage(mutationError), {
+   209→        hint: "รายการนี้ยังไม่ถูกบันทึก — แก้ไขจำนวนแล้วยืนยันใหม่ได้เลย",
+   210→      });
+   211→    },
+   212→  });
+   213→  // ROUND 77 — ปิดสลิป (และล้างผลลัพธ์) กลับไปหน้ารายละเอียดสมาชิก
+   214→  const closeWalletSlip = () => {
+   215→    setWalletOpen(null);
+   216→    setWalletResult(null);
+   217→    setWalletDoneAt(null);
+   218→    setWalletSlipBusy("");
+   219→    setWalletPrintPreview(false);
+   220→  };
+   221→  const downloadWalletSlip = async (format: "pdf" | "image") => {
+   222→    if (!walletResult) return;
+   223→    setWalletSlipBusy(format);
+   224→    try {
+   225→      const stamp = walletDoneAt
+   226→        ? `${String(walletDoneAt.getFullYear() + 543).slice(2)}${String(walletDoneAt.getMonth() + 1).padStart(2, "0")}${String(walletDoneAt.getDate()).padStart(2, "0")}-${String(walletDoneAt.getHours()).padStart(2, "0")}${String(walletDoneAt.getMinutes()).padStart(2, "0")}`
+   227→        : String(Date.now());
+   228→      const kindLabel =
+   229→        walletResult.type === "deposit"
+   230→          ? "เติมเงิน"
+   231→          : walletResult.type === "refund"
+   232→            ? "คืนบัตรเงินสด"
+   233→            : "ถอนเงิน";
+   234→      await downloadSlipFile(
+   235→        "member-wallet-slip",
+   236→        `สลิป${kindLabel}-${walletResult.memberNumber}-${stamp}`,
+   237→        format
+   238→      );
+   239→    } finally {
+   240→      setWalletSlipBusy("");
+   241→    }
+   242→  };
+   243→  const statusMutation = trpc.member.setStatus.useMutation({
+   244→    onSuccess: result => {
+   245→      const member = result?.member;
+   246→      if (!member) return;
+   247→      setNotice(
+   248→        `${member.status === "suspended" ? "ระงับการใช้งาน" : "คืนสถานะการใช้งาน"} ${memberFullName(member)} แล้ว`
+   249→      );
+   250→      void utils.member.list.invalidate();
+   251→      void utils.member.detail.invalidate();
+   252→    },
+   253→    onError: mutationError => setError(getErrorMessage(mutationError)),
+   254→  });
+   255→  const updateMutation = trpc.member.update.useMutation({
+   256→    onSuccess: result => {
+   257→      setEditOpen(false);
+   258→      setError("");
+   259→      setNotice(
+   260→        `บันทึกการแก้ไขข้อมูลสมาชิกเรียบร้อยแล้ว · ${memberFullName(result)}`
+   261→      );
+   262→      void utils.member.detail.invalidate({
+   263→        memberNumber: member.memberNumber,
+   264→      });
+   265→      void utils.member.list.invalidate();
+   266→    },
+   267→    onError: mutationError => setError(getErrorMessage(mutationError)),
+   268→  });
+   269→  // ROUND 34 (req 23.2) — ยื่นคำขอลดวงเงิน: เจ้าหน้าที่ทุกคนทำได้ คำขอเข้าสถานะรอพิจารณา
+   270→  const limitRequestMutation = trpc.member.requestLimitReduction.useMutation({
+   271→    onSuccess: () => {
+   272→      setLimitOpen(false);
+   273→      setLimitStep("form");
+   274→      setLimitValue("");
+   275→      setLimitReason("");
+   276→      setError("");
+   277→      setNotice("ส่งคำขอลดวงเงินเรียบร้อย · รอผู้บริหารพิจารณา");
+   278→      void utils.member.list.invalidate();
+   279→      void utils.member.detail.invalidate();
+   280→      void utils.reports.memberTransactions.invalidate();
+   281→    },
+   282→    onError: mutationError => setError(getErrorMessage(mutationError)),
+   283→  });
+   284→  const deleteMutation = trpc.member.delete.useMutation({
+   285→    onSuccess: result => {
+   286→      void utils.member.list.invalidate();
+   287→      void utils.dashboard.stats.invalidate();
+   288→      onDeleted(
+   289→        `ลบสมาชิก ${result.memberName} (${result.memberNumber}) ออกจากระบบแล้ว`
+   290→      );
+   291→    },
+   292→    onError: mutationError => setError(getErrorMessage(mutationError)),
+   293→  });
+   294→  const openEdit = () => {
+   295→    const detail = detailQuery.data?.member;
+   296→    setEditForm({
+   297→      prename: detail?.prename ?? profile.prename ?? "",
+   298→      firstName: detail?.firstName ?? profile.firstName,
+   299→      lastName: detail?.lastName ?? profile.lastName,
+   300→      type: detail?.type ?? profile.type,
+   301→      phone: detail?.phone ?? "",
+   302→      idCard: detail?.idCard ?? "",
+   303→      gender:
+   304→        detail?.gender === "ชาย"
+   305→          ? "ชาย"
+   306→          : detail?.gender === "หญิง"
+   307→            ? "หญิง"
+   308→            : "ไม่ระบุ",
+   309→      photoUrl: detail?.photoUrl ?? "",
+   310→      creditLimit:
+   311→        detail?.creditLimit != null ? String(detail.creditLimit) : "",
+   312→      cardNumber: detail?.cardNumber ?? profile.cardNumber ?? "",
+   313→      patientCode: detail?.patientCode ?? profile.patientCode ?? "",
+   314→    });
+   315→    setError("");
+   316→    setEditOpen(true);
+   317→  };
+   318→  // Round 31 — member photo upload in the edit dialog (shrunk to a data-URL).
+   319→  const onEditPhotoPick = (event: React.ChangeEvent<HTMLInputElement>) => {
+   320→    const file = event.target.files?.[0];
+   321→    event.target.value = "";
+   322→    if (!file) return;
+   323→    if (!/^image\/(png|jpe?g|webp)$/.test(file.type)) {
+   324→      setError("รองรับเฉพาะไฟล์รูป PNG JPG WEBP");
+   325→      return;
+   326→    }
+   327→    if (file.size > 8_000_000) {
+   328→      setError("ไฟล์รูปใหญ่เกิน 8MB — เลือกไฟล์เล็กลง");
+   329→      return;
+   330→    }
+   331→    compressImageToDataUrl(file, 480, 0.72)
+   332→      .then(dataUrl => {
+   333→        setEditForm(current =>
+   334→          current ? { ...current, photoUrl: dataUrl } : current
+   335→        );
+   336→        setError("");
+   337→      })
+   338→      .catch(() => setError("อ่านไฟล์รูปไม่สำเร็จ"));
+   339→  };
+   340→  const submitEdit = () => {
+   341→    if (!editForm) return;
+   342→    if (!editForm.firstName.trim() || !editForm.lastName.trim()) {
+   343→      setError("กรุณาระบุชื่อและนามสกุลสมาชิก");
+   344→      return;
+   345→    }
+   346→    // ROUND 34 — วงเงินซื้อสินค้าต่อวัน: เว้นว่าง = ไม่จำกัด (null) ไม่งั้นต้องเป็นจำนวนเต็มบวก
+   347→    const creditLimitDraft = editForm.creditLimit.trim();
+   348→    const creditLimitValue =
+   349→      creditLimitDraft === "" ? null : Number(creditLimitDraft);
+   350→    if (
+   351→      creditLimitValue !== null &&
+   352→      (!Number.isFinite(creditLimitValue) ||
+   353→        !Number.isInteger(creditLimitValue) ||
+   354→        creditLimitValue <= 0 ||
+   355→        creditLimitValue > 1_000_000)
+   356→    ) {
+   357→      setError("วงเงินต้องเป็นตัวเลขมากกว่า 0 และไม่เกิน 1,000,000");
+   358→      return;
+   359→    }
+   360→    setError("");
+   361→    updateMutation.mutate({
+   362→      memberNumber: member.memberNumber,
+   363→      prename: editForm.prename.trim() || null,
+   364→      firstName: editForm.firstName.trim(),
+   365→      lastName: editForm.lastName.trim(),
+   366→      idCard: editForm.idCard.trim() || null,
+   367→      phone: editForm.phone.trim() || null,
+   368→      type: editForm.type,
+   369→      gender: editForm.gender,
+   370→      photoUrl: editForm.photoUrl || null,
+   371→      creditLimit: creditLimitValue,
+   372→      cardNumber: editForm.cardNumber.trim() || null,
+   373→      patientCode: editForm.patientCode.trim() || null,
+   374→      actor,
+   375→      actorRole,
+   376→    });
+   377→  };
+   378→  const submitWallet = () => {
+   379→    if (!walletOpen) return;
+   380→    const amount = Number(walletAmount);
+   381→    if (!(amount > 0)) {
+   382→      setError("กรุณาระบุจำนวนเงินมากกว่า 0");
+   383→      return;
+   384→    }
+   385→    if (walletOpen !== "deposit" && amount > profile.balance) {
+   386→      setError(
+   387→        `ยอดเงินคงเหลือไม่พอ · ${walletOpen === "refund" ? "คืนบัตร" : "ถอน"} ${money(amount)} คงเหลือ ${money(profile.balance)}`
+   388→      );
+   389→      return;
+   390→    }
+   391→    setError("");
+   392→    setWalletConfirm(true);
+   393→  };
+   394→  const confirmWallet = () => {
+   395→    if (!walletOpen || !(Number(walletAmount) > 0)) {
+   396→      setWalletConfirm(false);
+   397→      return;
+   398→    }
+   399→    walletMutation.mutate({
+   400→      clientRequestId: crypto.randomUUID(),
+   401→      memberNumber: member.memberNumber,
+   402→      type: walletOpen,
+   403→      amount: Number(walletAmount),
+   404→      note: walletNote.trim() || undefined,
+   405→      actor,
+   406→      actorRole,
+   407→    });
+   408→  };
+   409→  // ROUND 34 (req 23.2) — ขอลดวงเงิน: เปิดโมดัล + ตรวจข้อมูลก่อนขั้นยืนยัน + ส่งคำขอ
+   410→  const openLimitDialog = () => {
+   411→    setLimitValue("");
+   412→    setLimitReason("");
+   413→    setLimitStep("form");
+   414→    setError("");
+   415→    setLimitOpen(true);
+   416→  };
+   417→  const submitLimitRequest = () => {
+   418→    const value = Number(limitValue);
+   419→    if (
+   420→      limitValue.trim() === "" ||
+   421→      !Number.isFinite(value) ||
+   422→      !Number.isInteger(value) ||
+   423→      value <= 0 ||
+   424→      value > 1_000_000
+   425→    ) {
+   426→      setError(
+   427→        "วงเงินใหม่ต้องเป็นตัวเลขจำนวนเต็มมากกว่า 0 และไม่เกิน 1,000,000"
+   428→      );
+   429→      return;
+   430→    }
+   431→    if (profile.creditLimit != null && value >= profile.creditLimit) {
+   432→      setError(
+   433→        `วงเงินใหม่ต้องน้อยกว่าวงเงินปัจจุบัน (${money(profile.creditLimit)})`
+   434→      );
+   435→      return;
+   436→    }
+   437→    setError("");
+   438→    setLimitStep("confirm");
+   439→  };
+   440→  const confirmLimitRequest = () => {
+   441→    const value = Number(limitValue);
+   442→    if (!Number.isInteger(value) || value <= 0) {
+   443→      setLimitStep("form");
+   444→      return;
+   445→    }
+   446→    limitRequestMutation.mutate({
+   447→      memberNumber: member.memberNumber,
+   448→      requestedLimit: value,
+   449→      reason: limitReason.trim() || undefined,
+   450→      actor,
+   451→      actorRole,
+   452→    });
+   453→  };
+   454→  return (
+   455→    <>
+   456→      <SectionHeader
+   457→        eyebrow="สมาชิกและบัญชี / รายละเอียด"
+   458→        title={`รายละเอียด ${displayName}`}
+   459→        description="ตรวจสอบประวัติการซื้อสินค้า เติมเงิน และถอนเงินของสมาชิกแต่ละราย"
+   460→        action={
+   461→          <button className="outline-button" onClick={onBack}>
+   462→            <ArrowDownToLine size={16} style={{ transform: "rotate(90deg)" }} />{" "}
+   463→            กลับไปรายการสมาชิก
+   464→          </button>
+   465→        }
+   466→      />
+   467→      <div className="member-detail-head">
+   468→        <div className="member-detail-profile">
+   469→          <span className="member-detail-avatar">
+   470→            {profile.firstName.slice(0, 1)}
+   471→          </span>
+   472→          <div>
+   473→            <span className="eyebrow">
+   474→              {profile.type} · {profile.memberNumber}
+   475→            </span>
+   476→            <h2>{displayName}</h2>
+   477→            <p>
+   478→              บัตร <b className="cell-mono">{profile.cardNumber ?? "—"}</b> ·
+   479→              รหัสผู้ป่วย{" "}
+   480→              <b className="cell-mono">{profile.patientCode ?? "—"}</b> ·
+   481→              เปิดใช้ {formatThaiDate(profile.createdAt)}
+   482→              <br />
+   483→              สถานะ{" "}
+   484→              <StatusPill tone={statusMeta.tone}>
+   485→                {statusMeta.label}
+   486→              </StatusPill>{" "}
+   487→              <span
+   488→                className="member-limit-chip"
+   489→                title="วงเงินซื้อสินค้าต่อวันของสมาชิกนี้ (ชำระหักบัญชี) — เว้นว่างคือไม่จำกัด"
+   490→              >
+   491→                วงเงินซื้อ/วัน{" "}
+   492→                {profile.creditLimit != null
+   493→                  ? money(profile.creditLimit)
+   494→                  : "ไม่จำกัด"}
+   495→              </span>
+   496→            </p>
+   497→          </div>
+   498→        </div>
+   499→        <div className="member-detail-actions">
+   500→          <button
+   501→            className="primary-button"
+   502→            disabled={profile.status !== "active"}
+   503→            onClick={() => {
+   504→              setWalletOpen("deposit");
+   505→              setWalletConfirm(false);
+   506→              setWalletResult(null);
+   507→              setError("");
+   508→            }}
+   509→          >
+   510→            <ArrowDownToLine size={15} /> เติมเงิน
+   511→          </button>
+   512→          <button
+   513→            className="outline-button"
+   514→            disabled={profile.status !== "active"}
+   515→            onClick={() => {
+   516→              setWalletOpen("withdrawal");
+   517→              setWalletConfirm(false);
+   518→              setWalletResult(null);
+   519→              setError("");
+   520→            }}
+   521→          >
+   522→            <ArrowUpFromLine size={15} /> ถอนเงิน
+   523→          </button>
+   524→          <button
+   525→            className="outline-button refund-card-button"
+   526→            disabled={profile.status !== "active" || profile.balance <= 0}
+   527→            onClick={() => {
+   528→              setWalletOpen("refund");
+   529→              setWalletAmount(
+   530→                profile.balance > 0 ? String(profile.balance) : ""
+   531→              );
+   532→              setWalletConfirm(false);
+   533→              setWalletResult(null);
+   534→              setError("");
+   535→            }}
+   536→            title="ผู้ป่วยคืนบัตรเมื่อออกจากโรงพยาบาล — จ่ายเงินสดคืนตามยอดคงเหลือ แล้วยอดเหลือเป็น 0"
+   537→          >
+   538→            <IdCard size={15} /> คืนบัตรเงินสด
+   539→          </button>
+   540→          <button
+   541→            className="outline-button"
+   542→            onClick={openLimitDialog}
+   543→            title="ยื่นคำขอลดวงเงินซื้อสินค้าต่อวัน — รอผู้บริหารพิจารณา"
+   544→          >
+   545→            <TrendingDown size={15} /> ขอลดวงเงิน
+   546→          </button>
+   547→          {profile.status === "active" ? (
+   548→            <button
+   549→              className="danger-outline-button"
+   550→              onClick={() => setConfirmStatus(true)}
+   551→            >
+   552→              <LockKeyhole size={15} /> ระงับการใช้งาน
+   553→            </button>
+   554→          ) : (
+   555→            <button
+   556→              className="outline-button"
+   557→              onClick={() => setConfirmStatus(true)}
+   558→            >
+   559→              <Check size={15} /> คืนสถานะ
+   560→            </button>
+   561→          )}
+   562→          <button className="outline-button" onClick={openEdit}>
+   563→            <Settings2 size={15} /> แก้ไขข้อมูลสมาชิก
+   564→          </button>
+   565→          <button
+   566→            className="outline-button"
+   567→            disabled={detailQuery.isLoading}
+   568→            onClick={() => setStatementOpen(true)}
+   569→          >
+   570→            <FileText size={15} /> ส่งออกรายงานธุรกรรม
+   571→          </button>
+   572→          <button className="outline-button" onClick={() => setCardOpen(true)}>
+   573→            <IdCard size={15} /> พิมพ์บัตรสมาชิก
+   574→          </button>
+   575→          {isAdminRole(role) && (
+   576→            <button
+   577→              className="danger-outline-button"
+   578→              onClick={() => {
+   579→                setConfirmDelete(true);
+   580→                setError("");
+   581→              }}
+   582→            >
+   583→              <Trash2 size={15} /> ลบสมาชิก
+   584→            </button>
+   585→          )}
+   586→        </div>
+   587→      </div>
+   588→      {error && !walletOpen && !editOpen && !limitOpen && (
+   589→        <div className="notice-bar error" style={{ marginBottom: 14 }}>
+   590→          <ShieldCheck size={16} /> {error}
+   591→          <button onClick={() => setError("")}>
+   592→            <X size={14} />
+   593→          </button>
+   594→        </div>
+   595→      )}
+   596→      <div className="member-detail-stats">
+   597→        <div>
+   598→          <span className="stat-icon green">
+   599→            <WalletCards size={18} />
+   600→          </span>
+   601→          <div>
+   602→            <small>ยอดเงินคงเหลือ</small>
+   603→            <strong>{money(profile.balance)}</strong>
+   604→          </div>
+   605→        </div>
+   606→        <div>
+   607→          <span className="stat-icon blue">
+   608→            <ShoppingCart size={18} />
+   609→          </span>
+   610→          <div>
+   611→            <small>ยอดซื้อเดือนนี้</small>
+   612→            <strong>{money(monthPurchase)}</strong>
+   613→          </div>
+   614→        </div>
+   615→        <div>
+   616→          <span className="stat-icon purple">
+   617→            <ArrowDownToLine size={18} />
+   618→          </span>
+   619→          <div>
+   620→            <small>เติมเงินสะสม</small>
+   621→            <strong>{money(totalDeposited)}</strong>
+   622→          </div>
+   623→        </div>
+   624→        <div>
+   625→          <span className="stat-icon amber">
+   626→            <CalendarDays size={18} />
+   627→          </span>
+   628→          <div>
+   629→            <small>รายการล่าสุด</small>
+   630→            <strong>{lastActivity}</strong>
+   631→          </div>
+   632→        </div>
+   633→      </div>
+   634→      {statsQuery.isLoading ? (
+   635→        <div
+   636→          className="member-detail-stats member-purchase-stats"
+   637→          aria-busy="true"
+   638→        >
+   639→          {Array.from({ length: 4 }, (_, index) => (
+   640→            <div key={`stat-skeleton-${index}`}>
+   641→              <span className="skeleton-avatar" />
+   642→              <div className="member-stat-skeleton">
+   643→                <span className="skeleton-cell-n" />
+   644→                <span className="skeleton-cell-w" />
+   645→              </div>
+   646→            </div>
+   647→          ))}
+   648→        </div>
+   649→      ) : statsQuery.data ? (
+   650→        <div className="member-detail-stats member-purchase-stats">
+   651→          <div>
+   652→            <span className="stat-icon blue">
+   653→              <ReceiptText size={18} />
+   654→            </span>
+   655→            <div>
+   656→              <small>ยอดซื้อสะสม</small>
+   657→              <strong>{money(statsQuery.data.totalSpent)}</strong>
+   658→            </div>
+   659→          </div>
+   660→          <div>
+   661→            <span className="stat-icon green">
+   662→              <ShoppingBag size={18} />
+   663→            </span>
+   664→            <div>
+   665→              <small>จำนวนบิล</small>
+   666→              <strong>{statsQuery.data.billCount} บิล</strong>
+   667→            </div>
+   668→          </div>
+   669→          <div>
+   670→            <span className="stat-icon purple">
+   671→              <CalendarDays size={18} />
+   672→            </span>
+   673→            <div>
+   674→              <small>ซื้อครั้งล่าสุด</small>
+   675→              <strong>
+   676→                {statsQuery.data.lastPurchaseAt
+   677→                  ? formatHistoryDate(statsQuery.data.lastPurchaseAt)
+   678→                  : "ยังไม่เคยซื้อ"}
+   679→              </strong>
+   680→            </div>
+   681→          </div>
+   682→          <div>
+   683→            <span className="stat-icon amber">
+   684→              <Star size={18} />
+   685→            </span>
+   686→            <div className="member-top-products">
+   687→              <small>สินค้าที่ซื้อบ่อย</small>
+   688→              {statsQuery.data.topProducts.length === 0 ? (
+   689→                <span className="top-products-empty">
+   690→                  ยังไม่มีประวัติการซื้อสินค้า
+   691→                </span>
+   692→              ) : (
+   693→                <div className="top-products-list">
+   694→                  {statsQuery.data.topProducts.map(product => (
+   695→                    <span className="top-product-chip" key={product.name}>
+   696→                      {product.name} <b>×{product.qty}</b>
+   697→                    </span>
+   698→                  ))}
+   699→                </div>
+   700→              )}
+   701→            </div>
+   702→          </div>
+   703→        </div>
+   704→      ) : null}
+   705→      <section className="panel table-panel member-history-panel">
+   706→        <div className="table-toolbar">
+   707→          <div>
+   708→            <h2>ประวัติการทำรายการ</h2>
+   709→            <p>
+   710→              ข้อมูลย้อนหลังของ {displayName} · รวม {transactions.length} รายการ
+   711→            </p>
+   712→          </div>
+   713→          <div className="filter-pills history-tabs">
+   714→            {[
+   715→              "ทั้งหมด",
+   716→              "ซื้อสินค้า",
+   717→              "เติมเงิน",
+   718→              "ถอนเงิน",
+   719→              "เปิดใช้บัตร",
+   720→              "คืนบัตรเงินสด",
+   721→            ].map(item => (
+   722→              <button
+   723→                className={tab === item ? "active" : ""}
+   724→                key={item}
+   725→                onClick={() => setTab(item as typeof tab)}
+   726→              >
+   727→                {item}
+   728→              </button>
+   729→            ))}
+   730→          </div>
+   731→        </div>
+   732→        <div className="member-history-list">
+   733→          {detailQuery.isLoading ? (
+   734→            <div className="table-loading">
+   735→              <ReceiptText size={22} />
+   736→              <b>กำลังโหลดประวัติการทำรายการ</b>
+   737→              <span>ดึงข้อมูลธุรกรรมของสมาชิกจากระบบ</span>
+   738→            </div>
+   739→          ) : filtered.length === 0 ? (
+   740→            <div className="table-loading">
+   741→              <ReceiptText size={22} />
+   742→              <b>ไม่พบรายการตามเงื่อนไข</b>
+   743→              <span>ลองเปลี่ยนแท็บหรือทำรายการผ่าน POS</span>
+   744→            </div>
+   745→          ) : (
+   746→            filtered.map(transaction => {
+   747→              const meta = WALLET_TX_META[transaction.type] ?? {
+   748→                label: transaction.type,
+   749→                tone: "blue",
+   750→              };
+   751→              return (
+   752→                <div className="history-row" key={transaction.id}>
+   753→                  <span className={`history-icon ${meta.tone}`}>
+   754→                    {transaction.type === "purchase" ? (
+   755→                      <ShoppingCart size={16} />
+   756→                    ) : transaction.type === "deposit" ? (
+   757→                      <ArrowDownToLine size={16} />
+   758→                    ) : transaction.type === "activation" ? (
+   759→                      <IdCard size={16} />
+   760→                    ) : (
+   761→                      <ArrowUpFromLine size={16} />
+   762→                    )}
+   763→                  </span>
+   764→                  <div className="history-main">
+   765→                    <div>
+   766→                      <b>{meta.label}</b>
+   767→                      <span>{`TX-${String(transaction.id).padStart(3, "0")}`}</span>
+   768→                    </div>
+   769→                    <small>{transaction.detail}</small>
+   770→                    <time>{formatHistoryDate(transaction.createdAt)}</time>
+   771→                  </div>
+   772→                  {transaction.hasSlip === 1 && (
+   773→                    <SlipViewButton
+   774→                      kind="tx"
+   775→                      id={transaction.id}
+   776→                      title={`หลักฐาน${meta.label}`}
+   777→                      subtitle={`${profile.memberNumber} · ${formatHistoryDate(transaction.createdAt)}`}
+   778→                    />
+   779→                  )}
+   780→                  <strong
+   781→                    className={transaction.amount > 0 ? "positive" : "negative"}
+   782→                  >
+   783→                    {transaction.amount > 0 ? "+ " : "- "}
+   784→                    {money(Math.abs(transaction.amount))}
+   785→                  </strong>
+   786→                </div>
+   787→              );
+   788→            })
+   789→          )}
+   790→        </div>
+   791→        {notice && (
+   792→          <div className="notice-bar">
+   793→            <Check size={16} /> {notice}
+   794→            <button onClick={() => setNotice("")}>
+   795→              <X size={14} />
+   796→            </button>
+   797→          </div>
+   798→        )}
+   799→      </section>
+   800→      {walletOpen && (
+   801→        <div className="modal-backdrop" onClick={closeWalletSlip}>
+   802→          <div
+   803→            className="form-modal"
+   804→            onClick={event => event.stopPropagation()}
+   805→          >
+   806→            <div className="modal-heading">
+   807→              <div>
+   808→                <span className="eyebrow">
+   809→                  {walletResult
+   810→                    ? walletResult.type === "deposit"
+   811→                      ? "สลิปเติมเงิน"
+   812→                      : walletResult.type === "refund"
+   813→                        ? "สลิปคืนบัตรเงินสด"
+   814→                        : "สลิปถอนเงิน"
+   815→                    : "รายการธุรกรรม"}
+   816→                </span>
+   817→                <h2>
+   818→                  {walletResult
+   819→                    ? walletResult.type === "deposit"
+   820→                      ? "สลิปเติมเงิน"
+   821→                      : walletResult.type === "refund"
+   822→                        ? "สลิปคืนบัตรเงินสด"
+   823→                        : "สลิปถอนเงิน"
+   824→                    : walletOpen === "deposit"
+   825→                      ? "เติมเงินเข้าบัญชีสมาชิก"
+   826→                      : walletOpen === "refund"
+   827→                        ? "คืนบัตรเงินสด (จ่ายเงินคืนผู้ป่วย)"
+   828→                        : "ถอนเงินจากบัญชีสมาชิก"}
+   829→                </h2>
+   830→                <p>
+   831→                  {walletResult
+   832→                    ? `${walletResult.memberName} · ${walletResult.memberNumber} · บันทึกเรียบร้อย`
+   833→                    : `${displayName} · ${profile.memberNumber} · ยอดคงเหลือ ${money(profile.balance)}${walletOpen === "refund" ? " · บัตรที่คืนต้องเหลือยอด 0" : ""}`}
+   834→                </p>
+   835→              </div>
+   836→              <button className="icon-button" onClick={closeWalletSlip}>
+   837→                <X size={17} />
+   838→              </button>
+   839→            </div>
+   840→            {walletResult ? (
+   841→              <>
+   842→                <div className="wallet-success">
+   843→                  <div
+   844→                    className="receipt-paper wallet-slip"
+   845→                    id="member-wallet-slip"
+   846→                  >
+   847→                    <div className="receipt-success slip">
+   848→                      <span>
+   849→                        {walletResult.type === "deposit" ? (
+   850→                          <ArrowDownToLine size={22} />
+   851→                        ) : (
+   852→                          <ArrowUpFromLine size={22} />
+   853→                        )}
+   854→                      </span>
+   855→                      <div>
+   856→                        <b>
+   857→                          {walletResult.type === "deposit"
+   858→                            ? "เติมเงินสำเร็จ"
+   859→                            : walletResult.type === "refund"
+   860→                              ? "คืนบัตรเงินสดสำเร็จ"
+   861→                              : "ถอนเงินสำเร็จ"}
+   862→                        </b>
+   863→                        <small>บันทึกลงรายการธุรกรรมของสมาชิกแล้ว</small>
+   864→                      </div>
+   865→                    </div>
+   866→                    <div className="receipt-divider" />
+   867→                    <div className="receipt-meta">
+   868→                      <span>
+   869→                        {walletResult.type === "deposit"
+   870→                          ? "ใบยืนยันการเติมเงิน"
+   871→                          : walletResult.type === "refund"
+   872→                            ? "ใบยืนยันการคืนบัตรเงินสด"
+   873→                            : "ใบยืนยันการถอนเงิน"}
+   874→                      </span>
+   875→                      <b>
+   876→                        {walletDoneAt
+   877→                          ? `${walletDoneAt.toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" })} · ${walletDoneAt.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })} น.`
+   878→                          : ""}
+   879→                      </b>
+   880→                    </div>
+   881→                    <div className="receipt-customer">
+   882→                      <span>สมาชิก</span>
+   883→                      <b>
+   884→                        {walletResult.memberName} · {walletResult.memberNumber}
+   885→                      </b>
+   886→                    </div>
+   887→                    <div className="receipt-line">
+   888→                      <span>
+   889→                        {walletResult.type === "deposit"
+   890→                          ? "จำนวนเงินที่เติม"
+   891→                          : walletResult.type === "refund"
+   892→                            ? "จำนวนเงินที่คืน"
+   893→                            : "จำนวนเงินที่ถอน"}
+   894→                      </span>
+   895→                      <b>{money(walletResult.amount)}</b>
+   896→                    </div>
+   897→                    <div className="receipt-line">
+   898→                      <span>ยอดคงเหลือก่อนรายการ</span>
+   899→                      <b>{money(walletResult.balanceBefore)}</b>
+   900→                    </div>
+   901→                    <div className="receipt-total">
+   902→                      <span>ยอดคงเหลือหลังรายการ</span>
+   903→                      <b>{money(walletResult.balanceAfter)}</b>
+   904→                    </div>
+   905→                    <div className="receipt-payment">
+   906→                      <span>ผู้ทำรายการ</span>
+   907→                      <b>
+   908→                        {actor} · {actorRole}
+   909→                      </b>
+   910→                    </div>
+   911→                    <div className="receipt-thanks">
+   912→                      บันทึกเข้าระบบเรียบร้อย
+   913→                      ตรวจสอบยอดได้ที่ประวัติการทำรายการด้านล่าง
+   914→                      <br />
+   915→                      <small>ข้อมูลถูกบันทึกในประวัติระบบ แล้ว</small>
+   916→                    </div>
+   917→                  </div>
+   918→                  <div className="wallet-success-actions">
+   919→                    <button
+   920→                      className="outline-button"
+   921→                      disabled={Boolean(walletSlipBusy)}
+   922→                      onClick={() => void downloadWalletSlip("pdf")}
+   923→                    >
+   924→                      <Download size={16} />{" "}
+   925→                      {walletSlipBusy === "pdf"
+   926→                        ? "กำลังสร้าง PDF..."
+   927→                        : "ดาวน์โหลด PDF"}
+   928→                    </button>
+   929→                    <button
+   930→                      className="outline-button"
+   931→                      disabled={Boolean(walletSlipBusy)}
+   932→                      onClick={() => void downloadWalletSlip("image")}
+   933→                    >
+   934→                      <FileImage size={16} />{" "}
+   935→                      {walletSlipBusy === "image"
+   936→                        ? "กำลังสร้างรูป..."
+   937→                        : "ดาวน์โหลดรูปภาพ"}
+   938→                    </button>
+   939→                    <button
+   940→                      className="outline-button"
+   941→                      onClick={() => setWalletPrintPreview(true)}
+   942→                    >
+   943→                      <Printer size={16} /> พิมพ์สลิป
+   944→                    </button>
+   945→                    <button
+   946→                      className="primary-button"
+   947→                      onClick={closeWalletSlip}
+   948→                    >
+   949→                      <Check size={16} /> เสร็จสิ้น · ปิดหน้าต่าง
+   950→                    </button>
+   951→                  </div>
+   952→                </div>
+   953→              </>
+   954→            ) : walletConfirm ? (
+   955→              <>
+   956→                <div className="wallet-confirm-warning">
+   957→                  <ShieldCheck size={16} />
+   958→                  <span>
+   959→                    ยอดเงินจะยังไม่ถูกบันทึกเข้าบัญชี จนกว่าจะกด
+   960→                    “ยืนยันการทำรายการ”
+   961→                  </span>
+   962→                </div>
+   963→                <div className="wallet-confirm-rows">
+   964→                  <div>
+   965→                    <span>ประเภทรายการ</span>
+   966→                    <b
+   967→                      className={
+   968→                        walletOpen === "deposit" ? "green-text" : "amber-text"
+   969→                      }
+   970→                    >
+   971→                      {walletModeLabel}
+   972→                    </b>
+   973→                  </div>
+   974→                  <div>
+   975→                    <span>สมาชิก</span>
+   976→                    <b>
+   977→                      {displayName} · {profile.memberNumber}
+   978→                    </b>
+   979→                  </div>
+   980→                  <div>
+   981→                    <span>จำนวนเงิน</span>
+   982→                    <b>{money(walletPreviewAmount)}</b>
+   983→                  </div>
+   984→                  <div>
+   985→                    <span>ยอดคงเหลือก่อนรายการ</span>
+   986→                    <b>{money(profile.balance)}</b>
+   987→                  </div>
+   988→                  <div>
+   989→                    <span>ยอดคงเหลือหลังยืนยัน</span>
+   990→                    <b className={balanceAfterWallet < 0 ? "red-text" : ""}>
+   991→                      {money(balanceAfterWallet)}
+   992→                    </b>
+   993→                  </div>
+   994→                  <div>
+   995→                    <span>ผู้ทำรายการ</span>
+   996→                    <b>
+   997→                      {actor} · {actorRole}
+   998→                    </b>
+   999→                  </div>
+  1000→                  {walletNote.trim() && (
+  1001→                    <div>
+  1002→                      <span>หมายเหตุ</span>
+  1003→                      <b>{walletNote.trim()}</b>
+  1004→                    </div>
+  1005→                  )}
+  1006→                </div>
+  1007→                {balanceAfterWallet < 0 && (
+  1008→                  <div className="notice-bar error">
+  1009→                    <ShieldCheck size={16} />{" "}
+  1010→                    ยอดเงินคงเหลือไม่พอสำหรับถอนจำนวนนี้ —
+  1011→                    ย้อนกลับแก้ไขจำนวนเงิน
+  1012→                    <button onClick={() => setError("")}>
+  1013→                      <X size={14} />
+  1014→                    </button>
+  1015→                  </div>
+  1016→                )}
+  1017→                {error && (
+  1018→                  <div className="notice-bar error">
+  1019→                    <ShieldCheck size={16} /> {error}
+  1020→                    <button onClick={() => setError("")}>
+  1021→                      <X size={14} />
+  1022→                    </button>
+  1023→                  </div>
+  1024→                )}
+  1025→                <div className="modal-actions">
+  1026→                  <button
+  1027→                    className="outline-button"
+  1028→                    onClick={() => setWalletConfirm(false)}
+  1029→                  >
+  1030→                    <RotateCcw size={15} /> ย้อนกลับแก้ไข
+  1031→                  </button>
+  1032→                  <button
+  1033→                    className="primary-button"
+  1034→                    disabled={
+  1035→                      walletMutation.isPending || balanceAfterWallet < 0
+  1036→                    }
+  1037→                    onClick={confirmWallet}
+  1038→                  >
+  1039→                    <Check size={16} />{" "}
+  1040→                    {walletMutation.isPending
+  1041→                      ? "กำลังบันทึก…"
+  1042→                      : "ยืนยันการทำรายการ"}
+  1043→                  </button>
+  1044→                </div>
+  1045→              </>
+  1046→            ) : (
+  1047→              <>
+  1048→                <div className="member-number-preview">
+  1049→                  <span>
+  1050→                    <WalletCards size={16} /> ยอดคงเหลือหลังรายการ
+  1051→                  </span>
+  1052→                  <b className={balanceAfterWallet < 0 ? "red-text" : ""}>
+  1053→                    {money(balanceAfterWallet)}
+  1054→                  </b>
+  1055→                </div>
+  1056→                {balanceAfterWallet < 0 && (
+  1057→                  <div className="notice-bar error">
+  1058→                    <ShieldCheck size={16} />{" "}
+  1059→                    ยอดเงินคงเหลือไม่พอสำหรับถอนจำนวนนี้
+  1060→                    <button onClick={() => setError("")}>
+  1061→                      <X size={14} />
+  1062→                    </button>
+  1063→                  </div>
+  1064→                )}
+  1065→                <div className="form-grid compact-form">
+  1066→                  <label>
+  1067→                    จำนวนเงิน (฿) *
+  1068→                    <input
+  1069→                      autoFocus
+  1070→                      type="number"
+  1071→                      min="0"
+  1072→                      step="0.01"
+  1073→                      value={walletAmount}
+  1074→                      onChange={event => setWalletAmount(event.target.value)}
+  1075→                      onKeyDown={event => {
+  1076→                        if (event.key === "Enter") {
+  1077→                          event.preventDefault();
+  1078→                          submitWallet();
+  1079→                        }
+  1080→                      }}
+  1081→                      placeholder="0.00"
+  1082→                    />
+  1083→                  </label>
+  1084→                  <label className="wide">
+  1085→                    หมายเหตุ
+  1086→                    <input
+  1087→                      value={walletNote}
+  1088→                      onChange={event => setWalletNote(event.target.value)}
+  1089→                      onKeyDown={event => {
+  1090→                        if (event.key === "Enter") {
+  1091→                          event.preventDefault();
+  1092→                          submitWallet();
+  1093→                        }
+  1094→                      }}
+  1095→                      placeholder={
+  1096→                        walletOpen === "deposit"
+  1097→                          ? "เช่น เติมเงินสดที่เคาน์เตอร์"
+  1098→                          : walletOpen === "refund"
+  1099→                            ? "เช่น ผู้ป่วยคืนบัตร ออกจากโรงพยาบาลแล้ว"
+  1100→                            : "เช่น ถอนเพื่อใช้จ่ายส่วนตัว"
+  1101→                      }
+  1102→                    />
+  1103→                  </label>
+  1104→                </div>
+  1105→                {error && (
+  1106→                  <div className="notice-bar error">
+  1107→                    <ShieldCheck size={16} /> {error}
+  1108→                    <button onClick={() => setError("")}>
+  1109→                      <X size={14} />
+  1110→                    </button>
+  1111→                  </div>
+  1112→                )}
+  1113→                <div className="modal-actions">
+  1114→                  <button
+  1115→                    className="outline-button"
+  1116→                    onClick={() => setWalletOpen(null)}
+  1117→                  >
+  1118→                    ยกเลิก
+  1119→                  </button>
+  1120→                  <button
+  1121→                    className="primary-button"
+  1122→                    disabled={
+  1123→                      walletMutation.isPending ||
+  1124→                      !(Number(walletAmount) > 0) ||
+  1125→                      balanceAfterWallet < 0
+  1126→                    }
+  1127→                    onClick={submitWallet}
+  1128→                  >
+  1129→                    <Check size={16} />{" "}
+  1130→                    {walletMutation.isPending
+  1131→                      ? "กำลังบันทึก…"
+  1132→                      : walletOpen === "deposit"
+  1133→                        ? "บันทึกการเติมเงิน"
+  1134→                        : walletOpen === "refund"
+  1135→                          ? "ยืนยันคืนบัตรเงินสด"
+  1136→                          : "บันทึกการถอนเงิน"}
+  1137→                  </button>
+  1138→                </div>
+  1139→              </>
+  1140→            )}
+  1141→          </div>
+  1142→        </div>
+  1143→      )}
+  1144→      <ConfirmDialog
+  1145→        open={confirmStatus}
+  1146→        title={
+  1147→          profile.status === "active"
+  1148→            ? "ยืนยันการระงับสมาชิก?"
+  1149→            : "ยืนยันการคืนสถานะสมาชิก?"
+  1150→        }
+  1151→        description={
+  1152→          profile.status === "active"
+  1153→            ? `สมาชิก ${displayName} จะไม่สามารถใช้ยอดคงเหลือซื้อสินค้าได้จนกว่าจะเปิดใช้งานอีกครั้ง`
+  1154→            : `สมาชิก ${displayName} จะสามารถใช้ยอดคงเหลือซื้อสินค้าและรับการเติมเงินได้อีกครั้ง`
+  1155→        }
+  1156→        confirmLabel={
+  1157→          profile.status === "active"
+  1158→            ? "ยืนยันระงับการใช้งาน"
+  1159→            : "ยืนยันคืนสถานะการใช้งาน"
+  1160→        }
+  1161→        onCancel={() => setConfirmStatus(false)}
+  1162→        onConfirm={() => {
+  1163→          setConfirmStatus(false);
+  1164→          statusMutation.mutate({
+  1165→            memberNumber: member.memberNumber,
+  1166→            suspended: profile.status === "active",
+  1167→            actor,
+  1168→            actorRole,
+  1169→          });
+  1170→        }}
+  1171→      />
+  1172→      {editOpen && editForm && (
+  1173→        <div className="modal-backdrop" onClick={() => setEditOpen(false)}>
+  1174→          <div
+  1175→            className="form-modal"
+  1176→            onClick={event => event.stopPropagation()}
+  1177→          >
+  1178→            <div className="modal-heading">
+  1179→              <div>
+  1180→                <span className="eyebrow">แก้ไขสมาชิก</span>
+  1181→                <h2>แก้ไขข้อมูลสมาชิก</h2>
+  1182→                <p>
+  1183→                  {displayName} · {profile.memberNumber}
+  1184→                </p>
+  1185→              </div>
+  1186→              <button
+  1187→                className="icon-button"
+  1188→                onClick={() => setEditOpen(false)}
+  1189→              >
+  1190→                <X size={17} />
+  1191→              </button>
+  1192→            </div>
+  1193→            <div
+  1194→              className="form-grid compact-form"
+  1195→              onKeyDownCapture={event => formEnterNav(event, submitEdit)}
+  1196→            >
+  1197→              <label>
+  1198→                คำนำหน้า
+  1199→                <input
+  1200→                  list="prename-options"
+  1201→                  value={editForm.prename}
+  1202→                  onChange={event =>
+  1203→                    setEditForm({ ...editForm, prename: event.target.value })
+  1204→                  }
+  1205→                  placeholder="เช่น นาย / นาง / นางสาว"
+  1206→                  maxLength={30}
+  1207→                  title="คำนำหน้าชื่อสมาชิก — เลือกจากรายการหรือพิมพ์เอง เว้นว่างได้"
+  1208→                />
+  1209→                <datalist id="prename-options">
+  1210→                  {PRENAME_OPTIONS.map(option => (
+  1211→                    <option key={option} value={option} />
+  1212→                  ))}
+  1213→                </datalist>
+  1214→              </label>
+  1215→              <label>
+  1216→                ชื่อ *
+  1217→                <input
+  1218→                  autoFocus
+  1219→                  value={editForm.firstName}
+  1220→                  onChange={event =>
+  1221→                    setEditForm({ ...editForm, firstName: event.target.value })
+  1222→                  }
+  1223→                  placeholder="ชื่อ"
+  1224→                />
+  1225→              </label>
+  1226→              <label>
+  1227→                นามสกุล *
+  1228→                <input
+  1229→                  value={editForm.lastName}
+  1230→                  onChange={event =>
+  1231→                    setEditForm({ ...editForm, lastName: event.target.value })
+  1232→                  }
+  1233→                  placeholder="นามสกุล"
+  1234→                />
+  1235→              </label>
+  1236→              <label>
+  1237→                ประเภทสมาชิก
+  1238→                <select
+  1239→                  value={editForm.type}
+  1240→                  onChange={event =>
+  1241→                    setEditForm({ ...editForm, type: event.target.value })
+  1242→                  }
+  1243→                >
+  1244→                  <option>สมาชิก</option>
+  1245→                  <option>เจ้าหน้าที่</option>
+  1246→                </select>
+  1247→              </label>
+  1248→              <label>
+  1249→                วงเงินซื้อสินค้าต่อวัน (บาท)
+  1250→                <input
+  1251→                  type="number"
+  1252→                  inputMode="numeric"
+  1253→                  min="1"
+  1254→                  step="1"
+  1255→                  value={editForm.creditLimit}
+  1256→                  onChange={event =>
+  1257→                    setEditForm({
+  1258→                      ...editForm,
+  1259→                      creditLimit: event.target.value,
+  1260→                    })
+  1261→                  }
+  1262→                  placeholder="เว้นว่าง = ไม่จำกัด"
+  1263→                  title="ยอดซื้อรวมต่อวันเมื่อชำระหักบัญชีสมาชิก · เว้นว่าง = ไม่จำกัด"
+  1264→                />
+  1265→              </label>
+  1266→              <label>
+  1267→                เบอร์โทรศัพท์
+  1268→                <input
+  1269→                  value={editForm.phone}
+  1270→                  onChange={event =>
+  1271→                    setEditForm({ ...editForm, phone: event.target.value })
+  1272→                  }
+  1273→                  placeholder="เช่น 08x-xxx-xxxx"
+  1274→                />
+  1275→              </label>
+  1276→              <label>
+  1277→                รหัสบัตรเงินสด
+  1278→                <input
+  1279→                  value={editForm.cardNumber}
+  1280→                  onChange={event =>
+  1281→                    setEditForm({ ...editForm, cardNumber: event.target.value })
+  1282→                  }
+  1283→                  placeholder="เช่น 2395100201"
+  1284→                  maxLength={30}
+  1285→                  title="รหัสบัตรเงินสดของสมาชิก — ใช้ค้นหาและขึ้นรายงานยอดเงินในบัตร"
+  1286→                />
+  1287→              </label>
+  1288→              <label>
+  1289→                รหัสผู้ป่วย (HN)
+  1290→                <input
+  1291→                  value={editForm.patientCode}
+  1292→                  onChange={event =>
+  1293→                    setEditForm({
+  1294→                      ...editForm,
+  1295→                      patientCode: event.target.value,
+  1296→                    })
+  1297→                  }
+  1298→                  placeholder="เช่น 70001"
+  1299→                  maxLength={30}
+  1300→                  title="รหัสผู้ป่วยที่ผูกกับบัตร — แสดงในรายงานยอดเงินในบัตร"
+  1301→                />
+  1302→              </label>
+  1303→              <label className="wide">
+  1304→                เลขที่บัตรประชาชน
+  1305→                <input
+  1306→                  value={editForm.idCard}
+  1307→                  onChange={event =>
+  1308→                    setEditForm({ ...editForm, idCard: event.target.value })
+  1309→                  }
+  1310→                  placeholder="-"
+  1311→                />
+  1312→              </label>
+  1313→              <label className="wide">
+  1314→                รูปสมาชิก (แสดงบนบัตร)
+  1315→                <div className="member-photo-uploader">
+  1316→                  {editForm.photoUrl ? (
+  1317→                    <>
+  1318→                      <img
+  1319→                        className="member-photo-preview"
+  1320→                        src={editForm.photoUrl}
+  1321→                        alt="รูปสมาชิกปัจจุบัน"
+  1322→                      />
+  1323→                      <div className="member-photo-actions">
+  1324→                        <div className="photo-action-row">
+  1325→                          <button
+  1326→                            type="button"
+  1327→                            className="outline-button compact"
+  1328→                            onClick={() => setEditCameraOpen(true)}
+  1329→                          >
+  1330→                            <Camera size={15} /> ถ่ายใหม่จากกล้อง
+  1331→                          </button>
+  1332→                          <button
+  1333→                            type="button"
+  1334→                            className="danger-outline-button compact"
+  1335→                            onClick={() =>
+  1336→                              setEditForm(current =>
+  1337→                                current ? { ...current, photoUrl: "" } : current
+  1338→                              )
+  1339→                            }
+  1340→                          >
+  1341→                            <Trash2 size={15} /> ลบรูป
+  1342→                          </button>
+  1343→                        </div>
+  1344→                      </div>
+  1345→                    </>
+  1346→                  ) : (
+  1347→                    <>
+  1348→                      <div className="photo-action-row">
+  1349→                        <label
+  1350→                          className="upload-drop member-photo-drop"
+  1351→                          htmlFor="edit-member-photo"
+  1352→                        >
+  1353→                          <ImagePlus size={17} />
+  1354→                          <span>
+  1355→                            <b>เลือกรูปจากไฟล์</b>
+  1356→                            <small>
+  1357→                              PNG JPG WEBP · ระบบย่อ 480px อัตโนมัติ
+  1358→                            </small>
+  1359→                          </span>
+  1360→                          <input
+  1361→                            id="edit-member-photo"
+  1362→                            type="file"
+  1363→                            accept="image/png,image/jpeg,image/webp"
+  1364→                            hidden
+  1365→                            onChange={onEditPhotoPick}
+  1366→                          />
+  1367→                        </label>
+  1368→                      </div>
+  1369→                      <button
+  1370→                        type="button"
+  1371→                        className="outline-button compact camera-hint-inline"
+  1372→                        onClick={() => setEditCameraOpen(true)}
+  1373→                      >
+  1374→                        <Camera size={15} /> หรือถ่ายรูปจากกล้องเลย
+  1375→                      </button>
+  1376→                    </>
+  1377→                  )}
+  1378→                </div>
+  1379→              </label>
+  1380→            </div>
+  1381→            <div className="initial-balance-note">
+  1382→              <ShieldCheck size={15} /> การแก้ไขจะบันทึกลงระบบทันทีและบันทึกลง
+  1383→              Log
+  1384→            </div>
+  1385→            {error && (
+  1386→              <div className="notice-bar error">
+  1387→                <ShieldCheck size={16} /> {error}
+  1388→                <button onClick={() => setError("")}>
+  1389→                  <X size={14} />
+  1390→                </button>
+  1391→              </div>
+  1392→            )}
+  1393→            <div className="modal-actions">
+  1394→              <button
+  1395→                className="outline-button"
+  1396→                onClick={() => setEditOpen(false)}
+  1397→              >
+  1398→                ยกเลิก
+  1399→              </button>
+  1400→              <button
+  1401→                className="primary-button"
+  1402→                disabled={
+  1403→                  updateMutation.isPending ||
+  1404→                  !editForm.firstName.trim() ||
+  1405→                  !editForm.lastName.trim()
+  1406→                }
+  1407→                onClick={submitEdit}
+  1408→              >
+  1409→                <Check size={16} />{" "}
+  1410→                {updateMutation.isPending ? "กำลังบันทึก…" : "บันทึกการแก้ไข"}
+  1411→              </button>
+  1412→            </div>
+  1413→          </div>
+  1414→        </div>
+  1415→      )}
+  1416→      {walletPrintPreview && walletResult && (
+  1417→        <PrintPreviewModal
+  1418→          targetId="member-wallet-slip"
+  1419→          title={
+  1420→            walletResult.type === "deposit"
+  1421→              ? "พรีวิวก่อนพิมพ์สลิปเติมเงิน"
+  1422→              : walletResult.type === "refund"
+  1423→                ? "พรีวิวก่อนพิมพ์สลิปคืนบัตรเงินสด"
+  1424→                : "พรีวิวก่อนพิมพ์สลิปถอนเงิน"
+  1425→          }
+  1426→          subtitle={`${walletResult.memberName} · ${walletResult.memberNumber} · ${money(walletResult.amount)}`}
+  1427→          paper="thermal"
+  1428→          chips={[
+  1429→            walletResult.type === "deposit"
+  1430→              ? "เติมเงินเข้าบัญชีสมาชิก"
+  1431→              : walletResult.type === "refund"
+  1432→                ? "คืนบัตรเงินสด"
+  1433→                : "ถอนเงินจากบัญชีสมาชิก",
+  1434→            `คงเหลือ ${money(walletResult.balanceAfter)}`,
+  1435→          ]}
+  1436→          onClose={() => setWalletPrintPreview(false)}
+  1437→        />
+  1438→      )}
+  1439→      {editCameraOpen && (
+  1440→        <CameraCaptureModal
+  1441→          open
+  1442→          title={`ถ่ายรูปสมาชิก · ${displayName}`}
+  1443→          hint="ตรวจสอบรูปก่อนกด “ใช้รูปนี้” — รูปจะแทนที่รูปเดิมของสมาชิกทันทีในฟอร์ม (ยังไม่บันทึกจนกดบันทึกการแก้ไข)"
+  1444→          onClose={() => setEditCameraOpen(false)}
+  1445→          onCapture={dataUrl => {
+  1446→            setEditForm(current =>
+  1447→              current ? { ...current, photoUrl: dataUrl } : current
+  1448→            );
+  1449→            setError("");
+  1450→          }}
+  1451→        />
+  1452→      )}
+  1453→      {limitOpen && (
+  1454→        <div className="modal-backdrop" onClick={() => setLimitOpen(false)}>
+  1455→          <div
+  1456→            className="form-modal limit-dialog"
+  1457→            role="dialog"
+  1458→            aria-modal="true"
+  1459→            aria-label="ยื่นคำขอลดวงเงินซื้อสินค้าต่อวัน"
+  1460→            onClick={event => event.stopPropagation()}
+  1461→          >
+  1462→            <div className="modal-heading">
+  1463→              <div>
+  1464→                <span className="eyebrow">ขอลดวงเงิน</span>
+  1465→                <h2>ขอลดวงเงินซื้อสินค้าต่อวัน</h2>
+  1466→                <p>
+  1467→                  {displayName} · {profile.memberNumber}
+  1468→                </p>
+  1469→              </div>
+  1470→              <button
+  1471→                className="icon-button"
+  1472→                onClick={() => setLimitOpen(false)}
+  1473→                aria-label="ปิดหน้าต่าง"
+  1474→              >
+  1475→                <X size={17} />
+  1476→              </button>
+  1477→            </div>
+  1478→            <div className="member-number-preview">
+  1479→              <span>
+  1480→                <TrendingDown size={16} /> วงเงินซื้อ/วัน ปัจจุบัน
+  1481→              </span>
+  1482→              <b>
+  1483→                {profile.creditLimit != null
+  1484→                  ? money(profile.creditLimit)
+  1485→                  : "ไม่จำกัด"}
+  1486→              </b>
+  1487→            </div>
+  1488→            {limitStep === "form" ? (
+  1489→              <>
+  1490→                <div className="form-grid compact-form">
+  1491→                  <label>
+  1492→                    วงเงินใหม่ (฿) *
+  1493→                    <input
+  1494→                      autoFocus
+  1495→                      type="number"
+  1496→                      inputMode="numeric"
+  1497→                      min="1"
+  1498→                      step="1"
+  1499→                      value={limitValue}
+  1500→                      onChange={event => setLimitValue(event.target.value)}
+  1501→                      placeholder={
+  1502→                        profile.creditLimit != null
+  1503→                          ? "ต่ำกว่าวงเงินปัจจุบัน"
+  1504→                          : "0"
+  1505→                      }
+  1506→                      onKeyDown={event => {
+  1507→                        if (event.key === "Enter") {
+  1508→                          event.preventDefault();
+  1509→                          submitLimitRequest();
+  1510→                        }
+  1511→                      }}
+  1512→                    />
+  1513→                  </label>
+  1514→                  <label>
+  1515→                    เหตุผล (ไม่บังคับ)
+  1516→                    <input
+  1517→                      value={limitReason}
+  1518→                      maxLength={500}
+  1519→                      onChange={event => setLimitReason(event.target.value)}
+  1520→                      placeholder="เช่น ขอควบคุมการใช้จ่ายของตนเอง"
+  1521→                      onKeyDown={event => {
+  1522→                        if (event.key === "Enter") {
+  1523→                          event.preventDefault();
+  1524→                          submitLimitRequest();
+  1525→                        }
+  1526→                      }}
+  1527→                    />
+  1528→                  </label>
+  1529→                </div>
+  1530→                <div className="initial-balance-note">
+  1531→                  <CircleHelp size={15} />{" "}
+  1532→                  {profile.creditLimit != null
+  1533→                    ? "วงเงินใหม่ต้องน้อยกว่าวงเงินปัจจุบัน · คำขอจะเข้าสถานะรอพิจารณา — วงเงินเปลี่ยนเมื่อผู้บริหารอนุมัติ"
+  1534→                    : "สมาชิกนี้ยังไม่จำกัดวงเงิน — ระบุวงเงินที่ต้องการ · คำขอจะเข้าสถานะรอพิจารณา ผู้บริหารพิจารณาที่รายงาน → ประวัติธุรกรรม"}
+  1535→                </div>
+  1536→                {error && (
+  1537→                  <div className="notice-bar error">
+  1538→                    <ShieldCheck size={16} /> {error}
+  1539→                    <button onClick={() => setError("")}>
+  1540→                      <X size={14} />
+  1541→                    </button>
+  1542→                  </div>
+  1543→                )}
+  1544→                <div className="modal-actions">
+  1545→                  <button
+  1546→                    className="outline-button"
+  1547→                    onClick={() => setLimitOpen(false)}
+  1548→                  >
+  1549→                    ยกเลิก
+  1550→                  </button>
+  1551→                  <button
+  1552→                    className="primary-button"
+  1553→                    onClick={submitLimitRequest}
+  1554→                  >
+  1555→                    <Check size={16} /> ต่อไป: ตรวจสอบคำขอ
+  1556→                  </button>
+  1557→                </div>
+  1558→              </>
+  1559→            ) : (
+  1560→              <>
+  1561→                <div className="wallet-confirm-warning">
+  1562→                  <ShieldCheck size={16} />
+  1563→                  <span>
+  1564→                    คำขอจะยังไม่ถูกส่งจนกว่าจะกด “ส่งคำขอ” —
+  1565→                    วงเงินของสมาชิกยังไม่เปลี่ยนจนกว่าผู้บริหารจะอนุมัติ
+  1566→                  </span>
+  1567→                </div>
+  1568→                <div className="wallet-confirm-rows">
+  1569→                  <div>
+  1570→                    <span>สมาชิก</span>
+  1571→                    <b>
+  1572→                      {displayName} · {profile.memberNumber}
+  1573→                    </b>
+  1574→                  </div>
+  1575→                  <div>
+  1576→                    <span>วงเงินปัจจุบัน</span>
+  1577→                    <b>
+  1578→                      {profile.creditLimit != null
+  1579→                        ? money(profile.creditLimit)
+  1580→                        : "ไม่จำกัด"}
+  1581→                    </b>
+  1582→                  </div>
+  1583→                  <div>
+  1584→                    <span>วงเงินใหม่ที่ขอ</span>
+  1585→                    <b className="purple-text">
+  1586→                      {money(Number(limitValue) || 0)}
+  1587→                    </b>
+  1588→                  </div>
+  1589→                  {limitReason.trim() && (
+  1590→                    <div>
+  1591→                      <span>เหตุผล</span>
+  1592→                      <b>{limitReason.trim()}</b>
+  1593→                    </div>
+  1594→                  )}
+  1595→                  <div>
+  1596→                    <span>ผู้ยื่นคำขอ</span>
+  1597→                    <b>
+  1598→                      {actor} · {actorRole}
+  1599→                    </b>
+  1600→                  </div>
+  1601→                </div>
+  1602→                {error && (
+  1603→                  <div className="notice-bar error">
+  1604→                    <ShieldCheck size={16} /> {error}
+  1605→                    <button onClick={() => setError("")}>
+  1606→                      <X size={14} />
+  1607→                    </button>
+  1608→                  </div>
+  1609→                )}
+  1610→                <div className="modal-actions">
+  1611→                  <button
+  1612→                    className="outline-button"
+  1613→                    onClick={() => setLimitStep("form")}
+  1614→                  >
+  1615→                    ย้อนกลับ
+  1616→                  </button>
+  1617→                  <button
+  1618→                    className="primary-button"
+  1619→                    disabled={limitRequestMutation.isPending}
+  1620→                    onClick={confirmLimitRequest}
+  1621→                  >
+  1622→                    <Check size={16} />{" "}
+  1623→                    {limitRequestMutation.isPending
+  1624→                      ? "กำลังส่งคำขอ…"
+  1625→                      : "ส่งคำขอ"}
+  1626→                  </button>
+  1627→                </div>
+  1628→              </>
+  1629→            )}
+  1630→          </div>
+  1631→        </div>
+  1632→      )}
+  1633→      <ConfirmDialog
+  1634→        open={confirmDelete}
+  1635→        title="ยืนยันการลบสมาชิก?"
+  1636→        description={`ลบ ${displayName} (${member.memberNumber}) ออกจากระบบถาวร · ลบได้เฉพาะบัญชีที่ยอดเงินเป็น 0 และไม่มีประวัติธุรกรรม หากมีประวัติการใช้งาน แนะนำใช้การระงับการใช้งานแทน`}
+  1637→        confirmLabel="ยืนยันลบสมาชิก"
+  1638→        onCancel={() => setConfirmDelete(false)}
+  1639→        onConfirm={() => {
+  1640→          setConfirmDelete(false);
+  1641→          deleteMutation.mutate({
+  1642→            memberNumber: member.memberNumber,
+  1643→            actor,
+  1644→            actorRole,
+  1645→          });
+  1646→        }}
+  1647→      />
+  1648→      {cardOpen && (
+  1649→        <MemberCardModal
+  1650→          member={
+  1651→            detailQuery.data?.member ?? {
+  1652→              ...member,
+  1653→              createdAt: new Date().toISOString(),
+  1654→            }
+  1655→          }
+  1656→          onClose={() => setCardOpen(false)}
+  1657→        />
+  1658→      )}
+  1659→      {statementOpen && (
+  1660→        <StatementModal
+  1661→          member={
+  1662→            detailQuery.data?.member ?? {
+  1663→              ...member,
+  1664→              createdAt: new Date().toISOString(),
+  1665→            }
+  1666→          }
+  1667→          transactions={transactions}
+  1668→          onClose={() => setStatementOpen(false)}
+  1669→        />
+  1670→      )}
+  1671→    </>
+  1672→  );
+  1673→}
+  1674→
