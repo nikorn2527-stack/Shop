@@ -763,3 +763,59 @@ Stage Summary:
 - Schema migration: 2 nullable TEXT columns + 2 partial indexes — idempotent ผ่าน `ensureColumn` (DB เดิมอัปเกรดอัตโนมัติตอนบูต)
 - TypeScript: 0 errors; commit `d24ad12` push ขึ้น origin/main-v2 สำเร็จ
 - Follow-up ที่เหลือ (task ถัดไป): frontend (Pos.tsx + MemberDetail.tsx) ต้อง generate UUID ด้วย `crypto.randomUUID()` per checkout/wallet attempt + retry ด้วย UUID เดียวกันเมื่อ network reject — server พร้อมรับ key แล้ว
+
+---
+Task ID: P3
+Agent: full-stack-developer (backup hardening)
+Task: เพิ่มการเข้ารหัสสำรองข้อมูล AES-256-GCM + restore drill + SOP docs (production hardening)
+
+Work Log:
+- อ่าน `worklog.md` ครั้งแรกเพื่อเข้าใจ context — โปรเจก Vite + React 19 + Express + tRPC + node:sqlite, branch `main-v2` (local branch `main`), P2 (idempotency) เสร็จที่ commit `d24ad12`
+- อ่าน `server/sqliteBackup.ts` (175 บรรทัด) ครบ — ทำความเข้าใจ backup/restore/verify/prune/list flows + `BackupManifest`, `SqliteBackupEntry`, `BACKUP_FILE_PATTERN`
+- อ่านส่วน `backup:` router ใน `server/routers.ts` (lines 1364-1528) — `create`, `list`, `download`, `upload`, `restore` (admin only ทั้งหมด, requireEdition `backupRestore`)
+- อ่าน `server/sqliteBackup.test.ts` เพื่อยืนยันว่า changes จะ backward compatible (test ไม่ได้ set `BACKUP_ENCRYPTION_KEY` → encryption path จะ skip อัตโนมัติ)
+
+Implementation ใน `server/sqliteBackup.ts`:
+- imports: เพิ่ม `scryptSync, createCipheriv, createDecipheriv, randomBytes` จาก `node:crypto`, `rmSync` จาก `node:fs`, `tmpdir` จาก `node:os`
+- `BackupManifest` type: เพิ่ม `encrypted?: boolean` (optional — backward compatible กับ manifest เก่าที่ไม่มี field นี้)
+- เพิ่ม constants: `ENCRYPTION_SALT = "png-shop-backup-salt"`, `ENC_IV_BYTES = 12`, `ENC_TAG_BYTES = 16`
+- เพิ่ม `getEncryptionKey(): Buffer | null` — อ่าน `process.env.BACKUP_ENCRYPTION_KEY` (ต้องยาว ≥ 32 ตัวอักษร), derive 32-byte key ผ่าน `scryptSync(raw, salt, 32)` — ถ้า unset/สั้นเกิน → คืน null (skip encryption)
+- เพิ่ม `isEncryptedFile(filePath)` — ตรวจสกุล `.enc`
+- เพิ่ม `encryptBackup(plainPath)` — อ่าน plain .sqlite → AES-256-GCM encrypt → เขียน `.sqlite.enc` (format `[12B IV][16B auth tag][ciphertext]`) → ลบ plain .sqlite ออกจาก disk (security: ไม่เหลือ plain copy) → คืน path `.enc`
+- เพิ่ม `decryptBackup(encPath)` — อ่าน `.enc` → แยก IV/tag/ciphertext → `createDecipheriv("aes-256-gcm", key, iv)` + `setAuthTag(tag)` → เขียน plain ไปที่ temp file ใน `os.tmpdir()` (`.backup-decrypt-<ts>-<rand>.sqlite`) → คืน temp path (caller ทำความสะอาด)
+- `verifySqliteBackup(filePath)` — ถ้า `.enc` → decrypt ไป temp → `assertSqliteIntegrity(temp)` → ลบ temp ใน `finally`; sha256/sizeBytes คืนเป็นของไฟล์ `.enc` จริงบน disk (manifest hash สอดคล้องกับที่เก็บ)
+- `backupSqliteDatabase({...})` — หลัง `copyFileSync` + `verifySqliteBackup(plain)` ถ้า `getEncryptionKey()` ไม่ null → `encryptBackup(destination)` (เขียน .enc, ลบ plain) → ใช้ finalPath/finalFile ใน manifest พร้อม `encrypted: true`; `sha256`/`sizeBytes` คำนวณจากไฟล์ final (.enc หรือ .sqlite ตามกรณี)
+- `nextBackupFileName(dir, now)` — เช็ค collision ทั้ง `.sqlite` และ `.sqlite.enc` (กันชื่อชนกันในวินาทีเดียวกัน)
+- `restoreSqliteBackup({backupPath, targetPath, overwrite})` — ถ้า `.enc` → decrypt ไป temp → `assertSqliteIntegrity(temp)` → `copyFileSync(temp, target)` → ลบ temp ใน `finally`; ถ้า plain → flow เดิม; ท้าย verify target ตามปกติ
+- เพิ่ม `testRestore(backupPath): { ok: true; tables: string[]; rowCount: number }` — decrypt (ถ้า .enc) ไป temp → เปิด read-only → `PRAGMA integrity_check` → `SELECT name FROM sqlite_master WHERE type='table'` → นับ rows ใน `products`, `members`, `sales`, `sale_items` → ลบ temp ใน `finally` (ใช้ try/finally ซ้อน 2 ชั้นป้องกัน temp รั่ว)
+- `BACKUP_FILE_PATTERN` → `/^welfare-store-\d{8}T\d{6}Z\.sqlite(\.enc)?$/` (match ทั้ง plain และ encrypted)
+- `pruneSqliteBackups` → ใช้ `BACKUP_FILE_PATTERN` ตัวเดียวกัน (DRY)
+
+Implementation ใน `server/routers.ts`:
+- import: เพิ่ม `testRestore` ใน destructuring จาก `./sqliteBackup`
+- `backupFileInput` regex → `/^welfare-store-\d{8}T\d{6}Z\.sqlite(\.enc)?$/` (strict superset — ไฟล์ plain เดิมยังผ่าน, เปิดทางให้ download/restore/testRestore รับไฟล์ `.enc` ได้)
+- เพิ่ม procedure `backup.testRestore` (admin only + `requireEdition("backupRestore")`): รับ `backupFileInput` → existsSync check → `testRestore(backupPath)` → บันทึก audit log สีฟ้า "ทดสอบกู้คืน" พร้อม detail ตาราง/แถว → คืน `{ ok, tables, rowCount }`
+
+Documentation:
+- สร้าง `docs/BACKUP_RESTORE_SOP_TH.md` (~150 บรรทัด) ครอบคลุม 8 sections: backup policy, retention, restore procedure, restore drill, encryption setup, ransomware response, RPO/RTO, responsibility matrix + quarterly drill log template
+
+Verification:
+- `npx tsc --noEmit` → **0 errors** ✅
+- backward compatible: เมื่อ `BACKUP_ENCRYPTION_KEY` ไม่ตั้ง → `getEncryptionKey()` คืน null → backup/restore/verify/prune/list ทำงานเหมือนเดิมทุกประการ; `encrypted?: boolean` เป็น optional → manifest เก่าที่ไม่มี field ยังอ่านได้
+
+Commit & push:
+- `git add server/sqliteBackup.ts server/routers.ts docs/BACKUP_RESTORE_SOP_TH.md`
+- `git commit -m "feat(P3): backup encryption (AES-256-GCM) + restore drill + SOP docs"` → commit `de89620`
+- `git push origin main:main-v2` → `5840715..de89620  main -> main-v2` ✅
+
+Stage Summary:
+- 3 files changed: `server/sqliteBackup.ts` (+190, -15), `server/routers.ts` (+37, -2), `docs/BACKUP_RESTORE_SOP_TH.md` (new file, ~150 บรรทัด)
+- P3 production hardening ครบทั้ง 3 ข้อ:
+  1) AES-256-GCM encryption optional ผ่าน `BACKUP_ENCRYPTION_KEY` env var (≥32 ตัวอักษร) — ไฟล์สำรองใหม่เข้ารหัสอัตโนมัติเป็น `.sqlite.enc`, restore auto-detect จากสกุลไฟล์, plain ไฟล์ถูกลบจาก disk หลังเข้ารหัส
+  2) `testRestore(backupPath)` function + `backup.testRestore` tRPC procedure — admin ทดสอบกู้คืนโดยไม่แตะฐานข้อมูลจริง (decrypt + integrity + list tables + count rows)
+  3) `docs/BACKUP_RESTORE_SOP_TH.md` — SOP ครอบคลุม backup/retention/restore/drill/encryption/ransomware/RPO-RTO/responsibility
+- TypeScript: 0 errors; commit `de89620` push ขึ้น origin/main-v2 สำเร็จ
+- ข้อควรระวังที่เจ้าของระบบควรทราบ:
+  - ถ้าตั้ง `BACKUP_ENCRYPTION_KEY` แล้วลบ env var ภายหลัง → ไฟล์ `.sqlite.enc` ที่เข้ารหัสด้วยคีย์เดิมกู้คืนไม่ได้ (SOP §5 เตือนไว้)
+  - คีย์ derive ด้วย salt ตายตัว `"png-shop-backup-salt"` — ถ้าต้องการ rotate คีย์โดยใช้ salt ใหม่ ต้อง re-encrypt ไฟล์เก่าทั้งหมด
+  - download ผาน tRPC คืน base64 ของไฟล์ `.enc` ดิบ (encrypted) — admin ที่ download ต้องมี key ถึงจะ decrypt ภายนอกระบบได้ (good for security — ไฟล์ที่ download ไปไม่มี key ก็อ่านไม่ได้)
