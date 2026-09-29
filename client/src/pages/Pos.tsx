@@ -695,6 +695,7 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
     if (discountValue > subtotal) { setError("ส่วนลดมากกว่ายอดรวมสินค้า"); blocker.warning("ส่วนลดมากกว่ายอดรวมสินค้า", "ปรับส่วนลดให้ไม่เกินยอดรวม แล้วกดยืนยันใหม่ได้เลย"); return; }
     clearNotices();
     checkoutMutation.mutate({
+      clientRequestId: crypto.randomUUID(),
       items: cart.map((item) => item.special
         ? { name: item.name, price: item.price, qty: item.qty, unit: item.unit }
         : item.variant
@@ -721,6 +722,7 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
     const memberNumber = walletMemberNumber || selectedMemberNumber;
     if (!memberNumber || !(Number(walletAmount) > 0)) { setWalletStep("form"); return; }
     walletMutation.mutate({
+      clientRequestId: crypto.randomUUID(),
       memberNumber,
       type: shortcut === "ถอนเงิน" ? "withdrawal" : "deposit",
       amount: Number(walletAmount),

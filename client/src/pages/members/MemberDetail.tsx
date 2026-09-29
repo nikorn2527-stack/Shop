@@ -397,6 +397,7 @@ export function MemberDetail({
       return;
     }
     walletMutation.mutate({
+      clientRequestId: crypto.randomUUID(),
       memberNumber: member.memberNumber,
       type: walletOpen,
       amount: Number(walletAmount),
