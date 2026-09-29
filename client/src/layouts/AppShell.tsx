@@ -17,6 +17,9 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   Bell,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   CircleHelp,
   LayoutDashboard,
   LockKeyhole,
@@ -116,6 +119,14 @@ export function AppShell({
     setMobileNav(false);
   };
   const [mobileNav, setMobileNav] = useState(false);
+  // PT-2 — sidebar collapse: icon-only mode (~64px). Default expanded on
+  // desktop; the toggle sits beside the brand mark. Tooltips (title attr) on
+  // every nav button show the label so collapsed mode stays usable.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // PT-2 — "จัดการระบบ" admin group (settings / users / logs) is collapsed
+  // by default; an admin taps the group header to expand it inline. Keeps the
+  // sidebar at ≤6 top-level items (5 primary + 1 group).
+  const [adminGroupOpen, setAdminGroupOpen] = useState(false);
   const [posShortcut, setPosShortcut] = useState("");
   // POS rail badge: parked-bill count, seeded from this device's storage and
   // kept in sync by the "pos-held" events Pos dispatches whenever they change.
@@ -531,7 +542,7 @@ export function AppShell({
         </aside>
       )}
       <aside
-        className={`sidebar ${mobileNav ? "open" : ""}${safeView === "pos" ? " pos-context" : ""}`}
+        className={`sidebar${mobileNav ? " open" : ""}${sidebarCollapsed ? " collapsed" : ""}${safeView === "pos" ? " pos-context" : ""}`}
       >
         <div className="brand">
           {appLogo ? (
@@ -541,12 +552,27 @@ export function AppShell({
               <span>{brandInitial(appName)}</span>
             </div>
           )}
-          <div>
+          <div className="brand-text">
             <b>{appName}</b>
             <small>Welfare Store</small>
           </div>
-          <button className="mobile-close" onClick={() => setMobileNav(false)}>
+          <button
+            type="button"
+            className="mobile-close"
+            onClick={() => setMobileNav(false)}
+            aria-label="ปิดเมนูด้านข้าง"
+          >
             <X size={19} />
+          </button>
+          <button
+            type="button"
+            className="sidebar-collapse-btn"
+            onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
+            title={sidebarCollapsed ? "ขยายเมนูด้านข้าง" : "ย่อเมนูด้านข้างเหลือไอคอน"}
+            aria-label={sidebarCollapsed ? "ขยายเมนูด้านข้าง" : "ย่อเมนูด้านข้างเหลือไอคอน"}
+            aria-expanded={!sidebarCollapsed}
+          >
+            {sidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
           </button>
         </div>
         <div className="role-card">
@@ -565,10 +591,11 @@ export function AppShell({
         </div>
         <div className="nav-group-label">เมนูหลัก</div>
         <nav>
-          {navItems.map(({ id, label, icon: Icon }) => (
+          {navItems.map(({ id, label, caption, icon: Icon }) => (
             <button
               className={safeView === id ? "active" : ""}
               key={id}
+              title={`${label} — ${caption}`}
               onClick={() => {
                 setActiveView(id);
                 setMobileNav(false);
@@ -576,48 +603,73 @@ export function AppShell({
             >
               <Icon size={20} />
               <b>{label}</b>
+              {/* PT-2 — badges show ONLY when the user must take action.
+                  Low stock → needs restocking; held bills → needs to resume.
+                  Member/bill totals are pure data so they live on the page. */}
               {id === "stock" && lowStock.length > 0 && (
                 <i className="nav-badge">{lowStock.length}</i>
+              )}
+              {id === "pos" && posHeldCount > 0 && (
+                <i className="nav-badge">{posHeldCount}</i>
               )}
             </button>
           ))}
         </nav>
         {isAdminRole(role) ? (
-          <>
-            <div className="nav-group-label">สำหรับผู้บริหาร</div>
-            <nav className="secondary-nav">
+          <div
+            className={`nav-admin-section${sidebarCollapsed ? " collapsed" : ""}${adminGroupOpen ? " open" : ""}`}
+          >
+            {!sidebarCollapsed && (
               <button
-                className={safeView === "settings" ? "active" : ""}
-                onClick={() => {
-                  setActiveView("settings");
-                  setMobileNav(false);
-                }}
+                type="button"
+                className="nav-group-toggle"
+                onClick={() => setAdminGroupOpen((open) => !open)}
+                aria-expanded={adminGroupOpen}
+                title="จัดการระบบ — ตั้งค่า / ผู้ใช้ระบบ / ประวัติระบบ"
               >
                 <Settings2 size={20} />
-                <b>ตั้งค่า</b>
+                <b>จัดการระบบ</b>
+                <ChevronDown size={14} className="toggle-chevron" />
               </button>
-              <button
-                className={safeView === "users" ? "active" : ""}
-                onClick={() => {
-                  setActiveView("users");
-                  setMobileNav(false);
-                }}
-              >
-                <UserCog size={20} />
-                <b>ผู้ใช้ระบบ</b>
-              </button>
-              <button
-                className={safeView === "logs" ? "active" : ""}
-                onClick={() => {
-                  setActiveView("logs");
-                  setMobileNav(false);
-                }}
-              >
-                <Activity size={20} />
-                <b>ประวัติระบบ</b>
-              </button>
-            </nav>
-          </>
+            )}
+            {(sidebarCollapsed || adminGroupOpen) && (
+              <nav className="nav-group-children">
+                <button
+                  className={safeView === "settings" ? "active" : ""}
+                  title="ตั้งค่า"
+                  onClick={() => {
+                    setActiveView("settings");
+                    setMobileNav(false);
+                  }}
+                >
+                  <Settings2 size={sidebarCollapsed ? 20 : 18} />
+                  {!sidebarCollapsed && <b>ตั้งค่า</b>}
+                </button>
+                <button
+                  className={safeView === "users" ? "active" : ""}
+                  title="ผู้ใช้ระบบ"
+                  onClick={() => {
+                    setActiveView("users");
+                    setMobileNav(false);
+                  }}
+                >
+                  <UserCog size={sidebarCollapsed ? 20 : 18} />
+                  {!sidebarCollapsed && <b>ผู้ใช้ระบบ</b>}
+                </button>
+                <button
+                  className={safeView === "logs" ? "active" : ""}
+                  title="ประวัติระบบ"
+                  onClick={() => {
+                    setActiveView("logs");
+                    setMobileNav(false);
+                  }}
+                >
+                  <Activity size={sidebarCollapsed ? 20 : 18} />
+                  {!sidebarCollapsed && <b>ประวัติระบบ</b>}
+                </button>
+              </nav>
+            )}
+          </div>
         ) : (
           <div className="locked-nav">
             <LockKeyhole size={15} />
@@ -636,7 +688,7 @@ export function AppShell({
             title="ออกจากระบบ"
             aria-label="ออกจากระบบ"
           >
-            <LogOut size={16} /> ออกจากระบบ
+            <LogOut size={16} /> <b>ออกจากระบบ</b>
           </button>
           <div className="sidebar-version">v1.0.0 · ระบบร้านค้าสวัสดิการ</div>
           <div className="sidebar-powered">

@@ -5510,3 +5510,39 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .report-workbench .page-template-action .outline-button.compact { height: 30px; }
 .app-shell:not(.pos-terminal) .page-content:has(.report-workbench) .page-template .section-header { margin-bottom: 8px; gap: 10px; }
 .app-shell:not(.pos-terminal) .page-content:has(.report-workbench) .page-template .section-header p { font-size: 10.5px; margin-top: 2px; }
+
+/* ===== PT-2 (sidebar restructure + Users cards) — single-line rules =====
+   Tailwind v4's @import processor breaks on multi-line CSS rules (see commit
+   64272a4), so every rule below is single-line. */
+/* Users page — 5 stat cards in one row (was reusing the 4-col .stock-overview grid). */
+.users-overview { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 12px; }
+@media (max-width: 1280px) { .users-overview { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 720px) { .users-overview { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .users-overview { grid-template-columns: 1fr; gap: 8px; } }
+/* Sidebar collapse — desktop-only button. Mobile drawer (mobile-close) handles narrow viewports. */
+.sidebar-collapse-btn { display: none; }
+@media (min-width: 821px) { .sidebar-collapse-btn { display: grid; place-items: center; margin-left: auto; border: 1px solid var(--line, #e5e2d8); background: var(--surface, #fff); color: #6f7a6d; border-radius: 8px; width: 26px; height: 26px; cursor: pointer; transition: all .15s ease; flex: 0 0 auto; } .sidebar-collapse-btn:hover { color: var(--teal, #2d8a6c); border-color: var(--teal, #2d8a6c); background: var(--teal-mist, #eaf5f1); } }
+.sidebar.collapsed { width: 64px; flex: 0 0 64px; padding: 16px 8px 14px; }
+.sidebar.collapsed .brand { padding: 0 0 16px; gap: 0; justify-content: center; }
+.sidebar.collapsed .brand-text { display: none; }
+.sidebar.collapsed .role-card { justify-content: center; padding: 4px 0; gap: 0; }
+.sidebar.collapsed .role-card > div { display: none; }
+.sidebar.collapsed .nav-group-label { display: none; }
+.sidebar.collapsed nav button { padding: 11px 0; justify-content: center; gap: 0; }
+.sidebar.collapsed nav button b { display: none; }
+.sidebar.collapsed .sidebar-logout { justify-content: center; padding: 11px 0; }
+.sidebar.collapsed .sidebar-logout b { display: none; }
+.sidebar.collapsed .sidebar-version, .sidebar.collapsed .sidebar-powered { display: none; }
+.sidebar.collapsed .sidebar-footer { padding-top: 12px; }
+.sidebar.collapsed .sidebar-collapse-btn { margin: 0 auto 14px; }
+/* Admin group ("จัดการระบบ") — expandable header + collapsible children. */
+.nav-admin-section { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.nav-group-toggle { display: flex; align-items: center; gap: 11px; padding: 10px 10px; border: 0; background: transparent; color: #505443; font-size: 13px; font-weight: 600; text-align: left; border-radius: 10px; cursor: pointer; width: 100%; transition: all .18s ease; }
+.nav-group-toggle:hover { background: #e8f0ec; color: var(--teal, #2d6a57); }
+.nav-group-toggle .toggle-chevron { margin-left: auto; transition: transform .18s ease; color: #8a8e7d; }
+.nav-admin-section.open .nav-group-toggle .toggle-chevron { transform: rotate(180deg); }
+.nav-group-children { display: flex; flex-direction: column; gap: 2px; padding-left: 6px; }
+.nav-group-children button { padding: 9px 10px; font-size: 12.5px; }
+.sidebar.collapsed .nav-admin-section { margin-top: 0; }
+.sidebar.collapsed .nav-group-children { padding-left: 0; }
+.sidebar.collapsed .nav-group-children button { padding: 11px 0; justify-content: center; }
