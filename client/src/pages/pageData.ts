@@ -137,12 +137,12 @@ export function formatMemberNumber(mode: "running" | "year" | "manual", sequence
   return `${head ? `${head}${separator}` : ""}${String(sequence).padStart(digits, "0")}`;
 }
 
-export const navItems: { id: View; label: string; caption: string; icon: React.ComponentType<any> }[] = [
-  { id: "dashboard", label: "ภาพรวม", caption: "สรุปการดำเนินงาน", icon: SquaresFour },
-  { id: "pos", label: "หน้าร้าน / POS", caption: "ขายสินค้าและรับชำระ", icon: ShoppingCart },
-  { id: "stock", label: "สต็อกสินค้า", caption: "รับเข้าและนับสต็อก", icon: Package },
-  { id: "members", label: "สมาชิกและบัญชี", caption: "สมาชิกและเจ้าหน้าที่", icon: Users },
-  { id: "reports", label: "รายงาน", caption: "วิเคราะห์และส่งออก", icon: ChartBar },
+export const navItems: { id: View; label: string; caption: string; icon: React.ComponentType<any>; tileColor: string }[] = [
+  { id: "dashboard", label: "ภาพรวม", caption: "สรุปการดำเนินงาน", icon: SquaresFour, tileColor: "#007a55" },
+  { id: "pos", label: "หน้าร้าน / POS", caption: "ขายสินค้าและรับชำระ", icon: ShoppingCart, tileColor: "#d97706" },
+  { id: "stock", label: "สต็อกสินค้า", caption: "รับเข้าและนับสต็อก", icon: Package, tileColor: "#2563eb" },
+  { id: "members", label: "สมาชิกและบัญชี", caption: "สมาชิกและเจ้าหน้าที่", icon: Users, tileColor: "#7c3aed" },
+  { id: "reports", label: "รายงาน", caption: "วิเคราะห์และส่งออก", icon: ChartBar, tileColor: "#0891b2" },
 ];
 
 // NOTE (OLD-2-b): mock exports `products` + `stockRows` were DELETED — Pos.tsx and
