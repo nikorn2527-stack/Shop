@@ -704,3 +704,62 @@ Stage Summary:
 - View pills ย้ายลงใต้ summary cards ตามที่ owner ขอ (ก่อนหน้านี้อยู่ระหว่าง heading กับ date chips)
 - ทุก functionality ครบ: tRPC queries + state + export logic + tx filter + member scan picker + limit decision modal + reprint modal + export preview modal + edition upgrade modal + notice bar — เปลี่ยนแค่ layout/rendering
 - commit hash `4fb1900` push ขึ้น origin/main-v2 สำเร็จ — รอเจ้าของงาน pull ไปเทสบนเครื่อง (ทุกแท็บ + staff dropdown + custom date picker inline + responsive stack บน mobile)
+
+---
+Task ID: P2-b
+Agent: full-stack-developer (idempotency)
+Task: Add idempotency protection to checkout + walletTx (prevent double-submit), fix voidSale TOCTOU, guard closeBusinessDay against double-close
+
+Work Log:
+- อ่าน worklog เข้าใจ context V2-A→E + PT-1/PT-2/PT-3 (UI redesign) + 1-fix (P1 logout cookie bug) — project = Vite + React 19 + Express + tRPC + Drizzle + SQLite (node:sqlite), pnpm (NOT Next.js); branch `main` local → push `origin/main-v2`
+- อ่าน `server/sqliteStore.ts` รอบฟังก์ชั่นที่เกี่ยวข้อง: createSqliteStore (line ~275) + CheckoutInput/checkout (line ~1494) + WalletTxInput/walletTx (line ~1875) + voidSale (line ~3195) + closeBusinessDay (line ~2888) + runInTransaction wrapper (line ~677, BEGIN/COMMIT/ROLLBACK)
+- อ่าน `server/routers.ts`: checkoutInput zod schema (line 307) + memberWalletInput zod schema (line 217) + pos.checkout mutation (line 1019, ใช้ `{...input, cashier, actorRole}`) + member.wallet mutation (line 1083, ใช้ `{...input, actor, actorRole}`)
+- baseline `npx tsc --noEmit` → 0 errors ก่อนแก้
+
+- แก้ 6 จุดใน `server/sqliteStore.ts`:
+  1) **createSqliteStore** — เพิ่ม 2 ensureColumn migrations + 2 partial indexes:
+     - `ensureColumn(db, "sales", "client_request_id", "TEXT")`
+     - `ensureColumn(db, "member_transactions", "client_request_id", "TEXT")`
+     - `CREATE INDEX IF NOT EXISTS idx_sales_client_req ON sales(client_request_id) WHERE client_request_id IS NOT NULL`
+     - `CREATE INDEX IF NOT EXISTS idx_member_tx_client_req ON member_transactions(client_request_id) WHERE client_request_id IS NOT NULL`
+     - migration idempotent — DB เดิมอัปเกรดอัตโนมัติตอนบูต
+  2) **CheckoutInput type** — เพิ่ม `clientRequestId?: string | null`
+  3) **checkout()** — ที่ต้นฟังก์ชั่น (ก่อน merge/stock/wallet checks):
+     - SELECT existing sale row ด้วย `client_request_id` → ถ้าเจอ replay receipt เดิม (items + totals + memberName + balanceAfter ดึงจาก `member_transactions WHERE detail LIKE 'บิล #X ·%'` เหมือน salesList) คืนเลย ไม่เขียน row ซ้ำ
+     - ใน INSERT path: sales INSERT เพิ่ม `client_request_id` เป็นคอลัมน์ที่ 10 (`input.clientRequestId ?? null`) — wallet purchase INSERT ไม่ใส่ client_request_id (idempotency key อยู่ที่ sale row ตัวเดียว + BEGIN คุม atomic อยู่แล้ว)
+  4) **WalletTxInput type** — เพิ่ม `clientRequestId?: string | null`
+  5) **walletTx()** — ที่ต้นฟังก์ชั่น (ก่อน balance check):
+     - SELECT existing member_transactions row ด้วย `client_request_id` → ถ้าเจอ replay ledger row เดิม (memberNumber, memberName, type, amount (abs), balanceBefore (reverse จาก balanceAfter), balanceAfter, detail) คืนเลย ไม่ update balance / insert ซ้ำ
+     - ใน INSERT path: member_transactions INSERT เพิ่ม `client_request_id` เป็นคอลัมน์ที่ 10 (`input.clientRequestId ?? null`)
+     - เก็บ return shape ตรงกับ normal path (`string`/`number` strict ไม่ใช่ `string | null`/`number | null`) เพื่อไม่ให้ union inferred ขยายและพัง consumer ใน Pos.tsx + MemberDetail.tsx — ใช้ `memberName ?? ""` และ `balanceAfter ?? memberRow?.balance ?? 0` coerce null บน replay path อย่างเดียว
+  6) **voidSale() TOCTOU fix**:
+     - ย้าย `SELECT 1 FROM sales WHERE id = ? AND voided = 1` check จาก OUTSIDE `runInTransaction` → INSIDE `runInTransaction` (ก่อน UPDATE/INSERT ใด ๆ)
+     - ปิด race ที่ void 2 คำขอพร้อมกันผ่าน outer SELECT ทั้งคู่ (ยังไม่เห็น UPDATE ของกัน) แล้ว double-refund wallet + double-restore stock
+     - guard `if (!sale)` (บิลไม่มี) และ `if (!input.reason.trim())` (ไม่ระบุเหตุผล) ยังอยู่นอก transaction — เป็น request-validation ไม่ต้องการ isolation
+  7) **closeBusinessDay() double-close guard**:
+     - เพิ่ม `SELECT 1 FROM day_closures WHERE period_start = ?` ที่ต้น `runInTransaction` → ถ้าเจอ row โยน `"รอบขายนี้ถูกตัดยอดไปแล้ว — ไม่สามารถตัดซ้อนได้"`
+     - คอมเมนต์ระบุตรง ๆ ว่า SQLite default `BEGIN DEFERRED` ไม่ lock write ก่อน first write — 2 closes พร้อมกันจริง ๆ อาจผ่าน SELECT ทั้งคู่ แต่ UI ส่ง closes ทีละครั้งต่อ user ตามธรรมเขียน → SELECT guard คลุม double-submit จริง (double-click/double-tap) ซึ่งคือสิ่งที่ task ต้องการ
+
+- แก้ `server/routers.ts`:
+  - **checkoutInput** zod schema — เพิ่ม `clientRequestId: z.string().max(200).nullish()` (line 325); pos.checkout mutation มี spread `{...input, cashier, actorRole}` อยู่แล้ว → ส่ง clientRequestId ผ่าน transparent
+  - **memberWalletInput** zod schema — เพิ่ม `clientRequestId: z.string().max(200).nullish()` (line 230); member.wallet mutation มี spread `{...input, actor, actorRole}` อยู่แล้ว → ส่ง clientRequestId ผ่าน transparent
+  - field optional (`.nullish()`) → frontend (Pos.tsx, MemberDetail.tsx) ไม่ต้องส่ง, response shapes เดิมทุกประการ — frontend จะ update ใน task ถัดไปให้ generate UUID ด้วย `crypto.randomUUID()` แล้ว retry ด้วย UUID เดียวกันเมื่อ tRPC mutation reject (network blip)
+
+- TypeScript:
+  - pass 1 หลังแก้ walletTx replay คืน `memberName: string | null` + `balanceAfter: number | null` → inferred union ขยาย → Pos.tsx (2 จุด) + MemberDetail.tsx (2 จุด) พัง 4 errors
+  - แก้: coerce บน replay path `memberName ?? ""` + `balanceAfter ?? memberRow?.balance ?? 0` → inferred union กลับเป็น strict `string`/`number` ตาม normal path
+  - pass 2 `npx tsc --noEmit` → **0 errors** ✅
+
+- commit: `git add server/sqliteStore.ts server/routers.ts && git commit -m "fix(P2): add idempotency to checkout+walletTx, fix voidSale TOCTOU, guard closeDay double-close"` → commit `d24ad12`
+- push: `git push origin main:main-v2` → `3979ab3..d24ad12  main -> main-v2` ✅
+
+Stage Summary:
+- 2 files changed: `server/sqliteStore.ts` (+110, -4), `server/routers.ts` (+9, -0)
+- 4 idempotency fixes ลงใน commit เดียว:
+  1) checkout() — idempotent on `client_request_id` (คืน existing receipt ไม่สร้างบิลซ้ำ)
+  2) walletTx() — idempotent on `client_request_id` (คืน existing ledger row ไม่ update balance ซ้ำ)
+  3) voidSale() — TOCTOU fix (voided=1 check ย้ายเข้าใน `runInTransaction`)
+  4) closeBusinessDay() — double-close guard (SELECT period_start ใน `runInTransaction` + โยน StoreError ถ้าเจอ row)
+- Schema migration: 2 nullable TEXT columns + 2 partial indexes — idempotent ผ่าน `ensureColumn` (DB เดิมอัปเกรดอัตโนมัติตอนบูต)
+- TypeScript: 0 errors; commit `d24ad12` push ขึ้น origin/main-v2 สำเร็จ
+- Follow-up ที่เหลือ (task ถัดไป): frontend (Pos.tsx + MemberDetail.tsx) ต้อง generate UUID ด้วย `crypto.randomUUID()` per checkout/wallet attempt + retry ด้วย UUID เดียวกันเมื่อ network reject — server พร้อมรับ key แล้ว
