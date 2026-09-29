@@ -1619,6 +1619,58 @@ export function Reports({
       setExportPreview(null);
     }
   };
+  // PT-3 — ย้ายการ์ดสรุปส่วนหัว (ยอดขาย/กำไร/สมาชิก/เงินคงเหลือ) ลงในแท็บ
+  // สรุปยอดขาย + ประวัติบิล — อยู่ใน Layer 4 (Content) หลัง FilterBar ตามโครง 4-layer
+  const salesSummaryCards = (
+    <div className="report-cards report-cards-dense">
+      <div className="report-card">
+        <span>ยอดขายสินค้า</span>
+        <strong>
+          {dailyQuery.isLoading ? "…" : money(totals.revenue)}
+        </strong>
+        <div className="report-card-facts">
+          <i>{totals.orders.toLocaleString("th-TH")} บิล</i>
+          <i>{totals.items.toLocaleString("th-TH")} ชิ้น</i>
+          <i>เฉลี่ย {money(avgPerBill)}/บิล</i>
+          {staffFilters.length > 0 && (
+            <i>พนักงาน {staffFilters.length} คน</i>
+          )}
+        </div>
+      </div>
+      <div className="report-card">
+        <span>กำไรขั้นต้น (ประมาณ)</span>
+        <strong className="green-text">
+          {dailyQuery.isLoading ? "…" : money(totals.profit)}
+        </strong>
+        <div className="report-card-facts">
+          <i>ต้นทุน {money(totals.cogs)}</i>
+          <i>มาร์จิ้น {marginPercent}%</i>
+        </div>
+      </div>
+      <div className="report-card">
+        <span>สมาชิกใหม่ · เปิดใช้งาน</span>
+        <strong>
+          {membersQuery.isLoading ? "…" : memberNewThisMonth}{" "}
+          <em className="card-unit">ราย</em>
+        </strong>
+        <div className="report-card-facts">
+          <i>
+            ใช้งาน {memberActiveCount}/{members.length} ราย
+          </i>
+        </div>
+      </div>
+      <div className="report-card">
+        <span>เงินคงเหลือในบัตรสมาชิก</span>
+        <strong>
+          {membersQuery.isLoading ? "…" : money(memberWalletTotal)}
+        </strong>
+        <div className="report-card-facts">
+          <i>{members.length} บัญชี</i>
+          <i>เฉลี่ย {money(avgWalletPerMember)}/บัญชี</i>
+        </div>
+      </div>
+    </div>
+  );
   return (
     <PageTemplate>
       <SectionHeader
@@ -1650,56 +1702,6 @@ export function Reports({
           </div>
         }
       />
-      {(reportTab === "sales" || reportTab === "bills") && (
-        <div className="report-cards report-cards-dense">
-          <div className="report-card">
-            <span>ยอดขายสินค้า</span>
-            <strong>
-              {dailyQuery.isLoading ? "…" : money(totals.revenue)}
-            </strong>
-            <div className="report-card-facts">
-              <i>{totals.orders.toLocaleString("th-TH")} บิล</i>
-              <i>{totals.items.toLocaleString("th-TH")} ชิ้น</i>
-              <i>เฉลี่ย {money(avgPerBill)}/บิล</i>
-              {staffFilters.length > 0 && (
-                <i>พนักงาน {staffFilters.length} คน</i>
-              )}
-            </div>
-          </div>
-          <div className="report-card">
-            <span>กำไรขั้นต้น (ประมาณ)</span>
-            <strong className="green-text">
-              {dailyQuery.isLoading ? "…" : money(totals.profit)}
-            </strong>
-            <div className="report-card-facts">
-              <i>ต้นทุน {money(totals.cogs)}</i>
-              <i>มาร์จิ้น {marginPercent}%</i>
-            </div>
-          </div>
-          <div className="report-card">
-            <span>สมาชิกใหม่ · เปิดใช้งาน</span>
-            <strong>
-              {membersQuery.isLoading ? "…" : memberNewThisMonth}{" "}
-              <em className="card-unit">ราย</em>
-            </strong>
-            <div className="report-card-facts">
-              <i>
-                ใช้งาน {memberActiveCount}/{members.length} ราย
-              </i>
-            </div>
-          </div>
-          <div className="report-card">
-            <span>เงินคงเหลือในบัตรสมาชิก</span>
-            <strong>
-              {membersQuery.isLoading ? "…" : money(memberWalletTotal)}
-            </strong>
-            <div className="report-card-facts">
-              <i>{members.length} บัญชี</i>
-              <i>เฉลี่ย {money(avgWalletPerMember)}/บัญชี</i>
-            </div>
-          </div>
-        </div>
-      )}
       <div className="dash-workbench report-workbench">
         <div className="dash-tabbar">
           <button
@@ -1751,14 +1753,96 @@ export function Reports({
         <div className="dash-tab-body">
           {reportTab === "sales" && (
             <section className="panel" id="daily-sales-report">
-              <div className="panel-heading">
-                <div>
-                  <h2>สรุปยอดขาย</h2>
-                  <p>
-                    ช่วงข้อมูล {rangeLabel} · เลือกมุมมองรายช่วงเวลา
-                    (กดแถวดูรายการสินค้าที่ขาย) หรือแยกตามสินค้า / รายการในบิล /
-                    ชนิดสินค้า / พนักงานขาย
-                  </p>
+              {/* PT-3 Layer 3 — consolidated FilterBar: date chips + inline custom
+                  picker + staff SELECT (replaces pills) + groupby + export */}
+              <div className="report-filter-bar">
+                <div className="report-range-row report-filter-row-main">
+                  <div
+                    className="report-tabs report-period-pills"
+                    role="group"
+                    aria-label="เลือกช่วงเวลาของรายงาน"
+                  >
+                    {REPORT_RANGE_CHIPS.map(chip => (
+                      <button
+                        type="button"
+                        key={chip.value}
+                        className={rangeMode === chip.value ? "active" : ""}
+                        onClick={() => pickRangeChip(chip.value)}
+                        title={
+                          chip.value === "today" || chip.value === "yesterday"
+                            ? "เลือกวันเดียว"
+                            : undefined
+                        }
+                      >
+                        {chip.label}
+                      </button>
+                    ))}
+                  </div>
+                  {rangeMode === "custom" && (
+                    <div
+                      className="range-picker report-custom-picker"
+                      role="group"
+                      aria-label="กำหนดช่วงวันที่"
+                    >
+                      <ThaiDatePicker
+                        value={rangeFrom}
+                        onChange={pickCustomFrom}
+                        max={rangeTo || undefined}
+                        ariaLabel="วันเริ่มต้น — เลือกวันเดียวก็แค่กดวันนี้"
+                      />
+                      <span className="range-sep" aria-hidden="true">
+                        →
+                      </span>
+                      <ThaiDatePicker
+                        value={rangeTo}
+                        onChange={pickCustomTo}
+                        min={rangeFrom || undefined}
+                        ariaLabel="วันสิ้นสุด — เว้นว่างไว้คือวันเดียวกับวันเริ่มต้น"
+                      />
+                    </div>
+                  )}
+                  <select
+                    className="report-staff-select"
+                    value={staffFilters[0] ?? ""}
+                    onChange={event =>
+                      setStaffFilters(
+                        event.target.value ? [event.target.value] : []
+                      )
+                    }
+                    aria-label="กรองตามพนักงานขาย"
+                    title="เลือกพนักงานขายเฉพาะคน — ทุกคน = รวมทุกคน"
+                  >
+                    <option value="">
+                      {cashierOptions.length > 0
+                        ? `พนักงาน: ทุกคน (${cashierOptions.reduce((sum, option) => sum + option.bills, 0).toLocaleString("th-TH")} บิล)`
+                        : "พนักงานขาย: ทุกคน"}
+                    </option>
+                    {cashierOptions.map(option => (
+                      <option key={option.cashier} value={option.cashier}>
+                        {option.cashier} · {option.bills.toLocaleString("th-TH")}{" "}
+                        บิล
+                      </option>
+                    ))}
+                  </select>
+                  {salesView === "timeline" && (
+                    <div
+                      className="report-groupby"
+                      role="group"
+                      aria-label="จัดกลุ่มแถวรายงาน"
+                    >
+                      <span>แยกตาม</span>
+                      {REPORT_GROUPBY_CHIPS.map(chip => (
+                        <button
+                          type="button"
+                          key={chip.value}
+                          className={groupBy === chip.value ? "active" : ""}
+                          onClick={() => setGroupBy(chip.value)}
+                        >
+                          {chip.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div
                   className="report-export-actions"
@@ -1787,117 +1871,9 @@ export function Reports({
                   </button>
                 </div>
               </div>
-              <div className="report-range-row">
-                <div
-                  className="report-tabs report-period-pills"
-                  role="group"
-                  aria-label="เลือกช่วงเวลาของรายงาน"
-                >
-                  {REPORT_RANGE_CHIPS.map(chip => (
-                    <button
-                      type="button"
-                      key={chip.value}
-                      className={rangeMode === chip.value ? "active" : ""}
-                      onClick={() => pickRangeChip(chip.value)}
-                      title={
-                        chip.value === "today" || chip.value === "yesterday"
-                          ? "เลือกวันเดียว"
-                          : undefined
-                      }
-                    >
-                      {chip.label}
-                    </button>
-                  ))}
-                </div>
-                {rangeMode === "custom" && (
-                  <div
-                    className="range-picker report-custom-picker"
-                    role="group"
-                    aria-label="กำหนดช่วงวันที่"
-                  >
-                    <span>ช่วงวันที่</span>
-                    <ThaiDatePicker
-                      value={rangeFrom}
-                      onChange={pickCustomFrom}
-                      max={rangeTo || undefined}
-                      ariaLabel="วันเริ่มต้น — เลือกวันเดียวก็แค่กดวันนี้"
-                    />
-                    <span className="range-sep" aria-hidden="true">
-                      →
-                    </span>
-                    <ThaiDatePicker
-                      value={rangeTo}
-                      onChange={pickCustomTo}
-                      min={rangeFrom || undefined}
-                      ariaLabel="วันสิ้นสุด — เว้นว่างไว้คือวันเดียวกับวันเริ่มต้น"
-                    />
-                    <span className="range-hint">
-                      เลือกวันเดียว: กำหนดวันเริ่มต้นอย่างเดียวก็พอ ·
-                      ช่วงหลายวัน: กำหนดวันสิ้นสุดเพิ่ม
-                    </span>
-                  </div>
-                )}
-                <div
-                  className="tx-type-pills report-staff-pills"
-                  role="group"
-                  aria-label="กรองตามพนักงานขาย — กดได้หลายคนพร้อมกัน"
-                >
-                  <button
-                    type="button"
-                    className={staffFilters.length === 0 ? "active" : ""}
-                    onClick={() => setStaffFilters([])}
-                    title="แสดงบิลของพนักงานทุกคน"
-                  >
-                    {cashierOptions.length > 0
-                      ? `ทุกคน (${cashierOptions.reduce((sum, option) => sum + option.bills, 0).toLocaleString("th-TH")} บิล)`
-                      : "พนักงานขาย: ทุกคน"}
-                  </button>
-                  {cashierOptions.map(option => {
-                    const selected = staffFilters.includes(option.cashier);
-                    return (
-                      <button
-                        type="button"
-                        key={option.cashier}
-                        aria-pressed={selected}
-                        className={selected ? "active" : ""}
-                        onClick={() => toggleStaffFilter(option.cashier)}
-                        title={
-                          selected
-                            ? `กดอีกครั้งเพื่อถอน “${option.cashier}” ออกจากตัวกรอง`
-                            : `เพิ่ม “${option.cashier}” เข้าตัวกรอง — เลือกหลายคนพร้อมกันได้ เช่น รวม 2 กะในรายงานเดียว`
-                        }
-                      >
-                        {option.cashier} ·{" "}
-                        {option.bills.toLocaleString("th-TH")} บิล
-                        {selected && (
-                          <i className="pill-check" aria-hidden="true">
-                            ✓
-                          </i>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-                {salesView === "timeline" && (
-                  <div
-                    className="report-groupby"
-                    role="group"
-                    aria-label="จัดกลุ่มแถวรายงาน"
-                  >
-                    <span>แยกตาม</span>
-                    {REPORT_GROUPBY_CHIPS.map(chip => (
-                      <button
-                        type="button"
-                        key={chip.value}
-                        className={groupBy === chip.value ? "active" : ""}
-                        onClick={() => setGroupBy(chip.value)}
-                      >
-                        {chip.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              {/* Layer 4 part 1 — summary cards (moved from above tabbar) */}
+              {salesSummaryCards}
+              {/* Layer 4 part 2 — view pills (below summary cards, above table) */}
               <div
                 className="report-tabs report-view-pills"
                 role="tablist"
@@ -2569,53 +2545,57 @@ export function Reports({
           )}
           {reportTab === "bills" && (
             <section className="panel table-panel" id="bills-history-report">
-              <div className="table-toolbar">
-                <div>
-                  <h2>ประวัติบิล</h2>
-                  <p>
-                    กดแถวเพื่อเปิดใบเสร็จย้อนหลังได้ทันที · แสดง 100
-                    บิลล่าสุดก่อน · กด แสดงเพิ่ม เพื่อดูบิลเก่ากว่านี้ ·
-                    จำกัดเพื่อความเร็วของหน้า · รวม {salesHistory.length} บิล
-                  </p>
-                </div>
-                <div className="toolbar-actions">
+              {/* PT-3 Layer 3 — FilterBar: search + member picker + export (no date range) */}
+              <div className="report-filter-bar">
+                <div className="report-filter-row-main bills-filter-row">
                   <div className="search-field">
                     <Search size={16} />
                     <input
                       value={billSearch}
                       onChange={event => setBillSearch(event.target.value)}
                       placeholder="ค้นหาเลขที่บิล หรือเลขสมาชิก (คีย์/สแกนได้)"
+                      aria-label="ค้นหาประวัติบิล"
                     />
                   </div>
+                  <div className="bill-member-filter">
+                    <MemberScanPicker
+                      members={members}
+                      selectedNumber={billMember?.memberNumber ?? null}
+                      onSelect={member => setBillMember(member)}
+                      placeholder="กรองตามสมาชิก — คีย์เลขสมาชิก หรือยิงบาร์โค้ด"
+                      inputId="bill-member-filter-input"
+                    />
+                  </div>
+                </div>
+                <div
+                  className="report-export-actions"
+                  aria-label="พรีวิวข้อมูลก่อนส่งออกประวัติบิล"
+                >
                   <button
                     className="outline-button compact"
                     onClick={() => openBillsExportPreview("csv")}
+                    title="พรีวิวแล้วส่งออก CSV"
                   >
                     <Download size={15} /> CSV
                   </button>
                   <button
                     className="outline-button compact"
                     onClick={() => openBillsExportPreview("xlsx")}
+                    title="พรีวิวแล้วส่งออก Excel"
                   >
                     <FileBarChart size={15} /> Excel
                   </button>
                   <button
                     className="outline-button compact"
                     onClick={() => openBillsExportPreview("pdf")}
+                    title="พรีวิวแล้วดาวน์โหลด PDF แบบเอกสาร A4"
                   >
                     <FileBarChart size={15} /> PDF
                   </button>
                 </div>
               </div>
-              <div className="bill-member-filter">
-                <MemberScanPicker
-                  members={members}
-                  selectedNumber={billMember?.memberNumber ?? null}
-                  onSelect={member => setBillMember(member)}
-                  placeholder="กรองตามสมาชิก — คีย์เลขสมาชิก หรือยิงบาร์โค้ด"
-                  inputId="bill-member-filter-input"
-                />
-              </div>
+              {/* Layer 4 part 1 — summary cards (shared with sales tab) */}
+              {salesSummaryCards}
               <div className="table-filter-summary">
                 <span>
                   <Search size={13} />{" "}
@@ -2777,131 +2757,131 @@ export function Reports({
           )}
           {reportTab === "transactions" && (
             <section className="panel table-panel" id="tx-report">
-              <div className="table-toolbar">
-                <div>
-                  <h2>ประวัติธุรกรรมสมาชิก</h2>
-                  <p>
-                    ใช้จ่าย · เติมเงิน · ถอนเงิน
-                    พร้อมเจ้าหน้าที่ทำรายการทุกรายการ · กรองตามสมาชิก ประเภท
-                    และช่วงเวลาได้
-                  </p>
+              {/* PT-3 Layer 3 — consolidated FilterBar: date chips + tx-date-range +
+                  MemberScanPicker + tx-type-pills + export buttons (all in one row) */}
+              <div className="report-filter-bar">
+                <div className="report-range-row report-filter-row-main">
+                  <div
+                    className="report-tabs report-period-pills"
+                    role="group"
+                    aria-label="เลือกช่วงเวลาของธุรกรรมสมาชิก"
+                  >
+                    {REPORT_RANGE_CHIPS.map(chip => (
+                      <button
+                        type="button"
+                        key={`tx-${chip.value}`}
+                        className={txRangeActive(chip.value) ? "active" : ""}
+                        onClick={() => pickTxRangeChip(chip.value)}
+                        title={
+                          chip.value === "today" || chip.value === "yesterday"
+                            ? "เลือกวันเดียว"
+                            : chip.value === "custom"
+                              ? "เลือกช่วงวันที่เองด้วยปฏิทิน"
+                              : undefined
+                        }
+                      >
+                        {chip.label}
+                      </button>
+                    ))}
+                  </div>
+                  <div
+                    className="tx-date-range"
+                    role="group"
+                    aria-label="ช่วงวันที่ของธุรกรรม"
+                  >
+                    <ThaiDatePicker
+                      value={txFrom}
+                      onChange={pickTxFrom}
+                      max={txTo || undefined}
+                      ariaLabel="วันเริ่มต้นของธุรกรรม"
+                    />
+                    <span aria-hidden="true">→</span>
+                    <ThaiDatePicker
+                      value={txTo}
+                      onChange={pickTxTo}
+                      min={txFrom || undefined}
+                      ariaLabel="วันสิ้นสุดของธุรกรรม"
+                    />
+                  </div>
                 </div>
-                <div className="toolbar-actions">
+                <div className="report-filter-row-main tx-filter-row">
+                  <MemberScanPicker
+                    members={members}
+                    selectedNumber={txMember?.memberNumber ?? null}
+                    onSelect={member => setTxMember(member)}
+                    placeholder="กรองตามสมาชิก — คีย์เลขสมาชิก หรือยิงบาร์โค้ด"
+                    inputId="tx-member-filter-input"
+                  />
+                  <div
+                    className="tx-type-pills"
+                    role="group"
+                    aria-label="กรองตามประเภทธุรกรรม — กดได้หลายประเภทพร้อมกัน"
+                  >
+                    <button
+                      type="button"
+                      className={txTypes.length === 0 ? "active" : ""}
+                      onClick={() => setTxTypes([])}
+                      title="แสดงทุกประเภทธุรกรรม"
+                    >
+                      ทั้งหมด
+                    </button>
+                    {(
+                      [
+                        ["purchase", "ใช้จ่าย"],
+                        ["deposit", "เติมเงิน"],
+                        ["withdrawal", "ถอนเงิน"],
+                        ["activation", "เปิดใช้บัตร"],
+                        ["refund", "คืนบัตรเงินสด"],
+                        ["limit_request", "ขอลดวงเงิน"],
+                      ] as const
+                    ).map(([value, label]) => (
+                      <button
+                        type="button"
+                        key={value}
+                        aria-pressed={txTypes.includes(value)}
+                        className={txTypes.includes(value) ? "active" : ""}
+                        onClick={() => toggleTxType(value)}
+                        title={
+                          txTypes.includes(value)
+                            ? `กดอีกครั้งเพื่อถอน “${label}” ออกจากตัวกรอง`
+                            : `เพิ่ม “${label}” เข้าตัวกรอง — เลือกหลายประเภทพร้อมกันได้`
+                        }
+                      >
+                        {label}
+                        {txTypes.includes(value) && (
+                          <i className="pill-check" aria-hidden="true">
+                            ✓
+                          </i>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div
+                  className="report-export-actions"
+                  aria-label="พรีวิวข้อมูลก่อนส่งออกประวัติธุรกรรม"
+                >
                   <button
                     className="outline-button compact"
                     onClick={() => openTxExportPreview("csv")}
+                    title="พรีวิวแล้วส่งออก CSV"
                   >
                     <Download size={15} /> CSV
                   </button>
                   <button
                     className="outline-button compact"
                     onClick={() => openTxExportPreview("xlsx")}
+                    title="พรีวิวแล้วส่งออก Excel"
                   >
                     <FileBarChart size={15} /> Excel
                   </button>
                   <button
                     className="outline-button compact"
                     onClick={() => openTxExportPreview("pdf")}
+                    title="พรีวิวแล้วดาวน์โหลด PDF แบบเอกสาร A4"
                   >
                     <FileBarChart size={15} /> PDF
                   </button>
-                </div>
-              </div>
-              <div className="report-range-row">
-                <div
-                  className="report-tabs report-period-pills"
-                  role="group"
-                  aria-label="เลือกช่วงเวลาของธุรกรรมสมาชิก"
-                >
-                  {REPORT_RANGE_CHIPS.map(chip => (
-                    <button
-                      type="button"
-                      key={`tx-${chip.value}`}
-                      className={txRangeActive(chip.value) ? "active" : ""}
-                      onClick={() => pickTxRangeChip(chip.value)}
-                      title={
-                        chip.value === "today" || chip.value === "yesterday"
-                          ? "เลือกวันเดียว"
-                          : chip.value === "custom"
-                            ? "เลือกช่วงวันที่เองด้วยปฏิทิน"
-                            : undefined
-                      }
-                    >
-                      {chip.label}
-                    </button>
-                  ))}
-                </div>
-                <div
-                  className="tx-date-range"
-                  role="group"
-                  aria-label="ช่วงวันที่ของธุรกรรม"
-                >
-                  <ThaiDatePicker
-                    value={txFrom}
-                    onChange={pickTxFrom}
-                    max={txTo || undefined}
-                    ariaLabel="วันเริ่มต้นของธุรกรรม"
-                  />
-                  <span aria-hidden="true">→</span>
-                  <ThaiDatePicker
-                    value={txTo}
-                    onChange={pickTxTo}
-                    min={txFrom || undefined}
-                    ariaLabel="วันสิ้นสุดของธุรกรรม"
-                  />
-                </div>
-              </div>
-              <div className="tx-filter-bar">
-                <MemberScanPicker
-                  members={members}
-                  selectedNumber={txMember?.memberNumber ?? null}
-                  onSelect={member => setTxMember(member)}
-                  placeholder="กรองตามสมาชิก — คีย์เลขสมาชิก หรือยิงบาร์โค้ด"
-                  inputId="tx-member-filter-input"
-                />
-                <div
-                  className="tx-type-pills"
-                  role="group"
-                  aria-label="กรองตามประเภทธุรกรรม — กดได้หลายประเภทพร้อมกัน"
-                >
-                  <button
-                    type="button"
-                    className={txTypes.length === 0 ? "active" : ""}
-                    onClick={() => setTxTypes([])}
-                    title="แสดงทุกประเภทธุรกรรม"
-                  >
-                    ทั้งหมด
-                  </button>
-                  {(
-                    [
-                      ["purchase", "ใช้จ่าย"],
-                      ["deposit", "เติมเงิน"],
-                      ["withdrawal", "ถอนเงิน"],
-                      ["activation", "เปิดใช้บัตร"],
-                      ["refund", "คืนบัตรเงินสด"],
-                      ["limit_request", "ขอลดวงเงิน"],
-                    ] as const
-                  ).map(([value, label]) => (
-                    <button
-                      type="button"
-                      key={value}
-                      aria-pressed={txTypes.includes(value)}
-                      className={txTypes.includes(value) ? "active" : ""}
-                      onClick={() => toggleTxType(value)}
-                      title={
-                        txTypes.includes(value)
-                          ? `กดอีกครั้งเพื่อถอน “${label}” ออกจากตัวกรอง`
-                          : `เพิ่ม “${label}” เข้าตัวกรอง — เลือกหลายประเภทพร้อมกันได้`
-                      }
-                    >
-                      {label}
-                      {txTypes.includes(value) && (
-                        <i className="pill-check" aria-hidden="true">
-                          ✓
-                        </i>
-                      )}
-                    </button>
-                  ))}
                 </div>
               </div>
               <div className="tx-log-strip" role="note">
@@ -3147,14 +3127,58 @@ export function Reports({
           )}
           {reportTab === "stock" && (
             <section className="panel" id="stock-balance-report">
-              <div className="panel-heading">
-                <div>
-                  <h2>สินค้าคงคลัง</h2>
-                  <p>
-                    ตามชีทรายงานโรงพยาบาล — รหัสสินค้า · ยอดยกมา · ยอดขาย ·
-                    คงเหลือ · ช่วงข้อมูล {rangeLabel}{" "}
-                    (ยอดยกมาคำนวณจากสต็อกปัจจุบันบวกที่ขายออกในช่วง)
-                  </p>
+              {/* PT-3 Layer 3 — FilterBar: date chips + custom picker + search + export */}
+              <div className="report-filter-bar">
+                <div className="report-range-row report-filter-row-main">
+                  <div
+                    className="report-tabs report-period-pills"
+                    role="group"
+                    aria-label="เลือกช่วงเวลาของรายงานสินค้าคงคลัง"
+                  >
+                    {REPORT_RANGE_CHIPS.map(chip => (
+                      <button
+                        type="button"
+                        key={`stock-${chip.value}`}
+                        className={rangeMode === chip.value ? "active" : ""}
+                        onClick={() => pickRangeChip(chip.value)}
+                        title={
+                          chip.value === "today" || chip.value === "yesterday"
+                            ? "เลือกวันเดียว"
+                            : undefined
+                        }
+                      >
+                        {chip.label}
+                      </button>
+                    ))}
+                  </div>
+                  {rangeMode === "custom" && (
+                    <div className="report-custom-range">
+                      <ThaiDatePicker
+                        value={rangeFrom}
+                        onChange={pickCustomFrom}
+                        max={rangeTo || undefined}
+                        ariaLabel="วันเริ่มต้นของรายงานสินค้าคงคลัง"
+                      />
+                      <span className="range-sep" aria-hidden="true">
+                        →
+                      </span>
+                      <ThaiDatePicker
+                        value={rangeTo}
+                        onChange={pickCustomTo}
+                        min={rangeFrom || undefined}
+                        ariaLabel="วันสิ้นสุดของรายงานสินค้าคงคลัง — เว้นว่างไว้คือวันเดียวกับวันเริ่มต้น"
+                      />
+                    </div>
+                  )}
+                  <div className="search-field">
+                    <Search size={16} />
+                    <input
+                      value={stockSearch}
+                      onChange={event => setStockSearch(event.target.value)}
+                      placeholder="ค้นหาชื่อสินค้า / รหัส / บาร์โค้ด"
+                      aria-label="ค้นหารายการสินค้าคงคลัง"
+                    />
+                  </div>
                 </div>
                 <div
                   className="report-export-actions"
@@ -3189,48 +3213,6 @@ export function Reports({
                     <Printer size={15} /> พิมพ์
                   </button>
                 </div>
-              </div>
-              <div className="report-range-row">
-                <div
-                  className="report-tabs report-period-pills"
-                  role="group"
-                  aria-label="เลือกช่วงเวลาของรายงานสินค้าคงคลัง"
-                >
-                  {REPORT_RANGE_CHIPS.map(chip => (
-                    <button
-                      type="button"
-                      key={`stock-${chip.value}`}
-                      className={rangeMode === chip.value ? "active" : ""}
-                      onClick={() => pickRangeChip(chip.value)}
-                      title={
-                        chip.value === "today" || chip.value === "yesterday"
-                          ? "เลือกวันเดียว"
-                          : undefined
-                      }
-                    >
-                      {chip.label}
-                    </button>
-                  ))}
-                </div>
-                {rangeMode === "custom" && (
-                  <div className="report-custom-range">
-                    <ThaiDatePicker
-                      value={rangeFrom}
-                      onChange={pickCustomFrom}
-                      max={rangeTo || undefined}
-                      ariaLabel="วันเริ่มต้นของรายงานสินค้าคงคลัง"
-                    />
-                    <span className="range-sep" aria-hidden="true">
-                      →
-                    </span>
-                    <ThaiDatePicker
-                      value={rangeTo}
-                      onChange={pickCustomTo}
-                      min={rangeFrom || undefined}
-                      ariaLabel="วันสิ้นสุดของรายงานสินค้าคงคลัง — เว้นว่างไว้คือวันเดียวกับวันเริ่มต้น"
-                    />
-                  </div>
-                )}
               </div>
               <div className="tx-summary-cards">
                 <div>
@@ -3288,27 +3270,6 @@ export function Reports({
                     )}
                   </strong>
                   <span>สต็อกปัจจุบัน</span>
-                </div>
-              </div>
-              <div className="table-toolbar">
-                <div>
-                  <h3>รายการสินค้าคงคลัง</h3>
-                  <p>
-                    {stockBalanceQuery.isLoading
-                      ? "กำลังโหลด…"
-                      : `${stockBalanceRows.length} รายการ${stockTotals.sold > 0 ? ` · ขายออกไปแล้ว ${stockTotals.sold.toLocaleString("th-TH")} ชิ้นในช่วงนี้` : ""}`}
-                  </p>
-                </div>
-                <div className="toolbar-actions">
-                  <div className="search-field">
-                    <Search size={16} />
-                    <input
-                      value={stockSearch}
-                      onChange={event => setStockSearch(event.target.value)}
-                      placeholder="ค้นหาชื่อสินค้า / รหัส / บาร์โค้ด"
-                      aria-label="ค้นหารายการสินค้าคงคลัง"
-                    />
-                  </div>
                 </div>
               </div>
               <div className="table-wrap">
@@ -3417,14 +3378,18 @@ export function Reports({
           )}
           {reportTab === "balances" && (
             <section className="panel" id="member-balances-report">
-              <div className="panel-heading">
-                <div>
-                  <h2>ยอดเงินในบัตรสมาชิก</h2>
-                  <p>
-                    สรุปยอดสมาชิก — เลขสมาชิก · ยอดทั้งหมด (เปิดใช้ + เติมเงิน)
-                    · ยอดจ่าย (ใช้ซื้อ + ถอน + คืนบัตร) · คงเหลือ ·
-                    วันที่เปิดใช้สมาชิก
-                  </p>
+              {/* PT-3 Layer 3 — FilterBar: search + export (snapshot, no date range) */}
+              <div className="report-filter-bar">
+                <div className="report-range-row report-filter-row-main">
+                  <div className="search-field">
+                    <Search size={16} />
+                    <input
+                      value={balanceSearch}
+                      onChange={event => setBalanceSearch(event.target.value)}
+                      placeholder="ค้นหาชื่อ / เลขสมาชิก"
+                      aria-label="ค้นหารายงานยอดเงินในบัตร"
+                    />
+                  </div>
                 </div>
                 <div
                   className="report-export-actions"
@@ -3504,27 +3469,6 @@ export function Reports({
                       : money(balanceTotals.balance)}
                   </strong>
                   <span>ยอดเงินในบัตรทุกใบขณะนี้</span>
-                </div>
-              </div>
-              <div className="table-toolbar">
-                <div>
-                  <h3>บัตรทุกใบในระบบ</h3>
-                  <p>
-                    {balancesQuery.isLoading
-                      ? "กำลังโหลด…"
-                      : `${balanceRows.length} ราย · ค้นหาจากชื่อหรือเลขสมาชิก`}
-                  </p>
-                </div>
-                <div className="toolbar-actions">
-                  <div className="search-field">
-                    <Search size={16} />
-                    <input
-                      value={balanceSearch}
-                      onChange={event => setBalanceSearch(event.target.value)}
-                      placeholder="ค้นหาชื่อ / เลขสมาชิก"
-                      aria-label="ค้นหารายงานยอดเงินในบัตร"
-                    />
-                  </div>
                 </div>
               </div>
               <div className="table-wrap">
