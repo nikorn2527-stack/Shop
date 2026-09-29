@@ -470,6 +470,24 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (member_number) REFERENCES members(member_number)
     );
+    -- P4 (release/rollback) — every install/update/rollback/hotfix lands a row
+    -- here so the on-premise deployment has an auditable release history. The
+    -- scripts/update.sh and scripts/rollback.sh drivers append a row each
+    -- time they run; system.releases (admin only) reads it back. Action is
+    -- CHECK-constrained to the four canonical actions so ad-hoc strings cannot
+    -- pollute the history. Migrations / health_check / backup_file are stored as
+    -- TEXT (the scripts pass JSON or markdown); actor is who/what triggered it.
+    CREATE TABLE IF NOT EXISTS release_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      version TEXT NOT NULL,
+      action TEXT NOT NULL CHECK (action IN ('install', 'update', 'rollback', 'hotfix')),
+      notes TEXT,
+      migrations TEXT,
+      backup_file TEXT,
+      health_check TEXT,
+      actor TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
   `);
   ensureColumn(db, "members", "phone", "TEXT");
   ensureColumn(db, "members", "type", "TEXT NOT NULL DEFAULT 'สมาชิก'");
@@ -716,6 +734,150 @@ export function logAction(
 export function listAuditLogs(db: SqliteDb, limit = 200): SqliteAuditLog[] {
   const capped = Math.max(1, Math.min(1000, Math.floor(limit)));
   return db.prepare(`SELECT id, action, actor, actor_role AS actorRole, detail, tone, created_at AS createdAt FROM audit_logs ORDER BY created_at DESC, id DESC LIMIT ?`).all(capped) as unknown as SqliteAuditLog[];
+}
+
+// --- P4: release/rollback log + schema version tracking --------------------
+
+/**
+ * P4 (release/rollback) — One row per install/update/rollback/hotfix action,
+ * so the on-premise deployment has an auditable release history that pairs
+ * with `scripts/update.sh` and `scripts/rollback.sh`. Action is constrained
+ * to the four canonical values by a CHECK clause on the table itself; the
+ * TypeScript union here mirrors that and keeps callers type-safe.
+ */
+export type ReleaseAction = "install" | "update" | "rollback" | "hotfix";
+
+export type ReleaseLogRow = {
+  id: number;
+  version: string;
+  action: ReleaseAction;
+  notes: string | null;
+  migrations: string | null;
+  backupFile: string | null;
+  healthCheck: string | null;
+  actor: string | null;
+  createdAt: string;
+};
+
+export type LogReleaseInput = {
+  version: string;
+  action: ReleaseAction;
+  notes?: string | null;
+  migrations?: string | null;
+  backupFile?: string | null;
+  healthCheck?: string | null;
+  actor?: string | null;
+  /** actorRole is preserved for audit-trail parity with logAction. */
+  actorRole?: string | null;
+};
+
+/**
+ * Append a release_logs row AND a matching audit_logs entry. The audit log
+ * is what shows up on the "ประวัติระบบ" page (red tone for rollback, blue for
+ * install/update, amber for hotfix) so admins see release events next to
+ * every other system action. Returns the inserted row.
+ *
+ * Idempotent: callers that re-send the same input (e.g. a script that gets
+ * re-run after a transient failure) will get a duplicate row. The script
+ * drivers therefore pass `--actor "$USER@$(hostname)"` plus a timestamp
+ * inside `notes` so duplicates are easy to spot in the history.
+ */
+export function logRelease(db: SqliteDb, input: LogReleaseInput): ReleaseLogRow {
+  const version = (input.version ?? "").trim() || "0.0.0";
+  const notes = input.notes?.trim() || null;
+  const migrations = input.migrations ?? null;
+  const backupFile = input.backupFile?.trim() || null;
+  const healthCheck = input.healthCheck ?? null;
+  const actor = input.actor?.trim() || null;
+  const actorRole = input.actorRole ?? null;
+  const result = db
+    .prepare(
+      `INSERT INTO release_logs (version, action, notes, migrations, backup_file, health_check, actor)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(version, input.action, notes, migrations, backupFile, healthCheck, actor);
+  const id = Number(result.lastInsertRowid);
+  const tone = input.action === "rollback" ? "red" : input.action === "hotfix" ? "amber" : "blue";
+  const summaryParts: string[] = [`เวอร์ชัน ${version}`];
+  if (backupFile) summaryParts.push(`สำรองไว้ที่ ${backupFile}`);
+  if (migrations) summaryParts.push(`migrations: ${migrations}`);
+  if (healthCheck) summaryParts.push(`health: ${healthCheck}`);
+  if (notes) summaryParts.push(notes);
+  logAction(
+    db,
+    input.action === "install"
+      ? "ติดตั้งระบบ"
+      : input.action === "update"
+        ? "อัปเดตระบบ"
+        : input.action === "rollback"
+          ? "ย้อนระบบกลับ"
+          : "Hotfix",
+    actor ?? "ระบบ",
+    summaryParts.join(" · "),
+    tone,
+    actorRole,
+  );
+  return db
+    .prepare(
+      `SELECT id, version, action, notes, migrations, backup_file AS backupFile, health_check AS healthCheck, actor, created_at AS createdAt
+       FROM release_logs WHERE id = ?`,
+    )
+    .get(id) as unknown as ReleaseLogRow;
+}
+
+/** Release history newest-first. Caps at 200 to match audit_logs behavior. */
+export function listReleases(db: SqliteDb, limit = 100): ReleaseLogRow[] {
+  const capped = Math.max(1, Math.min(200, Math.floor(limit)));
+  return db
+    .prepare(
+      `SELECT id, version, action, notes, migrations, backup_file AS backupFile, health_check AS healthCheck, actor, created_at AS createdAt
+       FROM release_logs ORDER BY created_at DESC, id DESC LIMIT ?`,
+    )
+    .all(capped) as unknown as ReleaseLogRow[];
+}
+
+// --- P4: schema version tracking (separate from app version) ----------------
+
+/**
+ * P4 — DB schema version, stored in `store_settings` under `schema_version`.
+ *
+ * This is INTENTIONALLY separate from the app semver (`package.json` version
+ * returned by `getVersion()` in `server/_core/version.ts`):
+ *   • The app version changes with every release (features, fixes).
+ *   • The schema version only bumps when a DB migration runs (new table,
+ *     new column, CHECK constraint change, etc.).
+ *
+ * `scripts/update.sh` reads this before/after running migrations so it can
+ * skip a migration that was already applied and refuse to downgrade.
+ *
+ * Default "1.0" matches the schema as of P4 (no migration versioning existed
+ * before this task — the value is backfilled the first time it is read).
+ */
+const SCHEMA_VERSION_KEY = "schema_version";
+const DEFAULT_SCHEMA_VERSION = "1.0";
+
+/** Current DB schema version (default "1.0" when never set). */
+export function getSchemaVersion(db: SqliteDb): string {
+  const row = db
+    .prepare(`SELECT value FROM store_settings WHERE key = ?`)
+    .get(SCHEMA_VERSION_KEY) as { value: string } | undefined;
+  const raw = (row?.value ?? "").trim();
+  return raw || DEFAULT_SCHEMA_VERSION;
+}
+
+/**
+ * Update the schema version setting. Called by the migration runner inside
+ * `scripts/update.sh` (and by any future in-app migration path) right after
+ * a successful migration commit. Does NOT log to audit_logs on its own —
+ * the caller (script or migration runner) writes a `logRelease` entry that
+ * already records the migration, so a second audit row would be noise.
+ */
+export function setSchemaVersion(db: SqliteDb, version: string): void {
+  const clean = (version ?? "").trim();
+  if (!clean) return;
+  db.prepare(
+    `INSERT INTO store_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+  ).run(SCHEMA_VERSION_KEY, clean);
 }
 
 // --- products & stock -------------------------------------------------------

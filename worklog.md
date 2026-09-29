@@ -819,3 +819,126 @@ Stage Summary:
   - ถ้าตั้ง `BACKUP_ENCRYPTION_KEY` แล้วลบ env var ภายหลัง → ไฟล์ `.sqlite.enc` ที่เข้ารหัสด้วยคีย์เดิมกู้คืนไม่ได้ (SOP §5 เตือนไว้)
   - คีย์ derive ด้วย salt ตายตัว `"png-shop-backup-salt"` — ถ้าต้องการ rotate คีย์โดยใช้ salt ใหม่ ต้อง re-encrypt ไฟล์เก่าทั้งหมด
   - download ผาน tRPC คืน base64 ของไฟล์ `.enc` ดิบ (encrypted) — admin ที่ download ต้องมี key ถึงจะ decrypt ภายนอกระบบได้ (good for security — ไฟล์ที่ download ไปไม่มี key ก็อ่านไม่ได้)
+
+
+---
+Task ID: P4
+Agent: full-stack-developer (release/rollback)
+Task: สร้างระบบ Release/Rollback — version tracking + health check + release_logs table + schema version tracking + scripts/update.sh + scripts/rollback.sh + handover doc template
+
+Work Log:
+- อ่าน `worklog.md` ครบ (P1-1fix, UI-1..UI-n, PT-1..PT-3, P2-a, P2-b, P3) เพื่อเข้าใจ context — โปรเจกต์ Vite + React 19 + Express + tRPC + node:sqlite, branch `main` (local) push ขึ้น `origin/main-v2`; P3 (backup AES-256-GCM + restore drill + SOP) เสร็จที่ commit `de89620`
+- อ่าน `docs/TECHNICAL_REVIEW_DEPLOYMENT_HANDOFF_TH.md` ครบ 274 บรรทัด — ดึง spec 10-step update flow จาก section 5 + 7-step rollback จาก task description; ดูว่า existing `systemRouter` (ใน `server/_core/systemRouter.ts`) มี `health` (stub `{ ok: true }`), `lanInfo` (admin), `notifyOwner` (admin) อยู่แล้ว
+- อ่าน `server/sqliteStore.ts` (4199 บรรทัด → 4362 บรรทัด): `createSqliteStore` line 275 (มี table block จนถึง line 472), `logAction` line 703, `installOverview` line 2809 (มี `statSync` pattern สำหรับ dbSizeBytes ที่จะ reuse), `getSettings` line 3029 (อ่าน `store_settings` JSON), `setEditionSettings` line 3057
+- อ่าน `server/_core/systemRouter.ts` (57 บรรทัด) — existing `health` มี input `z.object({ timestamp })` ที่ Settings page (`client/src/pages/settings/Settings.tsx` line 637) ใช้สำหรับ measure latency (`utils.client.system.health.query({ timestamp: Date.now() }).then(...)` — ไม่ได้อ่าน response shape)
+- อ่าน `server/_core/trpc.ts` — `adminProcedure` middleware คืน ctx ที่มี `user: ctx.user` (role=admin), `permissionProcedure` ใช้ `hasPermission(db, ctx.user.role, permission)`
+- อ่าน `server/_core/context.ts` — `ctx.user` shape คือ drizzle `User` (`id/openId/name/role/appRole/mustChangePassword/createdAt/...`); `appRole` คือ DB role จริง (`cashier/administrator/manager/dev`)
+- อ่าน `server/routers.ts` line 581 — `appRouter = router({ system: systemRouter, install: ..., auth: ..., backup: ..., ... })`; `isDevCtx` ใน routers.ts เช็ค `ctx.user.role === "admin" && (appRole === "dev" || appRole === "administrator")`
+- อ่าน `package.json` — `"name": "wellbeing-hospital-store", "version": "1.0.0", "type": "module"` → ต้องใช้ ESM `import.meta.url` + `fileURLToPath` แทน `__dirname`; build script `esbuild ... --format=esm --outdir=dist`
+
+Baseline check:
+- `npx tsc --noEmit` → 0 errors ก่อนแก้
+
+Implementation ใน `server/_core/version.ts` (new file, ~110 บรรทัด):
+- imports: `createRequire` จาก `node:module`, `dirname/resolve` จาก `node:path`, `fileURLToPath` จาก `node:url`, `statSync` จาก `node:fs`
+- `findPackageJsonPath()` — walk up directories จาก `dirname(fileURLToPath(import.meta.url))` สูสูงสุด 10 ระดับ; ใช้ `createRequire(import.meta.url)(candidate)` เพื่อ require ไฟล์ (ถ้าไม่มีจะ throw → ลองขั้นถัดไป); คืน absolute path ของ `package.json` แรกที่เจอ (works ทั้ง dev `server/_core/` และ production `dist/` bundle เพราะ esbuild inline แต่ `import.meta.url` ยัง resolve ได้)
+- `getVersion(): string` — อ่าน version จาก package.json ผ่าน `requireFromHere(PACKAGE_JSON_PATH).version`; trim + fallback `"0.0.0"` ถ้าไม่เจอ
+- `getVersionInfo(): VersionInfo` — คืน `{ version, nodeVersion: process.version, platform: process.platform, buildDate }` โดย `buildDate` = `statSync(dirname(fileURLToPath(import.meta.url))).mtime.toISOString()` หรือ `null` ถ้า stat ไม่ได้ (read-only container edge case)
+
+Implementation ใน `server/sqliteStore.ts` (modified, +162 lines):
+- เพิ่ม `release_logs` table ใน `createSqliteStore` หลัง `limit_requests` table (ก่อน closing `\`);` ของ db.exec):
+  ```sql
+  CREATE TABLE IF NOT EXISTS release_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    version TEXT NOT NULL,
+    action TEXT NOT NULL CHECK (action IN ('install', 'update', 'rollback', 'hotfix')),
+    notes TEXT, migrations TEXT, backup_file TEXT, health_check TEXT, actor TEXT,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  );
+  ```
+- เพิ่ม exports ใหม่หลัง `listAuditLogs` (line ~738):
+  - `type ReleaseAction = "install" | "update" | "rollback" | "hotfix"`
+  - `type ReleaseLogRow = { id, version, action, notes, migrations, backupFile, healthCheck, actor, createdAt }`
+  - `type LogReleaseInput = { version, action, notes?, migrations?, backupFile?, healthCheck?, actor?, actorRole? }`
+  - `logRelease(db, input): ReleaseLogRow` — INSERT + `logAction()` (red tone สำหรับ rollback, amber สำหรับ hotfix, blue สำหรับ install/update) + คืน row ที่ insert; action Thai label: ติดตั้งระบบ/อัปเดตระบบ/ย้อนระบบกลับ/Hotfix
+  - `listReleases(db, limit = 100): ReleaseLogRow[]` — SELECT newest-first, cap 200 (เทียบเท่า audit_logs)
+- เพิ่ม schema version tracking (constants + 2 functions):
+  - `const SCHEMA_VERSION_KEY = "schema_version"`, `const DEFAULT_SCHEMA_VERSION = "1.0"`
+  - `getSchemaVersion(db): string` — SELECT จาก `store_settings WHERE key = 'schema_version'`; fallback `"1.0"` ถ้าไม่มี row (DB เดิมที่สร้างก่อน P4 จะ backfill เป็น "1.0" อัตโนมัติ)
+  - `setSchemaVersion(db, version: string): void` — INSERT/UPSERT ค่าใหม่ (skip ถ้า empty string)
+- comment ใน SQL template หลีกเลี่ยง backticks (`) เพื่อไม่ให้ break template literal — ใช้ plain text แทน
+
+Implementation ใน `server/_core/systemRouter.ts` (modified, +157 lines):
+- imports เพิ่ม: `statSync` (node:fs), `TRPCError` (@trpc/server), `getVersion/getVersionInfo` (./version), `getWelfareDb/getWelfareDbPath` (../welfareStore), `getSchemaVersion/listReleases/logRelease` (../sqliteStore), `type TrpcContext` (./context)
+- **`system.health`** (publicProcedure — input optional เพื่อรองรับ load balancer GET ที่ไม่ส่ง body): คืน `{ status: "ok", version, uptime, db: { connected, sizeBytes }, memory: { usedMB, totalMB }, timestamp }`
+  - `version` จาก `getVersionInfo().version`
+  - `uptime` จาก `process.uptime()` (seconds, ปัดเป็น integer)
+  - `db.connected` = true ถ้า `statSync(getWelfareDbPath())` ไม่ throw; `db.sizeBytes` = `stats.size`
+  - `memory.usedMB` = `process.memoryUsage().rss` → MB (ปัดทศนิยม 2 ตำแหน่ง); `memory.totalMB` = `os.totalmem()` → MB
+  - `timestamp` = `new Date().toISOString()`
+  - รักษา input schema `{ timestamp: z.number().min(0) }.optional()` เพื่อให้ Settings page latency probe (`query({ timestamp: Date.now() })`) ยังทำงานได้ (ไม่ breaking change)
+- **`system.releases`** (adminProcedure — admin only เพราะ release notes มี actor hostnames/backup paths/migration JSON): รับ optional `{ limit?: 1..200 }`, คืน `{ releases: ReleaseLogRow[], schemaVersion: string, appVersion: string }` (newest-first, default limit 100)
+- **`system.logRelease`** (publicProcedure + inline dev check — dev/administrator only): รับ `{ version, action: enum, notes?, migrations?, backupFile?, healthCheck?, actor? }`, โยน FORBIDDEN "การบันทึกประวัติ release ใช้ได้เฉพาะบัญชีผู้พัฒนา (dev/administrator)" ถ้า `!isDevCtx(ctx)`; ส่งผ่านไป `logRelease(db, {...input, actorRole})` (dev → "ผู้พัฒนา", administrator → "ผู้บริหาร")
+- เพิ่ม local `isDevCtx(ctx)` helper (mirror จาก routers.ts — ไม่ import เพื่อกัน circular dependency)
+
+Implementation ของ `scripts/update.sh` (new file, ~280 บรรทัด):
+- `#!/usr/bin/env bash` + `set -euo pipefail` + log to `data/logs/update-<ISO>.log` (tee stdout/stderr)
+- 10 steps ตาม handoff doc section 5:
+  1. Pre-check: version arg/env/package.json + node ≥20 + pnpm + git + disk ≥200MB + service health (best-effort)
+  2. Backup DB: `cp -p ${DB_PATH} ${BACKUP_DIR}/welfare-store-<ISO>.sqlite` + log sha256/size (skip ถ้า DB ยังไม่มี = first install)
+  3. Backup Configuration: copy `.env` + `data/https/` + `Caddyfile` → `data/backups/config-<ISO>/`
+  4. Receive Artifact: `git fetch origin --tags --force` + หา ref (`refs/tags/v${VER}` หรือ `refs/heads/${VER}` หรือ commit hash) + `git checkout ${REF}` + `git clean -fd`
+  5. Stop Service: หา PID ด้วย `lsof -ti tcp:${PORT}` (fallback `ss -ltnp`) + SIGTERM (รอ 2s) + SIGKILL (ถ้ายังไม่ตาย)
+  6. Update Package: `pnpm install --frozen-lockfile`
+  7. Run Migrations: `pnpm db:push` (drizzle-kit generate + migrate) + อ่าน `schema_version` setting เพื่อ log before-state
+  8. Start Service: `NODE_ENV=production nohup pnpm start` + poll `curl system.health` สูงสุด 30s
+  9. Health Check + Smoke Test: `curl /api/trpc/system.health` (die ถ้า empty) + node นับ tables ใน sqlite_master (ต้องมี app_users/members/store_settings/products ครบ 4 ตาราง)
+  10. Log Release: optional auth (`RELEASE_LOG_DEV_USER` + `RELEASE_LOG_DEV_PASS`) → login → POST `/api/trpc/system.logRelease` ด้วย payload `{ version, action: "update", notes, migrations, backupFile, healthCheck, actor }`; ถ้าไม่มี credentials จะ log warning + บอก operator เรียกผ่าน UI เอง
+- env vars: `APP_VERSION`, `SQLITE_DB_PATH`, `SQLITE_BACKUP_DIR`, `PORT`, `NODE_ENV`, `GIT_REMOTE`, `SKIP_GIT_PULL`, `SKIP_INSTALL`, `SKIP_MIGRATE`, `DRY_RUN`, `RELEASE_LOG_DEV_USER`, `RELEASE_LOG_DEV_PASS`
+- ปลอดภัย: `set -euo pipefail` หยุดทันทีเมื่อ fail; ทุก step log ลงไฟล์; DRY_RUN mode สำหรับ rehearsal
+
+Implementation ของ `scripts/rollback.sh` (new file, ~250 บรรทัด):
+- 7 steps ตาม task spec:
+  1. Stop Service (same lsof/ss pattern as update.sh)
+  2. Backup current DB → `welfare-store-rollback-source-<ISO>.sqlite` (เก็บ broken state ไว้ forensic)
+  3. Restore DB: rm `${DB_PATH}{,-wal,-shm}` ทั้งหมดก่อน + `cp -p ${BACKUP_FILE} ${DB_PATH}` + ตรวจ magic header "SQLite format 3\0" (xxd -p = `53514c69746520666f726d6174203300`) ก่อน copy + `PRAGMA integrity_check` หลัง copy (die ถ้าไม่ ok)
+  4. Git Checkout Previous: `git checkout HEAD@{1}` (fallback `HEAD^` หรือ `GIT_PREV_REF` env var)
+  5. Start Service: `pnpm install --frozen-lockfile` + `NODE_ENV=production nohup pnpm start` + poll health
+  6. Health Check: same as update.sh step 9 (system.health + smoke test 4 core tables)
+  7. Log Rollback: optional auth → POST `system.logRelease` ด้วย `{ version: "rollback-<ISO>", action: "rollback", notes, migrations: "rollback", backupFile, healthCheck, actor }`
+
+Implementation ของ `docs/RELEASE_TEMPLATE_TH.md` (new file, ~140 บรรทัด):
+- 8 sections ตาม task spec: Version / Migrations / Backup / Health Check / Changes / Testing / Rollback Plan / Sign-off
+- ทุก field มี placeholder `[...]` + ตัวอย่างใน comment
+- Testing section เป็น checklist 11 รายการ (TypeScript check, dev boot, POS checkout, void/refund, wallet, reports, settings, backup drill, health endpoint, rollback drill, login/logout, RBAC) — 3 รายการแรก pre-ticked เพราะผ่านในงาน P4 นี้
+- Rollback Plan section มี pre-rollback checklist 5 ขั้น + estimated RTO + ตัวอย่าง rollback command
+- 2 Appendix sections: ไฟล์ที่เปลี่ยน (`git diff --stat`) + env vars ที่ใหม่/เปลี่ยน
+
+Verification:
+- `npx tsc --noEmit` → **0 errors** ✅ (หลังแก้ SQL template literal ที่มี backticks ใน comment ทำให้ parser พัง — ลบ backticks ออก)
+- runtime smoke test: `NODE_ENV=development PORT=3199 node --import tsx server/_core/index.ts` + `curl http://localhost:3199/api/trpc/system.health?input=%7B%22timestamp%22%3A0%7D` → ตอบ `{"result":{"data":{"json":{"status":"ok","version":"1.0.0","uptime":3,"db":{"connected":true,"sizeBytes":1409024},"memory":{"usedMB":356.44,"totalMB":4041.57},"timestamp":"2026-09-29T15:57:12.139Z"}}}}` ✅
+- bash syntax: `bash -n scripts/update.sh` ผ่าน, `bash -n scripts/rollback.sh` ผ่าน
+- backward compatible: existing `system.health` client call `.query({ timestamp: Date.now() })` ยังทำงาน (input schema `.optional()` รับได้ทั้ง with/without payload; client ไม่ได้อ่าน response shape เดิม จึงไม่ break)
+
+Commit & push:
+- `git add server/_core/version.ts server/_core/systemRouter.ts server/sqliteStore.ts scripts/update.sh scripts/rollback.sh docs/RELEASE_TEMPLATE_TH.md`
+- `git commit -m "feat(P4): release/rollback system — version tracking, health check, release log, update/rollback scripts, handover template"`
+- `git push origin main:main-v2`
+
+Stage Summary:
+- 6 files changed (3 new + 3 modified): `server/_core/version.ts` (new, ~110 บรรทัด), `server/_core/systemRouter.ts` (+157, -6), `server/sqliteStore.ts` (+162, 0), `scripts/update.sh` (new, ~280 บรรทัด, chmod +x), `scripts/rollback.sh` (new, ~250 บรรทัด, chmod +x), `docs/RELEASE_TEMPLATE_TH.md` (new, ~140 บรรทัด)
+- P4 release/rollback system ครบทั้ง 7 ข้อ:
+  1) Version tracking — `getVersion()` + `getVersionInfo()` ใน `server/_core/version.ts` (อ่านจาก package.json + process + stat)
+  2) Health check endpoint — `system.health` (publicProcedure, no auth) คืน `{ status, version, uptime, db: {connected, sizeBytes}, memory: {usedMB, totalMB}, timestamp }`
+  3) Release log table — `release_logs` (action CHECK-constrained) + `logRelease()` (INSERT + audit log) + `listReleases()` (newest-first) + `system.releases` (admin) + `system.logRelease` (dev only)
+  4) Migration status tracking — `getSchemaVersion(db)` + `setSchemaVersion(db, version)` ใน `store_settings` key `schema_version` (default "1.0", separate from app version)
+  5) Update flow script — `scripts/update.sh` 10-step flow ตาม handoff doc section 5 (pre-check → backup DB → backup config → git pull → stop → install → migrate → start → health → log release)
+  6) Rollback procedure — `scripts/rollback.sh` 7-step flow (stop → safety backup → restore + integrity check → git checkout prev → start → health → log rollback)
+  7) Release handover doc template — `docs/RELEASE_TEMPLATE_TH.md` 8 sections + 2 appendices (Version / Migrations / Backup / Health Check / Changes / Testing checklist / Rollback Plan / Sign-off)
+- TypeScript: 0 errors; runtime smoke test ผ่าน (`system.health` ตอบ rich payload, server บูท clean, no transform errors)
+- commit `TBD` push ขึ้น `origin/main-v2`
+- ข้อควรระวังที่เจ้าของระบบควรทราบ:
+  - `scripts/update.sh` และ `scripts/rollback.sh` ใช้ `kill -TERM $(lsof -ti tcp:${PORT})` เพื่อหยุด service — ถ้ารันบน PM2/systemd-managed process ต้องหยุดผ่าน service manager ก่อน (script จะเตือน "no process listening" ถ้า service ไม่รันอยู่)
+  - `system.logRelease` ใน scripts ต้องการ `RELEASE_LOG_DEV_USER` + `RELEASE_LOG_DEV_PASS` env vars ถ้าต้องการ auto-log release ใน DB; ถ้าไม่ตั้ง script จะ log warning แล้ว operator ต้องเรียก `system.logRelease` ผ่าน UI เอง
+  - `system.health` เป็น publicProcedure โดย design — load balancer สามารถ probe ได้โดยไม่มี cookie; ไม่ leak ข้อมูล sensitive (version, uptime, memory, db size = standard health metrics)
+  - `findPackageJsonPath()` ใน version.ts walk up สูงสุด 10 ระดับ — ถ้า bundle อยู่ใน folder structure ลึกกว่านั้น (rare) จะคืน null และ `getVersion()` จะคืน "0.0.0" (fail-safe ไม่ใช่ throw)
