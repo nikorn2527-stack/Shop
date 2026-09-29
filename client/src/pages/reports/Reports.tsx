@@ -197,6 +197,7 @@ export function Reports({
   // ROUND 51 — ตัวกรองพนักงานขายแบบเจาะจง: ใช้ร่วมกับทุกมุมมอง ทุกช่วงเวลา
   // ROUND 79 (user) — เลือกได้หลายคนพร้อมกัน (เช่น รวม 2 กะในรายงานเดียว) · [] = ทุกคน
   const [staffFilters, setStaffFilters] = useState<string[]>([]);
+  const [staffFilterOpen, setStaffFilterOpen] = useState(false);
   // ROUND 30 — สรุปยอดขายแยกตามชนิดสินค้า / พนักงานขาย + ประวัติธุรกรรมสมาชิก
   const [salesView, setSalesView] = useState<
     "timeline" | "category" | "product" | "items" | "cashier"
@@ -1801,48 +1802,50 @@ export function Reports({
                       />
                     </div>
                   )}
-                  <select
-                    className="report-staff-select"
-                    value={staffFilters[0] ?? ""}
-                    onChange={event =>
-                      setStaffFilters(
-                        event.target.value ? [event.target.value] : []
-                      )
-                    }
-                    aria-label="กรองตามพนักงานขาย"
-                    title="เลือกพนักงานขายเฉพาะคน — ทุกคน = รวมทุกคน"
-                  >
-                    <option value="">
-                      {cashierOptions.length > 0
-                        ? `พนักงาน: ทุกคน (${cashierOptions.reduce((sum, option) => sum + option.bills, 0).toLocaleString("th-TH")} บิล)`
-                        : "พนักงานขาย: ทุกคน"}
-                    </option>
-                    {cashierOptions.map(option => (
-                      <option key={option.cashier} value={option.cashier}>
-                        {option.cashier} · {option.bills.toLocaleString("th-TH")}{" "}
-                        บิล
-                      </option>
-                    ))}
-                  </select>
-                  {salesView === "timeline" && (
-                    <div
-                      className="report-groupby"
-                      role="group"
-                      aria-label="จัดกลุ่มแถวรายงาน"
+                  <div className="report-staff-multi" style={{ position: "relative" }}>
+                    <button
+                      type="button"
+                      className="outline-button compact report-staff-toggle"
+                      onClick={() => setStaffFilterOpen(open => !open)}
+                      aria-label="กรองตามพนักงานขาย — เลือกหลายคนพร้อมกันได้"
+                      title="เลือกพนักงานขาย — กดเพื่อเลือกหลายคนพร้อมกัน"
                     >
-                      <span>แยกตาม</span>
-                      {REPORT_GROUPBY_CHIPS.map(chip => (
-                        <button
-                          type="button"
-                          key={chip.value}
-                          className={groupBy === chip.value ? "active" : ""}
-                          onClick={() => setGroupBy(chip.value)}
-                        >
-                          {chip.label}
-                        </button>
-                      ))}
-                    </div>
-                  )}
+                      {staffFilters.length === 0
+                        ? `พนักงาน: ทุกคน`
+                        : staffFilters.length === 1
+                          ? staffFilters[0]
+                          : `พนักงาน: ${staffFilters.length} คน`}{" "}
+                      <ChevronDown size={14} weight="bold" />
+                    </button>
+                    {staffFilterOpen && (
+                      <div className="report-staff-dropdown" role="listbox">
+                        <label className="report-staff-option">
+                          <input
+                            type="checkbox"
+                            checked={staffFilters.length === 0}
+                            onChange={() => { setStaffFilters([]); }}
+                          />
+                          ทุกคน ({cashierOptions.reduce((s, o) => s + o.bills, 0).toLocaleString("th-TH")} บิล)
+                        </label>
+                        {cashierOptions.map(option => (
+                          <label key={option.cashier} className="report-staff-option">
+                            <input
+                              type="checkbox"
+                              checked={staffFilters.includes(option.cashier)}
+                              onChange={() => {
+                                setStaffFilters(prev =>
+                                  prev.includes(option.cashier)
+                                    ? prev.filter(c => c !== option.cashier)
+                                    : [...prev, option.cashier]
+                                );
+                              }}
+                            />
+                            {option.cashier} · {option.bills.toLocaleString("th-TH")} บิล
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div
                   className="report-export-actions"

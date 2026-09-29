@@ -5579,3 +5579,9 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 /* Compact FilterBar on narrow screens — stack rows, full-width select */
 @media (max-width: 820px) { .report-filter-bar { flex-direction: column; align-items: stretch; padding: 8px; } .report-filter-bar .report-export-actions { width: 100%; justify-content: flex-end; } .report-staff-select { max-width: none; } .report-filter-bar .search-field, .report-filter-bar .bill-member-filter, .report-filter-bar .tx-filter-row .member-scan-wrap { max-width: none; } }
 @media (max-width: 560px) { .report-filter-bar .report-range-row.report-filter-row-main { gap: 8px; } .report-staff-select { padding: 4px 26px 4px 10px; font-size: 11px; } }
+.report-staff-multi { position: relative; display: inline-block; }
+.report-staff-toggle { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.report-staff-dropdown { position: absolute; top: 100%; left: 0; margin-top: 4px; background: #fff; border: 1px solid #dce5e0; border-radius: 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.08); padding: 6px; z-index: 50; min-width: 220px; max-height: 280px; overflow-y: auto; }
+.report-staff-option { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12.5px; color: #4c5a50; transition: background 0.1s; }
+.report-staff-option:hover { background: var(--teal-mist, #eaf5f1); }
+.report-staff-option input { accent-color: var(--teal, #007a55); width: 16px; height: 16px; }
