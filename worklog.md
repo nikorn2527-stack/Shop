@@ -500,3 +500,64 @@ Stage Summary:
 - 5 shared component abstractions created
 - CSS @import warning resolved
 - All TypeScript checks pass, server boots HTTP 200
+
+---
+Task ID: PT-1
+Agent: full-stack-developer (PageTemplate → Reports)
+Task: Apply PageTemplate standard to Reports.tsx — make VISIBLE changes (button hierarchy, toolbar grouping, compact guide, page-template structure).
+
+Work Log:
+- อ่าน worklog ครบเข้าใจ context V2-A→E (PageTemplate component + CSS ถูกสร้างใน commit `e3497fe` แต่ CSS ถูก revert ใน commit `64272a4` เพราะ Tailwind v4 แพส prettier multi-line ไม่ได้ — ตอนนี้ PageTemplate component ยังอยู่ แต่ CSS rules `.page-template-*` หายไป)
+- อ่าน `client/src/components/page/PageTemplate.tsx` (79 บรรทัด) — component ให้ `<PageTemplate>` wrapper + `.Header/.Toolbar/.Content/.ContextualBar` subcomponents; แต่ subcomponents ใช้ class `.page-template-header/toolbar/content/contextual` ที่ revert ไปแล้ว — ต้อง re-add CSS
+- อ่าน `client/src/pages/reports/Reports.tsx` ส่วน JSX return (lines 1621-3776) ผ่าน Read หลายช่วง — เข้าใจโครงสร้าง:
+  - `<>` Fragment → `<div className="report-quick-guide">` (3 คอลัมน์ + ปุ่ม reset) → `<SectionHeader action={<outline-button date toggle>}` → 4 summary cards → `<div className="dash-workbench"><div className="dash-tabbar">5 แท็บ</div><div className="dash-tab-body">5 sections</div></div>` → modals (limit/receipt/export-preview/upgrade/notice)
+  - แต่ละ tab section: panel-heading + report-export-actions (CSV/Excel/PDF outline) + report-view-pills (sub-tabs) + report-range-row (period chips + staff filters + groupby + custom date picker) + table + table-show-more
+- ตรวจ CSS classes ที่เกี่ยวข้องใน `client/src/index.css`:
+  - `.primary-button`/`.outline-button` (line 108-111): primary = solid teal green, outline = white/gray border
+  - `.dash-tab.active` (line 2356): soft style — `background: var(--teal-mist); color: var(--teal-dark); box-shadow: inset 2.5px 0 0 var(--teal);`
+  - `.report-view-pills button.active` (line 2836): **solid green** — `background: var(--teal); color: #fff;` (conflicts with primary button — multiple greens)
+  - `.tx-type-pills button.active` (line 2854): **solid green**
+  - `.report-range-row .report-period-pills button.active` (line 4262): **solid green**
+  - `.report-quick-guide` (line 3372): 3-column grid + 4th column (reset button)
+  - `.report-cards-dense` (line 5228): compact cards (already UI-1)
+  - `.page-template*` rules: **ไม่มี** (reverted in 64272a4)
+- Apply 6 visible improvements:
+
+  **(1) Wrap return JSX in `<PageTemplate>`** — เพิ่ม `import { PageTemplate } from "@/components/page/PageTemplate";` (หลัง SectionHeader import), เปลี่ยน `<>` → `<PageTemplate>` และ `</>` → `</PageTemplate>`. PageTemplate คืน `<div className="page-template">` ที่จัด flex column gap 12px → ทำให้หน้ามี vertical rhythm สม่ำเสมอ
+
+  **(2) ลบ `report-quick-guide` 3-คอลัมน์ และพับเข้า description** — ลบทั้ง block 39 บรรทัด (3 ช่อง + reset button). ย้าย 3-step guide ("1. เลือกรายงาน → 2. กรองข้อมูล → 3. ส่งออก") ไปเป็นข้อความ inline ใน `description` prop ของ SectionHeader — ประหยัดพื้นที่แนวตั้ง ~110px เห็นชัด
+
+  **(3) ย้าย reset filters button เข้า header action** — จากใน report-quick-guide มาอยู่ใน `action` prop ของ SectionHeader คู่กับ date picker toggle. ใช้ `<div className="page-template-action">` ห่อ 2 ปุ่ม (outline reset + primary date) เรียงในแนวนอน ตามมาตรฐาน PageTemplate (header มี primary action บนขวา)
+
+  **(4) Button hierarchy — only ONE primary (green) per page** — date picker toggle เปลี่ยนจาก `outline-button` → `primary-button` (เป็น primary action ตามกฎ). reset filters คง outline-button compact. ปุ่ม export (CSV/Excel/PDF/print) ทั้ง 4 ที่อยู่ใน panel-heading คง outline-button compact (secondary actions). ไม่มี primary button อื่นในหน้านี้แล้ว ยกเว้น limit-act-approve ในตาราง (soft pill, light bg + dark text — ไม่ใช่ solid green จึงไม่ชนกับ primary)
+
+  **(5) Soften active state ของ secondary tabs/chips** — เปลี่ยน active style ของ 3 ที่จาก solid green bg → soft mist bg + teal-dark text ให้ตรงกับ dash-tab style:
+    - `.report-view-pills button.active` (line 2836): `background: var(--teal-mist); border-color: var(--teal); color: var(--teal-dark); font-weight: 600;`
+    - `.tx-type-pills button.active` (line 2854): เหมือนกัน
+    - `.report-range-row .report-period-pills button.active` (line 4262): เหมือนกัน
+    - ผล: active sub-tab/period chip เป็น "selected" ชัดแต่ไม่แย่งสีเขียวจากปุ่ม primary — ตอบ rule 3 (tabs ใช้สไตล์เดียวกันทุกหน้า) + rule 2 (only ONE green per page)
+
+  **(6) Re-add `.page-template-*` CSS rules** (reverted ใน 64272a4) — เพิ่ม block ใหม่ที่ท้าย `client/src/index.css` (line 5498+) ในรูปแบบ **single-line per rule** (ไม่ใช่ prettier multi-line) เพื่อหลีกเลี่ยง Tailwind v4 parse bug ที่เคยทำให้พัง:
+    - `.page-template { display: flex; flex-direction: column; gap: 12px; }`
+    - `.page-template-header`, `.page-template-action`, `.page-template-toolbar`, `.page-template-content`, `.page-template-contextual` ครบ
+    - เพิ่ม `.report-workbench .page-template-action .outline-button.compact { height: 30px; }` และ `.app-shell:not(.pos-terminal) .page-content:has(.report-workbench) .page-template .section-header { margin-bottom: 8px; gap: 10px; }` เพื่อให้ layout สอดคล้องกับที่เดิมทำไว้ใน line 5329-5330
+- ไม่แตะ business logic: tRPC queries, data processing (timeline rows, tx rows, stock balance rows, balance rows), export logic (downloadReportPdf/printReportDoc/downloadCsvFile/downloadXlsxFile), state handlers (setReportTab/setSalesView/pickRangeChip/toggleStaffFilter/pickCustomFrom/pickCustomTo/setTxTypes/pickTxRangeChip/setGroupBy/resetReportFilters), modal logic (limitDecision/exportPreview/viewedReceipt/upgradeFeature/notice) — ทั้งหมดคงเดิม
+- รักษา functionality ครบ: 5 tabs (sales/bills/transactions/stock/balances) + 5 sub-views (timeline/product/items/category/cashier) + 4 range chips + multi-staff filter + multi-tx-type filter + 3 group-by chips + custom date range + CSV/Excel/PDF/print export preview + limit decision modal + receipt modal + slip view + edition upgrade
+- `npx tsc --noEmit` → **0 errors** ✅ (PageTemplate import path `@/components/page/PageTemplate` ใช้ alias `@/*` → `./client/src/*` จาก tsconfig.json ถูกต้อง)
+- บูต dev server (`pkill -f tsx; nohup setsid ./start-dev.sh >> dev.log 2>&1 & disown; sleep 12`) → curl `/` 3 ครั้ง → HTTP 200/200/200 ✅ stable
+- dev.log: ไม่มี "Missing opening {" Tailwind v4 error (single-line CSS format แพสผ่าน); มีเพียง `[OAuth] OAUTH_SERVER_URL not configured` (pre-existing) และ `[Auth] Missing session cookie` (curl ไม่มี session ปกติ)
+- commit `8b0ce4c` push ขึ้น origin/main-v2 สำเร็จ (64272a4..8b0ce4c, rebase "Current branch main is up to date" — no remote changes ตอน pull)
+
+Stage Summary:
+- ไฟล์ที่เปลี่ยน:
+  - `client/src/pages/reports/Reports.tsx` (3776 → 3767 บรรทัด, ลด 9 บรรทัดจากการลบ report-quick-guide block 39 บรรทัด + เพิ่ม PageTemplate wrapper + restructured action area): เพิ่ม import PageTemplate + เปลี่ยน `<>` → `<PageTemplate>` + ลบ report-quick-guide 3-คอลัมน์ (folds 3-step guide เป็น inline description) + ย้าย reset button เข้า header action area + date picker toggle จาก outline-button → primary-button (เป็น primary action เดียวใน header)
+  - `client/src/index.css` (5496 → 5513 บรรทัด, เพิ่ม 17 บรรทัด): soften active state 3 ที่ (report-view-pills/tx-type-pills/report-period-pills) จาก solid green → soft mist bg + teal text (ตรง dash-tab style) + re-add `.page-template-*` CSS rules (single-line format) ที่ถูก revert ใน 64272a4 + 2 layout-specific rules สำหรับ reports page
+- Visible changes ที่เจ้าของงานจะเห็น:
+  1. **หัวหน้าสะอาด**: header มี 2 ปุ่มชิดขวา (outline "ล้างตัวกรอง" + **green primary** date picker) แทนที่จะมี outline ปุ่มเดียว + มี quick-guide 3-คอลัมน์กินพื้นที่ด้านบน
+  2. **ประหยัดพื้นที่ ~110px**: ลบ block "1. เลือกรายงาน / 2. กรอง / 3. ส่งออก" ออก — คู่มือ 3 ขั้นตอนพับเข้า description บรรทัดเดียวใต้ title "รายงาน"
+  3. **สีเขียวเด่นชัด 1 จุด**: date picker toggle เป็น green solid เดียวใน header — ส่วน active chips (วันนี้/7วัน/30วัน/กำหนดเอง, ภาพรวม/แยกสินค้า/แยกรายการ/แยกพนักงาน, ทั้งหมด/ใช้จ่าย/เติมเงิน/...) เปลี่ยนจาก solid green → soft teal-mist bg + teal-dark text (เหมือน main dash-tab) ไม่แย่งสีเขียว
+  4. **Vertical rhythm สม่ำเสมอ**: `<PageTemplate>` ห่อทั้งหน้าด้วย flex column gap 12px — cards/toolbar/tabs/modals ห่างกันเท่ากันหมด
+- ไม่เปลี่ยน: tRPC contracts, business logic, export logic, modal logic, tRPC queries, data processing, 5-tab/5-view structure, CSV/Excel/PDF/print exports, range/staff/tx-type filters — ทั้งหมดคงเดิม เป็น pure styling/restructuring ตาม PageTemplate standard
+- TypeScript: 0 errors, dev server: HTTP 200 ผ่าน (3 ครั้ง stable + no Tailwind v4 parse error)
+- commit hash: `8b0ce4c` บน origin/main-v2 — รอเจ้าของงาน pull ไปเทส reports view บนเครื่อง (เห็น primary green button + compact header + softened active chips + clean rhythm)
+
