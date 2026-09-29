@@ -1,5 +1,6 @@
 import { Check, Download, FileImage, Printer, X } from "@/lib/icons";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { trpc } from "@/lib/trpc";
 
 /**
@@ -51,7 +52,7 @@ export function SlipViewModal({ open, title, subtitle, slipUrl, loading, onClose
     setTimeout(() => setPrinting(false), 700);
   };
 
-  return (
+  return createPortal(
     <div className="modal-backdrop" onClick={onClose}>
       <div className="form-modal slip-view-modal" role="dialog" aria-modal="true" aria-label={title} onClick={(event) => event.stopPropagation()}>
         <div className="modal-heading">
@@ -77,7 +78,8 @@ export function SlipViewModal({ open, title, subtitle, slipUrl, loading, onClose
           <button className="primary-button" onClick={onClose}><Check size={15} /> เสร็จสิ้น</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

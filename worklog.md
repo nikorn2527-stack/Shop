@@ -1059,3 +1059,45 @@ Stage Summary:
 - File permissions: `scripts/release-checklist.sh` executable (-rwxr-xr-x) — verified คู่กับ scripts/update.sh + scripts/rollback.sh ที่มีอยู่
 - commit hash: `3b66d69` บน origin/main-v2 — production hardening P1..P6 ครบทั้ง 6 phase (auth, audit, idempotency, backup encryption, release/rollback, one-codebase + checklist)
 - ส่งต่อให้เจ้าของงาน pull ไปทดสอบ build Docker image จริง (`docker compose up -d --build`) + run release-checklist.sh ก่อนทุก release ในอนาคต
+
+---
+Task ID: FIX-4
+Agent: full-stack-developer (4 fixes)
+Task: แก้ 4 ปัญหาที่เจ้าของงานเทสเจอ — (1) Design Style ไม่่ติดทุกหน้า (2) โมดัลหน้าสมาชิกซ่อนหลังการ์ด stat (3) ปุ่ม "คืนบัตรเงินสด" ใช้ไม่ได้ (4) บัตรสมาชิกยังไม่ได้ขนาดนามบัตร CR80 และยังพิมพ์ได้ทีละใบ
+
+Work Log:
+- อ่าน worklog.md + 5 ไฟล์หลัก (MemberCardModal, MemberDetail, Members, SlipViewModal, sqliteStore) เพื่อ context
+- Issue 3 (refund bug) — แก้ก่อนเพราะเป็น functional bug:
+  - server/sqliteStore.ts `walletTx()`: เปลี่ยนเช็คจาก `member.balance < amount` เป็น `round2(member.balance) < amount` + error message ใช้ `round2(member.balance)` — SQLite เก็บ REAL เป็น IEEE-754 double ทำให้ 99.99 อาจกลายเป็น 99.98999999999 เมื่อ SELECT กลับ เลย reject refund ที่ amount = balance พอดี
+  - client/MemberDetail.tsx `submitWallet()`: เปลี่ยน `amount > profile.balance` เป็น `amount - profile.balance > 0.01` (epsilon 1 สตาง) กัน float noise + เพิ่ม `round2()` helper inline สำหรับ `balanceAfterWallet` กัน -0.0000001 disable ปุ่ม "ยืนยันการทำรายการ"
+- Issue 2 (z-index/stacking context): SlipViewModal ถูก render ภายใน `.history-row` ใน `.member-history-panel` ใน `.page-content` (ซึ่งมี `animation: viewIn` ที่ transform ทำให้เป็น containing block ชั่วคราว 240ms + `overflow: hidden`) — ทำให้ `.modal-backdrop` (z-index:50, position:fixed) อาจถูก trap ใต้ sibling elements
+  - แก้ที่ SlipViewModal.tsx: import `createPortal` from `react-dom` + wrap `<div className="modal-backdrop">` ด้วย `createPortal(..., document.body)` — render ที่ document.body หลุดพ้นจาก stacking context ของ .page-content ทั้งหมด
+- Issue 4 (batch print + CR80):
+  - ตรวจ CSS เดิม: `body:has(#member-card) .member-card { width: 85.6mm; height: 54mm }` มีอยู่แล้ว — ขนาด CR80 ถูกต้อง แต่ไม่มี batch grid
+  - refactor MemberCardModal.tsx: สกัด `MemberCardArt` component (ตัวการ์ดอย่างเดียว ใช้ซ้ำได้), `useBrand` และ `useQrDataUrl` hooks
+  - เพิ่ม `MemberCardBatchModal` ใหม่: รับ array ของ MemberCardData, render grid ของการ์ดใน `.member-card-batch-grid` (id="member-card-batch"), ปุ่ม "พิมพ์บัตร N ใบ" เปิด PrintPreviewModal ที่ targetId="member-card-batch"
+  - เพิ่มปุ่ม "พิมพ์อีกครั้ง" ใน MemberCardModal (single + batch) — reset PrintPreviewOpen แล้ว re-open ใน next tick
+  - Members.tsx: เพิ่ม checkbox column (header + row) + "เลือกทั้งหมด" indeterminate state, `selectedForPrint: Set<string>`, sticky `.batch-print-bar` ที่ bottom ของ table-panel พร้อมปุ่ม "พิมพ์บัตร N ใบ" → เปิด MemberCardBatchModal
+  - CSS (index.css): เพิ่ม `.member-card-batch-grid/.member-card-batch-item` on-screen + `@media print` สำหรับ `body:has(#member-card-batch)` (ซ่อน chrome, 1 card/page, CR80 size) + `.print-preview-paper .member-card-batch-grid` สำหรับ preview + `.entity-table .check-col` + `.batch-print-bar` + `.link-btn`
+- Issue 1 (Design Style applies only to some menus):
+  - ตรวจพบว่า CSS `[data-style="apple"/"microsoft"/"android"]` มี rule ครอบเฉพาะ elements หลัก (sidebar, topbar, primary-button, form-modal, nav button, metric-card, panel, stock-stat, report-card, form-grid input, etc.) แต่ขาด elements ที่สำคัญบน Member Detail/Members/Reports pages
+  - เพิ่ม CSS rule สำหรับ 3 style presets × ~11 elements: `.member-detail-head`, `.member-detail-stats > div`, `.member-mini-card`, `.history-row`, `.table-toolbar`, `.filter-pills button`, `.entity-table th/td`, `.notice-bar`, `.row-slip-btn`, `.help-disclosure-toggle`, `.modal-backdrop`, `.form-modal`, `.icon-button`, `.history-icon` — ปรับ border-radius + border-color ตาม preset (Apple 12px/980px, Microsoft 4px, Android 16px/20px) + เฉดพื้นหลัง modal-backdrop ตาม preset
+  - เอกสาร: rule ที่เพิ่ม narrow ช่องว่างที่เห็นชัดที่สุด — แต่ root cause จริงคือหลาย component ยัง hardcoded `#fff`/`#e7eeeb`/`#3d4a43` แทนที่จะใช้ `var(--canvas)`/`var(--surface)`/`var(--line)`/`var(--ink)`/`var(--muted)` — migration เต็มรูปแบบเป็น refactor แยก (ไม่อยู่ใน scope ของ FIX-4)
+- `npx tsc --noEmit` → 0 errors (fix bug แรก: `setQrDataUrl` ไม่มีใน scope ของ `useQrDataUrl` hook → เปลี่ยนเป็น `setUrl`)
+
+Stage Summary:
+- 4 ไฟล์ modified + 0 ไฟล์ใหม่:
+  - `server/sqliteStore.ts` (FIX-4 #3 — round2 balance check ใน walletTx)
+  - `client/src/components/SlipViewModal.tsx` (FIX-4 #2 — createPortal หลุด stacking context)
+  - `client/src/components/MemberCardModal.tsx` (FIX-4 #4 — refactor + MemberCardArt + MemberCardBatchModal + ปุ่ม "พิมพ์อีกครั้ง")
+  - `client/src/pages/members/Members.tsx` (FIX-4 #4 — checkbox + batch-print bar + batch modal trigger)
+  - `client/src/pages/members/MemberDetail.tsx` (FIX-4 #3 — submitWallet epsilon + round2 balanceAfterWallet)
+  - `client/src/index.css` (FIX-4 #4 + #1 — batch grid CSS + print rules + style preset extensions)
+- TypeScript: 0 errors (`npx tsc --noEmit` exit 0)
+- CSS: ทุก rule ใหม่อยู่ในรูป single-line format ตามข้อกำหนด
+- ฟังก์ชันเดิมไม่กระทบ: single-card print ยังทำงานเหมือนเดิม (id="member-card" ยังอยู่), SlipViewModal ยังทำงานเหมือนเดิม (แค่ย้าย mount target เป็น document.body), walletTx ยัง throw เมื่อ balance ไม่พอจริง (เช็คด้วยค่า round แล้ว)
+- ส่งต่อให้เจ้าของงาน pull ไปทดสอบ:
+  - Issue 3: ทดสอบ refund กับสมาชิกที่มียอด floating-point (เช่น 99.99 ฿) → ควรสำเร็จ
+  - Issue 2: ทดสอบเปิด SlipViewModal ในหน้า Member Detail (ปุ่ม FileImage ใน history row) → ควรไม่ถูกซ่อนหลังการ์ด stat
+  - Issue 4: ทดสอบเลือกหลายแถวในหน้า Members + กด "พิมพ์บัตร N ใบ" → พรีวิวโชว์ทุกใบ + พิมพ์ออก 1 ใบ/หน้ากระดาษที่ขนาด CR80 (85.6 × 54 มม.) + ปุ่ม "พิมพ์อีกครั้ง" ใน MemberCardModal (single) ทำงานได้
+  - Issue 1: เปลี่ยนสไตล์ใน ตั้งค่า → แบรนด์ → สไตล์หน้าตาแอป → เปิดหน้า Member Detail และ Members → ควรเห็นการ์ด/ตาราง/notice bar เปลี่ยน border-radius + border-color ตาม preset (Apple มน, Microsoft คม, Android มนมาก) — แต่สีพื้นหลัง/ตัวอักษรบางจุดยังคง hardcoded ของเดิม (documented ใน comment)

@@ -2143,8 +2143,13 @@ export function walletTx(db: SqliteDb, input: WalletTxInput) {
   const member = db.prepare(`SELECT id, member_number as memberNumber, prename, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, credit_limit as creditLimit, card_number as cardNumber, patient_code as patientCode FROM members WHERE member_number = ?`).get(input.memberNumber?.trim()) as SqliteMember | undefined;
   if (!member) throw new StoreError(`ไม่พบสมาชิก ${input.memberNumber} ในระบบ`);
   if (member.status !== "active") throw new StoreError(`สมาชิกถูกระงับการใช้งาน · ${member.memberNumber}`);
-  if (input.type !== "deposit" && member.balance < amount) {
-    throw new StoreError(`ยอดเงินคงเหลือไม่พอ · ${input.type === "refund" ? "คืนบัตร" : "ถอน"} ${money(amount)} คงเหลือ ${money(member.balance)}`);
+  // FIX-4 issue 3 — SQLite stores REAL as IEEE-754 double, so a stored 99.99
+  // may come back as 99.98999999999. Comparing raw balance < amount would
+  // reject a refund that exactly matches the displayed balance. Round both
+  // sides to 2 decimals before the check (refund = return-all-money case).
+  const roundedBalance = round2(member.balance);
+  if (input.type !== "deposit" && roundedBalance < amount) {
+    throw new StoreError(`ยอดเงินคงเหลือไม่พอ · ${input.type === "refund" ? "คืนบัตร" : "ถอน"} ${money(amount)} คงเหลือ ${money(roundedBalance)}`);
   }
   const signedAmount = input.type === "deposit" ? amount : -amount;
   const balanceAfter = round2(member.balance + signedAmount);

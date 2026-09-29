@@ -175,10 +175,15 @@ export function MemberDetail({
     tx => tab === "ทั้งหมด" || WALLET_TX_META[tx.type]?.label === tab
   );
   const walletPreviewAmount = Number(walletAmount) || 0;
-  const balanceAfterWallet =
+  // FIX-4 issue 3 — round to 2 decimals so float noise (e.g. -0.0000001)
+  // doesn't disable the "ยืนยันการทำรายการ" button on a refund that zeros
+  // the balance. Mirrors server round2() in sqliteStore.walletTx.
+  const round2 = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
+  const balanceAfterWallet = round2(
     walletOpen === "deposit"
       ? profile.balance + walletPreviewAmount
-      : profile.balance - walletPreviewAmount;
+      : profile.balance - walletPreviewAmount
+  );
   // ROUND 65 — ป้ายประเภทการเติม/ถอน/คืนบัตร ใช้ร่วมกันทั้งโมดัล
   const walletModeLabel =
     walletOpen === "deposit"
@@ -382,7 +387,12 @@ export function MemberDetail({
       setError("กรุณาระบุจำนวนเงินมากกว่า 0");
       return;
     }
-    if (walletOpen !== "deposit" && amount > profile.balance) {
+    // FIX-4 issue 3 — refund pre-fills walletAmount with String(profile.balance)
+    // so amount should equal profile.balance. Allow a 0.01 ฿ epsilon for any
+    // float-round-trip noise (String(99.99) → 99.99 → matches server's
+    // round2(stored-as-float 99.99)). Genuine "over-draft" stays blocked.
+    const epsilon = 0.01;
+    if (walletOpen !== "deposit" && amount - profile.balance > epsilon) {
       setError(
         `ยอดเงินคงเหลือไม่พอ · ${walletOpen === "refund" ? "คืนบัตร" : "ถอน"} ${money(amount)} คงเหลือ ${money(profile.balance)}`
       );
