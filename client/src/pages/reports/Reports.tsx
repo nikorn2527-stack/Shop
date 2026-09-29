@@ -1787,69 +1787,6 @@ export function Reports({
                   </button>
                 </div>
               </div>
-              <div
-                className="report-tabs report-view-pills"
-                role="tablist"
-                aria-label="มุมมองรายงานยอดขาย"
-              >
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={salesView === "timeline"}
-                  className={salesView === "timeline" ? "active" : ""}
-                  onClick={() => setSalesView("timeline")}
-                >
-                  ภาพรวมตามช่วงเวลา
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={salesView === "product"}
-                  className={`${salesView === "product" ? "active" : ""}${hasAdvancedReports ? "" : " edition-locked-tab"}`}
-                  onClick={() =>
-                    hasAdvancedReports
-                      ? setSalesView("product")
-                      : setUpgradeFeature("reportsAdvanced")
-                  }
-                >
-                  แยกตามสินค้า{!hasAdvancedReports && <Lock size={11} />}
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={salesView === "items"}
-                  className={`${salesView === "items" ? "active" : ""}${hasAdvancedReports ? "" : " edition-locked-tab"}`}
-                  onClick={() =>
-                    hasAdvancedReports
-                      ? setSalesView("items")
-                      : setUpgradeFeature("reportsAdvanced")
-                  }
-                >
-                  แยกตามรายการในบิล{!hasAdvancedReports && <Lock size={11} />}
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={salesView === "category"}
-                  className={salesView === "category" ? "active" : ""}
-                  onClick={() => setSalesView("category")}
-                >
-                  แยกตามชนิดสินค้า
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  aria-selected={salesView === "cashier"}
-                  className={`${salesView === "cashier" ? "active" : ""}${hasAdvancedReports ? "" : " edition-locked-tab"}`}
-                  onClick={() =>
-                    hasAdvancedReports
-                      ? setSalesView("cashier")
-                      : setUpgradeFeature("reportsAdvanced")
-                  }
-                >
-                  แยกตามพนักงานขาย{!hasAdvancedReports && <Lock size={11} />}
-                </button>
-              </div>
               <div className="report-range-row">
                 <div
                   className="report-tabs report-period-pills"
@@ -1960,6 +1897,69 @@ export function Reports({
                     </span>
                   </div>
                 )}
+              </div>
+              <div
+                className="report-tabs report-view-pills"
+                role="tablist"
+                aria-label="มุมมองรายงานยอดขาย"
+              >
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={salesView === "timeline"}
+                  className={salesView === "timeline" ? "active" : ""}
+                  onClick={() => setSalesView("timeline")}
+                >
+                  ภาพรวมตามช่วงเวลา
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={salesView === "product"}
+                  className={`${salesView === "product" ? "active" : ""}${hasAdvancedReports ? "" : " edition-locked-tab"}`}
+                  onClick={() =>
+                    hasAdvancedReports
+                      ? setSalesView("product")
+                      : setUpgradeFeature("reportsAdvanced")
+                  }
+                >
+                  แยกตามสินค้า{!hasAdvancedReports && <Lock size={11} />}
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={salesView === "items"}
+                  className={`${salesView === "items" ? "active" : ""}${hasAdvancedReports ? "" : " edition-locked-tab"}`}
+                  onClick={() =>
+                    hasAdvancedReports
+                      ? setSalesView("items")
+                      : setUpgradeFeature("reportsAdvanced")
+                  }
+                >
+                  แยกตามรายการในบิล{!hasAdvancedReports && <Lock size={11} />}
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={salesView === "category"}
+                  className={salesView === "category" ? "active" : ""}
+                  onClick={() => setSalesView("category")}
+                >
+                  แยกตามชนิดสินค้า
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={salesView === "cashier"}
+                  className={`${salesView === "cashier" ? "active" : ""}${hasAdvancedReports ? "" : " edition-locked-tab"}`}
+                  onClick={() =>
+                    hasAdvancedReports
+                      ? setSalesView("cashier")
+                      : setUpgradeFeature("reportsAdvanced")
+                  }
+                >
+                  แยกตามพนักงานขาย{!hasAdvancedReports && <Lock size={11} />}
+                </button>
               </div>
               <div className="report-range-status" role="status">
                 <CalendarDays size={13} /> แสดงข้อมูล{" "}
