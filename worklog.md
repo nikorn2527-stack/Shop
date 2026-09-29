@@ -646,3 +646,61 @@ Stage Summary:
 - Users page: 5 stat cards ใน 1 แถวบน desktop (total/admin/staff/dev/suspended) พร้อม responsive wrap 3→2→1
 - TypeScript: 0 errors, dev server: HTTP 200 ผ่าน (3 ครั้ง stable + process alive หลัง curl), Tailwind v4: 0 "Missing opening" errors (single-line CSS format)
 - commit hash: `4a89602` บน origin/main-v2 — รอเจ้าของงาน pull ไปเทส sidebar (desktop collapse toggle + admin group expand/collapse + held-bills badge) และ Users page (5 cards ใน 1 แถว) บนเครื่อง
+
+---
+Task ID: PT-3
+Agent: full-stack-developer (Reports redesign)
+Task: ปรับโครงหน้า Reports จาก 5-6 แถว controls เป็น 4-layer layout สะอาด — PageHeader / TabBar / FilterBar / Content(summary+viewpills+table)
+
+Work Log:
+- อ่าน worklog ทั้งหมด + Reports.tsx (3768 บรรทัด) แบบ chunk เพื่อเข้าใจ structure เดิม (SectionHeader + global report-cards-dense + tabbar + per-tab panel-heading + report-range-row + view pills + table)
+- รัน baseline `npx tsc --noEmit` → 0 errors
+- เปลี่ยนที่ละขั้น (incremental edits เพื่อ risk ต่ำ):
+  1) Extract `salesSummaryCards` JSX variable (ก่อน `return (`) จาก global block เดิม (ยอดขาย/กำไร/สมาชิก/เงินคงเหลือ) เพื่อ reuse ในแท็บ sales + bills
+  2) ลบ global `report-cards-dense` block ที่อยู่เหนือ tabbar — ย้ายลง Layer 4 (Content) ของแต่ละแท็บ ตามโครง 4-layer ที่ owner ระบุ
+  3) Sales tab: ลบ `panel-heading` (h2+p+export) → สร้าง `.report-filter-bar` ใหม่ที่รวม date chips + (inline custom picker เมื่อกำหนดเอง) + **staff SELECT** (แทน pills) + groupby chips (timeline only) + export buttons (CSV/Excel/PDF) → ใส่ `{salesSummaryCards}` → ย้าย `report-view-pills` ลงใต้ summary cards (ตามที่ owner ระบุ) → report-range-status → table (timeline/category/product/items/cashier)
+  4) Bills tab: ลบ `table-toolbar` (h2+p+search+export) + `bill-member-filter` → สร้าง FilterBar เดียวที่รวม search field + MemberScanPicker + export (no date range — shows latest bills) → `{salesSummaryCards}` → table-filter-summary → table → show-more
+  5) Transactions tab: ลบ `table-toolbar` + `report-range-row` + `tx-filter-bar` → สร้าง FilterBar เดียวที่รวม date chips + tx-date-range + MemberScanPicker + tx-type-pills + export ทั้งหมด → tx-log-strip → tx-summary-cards (six cards) → table-wrap → session-table-note
+  6) Stock tab: ลบ `panel-heading` (h2+p+export) + `report-range-row` แยก → สร้าง FilterBar รวม chips + custom picker + **search field** + export (CSV/Excel/PDF/พิมพ์) → tx-summary-cards (4 cards) → table-wrap (ลบ `table-toolbar` h3+p+search ที่ซ้ำซ้อนออก) → session-table-note
+  7) Balances tab: ลบ `panel-heading` (h2+p+export) → สร้าง FilterBar รวม search field + export (no date range — snapshot) → tx-summary-cards (4 cards) → table-wrap (ลบ `table-toolbar` h3+p+search ที่ซ้ำซ้อนออก) → session-table-note
+  8) Staff dropdown: ใช้ native `<select>` element ที่ styled ด้วย `.report-staff-select` (single-select) — เก็บ state `staffFilters: string[]` ไว้ (set ค่าเป็น `[value]` หรือ `[]` เพื่อ compatibility กับ tRPC queries ที่คาดหวัง array) — ไม่เปลี่ยน business logic แค่ UI
+- CSS: เพิ่ม block PT-3 ที่ท้าย index.css ทั้งหมดเป็น single-line format (`.class { prop: val; }`) ตาม constraint ของ Tailwind v4:
+  - `.report-filter-bar` (flex space-between, gap 12px, bg #f9fbfa, border #e8efec, radius 10px, padding 8px 10px)
+  - `.report-filter-bar .report-range-row` (reset margin/padding/background เพื่อไม่ให้ชนกับ rule เดิม)
+  - `.report-filter-bar .report-range-row.report-filter-row-main` (flex align-center gap 10px wrap)
+  - `.report-filter-bar .report-export-actions` (flex 0 0 auto)
+  - `.report-filter-bar .search-field` (height 30px, flex 1 1 220px, max 360px)
+  - `.report-filter-bar .bill-member-filter` (flex 1 1 260px, max 420px, margin 0)
+  - `.report-filter-bar .tx-filter-row` (flex align-center gap 10px wrap)
+  - `.report-staff-select` (height 30px, radius 16px, padding 4px 28px 4px 12px, appearance none + custom SVG chevron background-image, max-width 220px, focus teal ring)
+  - `.report-staff-select:hover`, `:focus`, `option` styling
+  - 3 sibling-combinator rules สำหรับ Layer 4 ordering: `.report-filter-bar + .report-cards-dense`, `.report-cards-dense + .report-view-pills`, `.report-cards-dense + .report-view-pills + .report-range-status` (margin-top tight)
+  - 2 `@media` rules (max-width 820px + 560px) สำหรับ responsive stack
+- ไม่แตะ CSS เดิมที่ใช้งานได้ — เพิ่ม rules ใหม่อย่างเดียว (ลด risk ของ regression)
+- คงไว้: ทุก tRPC query (`reports.daily`/`byCategory`/`byCashier`/`byProduct`/`lineItems`/`memberTransactions`/`memberBalances`/`stockBalance`/`cashiers`/`sales.list`/`logs.list`/`member.list`/`reports.limitRequests`), ทุก state (`rangeMode`/`groupBy`/`rangeFrom`/`rangeTo`/`staffFilters`/`salesView`/`txTypes`/`txFrom`/`txTo`/`billSearch`/`balanceSearch`/`stockSearch`/`billsVisible`/`reportTab`/`expandedPeriod`/`viewedReceipt`/`billMember`/`txMember`/`limitDecision`/`exportPreview`/`upgradeFeature`/`notice`), ทุก export function (`dailySalesExportPack`/`dailySalesDocConfig`/`billsDocConfig`/`txDocConfig`/`balancesDocConfig`/`stockBalanceDocConfig`/`openSalesExportPreview`/`openBillsExportPreview`/`openTxExportPreview`/`openBalancesExportPreview`/`openStockBalanceExportPreview`/`runExportPreview`), ทุก helper (`quickRangeOf`/`pickRangeChip`/`pickTxRangeChip`/`txRangeActive`/`pickCustomFrom`/`pickCustomTo`/`pickTxFrom`/`pickTxTo`/`toggleStaffFilter`/`toggleTxType`/`resetReportFilters`/`confirmLimitDecision`)
+- TypeScript: `npx tsc --noEmit` → **0 errors** (หลังแก้ทุก tab)
+- Boot: `bun run dev` บน port 3000 → server ติด clean (no transform errors) → `curl http://localhost:3000/` → **HTTP 200** ✅ → `/src/pages/reports/Reports.tsx` transform ผ่าน (Vite ส่ง JSX transform ออกมาไม่มี error) → `/src/index.css` compile ผ่าน Tailwind v4 (CSS 556KB compiled, มี `report-filter-bar` 19 occurrences + `report-staff-select` 6 occurrences ใน output) — ไม่มี "Missing opening {" errors
+- Commit: `4fb1900` — `feat(PT-3): redesign Reports page — 4-layer layout, consolidated filter bar, staff dropdown` (2 files changed, +364 / -394 lines)
+- Push: `git push origin main:main-v2` → success (`5cf10c4..4fb1900  main -> main-v2`)
+
+Stage Summary:
+- หน้า Reports ตอนนี้เป็น 4-layer layout ตามที่ owner ต้องการ:
+  ```
+  Layer 1: PageHeader — SectionHeader "รายงาน" + ปุ่ม primary (วันนี้ / เลือกช่วง) + outline ล้างตัวกรอง
+  Layer 2: TabBar — [สรุปยอดขาย] [ประวัติบิล] [ธุรกรรม] [สินค้าคงคลัง] [ยอดเงินในบัตร] (badge แสดง count ถ้ามี)
+  Layer 3: FilterBar (shared structure ทุกแท็บ — กล่อง #f9fbfa border สีเทาอ่อน):
+    [sales]      chips + (custom picker) + staff SELECT + groupby(timeline only)     [CSV/Excel/PDF]
+    [bills]      search field + MemberScanPicker                                       [CSV/Excel/PDF]
+    [tx]         chips + tx-date-range + MemberScanPicker + tx-type-pills             [CSV/Excel/PDF]
+    [stock]      chips + (custom picker) + search                                      [CSV/Excel/PDF/พิมพ์]
+    [balances]   search field                                                          [CSV/Excel/PDF/พิมพ์]
+  Layer 4: Content — SummaryCards → ViewPills (sales only) → report-range-status (sales only) → Table
+  ```
+- ปัญหา 4 ข้อที่ owner ระบุ แก้ครบ:
+  1) Date picker position consistent ทุกแท็บ — อยู่ใน Layer 3 FilterBar เสมอ (inline ถ้า custom)
+  2) ลดจาก 5-6 แถว controls เหลือ 2 แถว (Layer 2 tabbar + Layer 3 filterbar) — panel-heading ที่ซ้ำซ้อนกับ SectionHeader ถูกลบ
+  3) Staff pills (ที่บีบเมื่อน้อย + ยืดเมื่อมาก) → เปลี่ยนเป็น `<select>` dropdown ขนาดคงที่ (220px max) + native appearance ที่ styled สวย
+  4) Panel heading (h2+p+export) ต่อแท็บ ลบออก — SectionHeader "รายงาน" เป็น heading เดียว, ปุ่ม export ย้ายไปฝั่งขวาของ FilterBar
+- View pills ย้ายลงใต้ summary cards ตามที่ owner ขอ (ก่อนหน้านี้อยู่ระหว่าง heading กับ date chips)
+- ทุก functionality ครบ: tRPC queries + state + export logic + tx filter + member scan picker + limit decision modal + reprint modal + export preview modal + edition upgrade modal + notice bar — เปลี่ยนแค่ layout/rendering
+- commit hash `4fb1900` push ขึ้น origin/main-v2 สำเร็จ — รอเจ้าของงาน pull ไปเทสบนเครื่อง (ทุกแท็บ + staff dropdown + custom date picker inline + responsive stack บน mobile)
