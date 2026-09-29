@@ -5233,7 +5233,7 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .report-cards-dense .report-card-facts i { font-style: normal; font-size: 9.5px; color: #7d8272; white-space: nowrap; }
 .report-cards-dense .report-card-facts i:not(:first-child)::before { content: "·"; margin-right: 4px; color: #b3b8a9; }
 .report-staff-pills { flex-wrap: wrap; }
-.report-range-row .report-staff-pills { flex: 1 1 0; min-width: 0; max-width: 360px; overflow-x: auto; flex-wrap: nowrap; scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
+.report-range-row .report-staff-pills { flex: 0 1 auto; min-width: 0; overflow-x: auto; flex-wrap: nowrap; scrollbar-width: thin; -webkit-overflow-scrolling: touch; }
 .report-range-row .report-staff-pills::-webkit-scrollbar { height: 4px; }
 .report-range-row .report-staff-pills::-webkit-scrollbar-track { background: transparent; }
 .report-range-row .report-staff-pills::-webkit-scrollbar-thumb { background: #c8d4cd; border-radius: 2px; }
