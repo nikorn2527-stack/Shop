@@ -2787,25 +2787,6 @@ export function Reports({
                   </p>
                 </div>
                 <div className="toolbar-actions">
-                  <div
-                    className="tx-date-range"
-                    role="group"
-                    aria-label="ช่วงวันที่ของธุรกรรม"
-                  >
-                    <ThaiDatePicker
-                      value={txFrom}
-                      onChange={pickTxFrom}
-                      max={txTo || undefined}
-                      ariaLabel="วันเริ่มต้นของธุรกรรม — เลือกวันเดียวก็แค่กดวันนี้"
-                    />
-                    <span aria-hidden="true">→</span>
-                    <ThaiDatePicker
-                      value={txTo}
-                      onChange={pickTxTo}
-                      min={txFrom || undefined}
-                      ariaLabel="วันสิ้นสุดของธุรกรรม — เว้นว่างไว้คือวันเดียวกับวันเริ่มต้น"
-                    />
-                  </div>
                   <button
                     className="outline-button compact"
                     onClick={() => openTxExportPreview("csv")}
@@ -2849,6 +2830,25 @@ export function Reports({
                       {chip.label}
                     </button>
                   ))}
+                </div>
+                <div
+                  className="tx-date-range"
+                  role="group"
+                  aria-label="ช่วงวันที่ของธุรกรรม"
+                >
+                  <ThaiDatePicker
+                    value={txFrom}
+                    onChange={pickTxFrom}
+                    max={txTo || undefined}
+                    ariaLabel="วันเริ่มต้นของธุรกรรม"
+                  />
+                  <span aria-hidden="true">→</span>
+                  <ThaiDatePicker
+                    value={txTo}
+                    onChange={pickTxTo}
+                    min={txFrom || undefined}
+                    ariaLabel="วันสิ้นสุดของธุรกรรม"
+                  />
                 </div>
               </div>
               <div className="tx-filter-bar">
