@@ -796,7 +796,7 @@ nav button:active:not(:disabled),
 .notif-scroll::-webkit-scrollbar-thumb:hover { background: #c2d8cf; }
 
 /* 3) Settings — threshold number input (การแจ้งเตือน row) + toggle focus ring. */
-.toggle:focus-visible { outline: 2px solid #57b391; outline-offset: 2px; }
+.toggle:focus-visible { outline: 2px solid #28a17a; outline-offset: 3px; }
 .toggle-row-controls { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
 .threshold-input { display: inline-flex; align-items: center; border: 1px solid #e2eae7; border-radius: 7px; background: #fcfefd; overflow: hidden; transition: border-color .15s ease, box-shadow .15s ease; }
 .threshold-input:focus-within { border-color: #9bcdba; box-shadow: 0 0 0 3px #eaf6f1; }
@@ -1294,8 +1294,8 @@ td small { font-size: 11px; }
 .page-content > *:last-child { margin-bottom: 0; }
 .app-footer { padding-bottom: 18px; color: #6e7264; }
 
-/* (9) Touch comfort: slightly larger switches on coarse pointers */
-@media (pointer: coarse) { .toggle { transform: scale(1.18); transform-origin: right center; } }
+/* (9) Touch comfort: slightly larger switches on coarse pointers — FIX-6: ลด scale ลงเหลือ 1.06 เพราะ toggle ฐานใหญ่ขึ้นเป็น 48×28 แล้ว */
+@media (pointer: coarse) { .toggle { transform: scale(1.06); transform-origin: right center; } }
 
 /* (10) Session list: compact density so the panel reads as one block */
 .session-list { margin-top: 4px; }
@@ -1513,9 +1513,19 @@ td small { font-size: 11.5px; }
 .form-grid input { height: 38px; font-size: 13px; }
 .toggle-row b { font-size: 13px; }
 .toggle-row small { font-size: 11px; line-height: 1.5; }
-.toggle { width: 44px; height: 24px; }
-.toggle span { width: 20px; height: 20px; }
+/* FIX-6 (user) — Toggle อัปเกรดเป็นสไตล์ iOS/Material (เหมือนภาพที่ส่ง):
+   ขนาด 48×28px (เดิม 44×24), สี ON เขียวสดใส ใกล้ภาพแต่ยัง on-brand teal,
+   thumb ขาว 24px มี soft shadow, pill shape, transition แบบ Material standard.
+   ใช้ทั้งแอปเพื่อความสม่ำเสมอ — Settings, POS, Bank accounts, ทุกที่ที่มี .toggle */
+.toggle { width: 48px; height: 28px; padding: 2px; border-radius: 999px; background: #d4dad6; transition: background-color .22s cubic-bezier(0.4, 0, 0.2, 1), box-shadow .15s ease; }
+.toggle span { width: 24px; height: 24px; box-shadow: 0 2px 5px rgba(0, 0, 0, .22), 0 0 0 1px rgba(0, 0, 0, .04); transition: transform .22s cubic-bezier(0.4, 0, 0.2, 1), box-shadow .15s ease; }
+.toggle.on { background: #28a17a; }
 .toggle.on span { transform: translateX(20px); }
+.toggle:hover:not(:disabled):not(.on) { background: #c7cfca; }
+.toggle:hover:not(:disabled).on { background: #1f8c68; box-shadow: 0 0 0 3px rgba(40, 161, 122, .18); }
+.toggle:active:not(:disabled) span { transform: scale(0.94); }
+.toggle:disabled { opacity: .45; cursor: not-allowed; }
+.toggle:focus-visible { outline: 2px solid #28a17a; outline-offset: 3px; }
 .search-field { height: 40px; }
 .search-field input { font-size: 13px; }
 .category-tabs button, .report-tabs button { font-size: 13px; }

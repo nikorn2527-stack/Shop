@@ -1173,3 +1173,65 @@ Stage Summary:
 - agent-browser: ผ่าน end-to-end (login → add → save → POS → QR → see bank list → copy button → toast)
 - คำตอบคำถาม owner: ใช่แล้ว — "ตั้งค่า → การชำระเงิน" ตอนนี้รวมทั้งบัญชีพร้อมเพย์ร้าน QR และบัญชีธนาคารร้าน (รับเงินโอน) หลายบัญชีได้ แสดงที่หน้ายืนยันการชำระ POS + พิมพ์ท้ายใบเสร็จ (เฉพาะบิล QR / สแกน)
 - ส่งต่อให้ owner ทดสอบที่เครื่อง + ใส่บัญชีธนาคารจริงของร้าน + ลองพิมพ์ใบเสร็จดูบัญชีท้ายกระดาษ
+
+---
+Task ID: FIX-6
+Agent: full-stack-developer
+Task: อัปเกรด toggle switch ทั้งแอปให้เป็นสไตล์ iOS/Material Design ตามภาพอ้างอิงที่ owner ส่งมา (สีเขียวสด vivid green, 48×28px, pill shape, soft shadow) — ตอบคำถาม owner "มีหน้าไหนหรือฟังก์ชันไหนที่จะเปลี่ยนเป็นแบบในภาพได้มันจะได้เหมือนกันทั้งแอป"
+
+Work Log:
+- VLM วิเคราะห์ภาพอ้างอิง: toggle เป็น iOS-style (~52×32px, สี ON = #4CD964/#34C759, thumb ขาว 26-28px, มี soft shadow, รูป pill)
+- ตรวจ CSS เดิม: `.toggle` base ที่บรรทัด 151 (37×21px) + override ที่บรรทัด 1516 (44×24px) — ทั้งสองถูกใช้ทั้งแอปเพราะไม่มี class อื่น
+- ตรวจ style presets: apple=เขียว iOS #34c759, microsoft/android=var(--teal) #007a55 — คงไว้เพราะเป็น identity ของแต่ละสไตล์ แต่ปรับ base ใหม่
+- อัปเดต `.toggle` ที่บรรทัด 1516-1518 (override block):
+  - ขนาด 44×24 → **48×28** (ใกล้ภาพอ้างอิง 52×32 แต่ไม่ใหญ่เกิน)
+  - สี OFF `#dce5e1` → **#d4dad6** (เทาเย็นกว่า สอดคล้องกับ Material)
+  - สี ON `#64af93` → **#28a17a** (เขียว-เขียวเข้ม teal-green ที่ vivid ใกล้ภาพแต่ยัง on-brand)
+  - Thumb 17px → **24px** (ใหญ่ขึ้น สอดคล้อง track 28px)
+  - translateX(20px) → **20px** (ปรับให้ thumb ชิดขวาเมื่อ ON)
+  - border-radius 20px → **999px** (pill เต็มที่)
+  - transition `.2s ease` → **`.22s cubic-bezier(0.4, 0, 0.2, 1)`** (Material standard easing)
+  - Shadow thumb: `0 1px 3px rgba(0,0,0,.08)` → **`0 2px 5px rgba(0,0,0,.22), 0 0 0 1px rgba(0,0,0,.04)`** (deeper + crisp edge)
+- เพิ่ม interactive states ใหม่:
+  - `:hover:not(:disabled):not(.on)` → track ทำให้เข้มขึ้น (#c7cfca)
+  - `:hover:not(:disabled).on` → track ON ทำให้เข้ม + glow ring (`box-shadow: 0 0 0 3px rgba(40,161,122,.18)`)
+  - `:active:not(:disabled) span` → thumb สั่น (`transform: scale(0.94)`)
+  - `:disabled` → opacity .45 + cursor not-allowed
+  - `:focus-visible` → outline สีเดียวกับ toggle ON (#28a17a) + offset 3px
+- ปรับ coarse pointer scale 1.18 → **1.06** (เพราะ toggle ใหญ่ขึ้นแล้ว ไม่ต้องขยายเยอะ)
+- ปรับ focus ring ใน section "3" (Settings threshold input) สี `#57b391` → `#28a17a` ให้สอดคล้องกับ toggle ใหม่
+
+Verification (agent-browser end-to-end):
+1. เริ่ม dev server + login ใน bash call เดียวกัน (sandbox ฆ่า background หลัง 30s)
+2. Login ด้วย woraphot/1234 → ไปที่ Settings → การชำระเงิน → scroll ลงไปที่ bank account row (KBANK account ที่เพิ่มไว้ครั้ง FIX-5)
+3. Screenshot หน้า payment tab → VLM วิเคราะห์:
+   - ✅ เห็น toggle 1 อันใน state ON (สีเขียวเข้ม Teal-Green ~#0F7B6C/#1A7F6E ใกล้เคียง #28a17a ที่ตั้ง)
+   - ✅ ขนาด 44-48 × 24-26px (ตรงมาตรฐาน iOS/Material)
+   - ✅ มี soft shadow ที่ thumb
+   - ✅ รูปร่าง pill ชัดเจน
+4. ไปที่ Settings → ระบบและความปลอดภัย → สิทธิ์และความปลอดภัย → ดู Dev Access section (owner ถามถึง) → toggle ใน state OFF (สีเทา #d4dad6) ก็ใช้ style เดียวกัน
+
+Stage Summary:
+- 1 file modified: `client/src/index.css` (~25 บรรทัด changed)
+- TypeScript: 0 errors (CSS only, no code changes)
+- agent-browser + VLM: ผ่าน — toggle ใหม่มีขนาด สี shadow และ pill shape สอดคล้องกับภาพอ้างอิง
+- ตอบคำถาม owner: ใช่ — เปลี่ยนที่ base `.toggle` CSS class (ใช้ทั้งแอป) ทำให้ toggle ในทุกหน้า (Settings, POS, Bank Accounts, Dev Access, การแจ้งเตือน, สำรองข้อมูล, etc.) เปลี่ยนเป็นสไตล์ Material/iOS พร้อมกัน — ไม่ต้องเปลี่ยนทีละหน้า
+- ส่งต่อให้ owner ทดสอบที่เครื่อง: เปิด Settings → คลิก toggle ต่างๆ (Dev Access, แจ้งเตือน, สำรองข้อมูล) ดูการณ์ toggle ใหม่ — ทุก toggle ในแอปใช้ style เดียวกัน สีเขียวเข้ม vivid + pill shape + soft shadow เหมือนภาพอ้างอิง
+
+---
+Task ID: FIX-6 (ตอบคำถาม owner)
+Agent: full-stack-developer
+Task: ตอบคำถาม owner เรื่อง Dev Access + แนวทาง License/Server Model
+
+Work Log:
+- ตรวจ Settings.tsx: Dev Access UI มีอยู่แล้วที่บรรทัด 4257-4320 (section "การเข้าใช้งานสำหรับผู้พัฒนา (Dev Access)")
+- ตรวจ docs/TECHNICAL_REVIEW_DEPLOYMENT_HANDOFF_TH.md: Section 4 (One Codebase – Two Deployment Models), Section 3.3 (License Signing future work), Section 8.4 (Licensing/Activation for On-Premise = to-decide)
+- ตรวจ sqliteStore.ts: license key 3 ระดับ (standard/pro/proplus) มีอยู่แล้วใน ROUND 61
+
+Stage Summary (ตอบ owner):
+- ✅ Dev Access UI มีในแอปแล้ว ที่ Settings → ระบบและความปลอดภัย → สิทธิ์และความปลอดภัย → "การเข้าใช้งานสำหรับผู้พัฒนา (Dev Access)" section
+- ✅ วิธีเข้าใช้: ผู้บริหารเปิด toggle (ต้องยืนยันโมดัล) → บัญชี dev ล็อกอินได้ (ทุก login ถูกบันทึกเป็นสีแดง) → ใช้งานเสร็จก็ปิด toggle กลับ
+- ✅ จัดการบัญชี dev: สร้าง/ลบ/แก้ที่หน้า "ผู้ใช้ระบบ" (link จากการ์ด Dev Access)
+- ✅ ยังยึดเอกสารเดิม: One Codebase – Two Deployment Models (Cloud + On-Premise)
+- ⚠️ งานอนาคต (Section 3.3): License Signing Architecture — ตอนนี้ license secret ยังอยู่ใน source code, จะเปลี่ยนเป็น signed license (public verification key + private signing key) ในอนาคต
+- ⚠️ การตัดสินใจที่ยังไม่ได้ตัด (Section 8.4): Per-machine หรือ per-deployment license สำหรับ On-Premise — เจ้าของตัดสินใจ
