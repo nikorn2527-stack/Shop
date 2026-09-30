@@ -1,0 +1,13 @@
+{
+  "name": "printer-helper",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "bun --hot index.ts",
+    "start": "bun index.ts"
+  },
+  "dependencies": {
+    "@types/node": "^22.0.0"
+  }
+}

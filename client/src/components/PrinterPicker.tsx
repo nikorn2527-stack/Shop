@@ -83,28 +83,55 @@ export function PrinterPicker({ value, onChange, disabled = false }: PrinterPick
   const [systemPrinters, setSystemPrinters] = useState<string[] | null>(null);
   const [checking, setChecking] = useState(false);
   const [customMode, setCustomMode] = useState(false);
+  const [detectSource, setDetectSource] = useState<string>(""); // "helper" | "browser API" | "fallback"
 
-  // ลอง enumerate เครื่องพิมพ์จริงในระบบ (Chrome ≥ 100 with enterprise policy เท่านั้น)
-  // ส่วนใหญ่ browser จะไม่มี API นี้ หรือผู้ใช้ไม่อนุญาต → ใช้ fallback รายการนิยม
+  // ลอง enumerate เครื่องพิมพ์จริงในระบบ 3 ทางตามลำดับ:
+  // 1) mini-service printer-helper (port 3031) — รัน OS commands (wmic/lpstat) → list จริง
+  // 2) navigator.printing.printers API (Chrome enterprise เท่านั้น — ส่วนน้อย)
+  // 3) fallback รายการเครื่องพิมพ์นิยม 33 รุ่น
   const detectPrinters = async () => {
     setChecking(true);
     try {
+      // 1) ลอง fetch จาก printer-helper mini-service (port 3031)
+      // gateway pattern: relative URL + ?XTransformPort=3031
+      // on-premise: web app → http://localhost:3031/printers (same machine)
+      const res = await fetch("/printers?XTransformPort=3031", { signal: AbortSignal.timeout(2500) });
+      if (res.ok) {
+        const data = (await res.json()) as { printers?: string[]; source?: string };
+        if (Array.isArray(data.printers) && data.printers.length > 0) {
+          setSystemPrinters(data.printers);
+          setDetectSource(`helper (${data.source ?? "unknown"})`);
+          setChecking(false);
+          return;
+        }
+        // helper ตอบกลับมาแต่ list ว่าง (browser/OS ไม่มีเครื่องพิมพ์ติดตั้ง)
+        setSystemPrinters([]);
+        setDetectSource(`helper (${data.source ?? "unknown"}) — ไม่พบเครื่องพิมพ์`);
+        setChecking(false);
+        return;
+      }
+    } catch {
+      // helper ไม่ได้รันอยู่ หรือ fetch ล้มเหลว → ลอง navigator.printing ต่อ
+    }
+    try {
+      // 2) ลอง navigator.printing.printers (Chrome enterprise เท่านั้น)
       const printing = (navigator as unknown as { printing?: { printers?: Promise<Array<{ name: string }>> | Array<{ name: string }> } }).printing;
       if (printing && typeof printing.printers !== "undefined") {
         const printersResult = await Promise.resolve(printing.printers);
         if (Array.isArray(printersResult) && printersResult.length > 0) {
           setSystemPrinters(printersResult.map((p) => p.name));
-        } else {
-          setSystemPrinters([]);
+          setDetectSource("browser API (navigator.printing)");
+          setChecking(false);
+          return;
         }
-      } else {
-        setSystemPrinters([]);
       }
     } catch {
-      setSystemPrinters([]);
-    } finally {
-      setChecking(false);
+      // navigator.printing ไม่ได้รับอนุญาต → ใช้ fallback list
     }
+    // 3) fallback รายการเครื่องพิมพ์นิยม
+    setSystemPrinters([]);
+    setDetectSource("fallback รายการนิยม");
+    setChecking(false);
   };
 
   useEffect(() => {
@@ -186,15 +213,17 @@ export function PrinterPicker({ value, onChange, disabled = false }: PrinterPick
         {checking ? (
           <span>กำลังตรวจสอบเครื่องพิมพ์ในระบบ...</span>
         ) : hasSystemPrinters ? (
-          <span>พบ <b>{systemPrinters!.length}</b> เครื่องพิมพ์ในระบบ — เลือกได้จาก dropdown ด้านบน</span>
+          <span>พบ <b>{systemPrinters!.length}</b> เครื่องพิมพ์ในเครื่องนี้ · แหล่งข้อมูล: {detectSource} — เลือกได้จาก dropdown ด้านบน</span>
         ) : apiAvailable === false ? (
           <span>
-            browser ไม่อนุญาตให้ดึงรายชื่อเครื่องพิมพ์อัตโนมัติ (security) —
-            ใช้รายการนิยมด้านบน หรือกด <RefreshCw size={12} /> "ค้นหาในเครื่อง" เพื่อลองใหม่
-            · ตอนกดปุ่มพิมพ์ browser จะเปิด dialog ให้เลือกเครื่องพิมพ์จริงเองอยู่ดี
+            ไม่พบเครื่องพิมพ์ในระบบ (หรือ helper ไม่ได้รัน) — แหล่งข้อมูล: {detectSource}
+            <br />
+            <small>ติดตั้ง/รัน <b>printer-helper</b> (port 3031) เพื่อ enumerate เครื่องพิมพ์จริงในเครื่อง → รัน <code>cd mini-services/printer-helper && bun run dev</code> แล้ว refresh หน้านี้</small>
+            <br />
+            <small>ถ้าไม่รัน helper หรือ browser ไม่อนุญาต → ใช้รายการนิยมด้านบน หรือกด <RefreshCw size={12} /> "ค้นหาในเครื่อง" เพื่อลองใหม่ · ตอนกดปุ่มพิมพ์ browser จะเปิด dialog ให้เลือกเครื่องพิมพ์จริงเองอยู่ดี</small>
           </span>
         ) : (
-          <span>ใช้รายการเครื่องพิมพ์ที่นิยม — กด "ค้นหาในเครื่อง" เพื่อลอง enumerate เครื่องพิมพ์จริง</span>
+          <span>ใช้รายการเครื่องพิมพ์ที่นิยม — กด "ค้นหาในเครื่อง" เพื่อลอง enumerate เครื่องพิมพ์จริง (ต้องรัน printer-helper)</span>
         )}
       </div>
     </div>

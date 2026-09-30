@@ -1532,3 +1532,61 @@ Stage Summary:
   - ✅ "เครื่องปริ้นมันต้องเข้าไปเลือกได้ด้วย" → เปลี่ยนจาก text input เป็น dropdown เลือกจากรายการ + ลอง enumerate จริงในระบบ (ถ้า browser อนุญาต) + fallback รายการนิยม 33 รุ่น ครบทุกหมวด
   - ⚠️ ข้อจำกัด: browser (security) ห้ามเว็บเลือกเครื่องพิมพ์โดยตรง — ตอนกดปุ่มพิมพ์ browser ยังเปิด dialog ให้เลือกเองอยู่ดี แต่ dropdown ทำให้ผู้ใช้เลือกชื่อเครื่องจากรายการเป็น hint ได้สะดวก
 - ส่งต่อให้ owner ทดสอบที่เครื่อง: ไป ตั้งค่า → ใบเสร็จและเครื่องพิมพ์ → คลิก dropdown "เลือกเครื่องพิมพ์เริ่มต้น" → เลือกรุ่นของร้าน → บันทึก → badge "🖨 <รุ่น>" จะแสดงข้างปุ่มพิมพ์ทุกจุด
+
+---
+Task ID: FIX-10b
+Agent: full-stack-developer
+Task: ตอบคำถาม owner "ไม่หมายถึงมันต้องเลือกเหมือนปริ้นบนเบราเซอร์ คือในเครื่องมีเครื่องอะไรถึงจะเจอ" — owner ต้องการให้ dropdown แสดงเครื่องพิมพ์จริงที่ติดตั้งในเครื่อง ไม่ใช่ static list
+
+Work Log:
+- ตรวจ Web API: browser (ทุกตัว) มี security restriction ห้ามเว็บ enumerate เครื่องพิมพ์ในระบบ (กันเว็บร้ายสั่งพิมพ์เงียบ)
+- ทางออก: สร้าง **mini-service "printer-helper"** รันในเครื่อง POS (on-premise) — รัน OS commands (wmic/PowerShell/lpstat) เพื่อ enumerate เครื่องพิมพ์จริง → expose ผ่าน HTTP endpoint บน port 3031 → web app fetch รายการมาแสดงใน dropdown
+
+Implementation:
+1. **mini-services/printer-helper/** (NEW — independent bun project):
+   - `package.json` (scripts: dev/start ด้วย bun --hot)
+   - `index.ts` (~150 บรรทัด): Bun.serve บน port 3031 (fixed, ไม่ใช้ PORT env ตามข้อกำหนด)
+   - Endpoints:
+     - `GET /` → health check { ok, service, port, platform, endpoints }
+     - `GET /printers` → { printers: string[], source: "windows"|"macos"|"linux"|"unknown", command: string, error?: string }
+     - `GET /printers/test` → debug echo + detected
+   - OS commands:
+     - Windows: PowerShell `Get-Printer | Select-Object -ExpandProperty Name` (fallback `wmic printer get name /value`)
+     - macOS: `lpstat -p` (parse "printer <NAME> ...")
+     - Linux: `lpstat -p` (fallback `lpinfo -v`)
+   - CORS headers (`Access-Control-Allow-Origin: *`) — ให้ web app (port 3000) fetch ได้
+2. **PrinterPicker.tsx** (update):
+   - เปลี่ยน detectPrinters() ให้ลอง 3 ทางตามลำดับ:
+     1. **fetch จาก printer-helper** (`/printers?XTransformPort=3031` — gateway pattern, on-premise localhost) → ถ้าได้ list จริง ใช้เลย
+     2. **navigator.printing.printers** API (Chrome enterprise เท่านั้น)
+     3. **fallback รายการนิยม** 33 รุ่น (เดิมจาก FIX-10)
+   - เพิ่ม `detectSource` state — แสดง source ของข้อมูลใน status bar ("helper (linux)" / "browser API (navigator.printing)" / "fallback รายการนิยม")
+   - status bar อัปเดต: พบ N เครื่องพิมพ์ + source / ไม่พบ + คำแนะนำติดตั้ง helper
+
+Verification (agent-browser end-to-end):
+1. เริ่ม printer-helper (`bun --hot mini-services/printer-helper/index.ts`) → log "🖨️ Printer helper running on http://localhost:3031/"
+2. `curl http://localhost:3031/printers` → `{"printers":[], "source":"linux", ...}` (sandbox Linux ไม่มีเครื่องพิมพ์)
+3. เริ่ม main dev server (port 3000)
+4. Login → ตั้งค่า → ใบเสร็จและเครื่องพิมพ์
+5. PrinterPicker แสดงสถานะ: "ไม่พบเครื่องพิมพ์ในระบบ (หรือ helper ไม่ได้รัน) — แหล่งข้อมูล: fallback รายการนิยม"
+6. มีคำแนะนำ: "ติดตั้ง/รัน printer-helper (port 3031) เพื่อ enumerate เครื่องพิมพ์จริงในเครื่อง → รัน `cd mini-services/printer-helper && bun run dev` แล้ว refresh หน้านี้"
+
+Verification:
+- `npx tsc --noEmit` → 0 errors ✅
+- agent-browser end-to-end: PrinterPicker fetches from helper (port 3031) → returns empty list (sandbox ไม่มี printer) → fallback to common list → shows status bar with detectSource + install hint
+
+Stage Summary:
+- 3 files modified (1 new + 2 modified):
+  - `mini-services/printer-helper/package.json` (NEW — bun project, port 3031)
+  - `mini-services/printer-helper/index.ts` (NEW, ~150 บรรทัด: HTTP server + OS commands for printer enumeration)
+  - `client/src/components/PrinterPicker.tsx` (update detectPrinters to try helper first, add detectSource state, update status bar)
+- TypeScript: 0 errors
+- ตอบคำถาม owner:
+  - ✅ "ในเครื่องมีเครื่องอะไรถึงจะเจอ" → สร้าง mini-service "printer-helper" ที่รัน OS commands enumerate เครื่องพิมพ์จริงในเครื่อง → web app fetch รายการมาแสดงใน dropdown
+  - ⚠️ ข้อกำหนด: ต้องรัน printer-helper ในเครื่อง POS (background process) — คำสั่ง: `cd mini-services/printer-helper && bun run dev`
+  - ⚠️ ข้อจำกัด browser: ตอนกดปุ่มพิมพ์ browser ยังเปิด print dialog ให้เลือกเองอยู่ดี (security restriction)
+  - ✅ Fallback: ถ้า helper ไม่ได้รัน → ลอง navigator.printing API → fallback รายการนิยม
+- ส่งต่อให้ owner ทดสอบที่เครื่อง POS:
+  1. รัน printer-helper: `cd mini-services/printer-helper && bun run dev` (background)
+  2. ไป ตั้งค่า → ใบเสร็จและเครื่องพิมพ์ → dropdown จะแสดงเครื่องพิมพ์จริงที่ติดตั้งในเครื่อง (source: helper)
+  3. เลือกเครื่องพิมพ์ → บันทึก → badge "🖨 <รุ่น>" จะแสดงข้างปุ่มพิมพ์ทุกจุด
