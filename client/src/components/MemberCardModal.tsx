@@ -96,7 +96,7 @@ export function MemberCardArt({
       </div>
       <div className="member-card-body">
         <div className="member-card-photo">
-          <MemberAvatar member={member} size={72} rounded={false} />
+          <MemberAvatar member={member} size={84} rounded={false} />
         </div>
         <div className="member-card-identity">
           <div className={`member-card-name${nameFit}`}>{displayName}</div>

@@ -2973,6 +2973,10 @@ th { font-weight: 600; }
 /* --- 1) MemberAvatar — รูปสมาชิกจริง + เงาว์เพศเมื่อไม่มีรูป ------------- */
 .member-photo { object-fit: cover; display: block; border-radius: 10px; background: #eef3ef; flex: 0 0 auto; }
 .member-photo.round { border-radius: 50%; }
+.member-photo.id-portrait { object-fit: cover; object-position: center top; }
+.member-photo-fallback-photo { object-fit: cover; display: block; border-radius: 10px; background: #eef3ef; flex: 0 0 auto; }
+.member-photo-fallback-photo.round { border-radius: 50%; }
+.member-photo-fallback-photo.id-portrait { object-fit: cover; object-position: center top; }
 .member-photo-fallback { display: grid; place-items: center; flex: 0 0 auto; border-radius: 10px; color: #fff; background: #9aa88f; position: relative; }
 .member-photo-fallback.round { border-radius: 50%; }
 .member-photo-fallback.male { background: linear-gradient(160deg, #4f8f75, #3d7a61); }
@@ -2990,8 +2994,9 @@ th { font-weight: 600; }
 .member-card-modal .member-card { width: 360px; max-width: 100%; aspect-ratio: 85.6 / 54; min-height: auto; padding: 12px 14px 10px; }
 .member-card-modal .member-card-body { display: flex; flex-direction: row; align-items: stretch; gap: 10px; flex: 1; min-height: 0; }
 .member-card-modal .member-card-identity { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 1px; }
-/* FIX-9 — ปรับ photo container ให้พอดีกับ CR80: 72px wide × 96px tall (aspect 3:4) ใส่ใน body ได้พอดี */
-.member-card-photo { flex: 0 0 auto; padding: 2px; background: #fff; border: 1px solid #d3e5dd; border-radius: 6px; box-shadow: 0 2px 4px rgba(40,70,58,.1); width: 72px; }
+/* FIX-9 — ปรับ photo container ให้พอดีกับ CR80: 84px wide × 112px tall (aspect 3:4) ใส่ใน body ได้พอดี
+   FIX-11 (user) — ขยายจาก 72px → 84px เพื่อให้ SVG illustration ดูเด่นขึ้น เห็นใบหน้าชัดขึ้น */
+.member-card-photo { flex: 0 0 auto; padding: 3px; background: #fff; border: 1px solid #d3e5dd; border-radius: 7px; box-shadow: 0 2px 6px rgba(40,70,58,.14); width: 84px; }
 .member-card-photo .member-photo, .member-card-photo .member-photo-fallback { width: 100% !important; height: auto !important; aspect-ratio: 3 / 4; border-radius: 4px !important; display: block; }
 .member-card-photo .member-photo.id-portrait { object-fit: cover; }
 .member-card-photo .member-photo-fallback.id-portrait { background: #f3f0ec !important; color: #6a5a4a; }
