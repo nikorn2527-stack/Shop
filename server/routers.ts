@@ -327,6 +327,14 @@ const checkoutInput = z.object({
   // bill. Frontend will be updated to send a UUID per attempt in a follow-up;
   // for now the field is optional so the existing UI keeps working.
   clientRequestId: z.string().max(200).nullish(),
+  // FIX-7 (user) — ยอดเงินสดที่รับมา (เฉพาะ "เงินสด") — ใช้พิมพ์ "รับเงินมา X / ทอน Y" ท้ายใบเสร็จ
+  // null สำหรับ QR/wallet — backend จะ ignore ถ้าไม่ใช่เงินสด
+  receivedCash: z.number().min(0).nullish(),
+  // FIX-7 (user) — ยอดเงินทอน (เฉพาะ "เงินสด") — backend คำนวณจาก receivedCash - total
+  changeDue: z.number().min(0).nullish(),
+  // FIX-7 (user) — แคชเชียร์ยืนยันตรวจสอบการชำระแล้ว (เฉพาะ "QR / สแกน")
+  // บังคับให้ติ๊ก checkbox ก่อนปุ่ม "ยืนยันการชำระเงิน" ถึงจะ enable
+  paymentVerified: z.boolean().nullish(),
 });
 
 const productCreateInput = z.object({

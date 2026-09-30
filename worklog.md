@@ -1235,3 +1235,93 @@ Stage Summary (ตอบ owner):
 - ✅ ยังยึดเอกสารเดิม: One Codebase – Two Deployment Models (Cloud + On-Premise)
 - ⚠️ งานอนาคต (Section 3.3): License Signing Architecture — ตอนนี้ license secret ยังอยู่ใน source code, จะเปลี่ยนเป็น signed license (public verification key + private signing key) ในอนาคต
 - ⚠️ การตัดสินใจที่ยังไม่ได้ตัด (Section 8.4): Per-machine หรือ per-deployment license สำหรับ On-Premise — เจ้าของตัดสินใจ
+
+---
+Task ID: FIX-7
+Agent: full-stack-developer
+Task: แก้ปัญหา QR/สแกน ที่ "กดยืนยันแล้วสำเร็จเลยโดยไม่ตรวจสอบว่าได้รับเงินจริง" + เพิ่ม cash received + เงินทอน + ปุ่มลัดยอดรับ 50/100/200/500/1000 + touch screen support
+
+Work Log:
+- VLM วิเคราะห์ screenshot หน้า POS QR payment modal ปัจจุบัน → ยืนยันว่าไม่มี checkbox/confirm step บังคับให้แคชเชียร์ตรวจสอบก่อนกดยืนยัน → เสี่ยงกดผิดก่อนลูกค้าสแกนจ่ายจริง
+- ตรวจ `server/sqliteStore.ts`: `CheckoutInput` type + `checkout()` function + `salesList()` + `CheckoutReceipt` type — ทั้งหมดไม่มี field สำหรับเก็บยอดเงินสดรับ/ทอน หรือ flag ยืนยัน QR
+- ตรวจ `server/routers.ts`: `checkoutInput` Zod schema มีเฉพาะ slipImage + clientRequestId — ต้องเพิ่ม 3 fields ใหม่
+
+Implementation:
+1. **Backend types & schema** (`server/sqliteStore.ts`):
+   - เพิ่ม `receivedCash`, `changeDue`, `paymentVerified` ใน `CheckoutInput` type (optional, nullish)
+   - เพิ่ม fields เดียวกันใน `CheckoutReceipt` type (ส่งกลับ frontend)
+   - ใช้ `ensureColumn()` เพิ่ม 3 columns ใน sales table: `received_cash REAL`, `change_due REAL`, `payment_verified INTEGER` (NULL สำหรับบิลเก่า)
+2. **Backend INSERT + SELECT** (`server/sqliteStore.ts`):
+   - อัปเดต `INSERT INTO sales` statement ให้ใส่ 3 columns ใหม่ (เก็บเฉพาะเงินสดสำหรับ received_cash/change_due, เก็บเฉพาะ QR สำหรับ payment_verified)
+   - อัปเดต idempotency replay SELECT (เมื่อ clientRequestId ซ้ำ → replay ข้อมูลเดิมครบ)
+   - อัปเดต `salesList()` SELECT (สำหรับ reprint บิลเก่าจาก history) ให้ดึง 3 fields ใหม่ด้วย
+   - อัปเดต return value ของ checkout() ให้ส่ง 3 fields กลับ
+3. **Backend Zod validation** (`server/routers.ts`):
+   - เพิ่ม `receivedCash: z.number().min(0).nullish()` ใน checkoutInput
+   - เพิ่ม `changeDue: z.number().min(0).nullish()`
+   - เพิ่ม `paymentVerified: z.boolean().nullish()`
+4. **Frontend Pos.tsx** (state + flow):
+   - เพิ่ม state: `qrVerified: boolean` (default false), `cashReceived: string` (default "")
+   - Reset ทุกครั้งที่เปิด modal ใหม่ (ใน `choosePayment()`)
+   - Derived: `cashReceivedNum`, `changeDue`, `cashShortfall`, `cashSufficient`
+   - `QUICK_CASH_AMOUNTS = [50, 100, 200, 500, 1000]` + `pickQuickCash(amount | "exact")`:
+     - ปุ่ม 50/100/200/500/1000 → สะสม (กด 100 ตอนมี 50 → กลายเป็น 150)
+     - ปุ่ม "รับตรงยอด" → ตั้งยอดรับ = ยอดบิลพอดี
+   - `completePayment()` ส่ง receivedCash + changeDue + paymentVerified ไป backend
+5. **Frontend Pos.tsx** (JSX):
+   - เพิ่ม `pay-cash-block` (เมื่อ payConfirm === "เงินสด"): head + input (inputMode="decimal", กรองเฉพาะตัวเลขจุด) + ล้าง + ปุ่มลัด 6 ปุ่ม (50/100/200/500/1000/รับตรงยอด) + summary (ทอน/ขาด)
+   - เพิ่ม `pay-verify-block` (เมื่อ payConfirm === "QR / สแกน"): checkbox "ฉันตรวจสอบการชำระเงินแล้ว" + คำอธิบาย "ลูกค้าสแกนจ่าย / โอนเงินมาแล้วจริง"
+   - อัปเดต disabled state ของปุ่ม "ยืนยันการชำระเงิน":
+     - หักบัญชีสมาชิก: disabled ถ้า balance < payable (เดิม)
+     - เงินสด: disabled ถ้า !cashSufficient (เงินรับ < ยอดบิล)
+     - QR: disabled ถ้า !qrVerified (ยังไม่ติ๊ก checkbox)
+   - อัปเดตข้อความปุ่ม:
+     - "กรอกยอดรับเงินก่อน" (เงินสด ไม่พอ)
+     - "ติ๊กตรวจสอบก่อน" (QR ยังไม่ติ๊ก)
+     - ปกติ: `ยืนยันการชำระเงิน ${money(payable)}`
+6. **Receipt Modal** (`ReceiptModal.tsx`):
+   - แทรก `receipt-cash-change` block ระหว่าง receipt-balance และ receipt-bank-wrap (เฉพาะเมื่อ paymentMethod === "เงินสด" && receivedCash != null)
+   - บล็อกมี 2 บรรทัด: "รับเงินมา X" + "ทอนเงิน Y" (mono font เหมือนเลขสมาชิก)
+7. **CSS** (`client/src/index.css`):
+   - `pay-cash-block`, `pay-cash-head`, `pay-cash-input-row` (42px height, 18px font, IBM Plex Mono, text-align right), `pay-cash-quick` (6 cols grid), `quick-amount-btn` (mono font, 36px min-height, touch-action manipulation), `pay-cash-summary` (sufficient=เขียว, short=แดง)
+   - `pay-verify-block` (amber background, ขีดเตือน), `pay-verify-checkbox` (22px checkbox, accent-color #28a17a), `pay-verify-text` (b+small)
+   - `@media (pointer: coarse)`: ขยาย icon-button (40px), quick-amount-btn (44px), cash-input (50px/20px font), checkbox (26px), pay-cash-quick 3 cols แทน 6 cols
+   - `touch-action: manipulation` ทุกปุ่ม + toggle (กัน double-tap zoom)
+   - `receipt-cash-change` (bordered box สำหรับใบเสร็จ)
+   - Style presets: apple/microsoft/android สำหรับ pay-cash-block + pay-verify-block + quick-amount-btn
+
+Verification (agent-browser end-to-end):
+**Test 1 — Cash bill flow** (login + add product + เงินสด + รับตรงยอด + ยืนยัน):
+- ✅ Cash modal เปิด → เห็น "รับเงินมา (บาท)" head + input + ปุ่มลัด 6 ปุ่ม (50/100/200/500/1000/รับตรงยอด)
+- ✅ ปุ่ม "ยืนยันการชำระเงิน" disabled ก่อนกรอกยอด (ข้อความ "กรอกยอดรับเงินก่อน")
+- ✅ คลิก "รับตรงยอด" → input auto-fill ด้วยยอดบิล (7) + summary แสดง "ทอน ฿0.00" (เขียว)
+- ✅ ปุ่มยืนยัน enable → คลิก → สำเร็จ
+- ✅ DB check: `order_number: "RC-260930-001"`, `payment_method: "เงินสด"`, `total: 7`, `received_cash: 7`, `change_due: 0`, `payment_verified: null`
+- ✅ Message: "ชำระเงินสำเร็จด้วยเงินสด · บิล RC-260930-001"
+
+**Test 2 — QR bill flow** (login + add product + QR + checkbox + ยืนยัน):
+- ✅ QR modal เปิด → เห็น QR + บัญชีธนาคาร้าน + checkbox "ฉันตรวจสอบการชำระเงินแล้ว"
+- ✅ ปุ่ม "ยืนยันการชำระเงิน" disabled ก่อนติ๊ก checkbox (ข้อความ "ติ๊กตรวจสอบก่อน")
+- ✅ คลิก checkbox → ปุ่มยืนยัน enable → คลิก → สำเร็จ
+- ✅ DB check: `order_number: "RC-260930-002"`, `payment_method: "QR / สแกน"`, `total: 7`, `received_cash: null`, `change_due: null`, `payment_verified: 1`
+
+Verification:
+- `npx tsc --noEmit` → 0 errors ✅
+- agent-browser end-to-end: ผ่านครบทั้ง 2 flow (cash + QR)
+- DB persistence: บิลเงินสดเก็บ received_cash=7, change_due=0 ใน sales table; บิล QR เก็บ payment_verified=1
+- Backward compatible: บิลเก่าที่ไม่มี columns ใหม่ → ensureColumn() สร้าง column ใหม่แบบ NULL โดยไม่กระทบข้อมูลเดิม
+
+Stage Summary:
+- 4 files modified:
+  - `server/sqliteStore.ts` (+60 บรรทัด: 3 type fields + ensureColumn + INSERT/SELECT updates + return value)
+  - `server/routers.ts` (+9 บรรทัด: 3 Zod fields)
+  - `client/src/pages/Pos.tsx` (+50 บรรทัด: state + derived + pickQuickCash + JSX blocks for cash/verify)
+  - `client/src/components/ReceiptModal.tsx` (+2 บรรทัด: cash-change block in receipt)
+  - `client/src/index.css` (+50 บรรทัด: pay-cash-block + pay-verify + quick-amount-btn + touch + style presets)
+- TypeScript: 0 errors
+- agent-browser: ผ่านครบทั้ง cash + QR flow (DB persisted with correct values)
+- ตอบคำถาม owner:
+  - ✅ "กดมันสำเร็จเลย" → แก้แล้ว: ตอนนี้ต้องกรอกยอดรับเงินสด + ติ๊ก checkbox ยืนยัน QR ก่อนปุ่มยืนยันถึงจะ enable
+  - ✅ "แอฟรองรับจอสัมพัสไหม" → รองรับ: ปุ่ม POS ใหญ่พอ, inputMode=numeric/decimal บนช่องตัวเลข (ขึ้น number pad บนมือถือ), touch-action: manipulation กัน double-tap zoom, @media (pointer: coarse) ขยาย hit area
+  - ✅ "เพิ่มเป็นตัวเลือกเพื่อไว้ขายได้" → เพิ่มแล้ว: ปุ่มลัด 50/100/200/500/1000 + "รับตรงยอด" ใน modal เงินสด (สะสมยอดได้), คำนวณเงินทอนอัตโนมัติ, พิมพ์ "รับเงินมา X / ทอน Y" ท้ายใบเสร็จ
+- ส่งต่อให้ owner ทดสอบที่เครื่อง: ทดสอบ flow เงินสด (กรอกยอด + กดปุ่มลัด + ดูเงินทอน + ดูใบเสร็จ) และ flow QR (ติ๊ก checkbox + ยืนยัน) บนจอสัมผัส

@@ -3818,6 +3818,9 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 [data-style="apple"] .bank-row-ico { border-radius: 10px; }
 [data-style="apple"] .bank-preset-chip { border-radius: 980px; }
 [data-style="apple"] .bank-preset-chip.active { background: var(--teal-soft); color: var(--teal-dark); border-color: transparent; }
+[data-style="apple"] .pay-cash-block, [data-style="apple"] .pay-verify-block, [data-style="apple"] .quick-amount-btn { border-radius: 14px; }
+[data-style="apple"] .pay-cash-block { background: #f5f5f7; }
+[data-style="apple"] .quick-amount-btn { border-radius: 980px; }
 
 [data-style="microsoft"] .member-detail-head, [data-style="microsoft"] .member-detail-stats > div, [data-style="microsoft"] .member-mini-card, [data-style="microsoft"] .history-row, [data-style="microsoft"] .table-toolbar, [data-style="microsoft"] .filter-pills button, [data-style="microsoft"] .entity-table th, [data-style="microsoft"] .entity-table td, [data-style="microsoft"] .notice-bar, [data-style="microsoft"] .row-slip-btn, [data-style="microsoft"] .help-disclosure-toggle { border-radius: 4px; border-color: #e1dfdd; }
 [data-style="microsoft"] .member-detail-head { background: #fff; }
@@ -3831,6 +3834,8 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 [data-style="microsoft"] .bank-row, [data-style="microsoft"] .bank-draft-panel, [data-style="microsoft"] .pay-bank-accounts, [data-style="microsoft"] .pay-bank-row, [data-style="microsoft"] .bank-empty, [data-style="microsoft"] .bank-preset-chip { border-radius: 4px; border-color: #e1dfdd; }
 [data-style="microsoft"] .pay-bank-accounts, [data-style="microsoft"] .bank-draft-panel { background: #faf9f8; }
 [data-style="microsoft"] .bank-row-ico { border-radius: 4px; }
+[data-style="microsoft"] .pay-cash-block, [data-style="microsoft"] .pay-verify-block, [data-style="microsoft"] .quick-amount-btn { border-radius: 4px; }
+[data-style="microsoft"] .pay-cash-block { background: #faf9f8; }
 
 [data-style="android"] .member-detail-head, [data-style="android"] .member-detail-stats > div, [data-style="android"] .member-mini-card, [data-style="android"] .history-row, [data-style="android"] .table-toolbar, [data-style="android"] .filter-pills button, [data-style="android"] .entity-table th, [data-style="android"] .entity-table td, [data-style="android"] .notice-bar, [data-style="android"] .row-slip-btn, [data-style="android"] .help-disclosure-toggle { border-radius: 16px; border-color: #e7e0ec; }
 [data-style="android"] .member-detail-head { background: #fff; }
@@ -3846,6 +3851,9 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 [data-style="android"] .bank-row-ico { border-radius: 14px; }
 [data-style="android"] .bank-preset-chip { border-radius: 20px; }
 [data-style="android"] .bank-preset-chip.active { background: var(--teal-soft); color: var(--teal-dark); border-color: transparent; }
+[data-style="android"] .pay-cash-block, [data-style="android"] .pay-verify-block, [data-style="android"] .quick-amount-btn { border-radius: 16px; }
+[data-style="android"] .pay-cash-block { background: #fcf8fe; }
+[data-style="android"] .quick-amount-btn { border-radius: 20px; }
 
 /* องค์ประกอบสีเขียวตายตัว → ตามสีเน้นของสไตล์ที่เลือก (ทั้ง 3 สไตล์) */
 [data-style="apple"] .bar.teal, [data-style="microsoft"] .bar.teal, [data-style="android"] .bar.teal { background: var(--teal); }
@@ -4960,6 +4968,53 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .pay-slip-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .pay-slip-file { cursor: pointer; }
 .pay-qr-block .slip-preview { background: #fff; }
+/* FIX-7 (user) — Cash received block + QR verification checkbox + quick amount buttons
+   ป้องกันกดผิด/กดเร็วก่อนลูกค้าจ่ายจริง (QR) + คำนวณเงินทอน + ปุ่มลัดยอดรับ (เงินสด) */
+.pay-cash-block { border: 1px solid #dbeae3; background: #f5faf7; border-radius: 10px; padding: 11px 12px; display: grid; gap: 9px; }
+.pay-cash-head { display: flex; align-items: center; gap: 6px; color: #2e5b4c; font-size: 11.5px; font-weight: 600; }
+.pay-cash-head b { font-weight: 700; }
+.pay-cash-head small { margin-left: auto; color: #8a8e7d; font-size: 10px; font-weight: 500; }
+.pay-cash-input-row { display: flex; gap: 6px; align-items: stretch; }
+.pay-cash-input-row input { flex: 1; min-width: 0; height: 42px; border: 1px solid #d2e0d8; border-radius: 8px; padding: 0 12px; outline: none; color: #1c2b25; font-size: 18px; font-weight: 700; font-family: "IBM Plex Mono", monospace; background: #fff; text-align: right; }
+.pay-cash-input-row input:focus { border-color: #4a8d77; box-shadow: 0 0 0 3px rgba(40, 161, 122, .18); }
+.pay-cash-input-row .outline-button { flex: 0 0 auto; }
+.pay-cash-quick { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; }
+.quick-amount-btn { border: 1px solid #c8ddd3; background: #fff; color: #2e6b54; font-size: 12px; font-weight: 600; font-family: "IBM Plex Mono", monospace; padding: 9px 4px; border-radius: 7px; cursor: pointer; transition: .14s ease; min-height: 36px; touch-action: manipulation; }
+.quick-amount-btn:hover { border-color: #4a8d77; background: #eaf6f1; color: #1f8c68; }
+.quick-amount-btn:active { transform: scale(0.96); }
+.quick-amount-btn.exact { background: #e8f3ee; border-color: #4a8d77; color: #1f8c68; font-family: "Sarabun", sans-serif; font-size: 11px; }
+.pay-cash-summary { display: flex; align-items: center; gap: 7px; padding: 9px 10px; border-radius: 7px; background: #fff; border: 1px solid #e1ece5; font-size: 11.5px; line-height: 1.5; }
+.pay-cash-summary svg { flex: 0 0 auto; }
+.pay-cash-summary b { font-size: 14px; font-weight: 700; font-family: "IBM Plex Mono", monospace; margin-left: auto; }
+.pay-cash-summary small { display: block; color: #7d8172; font-size: 10px; margin-top: 2px; }
+.pay-cash-summary.sufficient { background: #eaf6f1; border-color: #b3ddc8; color: #1f6b50; }
+.pay-cash-summary.sufficient b { color: #1f8c68; }
+.pay-cash-summary.sufficient svg { color: #2e9b7e; }
+.pay-cash-summary.short { background: #fff0f0; border-color: #e6c5c5; color: #8d4438; }
+.pay-cash-summary.short b { color: #b95f5a; }
+.pay-cash-summary.short svg { color: #c16b6e; }
+.pay-cash-summary > span { color: #8a8e7d; }
+.pay-verify-block { border: 1px solid #e6c5a8; background: #fff7e8; border-radius: 10px; padding: 11px 12px; }
+.pay-verify-checkbox { display: flex; align-items: flex-start; gap: 9px; cursor: pointer; user-select: none; }
+.pay-verify-checkbox input[type="checkbox"] { width: 22px; height: 22px; margin: 1px 0 0; accent-color: #28a17a; cursor: pointer; flex: 0 0 auto; touch-action: manipulation; }
+.pay-verify-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.pay-verify-text { position: relative; padding-left: 0; }
+.pay-verify-text b { display: flex; align-items: center; gap: 5px; color: #8a5a26; font-size: 12px; font-weight: 700; }
+.pay-verify-text small { display: block; color: #7a6a4a; font-size: 10.5px; line-height: 1.5; font-weight: 500; }
+/* Touch device: ขยาย hit area ของ icon-button + ปุ่ม POS + quick-amount-btn */
+@media (pointer: coarse) {
+  .icon-button { min-width: 40px; min-height: 40px; }
+  .quick-amount-btn { min-height: 44px; padding: 11px 4px; font-size: 13px; }
+  .pay-cash-input-row input { height: 50px; font-size: 20px; }
+  .pay-verify-checkbox input[type="checkbox"] { width: 26px; height: 26px; }
+  .pay-cash-quick { grid-template-columns: repeat(3, 1fr); }
+}
+/* ป้องกัน double-tap zoom บนปุ่ม POS — ทำให้กดเร็วได้ไม่มีดีเลย์ */
+button, .primary-button, .outline-button, .icon-button, .quick-amount-btn, .pay-bank-row, .toggle, .toggle-row button { touch-action: manipulation; }
+/* ใบเสร็จ: บล็อก รับเงินมา / ทอน (เฉพาะบิลเงินสดที่กรอกยอดรับมา) */
+.receipt-cash-change { margin-top: 8px; padding: 6px 7px; background: #f7f9f7; border: 1px dashed #c8d3c5; border-radius: 4px; }
+.receipt-cash-change .receipt-line { padding: 4px 0; font-size: 11.5px; }
+.receipt-cash-change .receipt-line b { color: #111111; font-family: "IBM Plex Mono", monospace; font-size: 12px; }
 /* FIX-5 — บัญชีธนาคารร้าน: ทั้งหน้า POS ยืนยันการชำระ และการ์ดจัดการในหน้าตั้งค่า */
 .pay-bank-accounts { border: 1px solid #dbeae3; background: #f5faf7; border-radius: 10px; padding: 11px 12px; display: grid; gap: 8px; }
 .pay-bank-head { display: flex; align-items: center; gap: 6px; color: #2e5b4c; font-size: 11.5px; font-weight: 600; }

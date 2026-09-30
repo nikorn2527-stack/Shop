@@ -168,6 +168,12 @@ export type CheckoutReceipt = {
   memberName: string | null;
   balanceAfter: number | null;
   cashier: string | null;
+  /** FIX-7 (user) — ยอดเงินสดที่รับมา (เฉพาะ "เงินสด") ใช้พิมพ์ "รับเงินมา X / ทอน Y" ท้ายใบเสร็จ */
+  receivedCash?: number | null;
+  /** FIX-7 (user) — ยอดเงินทอน (เฉพาะ "เงินสด") */
+  changeDue?: number | null;
+  /** FIX-7 (user) — บิล QR ที่แคชเชียร์ยืนยันตรวจสอบแล้ว (เก็บไว้ในตารางเพื่อ audit) */
+  paymentVerified?: boolean | null;
 };
 
 /** A past receipt rebuilt from the sales/sale_items tables — balanceAfter is replayed from the member ledger when that bill was a wallet purchase. */
@@ -574,6 +580,11 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
   ensureColumn(db, "member_transactions", "client_request_id", "TEXT");
   db.exec("CREATE INDEX IF NOT EXISTS idx_sales_client_req ON sales(client_request_id) WHERE client_request_id IS NOT NULL");
   db.exec("CREATE INDEX IF NOT EXISTS idx_member_tx_client_req ON member_transactions(client_request_id) WHERE client_request_id IS NOT NULL");
+  // FIX-7 (user) — ยอดเงินสดที่รับมา + ยอดเงินทอน สำหรับบิล "เงินสด" + flag ยืนยันตรวจสอบสำหรับบิล "QR / สแกน"
+  // NULL on legacy rows (บิลเก่าไม่มีข้อมูลนี้ → ไม่แสดงในใบเสร็จ)
+  ensureColumn(db, "sales", "received_cash", "REAL");
+  ensureColumn(db, "sales", "change_due", "REAL");
+  ensureColumn(db, "sales", "payment_verified", "INTEGER");
   // ROUND 65 (user) — รหัสบัตรเงินสด (23951…) และรหัสผู้ป่วย (HN) ของสมาชิกร้านค้าสวัสดิการ
   ensureColumn(db, "members", "card_number", "TEXT");
   ensureColumn(db, "members", "patient_code", "TEXT");
@@ -1704,6 +1715,12 @@ export type CheckoutInput = {
    * of writing a second bill. Omitted on legacy clients → no idempotency.
    */
   clientRequestId?: string | null;
+  /** FIX-7 (user) — ยอดเงินที่รับมาจากลูกค้า (เฉพาะ "เงินสด") · null/undefined สำหรับ QR/wallet */
+  receivedCash?: number | null;
+  /** FIX-7 (user) — ยอดเงินทอน (เฉพาะ "เงินสด") · null/undefined สำหรับ QR/wallet */
+  changeDue?: number | null;
+  /** FIX-7 (user) — แคชเชียร์ยืนยันว่าตรวจสอบการชำระแล้ว (เฉพาะ "QR / สแกน") · null สำหรับเงินสด/wallet */
+  paymentVerified?: boolean | null;
 };
 
 export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
@@ -1712,8 +1729,8 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
   // for every retry of one logical checkout. We replay the original receipt
   // (items + totals + balanceAfter) so the UI shows the same slip again.
   if (input.clientRequestId) {
-    const existing = db.prepare(`SELECT id, order_number AS orderNumber, created_at AS createdAt, subtotal, discount, total, payment_method AS paymentMethod, member_number AS memberNumber, cashier FROM sales WHERE client_request_id = ? LIMIT 1`).get(input.clientRequestId) as
-      | { id: number; orderNumber: string; createdAt: string; subtotal: number; discount: number; total: number; paymentMethod: string; memberNumber: string | null; cashier: string | null }
+    const existing = db.prepare(`SELECT id, order_number AS orderNumber, created_at AS createdAt, subtotal, discount, total, payment_method AS paymentMethod, member_number AS memberNumber, cashier, received_cash AS receivedCash, change_due AS changeDue, payment_verified AS paymentVerified FROM sales WHERE client_request_id = ? LIMIT 1`).get(input.clientRequestId) as
+      | { id: number; orderNumber: string; createdAt: string; subtotal: number; discount: number; total: number; paymentMethod: string; memberNumber: string | null; cashier: string | null; receivedCash: number | null; changeDue: number | null; paymentVerified: number | null }
       | undefined;
     if (existing) {
       const itemRows = db.prepare(`SELECT product_id AS productId, name, COALESCE(unit, 'ชิ้น') AS unit, qty, price, ROUND(qty * price, 2) AS amount FROM sale_items WHERE sale_id = ?`).all(existing.id) as { productId: number | null; name: string; unit: string; qty: number; price: number; amount: number }[];
@@ -1741,6 +1758,10 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
         memberName,
         balanceAfter,
         cashier: existing.cashier,
+        // FIX-7 — replay ยอดเงินสด/ทอน และ flag ยืนยันด้วย (null/undefined สำหรับบิลเก่า)
+        receivedCash: existing.receivedCash ?? null,
+        changeDue: existing.changeDue ?? null,
+        paymentVerified: existing.paymentVerified === 1 ? true : existing.paymentVerified === 0 ? false : null,
       };
     }
   }
@@ -1828,7 +1849,7 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
   const slipImage = typeof input.slipImage === "string" && input.slipImage.startsWith("data:image/") ? input.slipImage.slice(0, 600_000) : null;
 
   return runInTransaction(db, () => {
-    const saleResult = db.prepare(`INSERT INTO sales (order_number, payment_method, member_number, subtotal, discount, total, cashier, created_at, slip_url, client_request_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    const saleResult = db.prepare(`INSERT INTO sales (order_number, payment_method, member_number, subtotal, discount, total, cashier, created_at, slip_url, client_request_id, received_cash, change_due, payment_verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
       orderNumber,
       input.paymentMethod,
       member?.memberNumber ?? (input.memberNumber?.trim() || null),
@@ -1839,6 +1860,10 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
       createdAt,
       slipImage,
       input.clientRequestId ?? null,
+      // FIX-7 — บิลเงินสดเก็บยอดรับ/ทอน · บิล QR เก็บ flag ยืนยัน · บิล wallet = null ทั้งคู่
+      input.paymentMethod === "เงินสด" ? (typeof input.receivedCash === "number" ? round2(input.receivedCash) : null) : null,
+      input.paymentMethod === "เงินสด" ? (typeof input.changeDue === "number" ? round2(input.changeDue) : null) : null,
+      input.paymentMethod === "QR / สแกน" ? (input.paymentVerified ? 1 : 0) : null,
     );
     const saleId = Number(saleResult.lastInsertRowid);
     const insertItem = db.prepare(`INSERT INTO sale_items (sale_id, product_id, name, qty, price, cost, unit) VALUES (?, ?, ?, ?, ?, ?, ?)`);
@@ -1888,6 +1913,10 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
       memberName: member ? [member.prename, member.firstName, member.lastName].filter(Boolean).join(" ") : null,
       balanceAfter,
       cashier,
+      // FIX-7 — ส่งยอดเงินสด/ทอน และ flag ยืนยันกลับไปแสดงในใบเสร็จ
+      receivedCash: input.paymentMethod === "เงินสด" ? (typeof input.receivedCash === "number" ? round2(input.receivedCash) : null) : null,
+      changeDue: input.paymentMethod === "เงินสด" ? (typeof input.changeDue === "number" ? round2(input.changeDue) : null) : null,
+      paymentVerified: input.paymentMethod === "QR / สแกน" ? !!input.paymentVerified : null,
     };
   });
 }
@@ -1910,7 +1939,7 @@ export function salesList(db: SqliteDb, input: SalesListInput = {}): SaleHistory
     params.push(`%${search}%`, `%${search}%`);
   }
   const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
-  const sales = db.prepare(`SELECT s.id, s.order_number AS orderNumber, s.payment_method AS paymentMethod, s.member_number AS memberNumber, s.subtotal, s.discount, s.total, s.cashier, s.created_at AS createdAt, s.slip_url IS NOT NULL AS hasSlip, CASE WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sales s LEFT JOIN members m ON m.member_number = s.member_number${where} ORDER BY s.created_at DESC, s.id DESC LIMIT ?`).all(...params, limit) as unknown as {
+  const sales = db.prepare(`SELECT s.id, s.order_number AS orderNumber, s.payment_method AS paymentMethod, s.member_number AS memberNumber, s.subtotal, s.discount, s.total, s.cashier, s.created_at AS createdAt, s.slip_url IS NOT NULL AS hasSlip, s.received_cash AS receivedCash, s.change_due AS changeDue, s.payment_verified AS paymentVerified, CASE WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sales s LEFT JOIN members m ON m.member_number = s.member_number${where} ORDER BY s.created_at DESC, s.id DESC LIMIT ?`).all(...params, limit) as unknown as {
     id: number;
     orderNumber: string;
     paymentMethod: string;
@@ -1921,6 +1950,9 @@ export function salesList(db: SqliteDb, input: SalesListInput = {}): SaleHistory
     cashier: string | null;
     createdAt: string;
     hasSlip: number;
+    receivedCash: number | null;
+    changeDue: number | null;
+    paymentVerified: number | null;
     memberName: string | null;
   }[];
   if (sales.length === 0) return [];
@@ -1956,6 +1988,10 @@ export function salesList(db: SqliteDb, input: SalesListInput = {}): SaleHistory
       : null,
     cashier: sale.cashier,
     hasSlip: sale.hasSlip === 1,
+    // FIX-7 — replay ยอดเงินสด/ทอน และ flag ยืนยัน (null สำหรับบิลเก่าที่ไม่มีข้อมูลนี้)
+    receivedCash: sale.receivedCash ?? null,
+    changeDue: sale.changeDue ?? null,
+    paymentVerified: sale.paymentVerified === 1 ? true : sale.paymentVerified === 0 ? false : null,
   }));
 }
 
