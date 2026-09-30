@@ -1101,3 +1101,75 @@ Stage Summary:
   - Issue 2: ทดสอบเปิด SlipViewModal ในหน้า Member Detail (ปุ่ม FileImage ใน history row) → ควรไม่ถูกซ่อนหลังการ์ด stat
   - Issue 4: ทดสอบเลือกหลายแถวในหน้า Members + กด "พิมพ์บัตร N ใบ" → พรีวิวโชว์ทุกใบ + พิมพ์ออก 1 ใบ/หน้ากระดาษที่ขนาด CR80 (85.6 × 54 มม.) + ปุ่ม "พิมพ์อีกครั้ง" ใน MemberCardModal (single) ทำงานได้
   - Issue 1: เปลี่ยนสไตล์ใน ตั้งค่า → แบรนด์ → สไตล์หน้าตาแอป → เปิดหน้า Member Detail และ Members → ควรเห็นการ์ด/ตาราง/notice bar เปลี่ยน border-radius + border-color ตาม preset (Apple มน, Microsoft คม, Android มนมาก) — แต่สีพื้นหลัง/ตัวอักษรบางจุดยังคง hardcoded ของเดิม (documented ใน comment)
+
+---
+Task ID: FIX-5
+Agent: full-stack-developer
+Task: เพิ่มบัญชีธนาคารร้าน (รับเงินโอน) เข้าในระบบ ตอบคำถาม owner ที่ว่า "ตั้งค่า → การชำระเงิน รวมถึงบัญชีธนาคารด้วยไหม" — เดิมมีแค่ PromptPay ID อย่างเดียว
+
+Work Log:
+- อ่าน worklog.md เพื่อเข้าใจ baseline ปัจจุบัน (commit `fee6fa7` บน main-v2) และเลือก scope ของงาน: ขยายฟีเจอร์การชำระเงิน ไม่ใช่ bug fix
+- ตรวจ `server/sqliteStore.ts`: `StoreSettings` type + `DEFAULT_STORE_SETTINGS` + `getSettings`/`setSettings` (เก็บ JSON blob ใน `store_settings` table key `app_settings`) — เหมาะกับการเพิ่ม field ใหมโดยไม่ต้องสร้าง table ใหม่
+- ตรวจ `server/routers.ts`: `settingsPatchInput` Zod schema มี `promptpayId` เป็น string optional — เพิ่ม field `bankAccounts` แบบ array โดยใช้ `z.array(z.object({...}))` ครบ schema + `.max(20)` กันเกิน
+- ตรวจ `client/src/pages/settings/Settings.tsx`: payment tab (tab === "payment") เดิมมีแค่ PromptPay panel เดียว — เพิ่ม `BankAccountsPanel` component ใหม่ mount ใต้ PromptPay panel
+
+Implementation:
+1. **Backend types & schema** (`server/sqliteStore.ts`):
+   - เพิ่ม `BankAccount` type: `{ id, bankCode, bankName, accountNumber, accountName, branch?, active, note? }`
+   - เพิ่ม `bankAccounts: BankAccount[]` field ใน `StoreSettings` type
+   - เพิ่ม `bankAccounts: []` ใน `DEFAULT_STORE_SETTINGS` (default = empty list)
+2. **Backend Zod validation** (`server/routers.ts`):
+   - เพิ่ม `bankAccounts` ใน `settingsPatchInput`: array ของ object แต่ละ field มี length/regex constraint + `.max(20)` กัน overflow
+   - `accountNumber` regex `/^[0-9\- ]+$/` (ตัวเลขเท่านั้น ใส่ - หรือช่องว่างคั่นได้) + `.min(7).max(20)`
+3. **Frontend Settings UI** — สร้าง `client/src/components/BankAccountsPanel.tsx` แยก (กัน Settings.tsx ใหญ่เกิน — ไฟล์เดิม 4467 บรรทัด):
+   - List บัญชี active/inactive ทั้งหมด แต่ละ row มี icon + bank name + bankCode pill + account number (mono font) + accountName + branch/note + actions (copy/edit/toggle active/delete)
+   - "เพิ่มบัญชีธนาคาร" button → เปิด inline draft panel (ไม่ใช่ modal ใหม่) ที่มี form ครบ: preset chips 14 ธนาคารไทย (BBL/KBANK/SCB/KTB/BAY/TTB/TCD/CIMBT/TISCO/KKTB/ICB/LHFB/GHIB/TCRB) + form-grid (bankName/accountNumber/accountName/branch/note/active toggle)
+   - ปุ่ม "คัดลอกข้อมูลบัญชี" (ทั้งหมด) + ปุ่ม "คัดลอกเลขบัญชี" (เฉพาะเลข) ในแต่ละ row
+   - Validation: `isComplete(draft)` = bankName + accountName + accountNumber (>=7 หลัก) ไม่ว่าง → ปุ่ม "เพิ่มบัญชี" ถูก disable จนกว่าจะกรอกครบ
+4. **Frontend POS payment confirmation** (`client/src/pages/Pos.tsx`):
+   - ใน pay-confirm-modal เมื่อ `payConfirm === "QR / สแกน"` แทรกบล็อก `.pay-bank-accounts` ระหว่าง QR figure/missing และ `.pay-slip-block`
+   - แสดงเฉพาะบัญชีที่ `active: true` แต่ละ row มี bank name + bankCode pill + account number + account name + branch/note + ปุ่ม "คัดลอกเลขบัญชี" (navigator.clipboard + toast success)
+   - Hint footer: "ถ้าลูกค้าโอนผ่านแอปธนาคาร (ไม่สแกน QR) — ให้แนบสลิปหลักฐานด้านล่าง"
+5. **Receipt Modal** (`client/src/components/ReceiptModal.tsx`):
+   - แทรกบล็อก `.receipt-bank-wrap` (มี divider + .receipt-bank-section) ระหว่างยอดคงเหลือสมาชิกและ .receipt-thanks — เฉพาะเมื่อ `receipt.paymentMethod === "QR / สแกน"` และมีบัญชี active >= 1
+   - แต่ละบัญชีบรรทัดเดียว: bankName (bold) + เลขที่ + ชื่อ + สาขา + note (mono font เหมือนเลขสมาชิก)
+6. **Icons** (`client/src/lib/icons.ts`):
+   - เพิ่ม `export { Bank } from "@phosphor-icons/react"` (Phosphor `Bank` = รูปตึกธนาคารคลาสสิก มีเสา)
+7. **CSS** (`client/src/index.css`):
+   - เพิ่ม ~50 single-line rules สำหรับ: `.pay-bank-accounts`, `.pay-bank-head`, `.pay-bank-list`, `.pay-bank-row`, `.pay-bank-row-info`, `.pay-bank-copy`, `.pay-bank-hint`, `.bank-code-pill`, `.bank-list`, `.bank-empty`, `.bank-row`, `.bank-row-ico`, `.bank-row-info`, `.bank-row-actions`, `.bank-draft-panel`, `.bank-draft-head`, `.bank-preset-row`, `.bank-preset-chips`, `.bank-preset-chip`, `.bank-draft-actions`, `.bank-add-row`, `.receipt-bank-wrap`, `.receipt-bank-section`, `.receipt-bank-head`, `.receipt-bank-line` + print rule สำหรับ receipt-bank-section
+   - Style presets: `[data-style="apple"/"microsoft"/"android"]` สำหรับ `.bank-row`, `.bank-draft-panel`, `.pay-bank-accounts`, `.pay-bank-row`, `.bank-empty`, `.bank-preset-chip` (Apple = 14px round, Microsoft = 4px square, Android = 16px round)
+   - Responsive: `.bank-row` flex-wrap บนมือถือ + `.bank-row-actions` ย้ายขึ้นบน + `.pay-bank-head small` ซ่อนบนมือถือ
+
+Verification (agent-browser end-to-end):
+1. เริ่ม dev server (`tsx watch`) + login ใน bash call เดียวกัน (sandbox ฆ่า background หลัง 30s)
+2. Login ด้วย woraphot/1234 (role=administrator) → ไปที่ Settings → แท็บ "การชำระเงิน" → เห็นการ์ด "บัญชีธนาคารร้าน (รับเงินโอน)" ใต้การ์ด PromptPay
+3. กด "เพิ่มบัญชีธนาคาร" → draft panel เปิด → แสดง preset chips 14 ธนาคาร + form 5 ช่อง + active toggle
+4. คลิก preset "ธนาคารกสิกรไทย" → ชื่อธนาคาร auto-fill "ธนาคารกสิกรไทย" + bankCode "KBANK"
+5. กรอกเลขที่บัญชี "1234567890" + ชื่อบัญชี "นายวรพจน์ ทดสอบ" → ปุ่ม "เพิ่มบัญชี" enable (จาก disabled)
+6. กด "เพิ่มบัญชี" → บัญชีเข้า list ทันที + dirty indicator "บันทึกการตั้งค่า · 1 รายการ"
+7. กด "บันทึกการตั้งค่า" → ตรวจ DB: `SELECT value FROM store_settings WHERE key = 'app_settings'` → JSON.parse → `bankAccounts.length === 1` ✅
+   - บัญชี: `{ id: "18e379a5-...", bankCode: "KBANK", bankName: "ธนาคารกสิกรไทย", accountNumber: "1234567890", accountName: "นายวรพจน์ ทดสอบ", active: true }`
+8. ไปที่ POS → กด product tile "เพิ่ม น้ำดื่มคริสตัล" → กดปุ่ม "QR / สแกน"
+9. ใน pay-confirm-modal เห็นบล็อก "หรือโอนผ่านบัญชีธนาคาร" แสดง "ธนาคารกสิกรไทย KBANK เลขที่ 1234567890 · ชื่อ นายวรพจน์ ทดสอบ" + ปุ่ม "คัดลอกเลขบัญชี" + hint footer
+10. กดปุ่ม "คัดลอกเลขบัญชี" → toast "คัดลอกเลขบัญชีแล้ว" ✅
+
+Verification:
+- `npx tsc --noEmit` → 0 errors ✅ (หลังแก้ JSX fragment issue: ใช้ `<div className="receipt-bank-wrap">` แทน `<>...</>` เพราะ parser สับสนกับ `</>}` ใน JSX expression)
+- agent-browser end-to-end: ผ่านครบทั้ง 10 ขั้นตอน (login, add bank account, save to DB, navigate to POS, add product, open payment confirmation, see bank accounts, copy button works)
+- DB persistence: บัญชีที่เพิ่มเก็บอยู่ใน store_settings JSON blob (ไม่มี migration ใหม่ เพราะอยู่ใน field ที่มีอยู่แล้ว)
+- Backward compatible: ระบบเดิมที่ยังไม่มี bankAccounts field → `getSettings()` คืน `DEFAULT_STORE_SETTINGS.bankAccounts = []` อัตโนมัติ (spread merge)
+
+Stage Summary:
+- 8 files changed (1 new + 7 modified):
+  - `server/sqliteStore.ts` (+20 บรรทัด: BankAccount type + field + default)
+  - `server/routers.ts` (+22 บรรทัด: Zod schema for bankAccounts array)
+  - `client/src/components/BankAccountsPanel.tsx` (NEW, ~290 บรรทัด: full panel + draft editor + presets)
+  - `client/src/pages/settings/Settings.tsx` (+12 บรรทัด: import, type, label, mount BankAccountsPanel)
+  - `client/src/pages/Pos.tsx` (+10 บรรทัด: แทรก pay-bank-accounts block ใน pay-qr-block)
+  - `client/src/components/ReceiptModal.tsx` (+5 บรรทัด: แทรก receipt-bank-wrap ก่อน receipt-thanks)
+  - `client/src/lib/icons.ts` (+1 บรรทัด: Bank icon)
+  - `client/src/index.css` (+~70 บรรทัด: bank account styles + 3 style presets)
+- TypeScript: 0 errors (`npx tsc --noEmit` exit 0)
+- agent-browser: ผ่าน end-to-end (login → add → save → POS → QR → see bank list → copy button → toast)
+- คำตอบคำถาม owner: ใช่แล้ว — "ตั้งค่า → การชำระเงิน" ตอนนี้รวมทั้งบัญชีพร้อมเพย์ร้าน QR และบัญชีธนาคารร้าน (รับเงินโอน) หลายบัญชีได้ แสดงที่หน้ายืนยันการชำระ POS + พิมพ์ท้ายใบเสร็จ (เฉพาะบิล QR / สแกน)
+- ส่งต่อให้ owner ทดสอบที่เครื่อง + ใส่บัญชีธนาคารจริงของร้าน + ลองพิมพ์ใบเสร็จดูบัญชีท้ายกระดาษ

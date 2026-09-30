@@ -204,6 +204,30 @@ export type DashboardStats = {
   memberCount: { total: number; active: number; suspended: number };
 };
 
+/** FIX-5 (user) — บัญชีธนาคารของร้าน (รับเงินโอน)
+ *  เก็บเป็น JSON array ใน StoreSettings.bankAccounts ·
+ *  ใช้แสดงที่หน้ายืนยันการชำระ POS + ท้ายใบเสร็จ (เมื่อชำระด้วย QR/สแกน)
+ *  แทนที่จะมีเฉพาะ QR PromptPay อย่างเดียว */
+export type BankAccount = {
+  /** id คงที่ (crypto.randomUUID()) — ใช้เป็น React key + อ้างอิงตอนลบ/แก้ */
+  id: string;
+  /** รหัสธนาคาร — เช่น "BBL" "KBANK" "SCB" "KTB" "BAY" "TTB" "TCD" "CIMBT" "TISCO" "KKTB" "ICB" "TCRB" "LHFB" "GHIB"
+   *  เก็บเพื่อ sort/group และแสดงสี/ไอคอน (ถ้ามี) ในอนาคต */
+  bankCode: string;
+  /** ชื่อธนาคาร (display) เช่น "ธนาคารกสิกรไทย" — ตรงกับที่ผู้ใช้พิมพ์เข้ามา */
+  bankName: string;
+  /** เลขที่บัญชี (ตัวเลขเท่านั้น, 10-12 หลัก) */
+  accountNumber: string;
+  /** ชื่อบัญชี (ตัวอักษรตามสมุดบัญชี) — ลูกค้าใช้ตรวจสอบก่อนโอน */
+  accountName: string;
+  /** ชื่อสาขา (ถ้ามี) — ไม่บังคับ */
+  branch?: string;
+  /** ปิด/เปิดใช้งาน — ปิดได้โดยไม่ลบ (สำหรับเปลี่ยนบัญชีชั่วคราว) */
+  active: boolean;
+  /** หมายเหตุ (ถ้ามี) เช่น "บัญชีออมทรัพย์" "เฉพาะโอนภายในเวลาทำการ" */
+  note?: string;
+};
+
 export type StoreSettings = {
   memberNumberMode: "running" | "year" | "manual";
   memberNumberPrefix: string;
@@ -262,6 +286,10 @@ export type StoreSettings = {
   /** ROUND 63 (user) — บัญชีพร้อมเพย์ของร้าน (เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก)
    *  ใช้สร้าง QR ให้ลูกค้าสแกนจ่ายที่หน้ายืนยันการชำระเงิน · "" = ยังไม่ตั้ง (ไม่แสดง QR) */
   promptpayId: string;
+  /** FIX-5 (user) — บัญชีธนาคารของร้าน (รับเงินโอน) · เก็บเป็น JSON array ใน store_settings
+   *  แสดงที่หน้ายืนยันการชำระ POS (ควบคู่กับ QR) และท้ายใบเสร็จเมื่อชำระด้วย QR / สแกน ·
+   *  [] = ยังไม่มีบัญชี (ลูกค้าไม่เห็นตัวเลือกโอนผ่านธนาคาร) */
+  bankAccounts: BankAccount[];
   /** ROUND 68 (user) — เบอร์โทรศูนย์ช่วยเหลือของร้าน แสดงท้ายหน้าจอทุกหน้า
    *  (แถบ footer) · "" = ไม่แสดง (เดิมเคยเป็นข้อความล็อก 02-XXX-XXXX แก้ไม่ได้) */
   helpPhone: string;
@@ -3033,6 +3061,9 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   trialStart: "",
   // ROUND 63 — บัญชีพร้อมเพย์ร้าน ยังไม่ตั้ง → หน้า POS จะแนะนำให้ไปตั้งที่หน้าตั้งค่า การชำระเงิน
   promptpayId: "",
+  // FIX-5 — บัญชีธนาคารร้าน (รับเงินโอน) เริ่มต้นว่าง → ลูกค้าเห็นเฉพาะ QR เท่านั้น
+  // ผู้บริหารเพิ่มได้ที่ ตั้งค่า → การชำระเงิน → บัญชีธนาคารร้าน
+  bankAccounts: [],
   // ROUND 68 — เบอร์ศูนย์ช่วยเหลือท้ายหน้าจอ ยังไม่ตั้ง → ไม่แสดงแถบช่วยเหลือใน footer
   helpPhone: "",
 };

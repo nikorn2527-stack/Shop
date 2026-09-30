@@ -3803,6 +3803,11 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 [data-style="apple"] .icon-button { border-radius: 50%; border-color: #e8e8ed; }
 [data-style="apple"] .row-slip-btn { border-radius: 980px; background: var(--teal-soft); color: var(--teal-dark); border-color: transparent; }
 [data-style="apple"] .history-icon { border-radius: 10px; }
+[data-style="apple"] .bank-row, [data-style="apple"] .bank-draft-panel, [data-style="apple"] .pay-bank-accounts, [data-style="apple"] .pay-bank-row, [data-style="apple"] .bank-empty, [data-style="apple"] .bank-preset-chip { border-radius: 14px; border-color: #e8e8ed; }
+[data-style="apple"] .pay-bank-accounts, [data-style="apple"] .bank-draft-panel { background: #f5f5f7; }
+[data-style="apple"] .bank-row-ico { border-radius: 10px; }
+[data-style="apple"] .bank-preset-chip { border-radius: 980px; }
+[data-style="apple"] .bank-preset-chip.active { background: var(--teal-soft); color: var(--teal-dark); border-color: transparent; }
 
 [data-style="microsoft"] .member-detail-head, [data-style="microsoft"] .member-detail-stats > div, [data-style="microsoft"] .member-mini-card, [data-style="microsoft"] .history-row, [data-style="microsoft"] .table-toolbar, [data-style="microsoft"] .filter-pills button, [data-style="microsoft"] .entity-table th, [data-style="microsoft"] .entity-table td, [data-style="microsoft"] .notice-bar, [data-style="microsoft"] .row-slip-btn, [data-style="microsoft"] .help-disclosure-toggle { border-radius: 4px; border-color: #e1dfdd; }
 [data-style="microsoft"] .member-detail-head { background: #fff; }
@@ -3813,6 +3818,9 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 [data-style="microsoft"] .icon-button { border-radius: 4px; border-color: #e1dfdd; }
 [data-style="microsoft"] .row-slip-btn { border-radius: 4px; background: #fff; color: var(--teal-dark); border-color: #e1dfdd; }
 [data-style="microsoft"] .history-icon { border-radius: 4px; }
+[data-style="microsoft"] .bank-row, [data-style="microsoft"] .bank-draft-panel, [data-style="microsoft"] .pay-bank-accounts, [data-style="microsoft"] .pay-bank-row, [data-style="microsoft"] .bank-empty, [data-style="microsoft"] .bank-preset-chip { border-radius: 4px; border-color: #e1dfdd; }
+[data-style="microsoft"] .pay-bank-accounts, [data-style="microsoft"] .bank-draft-panel { background: #faf9f8; }
+[data-style="microsoft"] .bank-row-ico { border-radius: 4px; }
 
 [data-style="android"] .member-detail-head, [data-style="android"] .member-detail-stats > div, [data-style="android"] .member-mini-card, [data-style="android"] .history-row, [data-style="android"] .table-toolbar, [data-style="android"] .filter-pills button, [data-style="android"] .entity-table th, [data-style="android"] .entity-table td, [data-style="android"] .notice-bar, [data-style="android"] .row-slip-btn, [data-style="android"] .help-disclosure-toggle { border-radius: 16px; border-color: #e7e0ec; }
 [data-style="android"] .member-detail-head { background: #fff; }
@@ -3823,6 +3831,11 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 [data-style="android"] .icon-button { border-radius: 50%; border-color: #e7e0ec; }
 [data-style="android"] .row-slip-btn { border-radius: 20px; background: var(--teal-soft); color: var(--teal-dark); border-color: transparent; }
 [data-style="android"] .history-icon { border-radius: 14px; }
+[data-style="android"] .bank-row, [data-style="android"] .bank-draft-panel, [data-style="android"] .pay-bank-accounts, [data-style="android"] .pay-bank-row, [data-style="android"] .bank-empty, [data-style="android"] .bank-preset-chip { border-radius: 16px; border-color: #e7e0ec; }
+[data-style="android"] .pay-bank-accounts, [data-style="android"] .bank-draft-panel { background: #fcf8fe; }
+[data-style="android"] .bank-row-ico { border-radius: 14px; }
+[data-style="android"] .bank-preset-chip { border-radius: 20px; }
+[data-style="android"] .bank-preset-chip.active { background: var(--teal-soft); color: var(--teal-dark); border-color: transparent; }
 
 /* องค์ประกอบสีเขียวตายตัว → ตามสีเน้นของสไตล์ที่เลือก (ทั้ง 3 สไตล์) */
 [data-style="apple"] .bar.teal, [data-style="microsoft"] .bar.teal, [data-style="android"] .bar.teal { background: var(--teal); }
@@ -4937,6 +4950,66 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .pay-slip-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .pay-slip-file { cursor: pointer; }
 .pay-qr-block .slip-preview { background: #fff; }
+/* FIX-5 — บัญชีธนาคารร้าน: ทั้งหน้า POS ยืนยันการชำระ และการ์ดจัดการในหน้าตั้งค่า */
+.pay-bank-accounts { border: 1px solid #dbeae3; background: #f5faf7; border-radius: 10px; padding: 11px 12px; display: grid; gap: 8px; }
+.pay-bank-head { display: flex; align-items: center; gap: 6px; color: #2e5b4c; font-size: 11.5px; font-weight: 600; }
+.pay-bank-head small { margin-left: auto; color: #8a8e7d; font-size: 10px; font-weight: 500; }
+.pay-bank-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.pay-bank-row { display: flex; align-items: center; gap: 9px; background: #fff; border: 1px solid #e1ece5; border-radius: 8px; padding: 8px 10px; }
+.pay-bank-row-info { flex: 1; min-width: 0; }
+.pay-bank-row-info b { display: flex; align-items: center; gap: 5px; color: #2e5b4c; font-size: 11.5px; font-weight: 700; }
+.pay-bank-row-info small { display: block; color: #6e756a; font-size: 10.5px; line-height: 1.5; margin-top: 2px; word-break: break-word; }
+.pay-bank-row-info small i { font-style: normal; color: #1c1c1a; font-family: "IBM Plex Mono", monospace; font-size: 11px; }
+.pay-bank-copy { color: #4a8d77; flex: 0 0 auto; }
+.pay-bank-copy:hover { background: #eaf6f1; color: #2e6b54; }
+.pay-bank-hint { display: flex; align-items: flex-start; gap: 6px; color: #5b7d72; font-size: 10.5px; font-weight: 500; line-height: 1.5; padding-top: 4px; border-top: 1px dashed #d2e6dc; }
+.pay-bank-hint svg { flex: 0 0 auto; margin-top: 1px; color: #3f8d72; }
+.bank-code-pill { display: inline-flex; align-items: center; padding: 1px 5px; border-radius: 4px; background: #e7f0ec; color: #4a7c66; font-size: 9px; font-weight: 600; font-family: "IBM Plex Mono", monospace; letter-spacing: .3px; text-transform: uppercase; }
+/* การ์ดบัญชีในหน้าตั้งค่า → การชำระเงิน */
+.bank-list { display: grid; gap: 8px; padding-top: 14px; }
+.bank-empty { display: flex; align-items: flex-start; gap: 10px; padding: 14px 15px; border: 1px dashed #d5e6de; background: #f7faf8; border-radius: 10px; color: #5d756a; }
+.bank-empty svg { flex: 0 0 auto; margin-top: 2px; color: #8a9b88; }
+.bank-empty b { display: block; color: #486158; font-size: 12px; }
+.bank-empty small { display: block; color: #7a8276; font-size: 10.5px; margin-top: 4px; line-height: 1.55; }
+.bank-row { display: flex; align-items: center; gap: 10px; padding: 11px 13px; background: #fff; border: 1px solid #e1ece5; border-radius: 10px; transition: .14s ease; }
+.bank-row:hover { border-color: #c8ddd3; box-shadow: 0 2px 8px rgba(45, 102, 80, .08); }
+.bank-row.inactive { opacity: .55; background: #f6f8f7; }
+.bank-row.inactive .bank-row-ico { background: #eef2f0; color: #99a39a; }
+.bank-row-ico { width: 32px; height: 32px; display: grid; place-items: center; border-radius: 8px; background: #e8f3ee; color: #2e6b54; flex: 0 0 auto; }
+.bank-row-info { flex: 1; min-width: 0; }
+.bank-row-info b { display: flex; align-items: center; gap: 6px; color: #2e5b4c; font-size: 12.5px; font-weight: 700; }
+.bank-row-info small { display: block; color: #6e756a; font-size: 11px; line-height: 1.55; margin-top: 4px; word-break: break-word; }
+.bank-row-info small i { font-style: normal; color: #1c1c1a; font-family: "IBM Plex Mono", monospace; font-size: 11.5px; }
+.bank-row-actions { display: flex; align-items: center; gap: 4px; flex: 0 0 auto; }
+.bank-row-actions .toggle { margin-left: 2px; }
+.bank-draft-panel { margin-top: 12px; border: 1px solid #d5e6de; background: #f7faf8; border-radius: 11px; padding: 14px 15px; display: grid; gap: 12px; }
+.bank-draft-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.bank-draft-head b { display: block; color: #2e5b4c; font-size: 12.5px; font-weight: 700; }
+.bank-draft-head small { display: block; color: #6e756a; font-size: 11px; margin-top: 4px; line-height: 1.55; }
+.bank-preset-row { display: grid; gap: 7px; }
+.bank-preset-row > small { color: #7a8276; font-size: 10.5px; font-weight: 500; }
+.bank-preset-chips { display: flex; gap: 5px; flex-wrap: wrap; }
+.bank-preset-chip { border: 1px solid #d8e6df; background: #fff; color: #4a6e5f; font-size: 10.5px; font-weight: 500; font-family: inherit; padding: 4px 9px; border-radius: 16px; cursor: pointer; transition: .14s ease; }
+.bank-preset-chip:hover { border-color: #a8c5b6; background: #f1f8f4; color: #2e5b4c; }
+.bank-preset-chip.active { border-color: #4a8d77; background: #e8f3ee; color: #2e6b54; font-weight: 600; }
+.bank-draft-panel .form-grid { padding-top: 0; }
+.bank-draft-panel .toggle-row { padding: 11px 0 4px; border-bottom: 0; }
+.bank-draft-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 4px; border-top: 1px dashed #d5e6de; padding-top: 11px; }
+.bank-add-row { display: flex; justify-content: center; padding-top: 4px; }
+/* ใบเสร็จ: บล็อกบัญชีธนาคาร (เฉพาะบิล QR) */
+.receipt-bank-wrap { margin-top: 9px; }
+.receipt-bank-section { background: #f7f9f7; border: 1px dashed #c8d3c5; border-radius: 4px; padding: 8px 9px; }
+.receipt-bank-head { display: flex; align-items: center; gap: 4px; color: #333333; font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .3px; margin-bottom: 5px; }
+.receipt-bank-head svg { color: #555555; }
+.receipt-bank-line { display: grid; gap: 1px; padding: 4px 0; border-top: 1px dotted #d8d8d3; }
+.receipt-bank-line:first-of-type { border-top: 0; padding-top: 0; }
+.receipt-bank-line b { color: #111111; font-size: 10.5px; font-weight: 700; }
+.receipt-bank-line small { color: #444444; font-size: 9.5px; font-weight: 500; font-family: "IBM Plex Mono", monospace; }
+.receipt-bank-line small.muted { color: #6a6a64; font-family: "Sarabun", sans-serif; }
+@media print {
+  .receipt-bank-section { background: none; border: 0; padding: 0; }
+  .receipt-bank-line { border-top: 1px dotted #aaa; }
+}
 .slip-uploader-row { display: flex; gap: 8px; align-items: stretch; }
 .slip-uploader-row .upload-drop { flex: 1; min-width: 0; }
 .slip-camera-btn { flex: 0 0 auto; }
@@ -4946,6 +5019,9 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
   .pay-qr-caption b { justify-content: center; }
   .slip-uploader-row { flex-direction: column; }
   .pay-slip-actions > button, .pay-slip-actions > .pay-slip-file { flex: 1; }
+  .bank-row { flex-wrap: wrap; }
+  .bank-row-actions { width: 100%; justify-content: flex-end; }
+  .pay-bank-head small { display: none; }
 }
 
 /* ROUND 63 — ปุ่มดูหลักฐานในตารางบิล + ประวัติธุรกรรมสมาชิก */

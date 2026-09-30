@@ -28,6 +28,7 @@ import {
   ArrowDownToLine,
   ArrowRight,
   ArrowUpFromLine,
+  Bank,
   Bell,
   CalendarClock,
   CalendarDays,
@@ -93,7 +94,7 @@ import {
   useEditionStatus,
 } from "@/components/EditionUi";
 import type { Role, View } from "../pageData";
-import type { InstallOverview } from "../../../../server/sqliteStore";
+import type { BankAccount, InstallOverview } from "../../../../server/sqliteStore";
 import {
   canAccessView,
   formatMemberNumber,
@@ -108,6 +109,7 @@ import {
 import { HelpDisclosure } from "@/components/HelpDisclosure";
 import { isValidPromptPayId } from "@/promptpay";
 import { PrintPreviewModal } from "@/components/PrintPreviewModal";
+import { BankAccountsPanel } from "@/components/BankAccountsPanel";
 import { trpc } from "@/lib/trpc";
 // V2-B — SettingsTab shared between Settings (this file) and AppShell (layouts/).
 import { SettingsTab } from "../shared";
@@ -174,6 +176,8 @@ type SettingsForm = {
   goliveChecks: string;
   /** ROUND 63 (user) — บัญชีพร้อมเพย์ร้าน: เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก */
   promptpayId: string;
+  /** FIX-5 (user) — บัญชีธนาคารร้าน (รับเงินโอน) หลายบัญชีได้ · แสดงที่หน้า POS + ใบเสร็จ */
+  bankAccounts: BankAccount[];
   /** ROUND 68 (user) — เบอร์โทรศูนย์ช่วยเหลือ แสดงท้ายหน้าจอ (footer) · ว่าง = ไม่แสดง */
   helpPhone: string;
 };
@@ -205,6 +209,7 @@ const SETTINGS_FIELD_LABELS: [keyof SettingsForm, string][] = [
   ["dailyCutOffMode", "โหมดตัดยอดรายวัน"],
   ["dailyCutOffTime", "เวลาตัดยอดรายวัน"],
   ["promptpayId", "บัญชีพร้อมเพย์ร้าน"],
+  ["bankAccounts", "บัญชีธนาคารร้าน"],
   ["helpPhone", "เบอร์ศูนย์ช่วยเหลือ"],
   ["devAccess", "การเข้าใช้งานสำหรับผู้พัฒนา"],
   ["backupAutoEnabled", "สำรองข้อมูลอัตโนมัติ"],
@@ -2567,6 +2572,12 @@ export function Settings({
                   </span>
                 </div>
               </section>
+              <BankAccountsPanel
+                value={form?.bankAccounts ?? []}
+                onChange={next => updateForm({ bankAccounts: next })}
+                disabled={!form}
+                storeName={form?.storeName}
+              />
             </div>
           )}
           {tab === "posmenu" && (

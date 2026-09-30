@@ -101,6 +101,7 @@ export { X as XIcon } from "@phosphor-icons/react";
 export { Lightning as Zap } from "@phosphor-icons/react";
 export { LightningSlash as ZapOff } from "@phosphor-icons/react";
 export { ChartBar as BarChart3 } from "@phosphor-icons/react";
+export { Bank } from "@phosphor-icons/react";
 export { Receipt as ReceiptText } from "@phosphor-icons/react";
 export { Clock as CalendarIcon } from "@phosphor-icons/react";
 export { Clock } from "@phosphor-icons/react";

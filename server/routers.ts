@@ -530,6 +530,27 @@ const settingsPatchInput = z
     goliveChecks: z.string().max(4000).optional(),
     // ROUND 63 (user) — บัญชีพร้อมเพย์ร้าน: เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก
     promptpayId: z.string().max(20).optional(),
+    // FIX-5 (user) — บัญชีธนาคารร้าน (รับเงินโอน): หลายบัญชีได้ · ผู้บริหารเพิ่ม/ลบ/แก้ที่ ตั้งค่า → การชำระเงิน
+    // รูปแบบเดียวกับ BankAccount ใน server/sqliteStore.ts (id/bankCode/bankName/accountNumber/accountName/branch/active/note)
+    bankAccounts: z
+      .array(
+        z.object({
+          id: z.string().min(1).max(80),
+          bankCode: z.string().min(1).max(20),
+          bankName: z.string().min(1).max(80),
+          accountNumber: z
+            .string()
+            .min(7)
+            .max(20)
+            .regex(/^[0-9\- ]+$/, "เลขที่บัญชีเป็นตัวเลขเท่านั้น (ใส่ - หรือช่องว่างคั่นได้)"),
+          accountName: z.string().min(1).max(120),
+          branch: z.string().max(80).optional(),
+          active: z.boolean(),
+          note: z.string().max(160).optional(),
+        }),
+      )
+      .max(20, "บัญชีธนาคารเกิน 20 บัญชี — เกินความจำเป็น")
+      .optional(),
     // ROUND 68 (user) — เบอร์โทรศูนย์ช่วยเหลือ แสดงท้ายหน้าจอ (footer) · "" = ไม่แสดง
     helpPhone: z.string().max(32).optional(),
   })
