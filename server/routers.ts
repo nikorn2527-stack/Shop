@@ -537,6 +537,9 @@ const settingsPatchInput = z
     // FIX-8 (user) — พรีวิวก่อนพิมพ์ (ใบเสร็จ/บัตร/รายงาน): true = เปิด preview ก่อน (default)
     // false = กดปุ่มพิมพ์แล้ว window.print() ทันที (เร็วกว่า แต่ไม่มีโอกาสตรวจก่อน)
     printPreviewBefore: z.boolean().optional(),
+    // FIX-9 (user) — ชื่อเครื่องพิมพ์เริ่มต้น (เช่น "EPSON TM-T82") — แสดงเป็น hint ตอนพิมพ์
+    // browser ยังถาม printer เองใน dialog (security) — แค่จดชื่อไว้ให้ผู้ใช้จำได้
+    defaultPrinterName: z.string().max(80).optional(),
     // ROUND 56 (user) — เช็คลิสต์วันขึ้นระบบ (โซนเครื่องมือติดตั้ง): JSON รหัสรายการที่ติ๊กแล้ว
     goliveChecks: z.string().max(4000).optional(),
     // ROUND 63 (user) — บัญชีพร้อมเพย์ร้าน: เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก

@@ -175,6 +175,8 @@ type SettingsForm = {
   /** FIX-8 (user) — พรีวิวก่อนพิมพ์ (ใบเสร็จ/บัตร/รายงาน): true = เปิด preview ก่อน (default)
    *  false = กดปุ่มพิมพ์แล้ว window.print() ทันที (เร็ว แต่ไม่มีโอกาสตรวจก่อน) */
   printPreviewBefore: boolean;
+  /** FIX-9 (user) — ชื่อเครื่องพิมพ์เริ่มต้นที่บันทึกไว้ (เช่น "EPSON TM-T82") — แสดงเป็น hint ตอนพิมพ์ */
+  defaultPrinterName: string;
   /** ROUND 56 (user) — เช็คลิสต์วันขึ้นระบบ (โซนเครื่องมือติดตั้ง): JSON รหัสรายการที่ติ๊กแล้ว */
   goliveChecks: string;
   /** ROUND 63 (user) — บัญชีพร้อมเพย์ร้าน: เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก */
@@ -220,6 +222,7 @@ const SETTINGS_FIELD_LABELS: [keyof SettingsForm, string][] = [
   ["backupKeepCount", "จำนวนไฟล์สำรองที่เก็บ"],
   ["receiptPaperWidth", "ความกว้างกระดาษสลิป"],
   ["printPreviewBefore", "พรีวิวก่อนพิมพ์"],
+  ["defaultPrinterName", "ชื่อเครื่องพิมพ์เริ่มต้น"],
   ["goliveChecks", "เช็คลิสต์วันขึ้นระบบ"],
 ];
 
@@ -2196,7 +2199,6 @@ export function Settings({
                       {form?.printPreviewBefore
                         ? "เปิดอยู่ — กดปุ่มพิมพ์จะเปิดหน้าต่างพรีวิวก่อน (ปลอดภัย ได้ตรวจทุกครั้ง)"
                         : "ปิดอยู่ — กดปุ่มพิมพ์แล้ว browser สั่งพิมพ์ทันที (เร็วกว่า ใช้ Enter ได้ แต่ไม่มีโอกาสตรวจทวน)"}
-                      {" · เครื่องพิมพ์ที่ใช้ — browser จะถามในหน้าต่างพิมพ์ทุกครั้ง (ผู้ใช้เลือกเองในเครื่องนั้น)"}
                     </small>
                   </div>
                   <button
@@ -2211,6 +2213,32 @@ export function Settings({
                   >
                     <span />
                   </button>
+                </div>
+                {/* FIX-9 (user) — บันทึกชื่อเครื่องพิมพ์เริ่มต้น (เช่น EPSON TM-T82) — แสดงเป็น hint ตอนพิมพ์
+                    browser ยังถาม printer เองใน dialog (security restriction) แต่ผู้ใช้จำชื่อเครื่องที่ต้องการเลือกได้ */}
+                <div className="form-grid">
+                  <label className="wide">
+                    ชื่อเครื่องพิมพ์เริ่มต้น (จดไว้ให้ผู้ใช้จำได้ตอนเลือกใน dialog)
+                    <input
+                      type="text"
+                      value={form?.defaultPrinterName ?? ""}
+                      onChange={event =>
+                        updateForm({ defaultPrinterName: event.target.value })
+                      }
+                      placeholder="เช่น EPSON TM-T82 หรือ HP LaserJet Pro M404"
+                      disabled={!form}
+                      maxLength={80}
+                      title="บันทึกชื่อเครื่องพิมพ์ที่ร้านใช้ — ตอนกดปุ่มพิมพ์ ระบบจะแสดงชื่อนี้เป็น hint ให้ผู้ใช้เลือกเครื่องที่ตรงกันในหน้าต่างพิมพ์ของ browser"
+                    />
+                  </label>
+                </div>
+                <div className="settings-inline-note">
+                  <Printer size={16} />
+                  <span>
+                    browser ไม่อนุญาตให้เว็บเลือกเครื่องพิมพ์เองโดยตรง (เพื่อความปลอดภัย) —
+                    ตอนกดปุ่มพิมพ์ browser จะเปิดหน้าต่างพิมพ์ขึ้นมา ให้ผู้ใช้เลือกเครื่องเอง ·
+                    ใส่ชื่อเครื่องพิมพ์ไว้ด้านบนเพื่อจำได้ตอนเลือก (ระบบจะแสดงชื่อนี้ใน tooltip ของปุ่มพิมพ์ด้วย)
+                  </span>
                 </div>
                 <div className="printer-test-row">
                   <div>

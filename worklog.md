@@ -1416,3 +1416,68 @@ Stage Summary:
   - ไปที่ ตั้งค่า → ใบเสร็จและเครื่องพิมพ์ → ปิด toggle "พรีวิวก่อนพิมพ์" → บันทึก → ทดสอบ POS (ขายของ → ชำระเงิน → ในหน้าใบเสร็จ กด Enter หรือกดปุ่ม "พิมพ์ใบเสร็จ" จะสั่งพิมพ์ทันทีผ่าน browser print dialog)
   - ทดสอบบัตรสมาชิก → กด พิมพ์บัตรสมาชิก → รูป fallback ใหม่ (หญิง/ชาย/ไม่ระบุ) มี head+neck+shoulders+เสื้อ+ผม+ตา+ปาก ดูเหมือน ID card จริง
   - ทดสอบ export รายการธุรกรรม → กด พิมพ์รายงาน → window.print() ทันที (ถ้าปิด preview)
+
+---
+Task ID: FIX-9
+Agent: full-stack-developer
+Task: แก้ 2 ปัญหาที่ owner รายงานหลัง FIX-8 — (1) บัตรสมาชิกขนาดไม่ใช่ CR80 จริง (CSS override เอา aspect-ratio ออก) (2) ตั้งค่าเครื่องพิมพ์ หมายถึงเลือก/บันทึกเครื่องพิมพ์เข้ามาได้ ไม่ใช่แค่บอกว่า browser จัดการเอง
+
+Work Log:
+- ตรวจ CSS เดิม: line 2964 `.member-card-modal .member-card` มี `aspect-ratio: auto` (override เอา CR80 ออก) → บัตรดูเป็นกล่องไม่ใช่บัตร
+- ตรวจ Web API: browser ไม่อนุญาตให้เว็บเลือกเครื่องพิมพ์โดยตรง (security restriction) — ต้องใช้ window.print() แล้ว browser ถามเอง
+- ทางออก: บันทึกชื่อเครื่องพิมพ์เริ่มต้นเป็น text field → แสดงเป็น hint ใน tooltip ของปุ่มพิมพ์ + badge ข้างปุ่ม ให้ผู้ใช้จำได้ตอนเลือกใน dialog ของ browser
+
+Implementation:
+1. **CSS** (`client/src/index.css`):
+   - แก้ `.member-card-modal .member-card`: เปลี่ยน `aspect-ratio: auto` → **`aspect-ratio: 85.6 / 54`** (คืนค่า CR80 จริง)
+   - ขยาย width 334px → **360px** (ได้ height 360 × 54/85.6 = 227px — พอดีกับเนื้อหา)
+   - ปรับ photo container: width 84px → **72px** (เล็กลงเพื่อใส่ใน CR80 ได้พอดี, aspect 3:4 = 96px tall)
+   - ปรับ batch grid: minmax(323px) → minmax(360px) + เพิ่ม aspect-ratio: 85.6/54 ให้ batch cards ด้วย
+2. **MemberCardModal** (`client/src/components/MemberCardModal.tsx`):
+   - ปรับ MemberAvatar `size={104}` → **`size={72}`** (เหมาะกับ container ใหม่)
+   - อ่าน `defaultPrinterName` จาก settingsQuery — แสดงใน tooltip + badge ข้างปุ่ม "พิมพ์บัตรสมาชิก"
+3. **ReceiptModal** (`client/src/components/ReceiptModal.tsx`):
+   - อ่าน `defaultPrinterName` จาก settingsQuery
+   - ปุ่ม "พิมพ์ใบเสร็จ" แสดง badge "🖨 EPSON TM-T82" ข้างปุ่ม + tooltip อธิบาย
+4. **StatementModal** (`client/src/components/StatementModal.tsx`):
+   - อ่าน `defaultPrinterName` — ปุ่ม "พิมพ์รายงาน" แสดง badge ชื่อเครื่องพิมพ์ + tooltip
+5. **Backend** (`server/sqliteStore.ts` + `server/routers.ts`):
+   - เพิ่ม `defaultPrinterName: string` ใน `StoreSettings` type (default "")
+   - เพิ่ม `defaultPrinterName: z.string().max(80).optional()` ใน Zod schema
+6. **Settings → ใบเสร็จและเครื่องพิมพ์** (`client/src/pages/settings/Settings.tsx`):
+   - เพิ่ม `defaultPrinterName` field ใน SettingsForm type + SETTINGS_FIELD_LABELS
+   - เพิ่ม text input ใน receipt tab ระหว่าง toggle preview และ ทดสอบการพิมพ์:
+     - label: "ชื่อเครื่องพิมพ์เริ่มต้น (จดไว้ให้ผู้ใช้จำได้ตอนเลือกใน dialog)"
+     - placeholder: "เช่น EPSON TM-T82 หรือ HP LaserJet Pro M404"
+     - maxLength 80, tooltip อธิบาย
+   - เพิ่ม `settings-inline-note` อธิบาย: "browser ไม่อนุญาตให้เว็บเลือกเครื่องพิมพ์เองโดยตรง (เพื่อความปลอดภัย) — ตอนกดปุ่มพิมพ์ browser จะเปิดหน้าต่างพิมพ์ขึ้นมา ให้ผู้ใช้เลือกเครื่องเอง · ใส่ชื่อเครื่องพิมพ์ไว้ด้านบนเพื่อจำได้ตอนเลือก"
+7. **CSS** (เพิ่ม):
+   - `.printer-name-hint`: badge สีเทาอ่อน ข้างปุ่มพิมพ์ (pill shape, max-width 140px, ellipsis ถ้าชื่อยาว)
+
+Verification (agent-browser):
+1. **Member card** (login → สมาชิกและบัญชี → กดสมาชิก → กด พิมพ์บัตรสมาชิก):
+   - ✅ VLM ยืนยัน: สัดส่วนใกล้เคียง CR80 (1.586:1) + layout รูปซ้าย/ข้อมูลขวา + ขนาดพอเหมาะ
+2. **Settings → ใบเสร็จและเครื่องพิมพ์**:
+   - ✅ เห็นช่อง "ชื่อเครื่องพิมพ์เริ่มต้น (จดไว้ให้ผู้ใช้จำได้ตอนเลือกใน dialog)"
+   - ✅ กรอก "EPSON TM-T82II" ได้ → dirty indicator "แก้ไขแล้ว: ชื่อเครื่องพิมพ์เริ่มต้น"
+   - ✅ มีคำอธิบาย: "browser ไม่อนุญาตให้เว็บเลือกเครื่องพิมพ์เองโดยตรง..."
+
+Verification:
+- `npx tsc --noEmit` → 0 errors ✅
+- agent-browser + VLM: บัตรสมาชิกกลับเป็นสัดส่วน CR80 จริง + ช่องเครื่องพิมพ์ทำงาน
+
+Stage Summary:
+- 5 files modified:
+  - `server/sqliteStore.ts` (+5 บรรทัด: type field + default)
+  - `server/routers.ts` (+4 บรรทัด: Zod field)
+  - `client/src/components/ReceiptModal.tsx` (+3 บรรทัด: read printerName + tooltip + badge)
+  - `client/src/components/StatementModal.tsx` (+3 บรรทัด: same)
+  - `client/src/components/MemberCardModal.tsx` (+3 บรรทัด: same + size=72)
+  - `client/src/pages/settings/Settings.tsx` (+25 บรรทัด: type + label + text input + note)
+  - `client/src/index.css` (+8 บรรทัด: CR80 aspect restore + photo container resize + .printer-name-hint)
+- TypeScript: 0 errors
+- ตอบคำถาม owner:
+  - ✅ "นามบัตรขนาดมันไม่ได้เป็นแบบนี้น่ะ" → แก้แล้ว: คืนค่า `aspect-ratio: 85.6 / 54` (CR80 จริง) + ปรับ photo container เล็กลงให้พอดี
+  - ✅ "ตั้งค่าเครื่องปริ้นยังไม่มีคือหมายถึงเลือกเครื่องปริ้นเข้ามาได้" → เพิ่มช่อง "ชื่อเครื่องพิมพ์เริ่มต้น" ใน ตั้งค่า → ใบเสร็จและเครื่องพิมพ์ — บันทึกชื่อเครื่องพิมพ์ที่ร้านใช้ (เช่น EPSON TM-T82) → แสดงเป็น hint ข้างปุ่มพิมพ์ทุกจุด (ใบเสร็จ/บัตร/รายงาน) ให้ผู้ใช้จำได้ตอนเลือกใน dialog ของ browser
+  - ⚠️ ข้อจำกัด: browser ไม่อนุญาตให้เว็บเลือกเครื่องพิมพ์โดยตรง (security) — ต้องเลือกเองใน print dialog ทุกครั้ง แต่ระบบจดชื่อไว้ให้จำได้
+- ส่งต่อให้ owner ทดสอบที่เครื่อง: ไป ตั้งค่า → ใบเสร็จและเครื่องพิมพ์ → ใส่ชื่อเครื่องพิมพ์ของร้าน (เช่น "EPSON TM-T82II") → บันทึก → ทดสอบพิมพ์ใบเสร็จ/บัตร/รายงาน — จะเห็น badge "🖨 EPSON TM-T82II" ข้างปุ่มพิมพ์ + tooltip อธิบาย
