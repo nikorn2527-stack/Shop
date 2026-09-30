@@ -2994,11 +2994,11 @@ th { font-weight: 600; }
 .member-card-modal .member-card { width: 360px; max-width: 100%; aspect-ratio: 85.6 / 54; min-height: auto; padding: 12px 14px 10px; }
 .member-card-modal .member-card-body { display: flex; flex-direction: row; align-items: stretch; gap: 10px; flex: 1; min-height: 0; }
 .member-card-modal .member-card-identity { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 1px; }
-/* FIX-9 — ปรับ photo container ให้พอดีกับ CR80: 84px wide × 112px tall (aspect 3:4) ใส่ใน body ได้พอดี
-   FIX-11 (user) — ขยายจาก 72px → 84px เพื่อให้ SVG illustration ดูเด่นขึ้น เห็นใบหน้าชัดขึ้น
-   FIX-12 (user) — เพิ่ม overflow:hidden + max-height ป้องกันรูปซ้อนทับ barcode/QR ด้านล่าง */
-.member-card-photo { flex: 0 0 auto; padding: 3px; background: #fff; border: 1px solid #d3e5dd; border-radius: 7px; box-shadow: 0 2px 6px rgba(40,70,58,.14); width: 78px; max-height: 100%; overflow: hidden; }
-.member-card-photo .member-photo, .member-card-photo .member-photo-fallback-photo { width: 100% !important; height: 100% !important; aspect-ratio: auto !important; border-radius: 4px !important; display: block; object-fit: cover; object-position: center top; }
+/* FIX-12 (user) — ป้องกันรูปซ้อนทับ barcode/QR ด้านล่าง
+   ใช้ aspect-ratio: 3/4 ให้รูปมีขนาดตามสัดส่วนอัตโนมัติ (78px wide → 104px tall)
+   + overflow:hidden ที่ body ป้องกันล้น */
+.member-card-photo { flex: 0 0 auto; padding: 3px; background: #fff; border: 1px solid #d3e5dd; border-radius: 7px; box-shadow: 0 2px 6px rgba(40,70,58,.14); width: 78px; }
+.member-card-photo .member-photo, .member-card-photo .member-photo-fallback-photo { width: 100% !important; height: auto !important; aspect-ratio: 3 / 4; border-radius: 4px !important; display: block; object-fit: cover; object-position: center top; }
 .member-card-photo .member-photo.id-portrait, .member-card-photo .member-photo-fallback-photo.id-portrait { object-fit: cover; object-position: center top; }
 .member-card-codes { display: grid; grid-template-columns: 1.55fr 1fr; gap: 6px; margin-top: 7px; }
 .member-card-barcode, .member-card-qr { background: #fff; border: 1px solid #d8e6df; border-radius: 8px; padding: 6px 5px 4px; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; }
