@@ -1481,3 +1481,54 @@ Stage Summary:
   - ✅ "ตั้งค่าเครื่องปริ้นยังไม่มีคือหมายถึงเลือกเครื่องปริ้นเข้ามาได้" → เพิ่มช่อง "ชื่อเครื่องพิมพ์เริ่มต้น" ใน ตั้งค่า → ใบเสร็จและเครื่องพิมพ์ — บันทึกชื่อเครื่องพิมพ์ที่ร้านใช้ (เช่น EPSON TM-T82) → แสดงเป็น hint ข้างปุ่มพิมพ์ทุกจุด (ใบเสร็จ/บัตร/รายงาน) ให้ผู้ใช้จำได้ตอนเลือกใน dialog ของ browser
   - ⚠️ ข้อจำกัด: browser ไม่อนุญาตให้เว็บเลือกเครื่องพิมพ์โดยตรง (security) — ต้องเลือกเองใน print dialog ทุกครั้ง แต่ระบบจดชื่อไว้ให้จำได้
 - ส่งต่อให้ owner ทดสอบที่เครื่อง: ไป ตั้งค่า → ใบเสร็จและเครื่องพิมพ์ → ใส่ชื่อเครื่องพิมพ์ของร้าน (เช่น "EPSON TM-T82II") → บันทึก → ทดสอบพิมพ์ใบเสร็จ/บัตร/รายงาน — จะเห็น badge "🖨 EPSON TM-T82II" ข้างปุ่มพิมพ์ + tooltip อธิบาย
+
+---
+Task ID: FIX-10
+Agent: full-stack-developer
+Task: แก้ปัญหา owner "เครื่องปริ้นมันต้องเข้าไปเลือกได้ด้วยไม่ใช่แค่เพิ่มชื่อ" — เปลี่ยน text input เป็น dropdown เลือกเครื่องพิมพ์จากรายการ
+
+Work Log:
+- ตรวจ Web API: `navigator.printing.printers` (Chrome ≥ 100 with enterprise policy เท่านั้น) — ส่วนใหญ่ browser ไม่มี หรือผู้ใช้ไม่อนุญาต → ต้องมี fallback
+- ทางออก: dropdown รายการเครื่องพิมพ์ที่นิยมในไทย (3 หมวด: thermal POS / เลเซอร์ / อิงค์เจ็ท) + ตัวเลือก "อื่นๆ (พิมพ์ชื่อเอง)"
+- ลอง enumerate เครื่องพิมพ์จริงในระบบก่อน (ถ้า browser อนุญาต) → ถ้าได้ ใช้รายการจริงแทน fallback
+
+Implementation:
+1. **PrinterPicker component** (`client/src/components/PrinterPicker.tsx`, NEW ~150 บรรทัด):
+   - ลอง `navigator.printing.printers` API (Chrome enterprise) → enumerate เครื่องพิมพ์จริงในเครื่อง
+   - ถ้า browser ไม่อนุญาต → fallback รายการเครื่องพิมพ์นิยมในไทย (3 หมวด 33 รุ่น):
+     - **thermal POS** (15): EPSON TM-T82II/T82/T88VI/T88V/T20III/T20II/U220, Star TSP100III/TSP143, Bixolon SRP-350III/SRP-380, Citizen CT-S310R, Xprinter XP-58II/XP-80, Zonerich AB-58K
+     - **เลเซอร์** (10): HP LaserJet Pro M404/M15/1020/P1102, Brother HL-L2321D/L2365DW, Canon LBP6030/LBP2900, Ricoh SP 230SF, Samsung Xpress M2020
+     - **อิงค์เจ็ท** (8): HP DeskJet 2332/Plus Ink Advantage 4120, Canon PIXMA E3370/G2010, Epson EcoTank L3210/L3110/L360, Brother DCP-T310
+   - ตัวเลือก "อื่นๆ (พิมพ์ชื่อเอง)" → เปิด text input สำหรับพิมพ์ชื่อเอง
+   - ปุ่ม "ค้นหาในเครื่อง" → ลอง `navigator.printing.printers` อีกครั้ง (ถ้า browser เปิด flag ภายหลัง)
+   - status bar อธิบาย: พบ N เครื่องพิมพ์ / browser ไม่อนุญาต → ใช้รายการนิยม
+2. **Settings → ใบเสร็จและเครื่องพิมพ์** (`client/src/pages/settings/Settings.tsx`):
+   - ลบ text input เดิมออก
+   - ใส่ PrinterPicker component แทน + heading "เลือกเครื่องพิมพ์เริ่มต้น"
+3. **CSS** (`client/src/index.css`):
+   - `.printer-picker-block` (container)
+   - `.printer-picker-select` (dropdown with custom arrow, Sarabun font, optgroup styling)
+   - `.printer-picker-custom-input` (text input เมื่อเลือก "อื่นๆ")
+   - `.printer-picker-status` (status bar 3 states: ok/fallback/default)
+   - `.printer-detect-btn` (compact outline button)
+
+Verification (agent-browser):
+- ✅ Login → ตั้งค่า → ใบเสร็จและเครื่องพิมพ์ → เห็น dropdown "เลือกเครื่องพิมพ์"
+- ✅ ค่า default ที่ตั้งไว้ก่อนหน้า ("EPSON TM-T82II") ถูกเลือกใน dropdown อัตโนมัติ
+- ✅ คลิก dropdown → แสดง optgroup 3 หมวด + ตัวเลือก "อื่นๆ (พิมพ์ชื่อเอง)" ครบ
+- ✅ รายการ: EPSON TM-T82II/T82/T88VI/T88V/T20III/T20II/U220, Star TSP100III/TSP143, Bixolon SRP-350III/SRP-380, HP LaserJet Pro M404/M15/1020/P1102, HP DeskJet 2332/Plus Ink Advantage 4120, "อื่นๆ"
+
+Verification:
+- `npx tsc --noEmit` → 0 errors ✅
+- agent-browser: dropdown แสดงครบทุกหมวด + ค่าที่บันทึกไว้แสดงถูกต้อง
+
+Stage Summary:
+- 3 files modified (1 new + 2 modified):
+  - `client/src/components/PrinterPicker.tsx` (NEW, ~150 บรรทัด: dropdown + API detect + fallback list + custom input)
+  - `client/src/pages/settings/Settings.tsx` (+5 บรรทัด: import + replace text input with PrinterPicker)
+  - `client/src/index.css` (+20 บรรทัด: printer-picker styles + optgroup + status states)
+- TypeScript: 0 errors
+- ตอบคำถาม owner:
+  - ✅ "เครื่องปริ้นมันต้องเข้าไปเลือกได้ด้วย" → เปลี่ยนจาก text input เป็น dropdown เลือกจากรายการ + ลอง enumerate จริงในระบบ (ถ้า browser อนุญาต) + fallback รายการนิยม 33 รุ่น ครบทุกหมวด
+  - ⚠️ ข้อจำกัด: browser (security) ห้ามเว็บเลือกเครื่องพิมพ์โดยตรง — ตอนกดปุ่มพิมพ์ browser ยังเปิด dialog ให้เลือกเองอยู่ดี แต่ dropdown ทำให้ผู้ใช้เลือกชื่อเครื่องจากรายการเป็น hint ได้สะดวก
+- ส่งต่อให้ owner ทดสอบที่เครื่อง: ไป ตั้งค่า → ใบเสร็จและเครื่องพิมพ์ → คลิก dropdown "เลือกเครื่องพิมพ์เริ่มต้น" → เลือกรุ่นของร้าน → บันทึก → badge "🖨 <รุ่น>" จะแสดงข้างปุ่มพิมพ์ทุกจุด

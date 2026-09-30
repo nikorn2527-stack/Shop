@@ -110,6 +110,7 @@ import { HelpDisclosure } from "@/components/HelpDisclosure";
 import { isValidPromptPayId } from "@/promptpay";
 import { PrintPreviewModal } from "@/components/PrintPreviewModal";
 import { BankAccountsPanel } from "@/components/BankAccountsPanel";
+import { PrinterPicker } from "@/components/PrinterPicker";
 import { trpc } from "@/lib/trpc";
 // V2-B — SettingsTab shared between Settings (this file) and AppShell (layouts/).
 import { SettingsTab } from "../shared";
@@ -2214,31 +2215,23 @@ export function Settings({
                     <span />
                   </button>
                 </div>
-                {/* FIX-9 (user) — บันทึกชื่อเครื่องพิมพ์เริ่มต้น (เช่น EPSON TM-T82) — แสดงเป็น hint ตอนพิมพ์
-                    browser ยังถาม printer เองใน dialog (security restriction) แต่ผู้ใช้จำชื่อเครื่องที่ต้องการเลือกได้ */}
-                <div className="form-grid">
-                  <label className="wide">
-                    ชื่อเครื่องพิมพ์เริ่มต้น (จดไว้ให้ผู้ใช้จำได้ตอนเลือกใน dialog)
-                    <input
-                      type="text"
-                      value={form?.defaultPrinterName ?? ""}
-                      onChange={event =>
-                        updateForm({ defaultPrinterName: event.target.value })
-                      }
-                      placeholder="เช่น EPSON TM-T82 หรือ HP LaserJet Pro M404"
-                      disabled={!form}
-                      maxLength={80}
-                      title="บันทึกชื่อเครื่องพิมพ์ที่ร้านใช้ — ตอนกดปุ่มพิมพ์ ระบบจะแสดงชื่อนี้เป็น hint ให้ผู้ใช้เลือกเครื่องที่ตรงกันในหน้าต่างพิมพ์ของ browser"
-                    />
-                  </label>
-                </div>
-                <div className="settings-inline-note">
-                  <Printer size={16} />
-                  <span>
-                    browser ไม่อนุญาตให้เว็บเลือกเครื่องพิมพ์เองโดยตรง (เพื่อความปลอดภัย) —
-                    ตอนกดปุ่มพิมพ์ browser จะเปิดหน้าต่างพิมพ์ขึ้นมา ให้ผู้ใช้เลือกเครื่องเอง ·
-                    ใส่ชื่อเครื่องพิมพ์ไว้ด้านบนเพื่อจำได้ตอนเลือก (ระบบจะแสดงชื่อนี้ใน tooltip ของปุ่มพิมพ์ด้วย)
-                  </span>
+                {/* FIX-10 (user) — PrinterPicker dropdown: เลือกเครื่องพิมพ์จากรายการ
+                    ลอง enumerate เครื่องพิมพ์จริงในระบบก่อน (navigator.printing API)
+                    ถ้า browser ไม่อนุญาต → fallback รายการเครื่องพิมพ์นิยมในไทย
+                    + ตัวเลือก "อื่นๆ" สำหรับพิมพ์ชื่อเอง */}
+                <div className="printer-picker-block">
+                  <div className="printer-picker-head">
+                    <b>เลือกเครื่องพิมพ์เริ่มต้น</b>
+                    <small>
+                      เลือกจากรายการด้านล่าง — ระบบจะจดชื่อไว้แสดงเป็น hint ข้างปุ่มพิมพ์ทุกจุด
+                      (ใบเสร็จ · บัตร · รายงาน) ให้ผู้ใช้จำได้ตอนเลือกใน dialog ของ browser
+                    </small>
+                  </div>
+                  <PrinterPicker
+                    value={form?.defaultPrinterName ?? ""}
+                    onChange={next => updateForm({ defaultPrinterName: next })}
+                    disabled={!form}
+                  />
                 </div>
                 <div className="printer-test-row">
                   <div>
