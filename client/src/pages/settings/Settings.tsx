@@ -172,6 +172,9 @@ type SettingsForm = {
   backupKeepCount: number;
   /** ROUND 42 (ข้อ 4) — ความกว้างกระดาษสลิป: "58" | "72" | "80" */
   receiptPaperWidth: "58" | "72" | "80";
+  /** FIX-8 (user) — พรีวิวก่อนพิมพ์ (ใบเสร็จ/บัตร/รายงาน): true = เปิด preview ก่อน (default)
+   *  false = กดปุ่มพิมพ์แล้ว window.print() ทันที (เร็ว แต่ไม่มีโอกาสตรวจก่อน) */
+  printPreviewBefore: boolean;
   /** ROUND 56 (user) — เช็คลิสต์วันขึ้นระบบ (โซนเครื่องมือติดตั้ง): JSON รหัสรายการที่ติ๊กแล้ว */
   goliveChecks: string;
   /** ROUND 63 (user) — บัญชีพร้อมเพย์ร้าน: เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก */
@@ -216,6 +219,7 @@ const SETTINGS_FIELD_LABELS: [keyof SettingsForm, string][] = [
   ["backupIntervalHours", "รอบสำรองข้อมูลอัตโนมัติ"],
   ["backupKeepCount", "จำนวนไฟล์สำรองที่เก็บ"],
   ["receiptPaperWidth", "ความกว้างกระดาษสลิป"],
+  ["printPreviewBefore", "พรีวิวก่อนพิมพ์"],
   ["goliveChecks", "เช็คลิสต์วันขึ้นระบบ"],
 ];
 
@@ -2183,6 +2187,30 @@ export function Settings({
                       </button>
                     ))}
                   </div>
+                </div>
+                {/* FIX-8 (user) — toggle พรีวิวก่อนพิมพ์: ปิดเพื่อ window.print() ทันทีเมื่อกดปุ่มพิมพ์ */}
+                <div className="toggle-row">
+                  <div>
+                    <b>พรีวิวก่อนพิมพ์ (ใบเสร็จ · บัตรสมาชิก · รายงาน)</b>
+                    <small>
+                      {form?.printPreviewBefore
+                        ? "เปิดอยู่ — กดปุ่มพิมพ์จะเปิดหน้าต่างพรีวิวก่อน (ปลอดภัย ได้ตรวจทุกครั้ง)"
+                        : "ปิดอยู่ — กดปุ่มพิมพ์แล้ว browser สั่งพิมพ์ทันที (เร็วกว่า ใช้ Enter ได้ แต่ไม่มีโอกาสตรวจทวน)"}
+                      {" · เครื่องพิมพ์ที่ใช้ — browser จะถามในหน้าต่างพิมพ์ทุกครั้ง (ผู้ใช้เลือกเองในเครื่องนั้น)"}
+                    </small>
+                  </div>
+                  <button
+                    type="button"
+                    className={`toggle ${form?.printPreviewBefore ? "on" : ""}`}
+                    onClick={() =>
+                      updateForm({ printPreviewBefore: !form?.printPreviewBefore })
+                    }
+                    disabled={!form}
+                    aria-label="สลับโหมดพรีวิวก่อนพิมพ์"
+                    aria-pressed={!!form?.printPreviewBefore}
+                  >
+                    <span />
+                  </button>
                 </div>
                 <div className="printer-test-row">
                   <div>

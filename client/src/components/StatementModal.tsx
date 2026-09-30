@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { Download, FileText, Printer, X } from "@/lib/icons";
@@ -114,8 +114,31 @@ export function StatementModal({ member, transactions, onClose }: { member: Stat
 
   // ROUND 51 — พิมพ์ผ่านพรีวิวก่อน (เหมือนจุดพิมพ์อื่นทั้งระบบ) — เห็นหน้ากระดาษ A4
   // พร้อมจำนวนแถวก่อนสั่งพิมพ์จริง
+  // FIX-8 (user) — ปิด preview ได้ที่ตั้งค่า → ใบเสร็จและเครื่องพิมพ์ (ลดขั้นตอน กดแล้วพิมพ์เลย)
+  const printPreviewBefore = settingsQuery.data?.printPreviewBefore !== false;
   const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
-  const printStatement = () => setPrintPreviewOpen(true);
+  const printStatement = () => {
+    if (printPreviewBefore) {
+      setPrintPreviewOpen(true);
+    } else {
+      // กดแล้ว window.print() ทันที — browser จะถามเครื่องพิมพ์ใน dialog เอง
+      window.print();
+    }
+  };
+  // FIX-8 — Enter = สั่งพิมพ์ทันที (shortcut เมื่อ modal เปิด)
+  useEffect(() => {
+    const handler = (event: KeyboardEvent) => {
+      if (event.key !== "Enter") return;
+      const target = event.target as HTMLElement;
+      const tag = target?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      event.preventDefault();
+      printStatement();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [printPreviewBefore]);
 
   return <div className="modal-backdrop" onClick={onClose}><div className="statement-modal" onClick={(event) => event.stopPropagation()}>
     <div className="modal-heading">
@@ -187,7 +210,7 @@ export function StatementModal({ member, transactions, onClose }: { member: Stat
     <div className="statement-actions modal-actions">
       <span className="statement-hint"><FileText size={14} /> A4 · {totals.count} รายการ</span>
       <button className="outline-button" disabled={busy} onClick={downloadPdf}><Download size={16} /> {busy ? "กำลังสร้าง PDF..." : "ดาวน์โหลด PDF"}</button>
-      <button className="primary-button" onClick={printStatement}><Printer size={16} /> พิมพ์รายงาน</button>
+      <button className="primary-button" onClick={printStatement} title={printPreviewBefore ? "พรีวิวก่อนพิมพ์ (ปิดได้ที่ ตั้งค่า → ใบเสร็จและเครื่องพิมพ์)" : "พิมพ์ทันที — เลือกเครื่องพิมพ์ใน dialog ของ browser"}><Printer size={16} /> พิมพ์รายงาน{!printPreviewBefore && <kbd className="enter-hint">Enter</kbd>}</button>
     </div>
     {printPreviewOpen && <PrintPreviewModal targetId="member-statement" title="พรีวิวก่อนพิมพ์รายงานสมาชิก" subtitle={`${displayName} · ${member.memberNumber} · ยอดคงเหลือ ${money(member.balance)}`} paper="a4" chips={[`${totals.count} รายการ`, totals.truncated ? `แสดง ${TX_LIMIT} รายการล่าสุด` : "ครบทุกรายการ"]} onClose={() => setPrintPreviewOpen(false)} />}
   </div></div>;

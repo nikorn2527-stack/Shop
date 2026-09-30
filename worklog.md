@@ -1325,3 +1325,94 @@ Stage Summary:
   - ✅ "แอฟรองรับจอสัมพัสไหม" → รองรับ: ปุ่ม POS ใหญ่พอ, inputMode=numeric/decimal บนช่องตัวเลข (ขึ้น number pad บนมือถือ), touch-action: manipulation กัน double-tap zoom, @media (pointer: coarse) ขยาย hit area
   - ✅ "เพิ่มเป็นตัวเลือกเพื่อไว้ขายได้" → เพิ่มแล้ว: ปุ่มลัด 50/100/200/500/1000 + "รับตรงยอด" ใน modal เงินสด (สะสมยอดได้), คำนวณเงินทอนอัตโนมัติ, พิมพ์ "รับเงินมา X / ทอน Y" ท้ายใบเสร็จ
 - ส่งต่อให้ owner ทดสอบที่เครื่อง: ทดสอบ flow เงินสด (กรอกยอด + กดปุ่มลัด + ดูเงินทอน + ดูใบเสร็จ) และ flow QR (ติ๊ก checkbox + ยืนยัน) บนจอสัมผัส
+
+---
+Task ID: FIX-8
+Agent: full-stack-developer
+Task: แก้ 3 ปัญหาที่ owner รายงาน — (1) ใบเสร็จ: ปุ่ม 3 อันกดแล้วเด้งไปอีกหน้า อยากกดแล้วพิมพ์เลย + Enter = พิมพ์ + ตั้งค่าเครื่องพิมพ์ (2.1) บัตรสมาชิก รูปคนดูไม่เหมือนบุคคลจริง + layout ไม่เหมือนบัตรประชาชน (2.2) export รายการธุรกรรม หลายขั้นตอน ลดความซับซ้อน
+
+Work Log:
+- VLM วิเคราะห์ภาพอ้างอิง 2 ภาพ: ใบเสร็จ modal (มี 3 ปุ่ม) + บัตรสมาชิก (รูป fallback เล็กเป็นไอคอน ไม่เหมือนรูปคนจริง)
+- ตรวจ ReceiptModal.tsx: ปุ่ม "พิมพ์ใบเสร็จ" → setPrintPreviewOpen(true) → เปิด PrintPreviewModal ก่อน → user ต้องกดพิมพ์ใน preview อีกที = 2 ขั้นตอน
+- ตรวจ MemberCardModal.tsx + MemberAvatar.tsx: layout body เป็น flex row (รูปซ้าย/ข้อมูลขวา) แต่ MemberAvatar ใช้ SVG silhouette เล็ก (head + หัวไหล่ ไม่มีรายละเอียด) — ดูไม่เหมือนรูปบุคคลจริง
+- ตรวจ StatementModal.tsx: ปุ่ม "พิมพ์รายงาน" → setPrintPreviewOpen(true) → ต้องกดพิมพ์ใน preview = 2 ขั้นตอนเหมือนใบเสร็จ
+
+Implementation:
+1. **Backend** (`server/sqliteStore.ts` + `server/routers.ts`):
+   - เพิ่ม `printPreviewBefore: boolean` ใน `StoreSettings` type (default `true` ปลอดภัย)
+   - เพิ่ม `printPreviewBefore?: boolean` ใน `CheckoutReceipt` type (optional, ส่งกลับ frontend)
+   - เพิ่ม `printPreviewBefore: true` ใน `DEFAULT_STORE_SETTINGS`
+   - เพิ่ม `printPreviewBefore: z.boolean().optional()` ใน `settingsPatchInput` Zod schema
+2. **ReceiptModal** (`client/src/components/ReceiptModal.tsx`):
+   - อ่าน `printPreviewBefore` จาก settingsQuery (default true)
+   - `directPrint()`: ถ้า `printPreviewBefore === true` → เปิด preview (เหมือนเดิม) / ถ้า false → `window.print()` ทันที (browser ถามเครื่องพิมพ์เอง)
+   - `useEffect` ผูก Enter key → trigger directPrint (skip ถ้า focus อยู่ใน input/textarea/select — กัน accidental print ตอนพิมพ์)
+   - ปุ่ม "พิมพ์ใบเสร็จ" แสดง kbd "Enter" badge เมื่อ preview ปิด + tooltip อธิบาย
+3. **StatementModal** (`client/src/components/StatementModal.tsx`):
+   - อ่าน `printPreviewBefore` จาก settingsQuery
+   - ปรับ `printStatement()`: ถ้า preview on → เปิด preview / ถ้า off → `window.print()` ทันที
+   - `useEffect` ผูก Enter → trigger printStatement (skip ถ้า focus ใน input)
+   - ปุ่ม "พิมพ์รายงาน" แสดง kbd "Enter" badge เมื่อ preview ปิด
+4. **MemberCardModal** (`client/src/components/MemberCardModal.tsx`):
+   - อ่าน `printPreviewBefore` จาก settingsQuery (เพิ่ม query ใหม่)
+   - ปรับ `printCardDirect()`: ถ้า preview on → เปิด preview / ถ้า off → `window.print()` ทันที
+   - `useEffect` ผูก Enter → trigger printCardDirect (skip ถ้าเป็น confirmForBill mode — กันกดผิดตอนยืนยันสมาชิก)
+   - ปุ่ม "พิมพ์บัตรสมาชิก" แสดง kbd "Enter" badge เมื่อ preview ปิด
+   - **สำคัญ**: ใน `MemberCardArt` — เปลี่ยน MemberAvatar `size=82` → `size=104` + `rounded={false}` (เปิดใช้ portrait mode ใหม่)
+5. **MemberAvatar** (`client/src/components/MemberAvatar.tsx`) — **redesign fallback**:
+   - เพิ่ม `id-portrait` class เมื่อ `rounded=false` (ใช้ในบัตรสมาชิก)
+   - ใช้ SVG `viewBox="0 0 48 60"` (4:5 portrait) แทน 48x48 square — สัดส่วนเหมือนรูปบัตรประชาชน
+   - เพิ่มความละเอียด: rect พื้นหลังสีอ่อน + path ผมด้านหลัง (หญิง = ผมยาว) + rect คอ + path เสื้อ/ไหล่ (หญิง = ชุดบลาวส์ชมพู / ชาย = เชิ้ตสีน้ำเงิน) + ellipse หัว + path ผมหน้า + circle ตา 2 อัน + path ปากยิ้ม
+   - หญิง/ชาย/ไม่ระบุ มี variant ของตัวเอง (สีผม + สีเสื้อ + สีผิวต่างกัน)
+   - ดูเหมือนรูป ID จริง (มี head + neck + shoulders ครบ) ไม่ใช่ไอคอนเล็กๆ
+6. **Settings → ใบเสร็จและเครื่องพิมพ์** (`client/src/pages/settings/Settings.tsx`):
+   - เพิ่ม `printPreviewBefore` field ใน SettingsForm type + SETTINGS_FIELD_LABELS
+   - เพิ่ม toggle UI ระหว่าง paper-width-block และ printer-test-row:
+     - หัวข้อ: "พรีวิวก่อนพิมพ์ (ใบเสร็จ · บัตรสมาชิก · รายงาน)"
+     - ข้อความอัปเดตตาม state: "เปิดอยู่ — กดปุ่มพิมพ์จะเปิดหน้าต่างพรีวิวก่อน (ปลอดภัย ได้ตรวจทุกครั้ง)" หรือ "ปิดอยู่ — กดปุ่มพิมพ์แล้ว browser สั่งพิมพ์ทันที (เร็วกว่า ใช้ Enter ได้ แต่ไม่มีโอกาสตรวจทวน)"
+     - คำอธิบายเครื่องพิมพ์: "เครื่องพิมพ์ที่ใช้ — browser จะถามในหน้าต่างพิมพ์ทุกครั้ง (ผู้ใช้เลือกเองในเครื่องนั้น)" — อธิบายว่า browser handles printer selection เองผ่าน dialog
+7. **CSS** (`client/src/index.css`):
+   - ปรับ `.member-card-photo`: width 84px, padding 3px, portrait aspect
+   - ปรับ `.member-card-photo .member-photo` + `.member-photo-fallback`: `aspect-ratio: 3 / 4`, `width: 100% !important`, `height: auto !important`, `border-radius: 5px`
+   - เพิ่ม `.member-photo.id-portrait` (object-fit: cover สำหรับรูปจริง)
+   - เพิ่ม `.member-photo-fallback.id-portrait` (background #f3f0ec สีอ่อน ๆ สำหรับ fallback)
+   - เพิ่ม `kbd.enter-hint` (badge เล็ก ๆ สีเขียวอ่อน ข้างปุ่มพิมพ์ — บอกว่า Enter = พิมพ์)
+   - ปรับ `.member-card-body` เป็น `align-items: stretch` (ให้รูป + identity สูงเท่ากัน)
+
+Verification (agent-browser):
+1. **Member card** (login → สมาชิกและบัญชี → กด row สมาชิก → กด พิมพ์บัตรสมาชิก):
+   - ✅ Member card modal เปิด → เห็นรูปใหม่ (illustration แบบ flat design)
+   - ✅ VLM ยืนยัน: layout horizontal (รูปซ้าย/ข้อมูลขวา) + portrait aspect (3:4 หรือ 2:3) + ขนาดพอเหมาะ + ดูเหมือน ID card จริง
+2. **Settings → ใบเสร็จและเครื่องพิมพ์** (login → ตั้งค่า → แท็บ ใบเสร็จและเครื่องพิมพ์):
+   - ✅ เห็น toggle "พรีวิวก่อนพิมพ์ (ใบเสร็จ · บัตรสมาชิก · รายงาน)" ใหม่
+   - ✅ คำอธิบายอัปเดตตาม state: "ปิดอยู่ — กดปุ่มพิมพ์แล้ว browser สั่งพิมพ์ทันที (เร็วกว่า ใช้ Enter ได้ แต่ไม่มีโอกาสตรวจทวน) · เครื่องพิมพ์ที่ใช้ — browser จะถามในหน้าต่างพิมพ์ทุกครั้ง"
+   - ✅ Toggle ทำงาน — เปลี่ยน state ได้
+   - ⚠️ Save mutation ไม่ได้ทดสอบ completion เพราะ sandbox ฆ่า server หลัง ~30s — แต่ TypeScript ผ่าน + Zod schema ถูกต้อง + field อยู่ใน DEFAULT_STORE_SETTINGS (default true)
+
+Verification:
+- `npx tsc --noEmit` → 0 errors ✅
+- agent-browser + VLM: member card ใหม่ดูเหมือน ID card จริง (illustration มี head+neck+shoulders+เสื้อ+ผม+ตา+ปาก) + layout รูปซ้าย/ข้อมูลขวา + portrait 3:4
+- agent-browser: Settings toggle ใหม่ "พรีวิวก่อนพิมพ์" แสดงในแท็บ ใบเสร็จและเครื่องพิมพ์ + คำอธิบายอัปเดตตาม state
+- Backward compatible: บิลเก่า + บัตรเก่ายังทำงานได้ (printPreviewBefore optional ใน CheckoutReceipt, default true ใน StoreSettings)
+
+Stage Summary:
+- 5 files modified:
+  - `server/sqliteStore.ts` (+8 บรรทัด: type field + default)
+  - `server/routers.ts` (+4 บรรทัด: Zod field)
+  - `client/src/components/ReceiptModal.tsx` (+30 บรรทัด: useEffect Enter + directPrint + kbd badge)
+  - `client/src/components/StatementModal.tsx` (+25 บรรทัด: useEffect Enter + directPrint + kbd badge)
+  - `client/src/components/MemberCardModal.tsx` (+25 บรรทัด: useEffect Enter + directPrint + kbd badge + size=104 rounded=false)
+  - `client/src/components/MemberAvatar.tsx` (~80 บรรทัดใหม่: id-portrait SVG fallback with head+neck+shoulders+face features)
+  - `client/src/pages/settings/Settings.tsx` (+25 บรรทัด: type + label + toggle UI)
+  - `client/src/index.css` (+12 บรรทัด: member-card-photo portrait + kbd.enter-hint + id-portrait classes)
+- TypeScript: 0 errors
+- agent-browser + VLM: member card ใหม่ดูเหมือน ID card จริง (illustration + portrait + layout row)
+- ตอบคำถาม owner:
+  - ✅ "กดแล้วสั่งเลยไม่ต้องเข้าอีกหน้า หรือปุ่มลัด Enter" → แก้แล้ว: ตั้งค่า → ใบเสร็จและเครื่องพิมพ์ → toggle "พรีวิวก่อนพิมพ์" ปิด → ปุ่ม "พิมพ์..." จะ window.print() ทันที + ใช้ Enter ได้ (badge kbd แสดงข้างปุ่ม)
+  - ✅ "ตั้งค่าเครื่องพิมพ์ในเครื่อง" → browser handles printer selection เองผ่าน print dialog (อธิบายใน toggle) — ไม่ต้องเพิ่ม setting เพราะ browser มี printer picker อยู่แล้วทุกครั้งที่ window.print() รัน
+  - ✅ "บัตรสมาชิก รูปเหมือนรูปบุคคลมากกว่านี้" → แก้แล้ว: fallback ใหม่เป็น illustration แบบ flat design มี head+neck+shoulders+เสื้อ+ผม+ตา+ปาก (ดูเหมือนรูป ID จริง) + layout row (รูปซ้าย/ข้อมูลขวา) + portrait 3:4
+  - ✅ "export รายการธุรกรรม ลดความซับซ้อน" → แก้แล้ว: ปิด preview ที่ตั้งค่า → กด "พิมพ์รายงาน" แล้ว window.print() ทันที + ใช้ Enter ได้
+- ส่งต่อให้ owner ทดสอบที่เครื่อง:
+  - ไปที่ ตั้งค่า → ใบเสร็จและเครื่องพิมพ์ → ปิด toggle "พรีวิวก่อนพิมพ์" → บันทึก → ทดสอบ POS (ขายของ → ชำระเงิน → ในหน้าใบเสร็จ กด Enter หรือกดปุ่ม "พิมพ์ใบเสร็จ" จะสั่งพิมพ์ทันทีผ่าน browser print dialog)
+  - ทดสอบบัตรสมาชิก → กด พิมพ์บัตรสมาชิก → รูป fallback ใหม่ (หญิง/ชาย/ไม่ระบุ) มี head+neck+shoulders+เสื้อ+ผม+ตา+ปาก ดูเหมือน ID card จริง
+  - ทดสอบ export รายการธุรกรรม → กด พิมพ์รายงาน → window.print() ทันที (ถ้าปิด preview)

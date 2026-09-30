@@ -534,6 +534,9 @@ const settingsPatchInput = z
     backupKeepCount: z.number().int().min(3).max(60).optional(),
     // ROUND 42 (ข้อ 32 ตอนที่ 3 — ข้อ 4) — ความกว้างกระดาษสลิปเครื่องพิมพ์ 58/72/80 มม.
     receiptPaperWidth: z.enum(["58", "72", "80"]).optional(),
+    // FIX-8 (user) — พรีวิวก่อนพิมพ์ (ใบเสร็จ/บัตร/รายงาน): true = เปิด preview ก่อน (default)
+    // false = กดปุ่มพิมพ์แล้ว window.print() ทันที (เร็วกว่า แต่ไม่มีโอกาสตรวจก่อน)
+    printPreviewBefore: z.boolean().optional(),
     // ROUND 56 (user) — เช็คลิสต์วันขึ้นระบบ (โซนเครื่องมือติดตั้ง): JSON รหัสรายการที่ติ๊กแล้ว
     goliveChecks: z.string().max(4000).optional(),
     // ROUND 63 (user) — บัญชีพร้อมเพย์ร้าน: เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก

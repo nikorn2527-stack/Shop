@@ -96,13 +96,13 @@ export function MemberCardArt({
       </div>
       <div className="member-card-body">
         <div className="member-card-photo">
-          <MemberAvatar member={member} size={82} />
+          <MemberAvatar member={member} size={104} rounded={false} />
         </div>
         <div className="member-card-identity">
           <div className={`member-card-name${nameFit}`}>{displayName}</div>
           <div className="member-card-number">{member.memberNumber}</div>{member.cardNumber ? <div className="member-card-patient">{`บัตร ${member.cardNumber}${member.patientCode ? ` · HN ${member.patientCode}` : ""}`}</div> : null}
           <div className="member-card-meta">
-            {member.createdAt ? <span>สมาชิกตั้งแต่ {formatCardDate(member.createdAt)}</span> : <span className="now">พร้อมใช้จ่ายที่เคาน์เตอร์</span>}
+            {member.createdAt ? <span>สมัครเมื่อ {formatCardDate(member.createdAt)}</span> : <span className="now">พร้อมใช้จ่ายที่เคาน์เตอร์</span>}
             <span className={member.status === "active" ? "ok" : "suspended"}>{member.status === "active" ? "ใช้จ่ายได้ปกติ" : "ระงับการใช้จ่าย"}</span>
           </div>
         </div>
@@ -182,8 +182,33 @@ export function MemberCardModal({
   // ROUND 51 — พิมพ์บัตรผ่านพรีวิวก่อน (เหมือนจุดพิมพ์อื่น) ตรวจบัตรให้ถูกคนก่อนสั่งพิมพ์จริง
   // FIX-4 issue 4 — printPreviewOpen ค้างเปิดได้ ปุ่ม "พิมพ์อีกครั้ง" ใช้ setPrintPreviewOpen(true)
   // ซ้ำได้เลย (ปิดพรีวิวเก่าแล้วเปิดใหม่ในคลิกเดียว)
+  // FIX-8 (user) — ปิด preview ได้ที่ตั้งค่า → ใบเสร็จและเครื่องพิมพ์ (ลดขั้นตอน กดแล้วพิมพ์เลย)
+  const settingsQuery = trpc.settings.get.useQuery(undefined);
+  const printPreviewBefore = settingsQuery.data?.printPreviewBefore !== false;
   const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
-  const printCard = () => setPrintPreviewOpen(true);
+  const printCardDirect = () => {
+    if (printPreviewBefore) {
+      setPrintPreviewOpen(true);
+    } else {
+      window.print();
+    }
+  };
+  const printCard = () => printCardDirect();
+  // FIX-8 — Enter = สั่งพิมพ์ทันที (shortcut เมื่อ modal เปิด และไม่ใช่ confirmForBill mode)
+  useEffect(() => {
+    if (confirmForBill) return; // โหมดยืนยันสมาชิกไม่ผูก Enter (กันกดผิด)
+    const handler = (event: KeyboardEvent) => {
+      if (event.key !== "Enter") return;
+      const target = event.target as HTMLElement;
+      const tag = target?.tagName?.toLowerCase();
+      if (tag === "input" || tag === "textarea" || tag === "select") return;
+      event.preventDefault();
+      printCardDirect();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [confirmForBill, printPreviewBefore]);
   const reprintCard = () => {
     setPrintPreviewOpen(false);
     // next tick so the old PrintPreviewModal unmounts before the new one mounts
@@ -219,7 +244,7 @@ export function MemberCardModal({
       </> : <>
         <button className="outline-button" disabled={busy} onClick={downloadCard}><Download size={16} /> {busy ? "กำลังสร้างรูป..." : "ดาวน์โหลดรูปบัตร"}</button>
         <button className="outline-button" onClick={reprintCard} title="เปิดหน้าต่างพรีวิวอีกครั้ง — ใช้เมื่อพิมพ์ครั้งแรกไม่สำเร็จ หรือต้องพิมพ์ซ้ำ"><Printer size={16} /> พิมพ์อีกครั้ง</button>
-        <button className="primary-button" onClick={printCard}><Printer size={16} /> พิมพ์บัตรสมาชิก</button>
+        <button className="primary-button" onClick={printCard} title={printPreviewBefore ? "พรีวิวก่อนพิมพ์ (ปิดได้ที่ ตั้งค่า → ใบเสร็จและเครื่องพิมพ์)" : "พิมพ์ทันที — เลือกเครื่องพิมพ์ใน dialog ของ browser"}><Printer size={16} /> พิมพ์บัตรสมาชิก{!printPreviewBefore && <kbd className="enter-hint">Enter</kbd>}</button>
       </>}
     </div>
     {printPreviewOpen && <PrintPreviewModal targetId="member-card" title="พรีวิวก่อนพิมพ์บัตรสมาชิก" subtitle={`${displayName} · ${member.memberNumber}`} paper="card" chips={[`ยอดคงเหลือ ${money(member.balance)}`, member.status === "active" ? "สถานะใช้จ่ายได้" : "ระงับการใช้จ่าย"]} onClose={() => setPrintPreviewOpen(false)} />}
