@@ -294,6 +294,10 @@ export type StoreSettings = {
   reportPrinterName: string;
   /** FIX-15 (user) — เครื่องพิมพ์บัตรสมาชิก — พิมพ์บัตรสมาชิก · "" = ยังไม่ตั้ง */
   cardPrinterName: string;
+  /** FIX-18 (user) — toggle พรีวิวแยกตามประเภทเอกสาร */
+  receiptPreviewBefore: boolean;
+  reportPreviewBefore: boolean;
+  cardPreviewBefore: boolean;
   /** ROUND 56 (user) — เช็คลิสต์วันขึ้นระบบ (โซนเครื่องมือติดตั้ง): JSON array ของ id ที่ติ๊กแล้ว
    *  เก็บฝั่งเซิร์ฟเวอร์ให้ทุกเครื่องเห็นตรงกัน · "" = ยังไม่ได้ติ๊กอะไร */
   goliveChecks: string;
@@ -3124,6 +3128,10 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   receiptPrinterName: "",
   reportPrinterName: "",
   cardPrinterName: "",
+  // FIX-18 (user) — toggle พรีวิวแยกตามประเภทเอกสาร (default true = ปลอดภัย)
+  receiptPreviewBefore: true,
+  reportPreviewBefore: true,
+  cardPreviewBefore: true,
   // ROUND 68 — เบอร์ศูนย์ช่วยเหลือท้ายหน้าจอ ยังไม่ตั้ง → ไม่แสดงแถบช่วยเหลือใน footer
   helpPhone: "",
 };

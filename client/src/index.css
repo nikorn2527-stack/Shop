@@ -422,6 +422,12 @@ kbd.enter-hint { display: inline-flex; align-items: center; margin-left: 7px; pa
 .outline-button.purple:hover { border-color: #b090c8; background: #f0e8f8; color: #6a4a8f; }
 /* FIX-16 (user) — ชื่อเครื่องพิมพ์ที่บันทึกไว้ แสดงข้างปุ่มพิมพ์ (badge สีเทาอ่อน คล้าย pill) */
 .printer-name-hint { display: inline-flex; align-items: center; gap: 3px; margin-left: 7px; padding: 1px 7px; font-size: 10px; font-weight: 500; color: #5d655a; background: #f1f3f0; border: 1px solid #dfe3dc; border-radius: 12px; white-space: nowrap; max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
+/* FIX-18 (user) — แถวเครื่องพิมพ์แบบง่าย: ชื่อเอกสาร + dropdown + toggle ในแถวเดียว */
+.printer-row-simple { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid #f2f3f0; }
+.printer-row-simple:last-of-type { border-bottom: 0; }
+.printer-row-simple > b { flex: 0 0 90px; font-size: 12px; color: #42584f; }
+.printer-row-simple > .printer-picker { flex: 1; min-width: 0; }
+.printer-row-simple > .toggle { flex: 0 0 auto; }
 /* FIX-10 (user) — PrinterPicker dropdown — เลือกเครื่องพิมพ์จากรายการ */
 .printer-picker-block { display: grid; gap: 8px; padding: 11px 0 6px; }
 .printer-picker-head b { display: block; color: #2e5b4c; font-size: 12px; font-weight: 700; }

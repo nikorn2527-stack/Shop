@@ -543,6 +543,10 @@ const settingsPatchInput = z
     receiptPrinterName: z.string().max(80).optional(),
     reportPrinterName: z.string().max(80).optional(),
     cardPrinterName: z.string().max(80).optional(),
+    // FIX-18 (user) — toggle พรีวิวแยกตามประเภทเอกสาร
+    receiptPreviewBefore: z.boolean().optional(),
+    reportPreviewBefore: z.boolean().optional(),
+    cardPreviewBefore: z.boolean().optional(),
     // ROUND 56 (user) — เช็คลิสต์วันขึ้นระบบ (โซนเครื่องมือติดตั้ง): JSON รหัสรายการที่ติ๊กแล้ว
     goliveChecks: z.string().max(4000).optional(),
     // ROUND 63 (user) — บัญชีพร้อมเพย์ร้าน: เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก

@@ -184,6 +184,10 @@ type SettingsForm = {
   reportPrinterName: string;
   /** FIX-15 (user) — เครื่องพิมพ์บัตรสมาชิก */
   cardPrinterName: string;
+  /** FIX-18 (user) — toggle พรีวิวแยกตามประเภทเอกสาร */
+  receiptPreviewBefore: boolean;
+  reportPreviewBefore: boolean;
+  cardPreviewBefore: boolean;
   /** ROUND 56 (user) — เช็คลิสต์วันขึ้นระบบ (โซนเครื่องมือติดตั้ง): JSON รหัสรายการที่ติ๊กแล้ว */
   goliveChecks: string;
   /** ROUND 63 (user) — บัญชีพร้อมเพย์ร้าน: เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก */
@@ -2099,179 +2103,33 @@ export function Settings({
                 <div className="settings-heading">
                   <div>
                     <h2>เครื่องพิมพ์หน้าร้าน</h2>
-                    <p>
-                      ระบบส่งงานพิมพ์ทันทีที่กดยืนยัน —
-                      ที่เครื่องพิมพ์เริ่มต้นของเครื่องนี้โดยตรง
-                    </p>
+                    <p>เลือกเครื่องพิมพ์และโหมดพรีวิวสำหรับแต่ละประเภทเอกสาร</p>
                   </div>
                   <Printer size={20} className="muted-icon" />
                 </div>
-                <HelpDisclosure
-                  id="printer-flow-steps"
-                  label="คำแนะนำการใช้งาน"
-                  className="printer-flow-disclosure"
-                >
-                  <div className="printer-flow-steps">
-                    <div className="printer-step">
-                      <b>1</b>
-                      <div>
-                        <b>ตั้งเครื่องพิมพ์เริ่มต้นที่เครื่องคอมพิวเตอร์</b>
-                        <small>
-                          Windows: การตั้งค่า → อุปกรณ์ →
-                          เครื่องพิมพ์และสแกนเนอร์ → กด “ตั้งเป็นค่าเริ่มต้น” ·
-                          macOS: การตั้งค่าระบบ → เครื่องพิมพ์และสแกนเนอร์ →
-                          เครื่องพิมพ์เริ่มต้น · ตั้งครั้งเดียว
-                          ทุกใบเสร็จ/สลิป/บัตรจะวิ่งไปเครื่องนี้
-                        </small>
-                      </div>
-                    </div>
-                    <div className="printer-step">
-                      <b>2</b>
-                      <div>
-                        <b>กด “พิมพ์ใบเสร็จ” ที่หน้าสำเร็จหลังชำระเงิน</b>
-                        <small>
-                          ชำระเสร็จแล้วระบบแสดงหน้าใบเสร็จให้เลือกเอง — พิมพ์
-                          (ผ่านพรีวิว) · บันทึกรูป PNG · ดาวน์โหลด PDF ·
-                          แล้วเริ่มรายการขายใหม่ได้ทันที
-                          ไม่มีการเด้งไปหน้าสั่งพิมพ์ระหว่างทาง
-                        </small>
-                      </div>
-                    </div>
-                    <div className="printer-step">
-                      <b>3</b>
-                      <div>
-                        <b>อยากให้พิมพ์เงียบ ๆ ไม่ต้องกด</b>
-                        <small>
-                          เปิด Chrome ด้วยคำสั่ง --kiosk-printing (เมนู Start →
-                          Chrome → Properties → เพิ่มท้าย Target) —
-                          สลิปจะออกจากเครื่องพิมพ์ทันทีที่ยืนยัน ไม่มีหน้าต่าง ·
-                          ตั้งครั้งเดียวโดยผู้ดูแลระบบ
-                        </small>
-                      </div>
-                    </div>
-                    <div className="printer-step">
-                      <b>4</b>
-                      <div>
-                        <b>กระดาษออกมายาวเกินหลังท้ายรายการ?</b>
-                        <small>
-                          ระบบจัดความยาวสลิปตามจำนวนรายการให้แล้ว
-                          (ไม่มีขอบกระดาษ) —
-                          ส่วนที่เกินมาจากขนาดกระดาษในไดรเวอร์เครื่องพิมพ์:
-                          หน้าต่างพิมพ์ของ Chrome → ขอบกระดาษ “ไม่มี” +
-                          ปิดหัว-ท้ายกระดาษ และตั้งความสูงกระดาษที่ Windows
-                          การตั้งค่า → อุปกรณ์ → เครื่องพิมพ์ → ปรับแต่งการพิมพ์
-                          ให้ใกล้ความยาวสลิปจริง (ดูวิธีทีละขั้นได้ที่ปุ่ม
-                          “ข้อแนะนำ” ในหน้าต่างพรีวิวก่อนพิมพ์)
-                        </small>
-                      </div>
-                    </div>
-                  </div>
-                </HelpDisclosure>
-                {/* FIX-17 (user) — ทำให้เรียบง่าย: toggle พรีวิว + ทดสอบพิมพ์ + note
-                    ลบ: paper width selector, 3 PrinterPicker dropdowns, printer tips
-                    เพราะ: เครื่องพิมพ์ + หน้ากระดาษ ตั้งในไดรเวอร์ของ Windows
-                    browser print dialog จะแสดงเครื่องพิมพ์ที่ติดตั้งไว้ให้เลือกเอง */}
-                <div className="toggle-row">
-                  <div>
-                    <b>พรีวิวก่อนพิมพ์</b>
-                    <small>
-                      {form?.printPreviewBefore
-                        ? "เปิดอยู่ — กดปุ่มพิมพ์จะเปิดหน้าต่างพรีวิวก่อน (ปลอดภัย)"
-                        : "ปิดอยู่ — กดปุ่มพิมพ์แล้ว browser สั่งพิมพ์ทันที (เร็วกว่า ใช้ Enter ได้)"}
-                    </small>
-                  </div>
-                  <button
-                    type="button"
-                    className={`toggle ${form?.printPreviewBefore ? "on" : ""}`}
-                    onClick={() =>
-                      updateForm({ printPreviewBefore: !form?.printPreviewBefore })
-                    }
-                    disabled={!form}
-                    aria-label="สลับโหมดพรีวิวก่อนพิมพ์"
-                    aria-pressed={!!form?.printPreviewBefore}
-                  >
-                    <span />
-                  </button>
+                {/* FIX-18 (user) — 3 แถว หัวข้อละแถว: ใบเสร็จ / รายงาน / บัตรสมาชิก
+                    แต่ละแถวมี: ชื่อเอกสาร + dropdown เลือกเครื่องพิมพ์ + toggle พรีวิว */}
+                <div className="printer-row-simple">
+                  <b>ใบเสร็จ</b>
+                  <PrinterPicker value={form?.receiptPrinterName ?? ""} onChange={next => updateForm({ receiptPrinterName: next })} disabled={!form} />
+                  <button type="button" className={`toggle ${form?.receiptPreviewBefore !== false ? "on" : ""}`} onClick={() => updateForm({ receiptPreviewBefore: !(form?.receiptPreviewBefore !== false) })} disabled={!form} aria-label="พรีวิวก่อนพิมพ์ใบเสร็จ"><span /></button>
+                </div>
+                <div className="printer-row-simple">
+                  <b>รายงาน</b>
+                  <PrinterPicker value={form?.reportPrinterName ?? ""} onChange={next => updateForm({ reportPrinterName: next })} disabled={!form} />
+                  <button type="button" className={`toggle ${form?.reportPreviewBefore !== false ? "on" : ""}`} onClick={() => updateForm({ reportPreviewBefore: !(form?.reportPreviewBefore !== false) })} disabled={!form} aria-label="พรีวิวก่อนพิมพ์รายงาน"><span /></button>
+                </div>
+                <div className="printer-row-simple">
+                  <b>บัตรสมาชิก</b>
+                  <PrinterPicker value={form?.cardPrinterName ?? ""} onChange={next => updateForm({ cardPrinterName: next })} disabled={!form} />
+                  <button type="button" className={`toggle ${form?.cardPreviewBefore !== false ? "on" : ""}`} onClick={() => updateForm({ cardPreviewBefore: !(form?.cardPreviewBefore !== false) })} disabled={!form} aria-label="พรีวิวก่อนพิมพ์บัตรสมาชิก"><span /></button>
                 </div>
                 <div className="printer-test-row">
-                  <div>
-                    <b>ทดสอบการพิมพ์</b>
-                    <small>พิมพ์สลิปตัวอย่างเพื่อเช็คกระดาษ/หมึกก่อนเปิดร้าน</small>
-                  </div>
-                  <button
-                    type="button"
-                    className="outline-button"
-                    onClick={testPrintReceipt}
-                  >
-                    <Printer size={16} /> พิมพ์ทดสอบ
-                  </button>
+                  <div><b>ทดสอบการพิมพ์</b><small>เช็คกระดาษ/หมึกก่อนเปิดร้าน</small></div>
+                  <button type="button" className="outline-button" onClick={testPrintReceipt}><Printer size={16} /> พิมพ์ทดสอบ</button>
                 </div>
-                <div className="settings-inline-note">
-                  <Printer size={16} />
-                  <span>
-                    เครื่องพิมพ์และขนาดกระดาษตั้งที่ไดรเวอร์ใน Windows
-                    (Settings → Devices → Printers) —
-                    ตอนกดปุ่มพิมพ์ browser จะเปิดหน้าต่างให้เลือกเครื่องพิมพ์ที่ติดตั้งไว้
-                  </span>
-                </div>
-                {printerTestOpen && (
-                  <div
-                    className="receipt-paper printer-test-slip"
-                    id="printer-test-slip"
-                  >
-                    <div className="receipt-brand">
-                      <div>
-                        <b>{form?.storeName || "ร้านค้าสวัสดิการ"}</b>
-                        <small>ทดสอบการพิมพ์</small>
-                      </div>
-                    </div>
-                    <div className="receipt-divider" />
-                    <div className="receipt-meta">
-                      <span>สลิปทดสอบเครื่องพิมพ์</span>
-                      <b>{formatThaiDate(new Date())}</b>
-                    </div>
-                    <div className="receipt-line">
-                      <span>ตัวอักษรไทย</span>
-                      <b>กขคง ๑๒๓</b>
-                    </div>
-                    <div className="receipt-line">
-                      <span>ตัวเลข</span>
-                      <b>฿1,234.56</b>
-                    </div>
-                    <div className="receipt-total">
-                      <span>ถ้าอ่านชัดทุกบรรทัด</span>
-                      <b>เครื่องพิมพ์พร้อม</b>
-                    </div>
-                    <div className="receipt-thanks">
-                      สลิปนี้พิมพ์จากเครื่องพิมพ์เริ่มต้นของเครื่อง
-                      <br />
-                      <small>ปรับกระดาษหรือหัวพิมพ์ถ้าตัวอักษรจาง</small>
-                    </div>
-                  </div>
-                )}
-                {printerPreviewOpen && (
-                  <PrintPreviewModal
-                    targetId="printer-test-slip"
-                    title="พรีวิวก่อนพิมพ์สลิปทดสอบ"
-                    subtitle="สลิปตัวอย่างสำหรับเช็คเครื่องพิมพ์ — ตัวอักษรไทย ตัวเลข และจุดตัดบรรทัด"
-                    paper="thermal"
-                    chips={[
-                      "สลิปทดสอบเครื่องพิมพ์",
-                      formatThaiDate(new Date()),
-                    ]}
-                    onClose={() => {
-                      setPrinterPreviewOpen(false);
-                      setPrinterTestOpen(false);
-                    }}
-                    onPrint={() => {
-                      toast.success("ส่งสลิปทดสอบไปเครื่องพิมพ์แล้ว", {
-                        description:
-                          "ถ้าไม่มีอะไรออกมา ตรวจกระดาษ / สาย USB / เครื่องพิมพ์เริ่มต้นของเครื่อง",
-                      });
-                    }}
-                  />
-                )}
               </section>
+
             </>
           )}
           {tab === "member" && (
