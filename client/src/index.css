@@ -3004,6 +3004,10 @@ th { font-weight: 600; }
 .member-photo-fallback.neutral { background: linear-gradient(160deg, #8d9c85, #75846d); }
 .member-photo-fallback svg { opacity: .96; }
 .member-photo-fallback .avatar-initial { position: absolute; inset: 0; display: grid; place-items: center; font-style: normal; font-weight: 700; font-size: 13px; color: #ffffff; text-shadow: 0 1px 2px rgba(0,0,0,.25); }
+/* FIX-28 — blank placeholder when no photo: empty box with thin border */
+.member-photo-blank { display: block; border-radius: 4px; background: #f5f5f3; border: 1px dashed #c0c0bc; flex: 0 0 auto; }
+.member-photo-blank.round { border-radius: 50%; }
+.member-photo-blank.id-portrait { border-radius: 4px; }
 
 /* --- 2) บัตรสมาชิก — รูป + บาร์โค้ด + คิวอาร์โค้ด ---------------------- */
 /* the wallet card grew a photo column and a codes row: scoped overrides
@@ -3011,24 +3015,21 @@ th { font-weight: 600; }
 /* FIX-14 (user) — ถอด aspect-ratio ออกจากหน้าจอ (เดิม 85.6/54 บังคับความสูงน้อยเกิน → content ล้น บังรูป + ปุ่มลอย)
    ใช้ min-height แทน — การ์ดโตพอใส่ content ได้หมด ไม่มีอะไรล้นซ้อน
    ส่วนพิมพ์จริงยังเป็น CR80 แบบ 85.6×54mm อยู่แล้วใน @media print (บรรทัด 904) */
-/* FIX-24 (user) — แก้บาร์โค้ด/QR ซ้อนครั้งหลัง:
-   1. override aspect-ratio: auto (เอาค่าจาก base .member-card ที่บังคับความสูงน้อยเกินออก)
-   2. ลดขนาดบาร์โค้ด + QR ให้เล็กลง
-   3. เพิ่ม flex-shrink กันล้น */
-.member-card-modal .member-card { width: 380px; max-width: 100%; aspect-ratio: auto; min-height: auto; padding: 14px 16px 12px; }
+/* FIX-28 (user) — ขนาด CR80 จริง (85.6×54mm):
+   on-screen ใช้ 320px×202px (สัดส่วน 85.6:54) เหมาะกับการดู
+   print ใช้ 85.6mm×54mm ตรงตามขนาดนามบัตรจริง */
+.member-card-modal .member-card { width: 320px; max-width: 100%; aspect-ratio: 85.6 / 54; min-height: auto; padding: 10px 12px 8px; }
 .member-card-modal .member-card-body { display: flex; flex-direction: row; align-items: stretch; gap: 10px; flex: 0 0 auto; min-height: 0; }
 .member-card-modal .member-card-identity { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 1px; }
-/* FIX-12 (user) — ป้องกันรูปซ้อนทับ barcode/QR ด้านล่าง
-   ใช้ aspect-ratio: 3/4 ให้รูปมีขนาดตามสัดส่วนอัตโนมัติ (78px wide → 104px tall)
-   + overflow:hidden ที่ body ป้องกันล้น */
-.member-card-photo { flex: 0 0 auto; padding: 3px; background: #fff; border: 1px solid #d3e5dd; border-radius: 7px; box-shadow: 0 2px 6px rgba(40,70,58,.14); width: 78px; }
-.member-card-photo .member-photo, .member-card-photo .member-photo-fallback-photo { width: 100% !important; height: auto !important; aspect-ratio: 3 / 4; border-radius: 4px !important; display: block; object-fit: cover; object-position: center top; }
-.member-card-photo .member-photo.id-portrait, .member-card-photo .member-photo-fallback-photo.id-portrait { object-fit: cover; object-position: center top; }
-.member-card-codes { display: grid; grid-template-columns: 1.55fr 1fr; gap: 6px; margin-top: 8px; flex-shrink: 0; }
-.member-card-barcode, .member-card-qr { background: #fff; border: 1px solid #d8e6df; border-radius: 6px; padding: 4px 4px 2px; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; overflow: hidden; }
-.member-card-barcode img { max-width: 100%; max-height: 38px; width: auto; height: auto; display: block; }
-.member-card-qr img { width: 44px; height: 44px; display: block; }
-.member-card-barcode small, .member-card-qr small { font-size: 6.5px; color: #7b8170; display: flex; align-items: center; gap: 2px; letter-spacing: .2px; }
+/* FIX-28 — ลดขนาด photo ให้พอดีกับบัตร 320px */
+.member-card-photo { flex: 0 0 auto; padding: 2px; background: #fff; border: 1px solid #d3e5dd; border-radius: 5px; box-shadow: 0 1px 4px rgba(40,70,58,.1); width: 60px; }
+.member-card-photo .member-photo, .member-card-photo .member-photo-fallback-photo, .member-card-photo .member-photo-blank { width: 100% !important; height: auto !important; aspect-ratio: 3 / 4; border-radius: 3px !important; display: block; }
+.member-card-photo .member-photo.id-portrait, .member-card-photo .member-photo-fallback-photo.id-portrait, .member-card-photo .member-photo-blank.id-portrait { border-radius: 3px !important; }
+.member-card-codes { display: grid; grid-template-columns: 1.55fr 1fr; gap: 4px; margin-top: 5px; flex-shrink: 0; }
+.member-card-barcode, .member-card-qr { background: #fff; border: 1px solid #d8e6df; border-radius: 4px; padding: 3px 3px 1px; display: flex; flex-direction: column; align-items: center; gap: 1px; min-width: 0; overflow: hidden; }
+.member-card-barcode img { max-width: 100%; max-height: 28px; width: auto; height: auto; display: block; }
+.member-card-qr img { width: 34px; height: 34px; display: block; }
+.member-card-barcode small, .member-card-qr small { font-size: 5.5px; color: #7b8170; display: flex; align-items: center; gap: 2px; letter-spacing: .1px; }
 .member-card-code-fallback { height: 54px; display: grid; place-items: center; color: #b9beac; font-size: 12px; }
 .member-card-modal .member-card-foot { border-top: 1px dashed #cfe4db; padding-top: 6px; display: flex; justify-content: space-between; gap: 10px; }
 .member-card-modal .member-card-name { font-size: 14px; }
