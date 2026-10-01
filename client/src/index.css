@@ -2988,10 +2988,10 @@ th { font-weight: 600; }
 /* --- 2) บัตรสมาชิก — รูป + บาร์โค้ด + คิวอาร์โค้ด ---------------------- */
 /* the wallet card grew a photo column and a codes row: scoped overrides
    neutralize the older aspect-locked / grid rules from earlier rounds */
-/* FIX-9 (user) — คืนค่าสัดส่วน CR80 จริง (85.6/54 ≈ 1.585) เพื่อให้บัตรดูเหมือนบัตรประชาชน/บัตรเครดิตจริง
-   เดิมตั้ง aspect-ratio: auto ทำให้สัดส่วนเพี้ยน ดูเป็นกล่องไม่ใช่บัตร
-   ขยาย width เป็น 360px (เดิม 334) ได้ height 360 × 54/85.6 = 227px — พอดีกับเนื้อหา */
-.member-card-modal .member-card { width: 360px; max-width: 100%; aspect-ratio: 85.6 / 54; min-height: auto; padding: 12px 14px 10px; }
+/* FIX-14 (user) — ถอด aspect-ratio ออกจากหน้าจอ (เดิม 85.6/54 บังคับความสูงน้อยเกิน → content ล้น บังรูป + ปุ่มลอย)
+   ใช้ min-height แทน — การ์ดโตพอใส่ content ได้หมด ไม่มีอะไรล้นซ้อน
+   ส่วนพิมพ์จริงยังเป็น CR80 แบบ 85.6×54mm อยู่แล้วใน @media print (บรรทัด 904) */
+.member-card-modal .member-card { width: 380px; max-width: 100%; min-height: 250px; padding: 14px 16px 12px; }
 .member-card-modal .member-card-body { display: flex; flex-direction: row; align-items: stretch; gap: 10px; flex: 1; min-height: 0; }
 .member-card-modal .member-card-identity { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 1px; }
 /* FIX-12 (user) — ป้องกันรูปซ้อนทับ barcode/QR ด้านล่าง
