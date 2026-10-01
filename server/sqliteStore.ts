@@ -285,9 +285,15 @@ export type StoreSettings = {
   /** FIX-8 (user) — พรีวิวก่อนพิมพ์ (ใบเสร็จ/บัตร/รายงาน): true = เปิดก่อน (default ปลอดภัย)
    *  false = กดปุ่มพิมพ์แล้ว window.print() ทันที (เร็ว แต่ไม่มีโอกาสตรวจก่อน) */
   printPreviewBefore: boolean;
-  /** FIX-9 (user) — ชื่อเครื่องพิมพ์เริ่มต้นที่บันทึกไว้ (เช่น "EPSON TM-T82") — แสดงเป็น hint
-   *  ตอนกดปุ่มพิมพ์ browser ยังถาม printer ใน dialog เอง (กันความปลอดภัย) · "" = ยังไม่ได้ตั้ง */
+  /** FIX-9 (user) — @deprecated ใช้ receiptPrinterName/reportPrinterName/cardPrinterName แทน
+   *  เก็บไว้เพื่อ backward compat (บิลเก่าที่ยังไม่ได้อัปเดต) */
   defaultPrinterName: string;
+  /** FIX-15 (user) — เครื่องพิมพ์ใบเสร็จ (thermal) — พิมพ์ใบเสร็จ/สลิปเติม-ถอน · "" = ยังไม่ตั้ง */
+  receiptPrinterName: string;
+  /** FIX-15 (user) — เครื่องพิมพ์รายงาน (A4 laser/inkjet) — พิมพ์รายงานสมาชิก/สรุปยอด · "" = ยังไม่ตั้ง */
+  reportPrinterName: string;
+  /** FIX-15 (user) — เครื่องพิมพ์บัตรสมาชิก — พิมพ์บัตรสมาชิก · "" = ยังไม่ตั้ง */
+  cardPrinterName: string;
   /** ROUND 56 (user) — เช็คลิสต์วันขึ้นระบบ (โซนเครื่องมือติดตั้ง): JSON array ของ id ที่ติ๊กแล้ว
    *  เก็บฝั่งเซิร์ฟเวอร์ให้ทุกเครื่องเห็นตรงกัน · "" = ยังไม่ได้ติ๊กอะไร */
   goliveChecks: string;
@@ -3112,8 +3118,12 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   // FIX-8 (user) — พรีวิวก่อนพิมพ์ (ใบเสร็จ/บัตร/รายงาน): default true (ปลอดภัย) —
   // owner ที่อยากเร็วกว่านี้ปิดเพื่อ window.print() ทันทีเมื่อกดปุ่มพิมพ์
   printPreviewBefore: true,
-  // FIX-9 (user) — ชื่อเครื่องพิมพ์เริ่มต้น ยังไม่ตั้ง → ผู้ใช้พิมพ์เองใน ตั้งค่า → ใบเสร็จและเครื่องพิมพ์
+  // FIX-9 (user) — @deprecated เก็บไว้ backward compat
   defaultPrinterName: "",
+  // FIX-15 (user) — 3 เครื่องพิมพ์แยกตามประเภทเอกสาร
+  receiptPrinterName: "",
+  reportPrinterName: "",
+  cardPrinterName: "",
   // ROUND 68 — เบอร์ศูนย์ช่วยเหลือท้ายหน้าจอ ยังไม่ตั้ง → ไม่แสดงแถบช่วยเหลือใน footer
   helpPhone: "",
 };

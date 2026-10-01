@@ -186,7 +186,8 @@ export function MemberCardModal({
   const settingsQuery = trpc.settings.get.useQuery(undefined);
   const printPreviewBefore = settingsQuery.data?.printPreviewBefore !== false;
   // FIX-9 (user) — ชื่อเครื่องพิมพ์ที่บันทึกไว้ — แสดงใน tooltip
-  const printerName = (settingsQuery.data?.defaultPrinterName ?? "").trim();
+  // FIX-15 (user) — เปลี่ยนเป็น cardPrinterName (แยกตามประเภทเอกสาร) + ไม่โชว์ badge แล้ว
+  const printerName = (settingsQuery.data?.cardPrinterName ?? "").trim();
   const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
   const printCardDirect = () => {
     if (printPreviewBefore) {
@@ -246,7 +247,7 @@ export function MemberCardModal({
       </> : <>
         <button className="outline-button" disabled={busy} onClick={downloadCard}><Download size={16} /> {busy ? "กำลังสร้างรูป..." : "ดาวน์โหลดรูปบัตร"}</button>
         <button className="outline-button" onClick={reprintCard} title="เปิดหน้าต่างพรีวิวอีกครั้ง — ใช้เมื่อพิมพ์ครั้งแรกไม่สำเร็จ หรือต้องพิมพ์ซ้ำ"><Printer size={16} /> พิมพ์อีกครั้ง</button>
-        <button className="primary-button" onClick={printCard} title={`พิมพ์บัตรสมาชิก${printPreviewBefore ? " (พรีวิวก่อน — ปิดได้ที่ ตั้งค่า → ใบเสร็จและเครื่องพิมพ์)" : " (พิมพ์ทันที — Enter)"}${printerName ? ` · เครื่องพิมพ์ที่บันทึกไว้: ${printerName}` : " · ยังไม่ได้ตั้งชื่อเครื่องพิมพ์"}`}><Printer size={16} /> พิมพ์บัตรสมาชิก{!printPreviewBefore && <kbd className="enter-hint">Enter</kbd>}{printerName && <span className="printer-name-hint">🖨 {printerName}</span>}</button>
+        <button className="primary-button" onClick={printCard} title={`พิมพ์บัตรสมาชิก${printPreviewBefore ? " (พรีวิวก่อน — ปิดได้ที่ ตั้งค่า → ใบเสร็จและเครื่องพิมพ์)" : " (พิมพ์ทันที — Enter)"}${printerName ? ` · เครื่องพิมพ์: ${printerName}` : ""}`}><Printer size={16} /> พิมพ์บัตรสมาชิก{!printPreviewBefore && <kbd className="enter-hint">Enter</kbd>}</button>
       </>}
     </div>
     {printPreviewOpen && <PrintPreviewModal targetId="member-card" title="พรีวิวก่อนพิมพ์บัตรสมาชิก" subtitle={`${displayName} · ${member.memberNumber}`} paper="card" chips={[`ยอดคงเหลือ ${money(member.balance)}`, member.status === "active" ? "สถานะใช้จ่ายได้" : "ระงับการใช้จ่าย"]} onClose={() => setPrintPreviewOpen(false)} />}

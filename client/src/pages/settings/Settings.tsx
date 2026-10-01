@@ -176,8 +176,14 @@ type SettingsForm = {
   /** FIX-8 (user) — พรีวิวก่อนพิมพ์ (ใบเสร็จ/บัตร/รายงาน): true = เปิด preview ก่อน (default)
    *  false = กดปุ่มพิมพ์แล้ว window.print() ทันที (เร็ว แต่ไม่มีโอกาสตรวจก่อน) */
   printPreviewBefore: boolean;
-  /** FIX-9 (user) — ชื่อเครื่องพิมพ์เริ่มต้นที่บันทึกไว้ (เช่น "EPSON TM-T82") — แสดงเป็น hint ตอนพิมพ์ */
+  /** FIX-9 (user) — @deprecated ใช้ 3 fields ด้านล่างแทน */
   defaultPrinterName: string;
+  /** FIX-15 (user) — เครื่องพิมพ์ใบเสร็จ (thermal) */
+  receiptPrinterName: string;
+  /** FIX-15 (user) — เครื่องพิมพ์รายงาน (A4 laser/inkjet) */
+  reportPrinterName: string;
+  /** FIX-15 (user) — เครื่องพิมพ์บัตรสมาชิก */
+  cardPrinterName: string;
   /** ROUND 56 (user) — เช็คลิสต์วันขึ้นระบบ (โซนเครื่องมือติดตั้ง): JSON รหัสรายการที่ติ๊กแล้ว */
   goliveChecks: string;
   /** ROUND 63 (user) — บัญชีพร้อมเพย์ร้าน: เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก */
@@ -224,6 +230,9 @@ const SETTINGS_FIELD_LABELS: [keyof SettingsForm, string][] = [
   ["receiptPaperWidth", "ความกว้างกระดาษสลิป"],
   ["printPreviewBefore", "พรีวิวก่อนพิมพ์"],
   ["defaultPrinterName", "ชื่อเครื่องพิมพ์เริ่มต้น"],
+  ["receiptPrinterName", "เครื่องพิมพ์ใบเสร็จ"],
+  ["reportPrinterName", "เครื่องพิมพ์รายงาน"],
+  ["cardPrinterName", "เครื่องพิมพ์บัตรสมาชิก"],
   ["goliveChecks", "เช็คลิสต์วันขึ้นระบบ"],
 ];
 
@@ -2215,21 +2224,40 @@ export function Settings({
                     <span />
                   </button>
                 </div>
-                {/* FIX-10 (user) — PrinterPicker dropdown: เลือกเครื่องพิมพ์จากรายการ
-                    ลอง enumerate เครื่องพิมพ์จริงในระบบก่อน (navigator.printing API)
-                    ถ้า browser ไม่อนุญาต → fallback รายการเครื่องพิมพ์นิยมในไทย
-                    + ตัวเลือก "อื่นๆ" สำหรับพิมพ์ชื่อเอง */}
+                {/* FIX-15 (user) — 3 เครื่องพิมพ์แยกตามประเภทเอกสาร:
+                    ใบเสร็จ (thermal) / รายงาน (A4) / บัตรสมาชิก
+                    แต่ละหน้าจะใช้เครื่องพิมพ์ที่กำหนดไว้ที่นี่อัตโนมัติ
+                    ไม่ต้องโชว์ชื่อเครื่องพิมพ์บนปุ่ม (เก็บไว้ใน tooltip เฉยๆ) */}
                 <div className="printer-picker-block">
                   <div className="printer-picker-head">
-                    <b>เลือกเครื่องพิมพ์เริ่มต้น</b>
-                    <small>
-                      เลือกจากรายการด้านล่าง — ระบบจะจดชื่อไว้แสดงเป็น hint ข้างปุ่มพิมพ์ทุกจุด
-                      (ใบเสร็จ · บัตร · รายงาน) ให้ผู้ใช้จำได้ตอนเลือกใน dialog ของ browser
-                    </small>
+                    <b>เครื่องพิมพ์ใบเสร็จ (thermal)</b>
+                    <small>ใช้พิมพ์ใบเสร็จ · สลิปเติม/ถอนเงิน — เลือกเครื่องพิมพ์ thermal ของร้าน</small>
                   </div>
                   <PrinterPicker
-                    value={form?.defaultPrinterName ?? ""}
-                    onChange={next => updateForm({ defaultPrinterName: next })}
+                    value={form?.receiptPrinterName ?? ""}
+                    onChange={next => updateForm({ receiptPrinterName: next })}
+                    disabled={!form}
+                  />
+                </div>
+                <div className="printer-picker-block">
+                  <div className="printer-picker-head">
+                    <b>เครื่องพิมพ์รายงาน (A4)</b>
+                    <small>ใช้พิมพ์รายงานสมาชิก · สรุปยอด · เอกสาร A4 — เลือกเครื่องพิมพ์เลเซอร์/อิงค์เจ็ท</small>
+                  </div>
+                  <PrinterPicker
+                    value={form?.reportPrinterName ?? ""}
+                    onChange={next => updateForm({ reportPrinterName: next })}
+                    disabled={!form}
+                  />
+                </div>
+                <div className="printer-picker-block">
+                  <div className="printer-picker-head">
+                    <b>เครื่องพิมพ์บัตรสมาชิก</b>
+                    <small>ใช้พิมพ์บัตรสมาชิก — เลือกเครื่องพิมพ์ที่รองรับขนาด CR80 (85.6×54มม.)</small>
+                  </div>
+                  <PrinterPicker
+                    value={form?.cardPrinterName ?? ""}
+                    onChange={next => updateForm({ cardPrinterName: next })}
                     disabled={!form}
                   />
                 </div>
