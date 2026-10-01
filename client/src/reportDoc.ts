@@ -119,10 +119,6 @@ function buildPage(config: ReportDocConfig, rows: string[][], pageIndex: number,
     note.textContent = config.footnote;
     page.appendChild(note);
   }
-  const foot = document.createElement("div");
-  foot.className = "rd-foot";
-  foot.textContent = `หน้า ${pageIndex + 1} / ${pageCount} · เอกสารสร้างจากระบบร้านค้าสวัสดิการ${page === null ? "" : ""}`;
-  page.appendChild(foot);
   return page;
 }
 

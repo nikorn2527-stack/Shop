@@ -90,15 +90,6 @@ export function ExportPreviewModal({
           </button>
         </div>
 
-        <div className="export-preview-summary">
-          <span className="preview-chip">
-            <Table2 size={13} /> {bodyRows.length.toLocaleString("th-TH")} แถวข้อมูล
-          </span>
-          <span className="preview-chip">{headers.length} คอลัมน์</span>
-          {totalsRow && <span className="preview-chip ok">พร้อมแถวรวมท้ายตาราง</span>}
-          <span className="preview-chip mute">ไฟล์: {state.fileName}.csv / .xlsx / .pdf</span>
-        </div>
-
         <div className="export-preview-table-wrap">
           <table className="export-preview-table" aria-label="ตัวอย่างข้อมูลที่จะส่งออก">
             <thead>
