@@ -941,7 +941,42 @@ tr.locked-row .user-avatar { background: #f6ecd4; color: #a97f2e; }
   body:has(#member-card) .member-card-stage { background: none; border: 0; padding: 0; }
   body:has(#member-card) .member-card { width: 85.6mm; aspect-ratio: auto; height: 54mm; box-shadow: none; border: 1px dashed #aeb49d; border-radius: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body:has(#member-card) .member-card::after { display: none; }
+  /* FIX-11a — never print the hidden capture host (download-only) */
+  body:has(#member-card) .member-card-capture-host { display: none !important; }
 }
+
+/* 6a) FIX-11a (user) — Hidden off-screen capture host for html2canvas download.
+      The on-screen #member-card uses aspect-ratio + ::after + box-shadow which
+      html2canvas 1.4.x renders unreliably (height computed wrong, pseudo
+      missing, shadow clipped). This host renders a duplicate card with CLEAN
+      CSS: explicit width×height (CR80 1.586:1), no pseudo-element, no shadow,
+      no border-radius — so the downloaded PNG matches the print output and
+      looks like a real CR80 card. Keep opacity:1 + display:block so
+      html2canvas can measure the element (display:none breaks it). */
+.member-card-capture-host {
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 323px;
+  height: 204px;
+  pointer-events: none;
+  opacity: 1;
+  z-index: -1;
+  overflow: hidden;
+}
+.member-card-capture-host .member-card {
+  width: 323px !important;
+  height: 204px !important;
+  aspect-ratio: auto !important;
+  border-radius: 13px;
+  background: linear-gradient(150deg, #f8fbf9 0%, #eef6f2 55%, #e2efe9 100%);
+  border: 1px solid #d3e5dd;
+  box-shadow: none;
+  padding: 13px 15px 11px;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.member-card-capture-host .member-card::after { display: none; }
 
 /* 6b) FIX-4 issue 4 — Batch print: multiple cards (CR80) one per page.
       Same guard pattern as the single-card rule above. The grid wrapper

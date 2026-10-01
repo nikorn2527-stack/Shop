@@ -165,14 +165,24 @@ export function MemberCardModal({
   const displayName = [member.prename?.trim() || "", member.firstName, member.lastName].filter(Boolean).join(" ");
   const suspended = member.status === "suspended";
 
+  // FIX-11a (user) — ดาวน์โหลดรูปบัตรให้ตรงพรีวิว/พิมพ์: จับภาพจาก hidden
+  // #member-card-capture (CR80 สะอาด — explicit width×height, ไม่มี ::after,
+  // ไม่มี shadow) ต่างจาก #member-card บนหน้าจอที่เน้น decoration (gradient/
+  // shadow/pseudo) html2canvas ไม่เก่ง aspect-ratio + ::after → เลยใช้ element
+  // สำหรับ capture โดยเฉพาะ ผลลัพธ์ PNG ตรงกับที่ print ออกมาเป๊ะ
   const downloadCard = async () => {
-    const element = document.getElementById("member-card");
+    const element = document.getElementById("member-card-capture");
     if (!element) return;
     setBusy(true);
     try {
-      // Round 43 — รอฟอนต์ (Sarabun) พร้อมก่อนเสมอ กัน html2canvas วาดข้อความไทยตกหล่น
+      // Round 43 — รอ Sarabun font load ก่อน html2canvas (กันตัวอักษรไทยตกหล่น)
       if (document.fonts?.ready) await document.fonts.ready;
-      const canvas = await html2canvas(element, { scale: 2, backgroundColor: "#ffffff" });
+      const canvas = await html2canvas(element, {
+        scale: 4,
+        backgroundColor: "#ffffff",
+        useCORS: true,
+        logging: false,
+      });
       const link = document.createElement("a");
       link.download = `card-${member.memberNumber}.png`;
       link.href = canvas.toDataURL("image/png");
@@ -180,9 +190,8 @@ export function MemberCardModal({
     } finally { setBusy(false); }
   };
   // ROUND 51 — พิมพ์บัตรผ่านพรีวิวก่อน (เหมือนจุดพิมพ์อื่น) ตรวจบัตรให้ถูกคนก่อนสั่งพิมพ์จริง
-  // ซ้ำได้เลย (ปิดพรีวิวเก่าแล้วเปิดใหม่ในคลิกเดียว)
-  // FIX-8 (user) — ปิด preview ได้ที่ตั้งค่า → ใบเสร็จและเครื่องพิมพ์ (ลดขั้นตอน กดแล้วพิมพ์เลย)
   // FIX-26 (user) — ปุ่ม 'พิมพ์' พิมพ์เลย ไม่เข้าพรีวิวก่อน
+  // FIX-11c (user) — ลบปุ่ม 'พิมพ์อีกครั้ง' ที่ทำเหมือน 'พิมพ์บัตรสมาชิก' เป๊ะ (ชื่อต่างแต่ทำเหมือนกัน → งง)
   const printCard = () => { window.print(); };
   useEffect(() => {
     if (confirmForBill) return;
@@ -197,7 +206,6 @@ export function MemberCardModal({
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [confirmForBill]);
-  const reprintCard = () => { window.print(); };
   return <div className="modal-backdrop" onClick={onClose}><div className={`member-card-modal${confirmForBill ? " confirm-mode" : ""}`} onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label={confirmForBill ? "ยืนยันข้อมูลสมาชิกก่อนทำรายการ" : "บัตรสมาชิก"}>
     <div className="modal-heading">
       <div>
@@ -220,15 +228,24 @@ export function MemberCardModal({
     <div className="member-card-stage">
       <MemberCardArt member={member} brandName={brandName} brandLogo={brandLogo} qrDataUrl={qrDataUrl} id="member-card" footnoteAtScan={confirmForBill} />
     </div>
+    {/* FIX-11a (user) — hidden off-screen capture host for html2canvas download.
+        Rendered at the same CR80 size as the on-screen card but with clean CSS
+        (explicit width×height, no ::after, no shadow) so the downloaded PNG
+        matches the print output. Only rendered when the download button shows
+        (i.e. not in confirmForBill mode). */}
+    {!confirmForBill && (
+      <div className="member-card-capture-host" aria-hidden="true">
+        <MemberCardArt member={member} brandName={brandName} brandLogo={brandLogo} qrDataUrl={qrDataUrl} id="member-card-capture" footnoteAtScan={confirmForBill} />
+      </div>
+    )}
     <div className="member-card-note"><CreditCard size={15} /> {confirmForBill ? "ทุกครั้งที่ยิงบัตรสมาชิก ระบบจะเด้งข้อมูลบัตรขึ้นมาให้ตรวจสอบเสมอ — ยืนยันเฉพาะเมื่อข้อมูลตรงกับลูกค้าที่ยื่นบัตรเท่านั้น" : "สมาชิกไม่มีบัญชีเข้าสู่ระบบแอป — บัตรใบนี้ใช้ระบุตัวตนที่เคาน์เตอร์ · ทุกครั้งที่สแกนบัตร พนักงานจะเห็นข้อมูลสมาชิกเพื่อยืนยันก่อนหักยอดเสมอ"}</div>
     <div className="modal-actions">
       {confirmForBill ? <>
         <button className="outline-button" onClick={onClose}><X size={16} /> ไม่ใช่สมาชิกนี้</button>
         <button className="primary-button" disabled={busy} onClick={() => onConfirm?.()}><UserCheck size={16} /> {confirmLabel}</button>
       </> : <>
-        <button className="outline-button amber" disabled={busy} onClick={downloadCard} title="ดาวน์โหลดรูปบัตรสมาชิกเป็นไฟล์รูปภาพ"><Download size={16} /> {busy ? "กำลังสร้างรูป..." : "ดาวน์โหลดรูปบัตร"}</button>
-        <button className="outline-button blue" onClick={reprintCard} title="เปิดหน้าต่างพรีวิวอีกครั้ง — ใช้เมื่อพิมพ์ครั้งแรกไม่สำเร็จ หรือต้องพิมพ์ซ้ำ"><Printer size={16} /> พิมพ์อีกครั้ง</button>
-        <button className="primary-button" onClick={printCard} title="พิมพ์บัตรสมาชิกเลย"><Printer size={16} /> พิมพ์บัตรสมาชิก</button>
+        <button className="outline-button amber" disabled={busy} onClick={downloadCard} title="ดาวน์โหลดรูปบัตรสมาชิกเป็นไฟล์ PNG (ขนาด CR80 จริง พร้อมบาร์โค้ด+QR)"><Download size={16} /> {busy ? "กำลังสร้างรูป..." : "ดาวน์โหลดรูปบัตร"}</button>
+        <button className="primary-button" onClick={printCard} title="พิมพ์บัตรสมาชิก (CR80 85.6×54 มม.) ผ่านเครื่องพิมพ์"><Printer size={16} /> พิมพ์บัตรสมาชิก</button>
       </>}
     </div>
   </div></div>;
@@ -262,8 +279,6 @@ export function MemberCardBatchModal({
       .catch(() => { if (alive) setQrMap(new Map()); });
     return () => { alive = false; };
   }, [members]);
-  const reprintBatch = () => {
-  };
   return <div className="modal-backdrop" onClick={onClose}><div className="member-card-modal member-card-batch-modal" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="พิมพ์บัตรสมาชิกหลายคนพร้อมกัน">
     <div className="modal-heading">
       <div>
@@ -280,10 +295,9 @@ export function MemberCardBatchModal({
         </div>
       ))}
     </div>
-    <div className="member-card-note"><CreditCard size={15} /> พรีวิวก่อนพิมพ์ทุกใบ — ตรวจชื่อ-รูป-เลขสมาชิกให้ถูกต้องก่อนสั่งพิมพ์จริง · ถ้าพิมพ์ไม่สำเร็จกด "พิมพ์อีกครั้ง" ได้ทันที</div>
+    <div className="member-card-note"><CreditCard size={15} /> พรีวิวก่อนพิมพ์ทุกใบ — ตรวจชื่อ-รูป-เลขสมาชิกให้ถูกต้องก่อนสั่งพิมพ์จริง · ถ้าพิมพ์ไม่สำเร็จกด "พิมพ์บัตร {members.length} ใบ" ได้ทันที</div>
     <div className="modal-actions">
       <button className="outline-button" onClick={onClose}>ปิด</button>
-      <button className="outline-button" onClick={reprintBatch} title="เปิดหน้าต่างพรีวิวอีกครั้ง"><Printer size={16} /> พิมพ์อีกครั้ง</button>
       <button className="primary-button" onClick={() => window.print()}><Printer size={16} /> พิมพ์บัตร {members.length} ใบ</button>
     </div>
   </div></div>;
