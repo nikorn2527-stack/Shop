@@ -237,37 +237,36 @@ export function printReportDoc(config: ReportDocConfig) {
   @font-face { font-family: "Sarabun"; font-weight: 700; font-style: normal; font-display: swap; src: url("/fonts/Sarabun-700-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
   @font-face { font-family: "Sarabun"; font-weight: 800; font-style: normal; font-display: swap; src: url("/fonts/Sarabun-800-thai.woff2") format("woff2"); unicode-range: U+02D7, U+0303, U+0331, U+0E01-0E5B, U+200C-200D, U+25CC; }
   @font-face { font-family: "Sarabun"; font-weight: 800; font-style: normal; font-display: swap; src: url("/fonts/Sarabun-800-latin.woff2") format("woff2"); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
-  @page { size: A4 portrait; margin: 12mm; }
+  @page { size: A4 portrait; margin: 14mm; }
   * { box-sizing: border-box; }
-  body { margin: 0; font-family: "Sarabun", "TH Sarabun New", "Leelawadee UI", Tahoma, sans-serif; color: #1c1c1a; background: #fff; font-size: ${config.compact ? "12px" : "13px"}; }
+  body { margin: 0; font-family: "Sarabun", "TH Sarabun New", "Leelawadee UI", Tahoma, sans-serif; color: #1c1c1a; background: #fff; font-size: ${config.compact ? "12px" : "13px"}; line-height: 1.5; }
   .doc { padding: 4px 2px; }
-  .rd-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; border-bottom: 2.5px solid #1c1c1a; padding-bottom: 12px; }
+  .rd-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; border-bottom: 2.5px solid #1c1c1a; padding-bottom: 10px; }
   .rd-brand { display: flex; align-items: center; gap: 10px; }
   .rd-brand img { display: none; }
-  .rd-brand b { font-size: 16px; color: #111; }
-  .rd-brand small { display: block; color: #555; font-size: 11px; margin-top: 2px; font-weight: 500; }
-  .rd-stamp { font-size: 11px; color: #444; text-align: right; font-weight: 500; }
-  h1 { font-size: 20px; font-weight: 800; margin: 14px 0 4px; color: #111; }
-  .rd-title p { margin: 0 0 8px; color: #444; font-size: 12px; font-weight: 500; }
-  .rd-meta { display: flex; flex-wrap: wrap; gap: 5px 16px; margin: 7px 0 9px; padding: 8px 12px; background: #f5f5f4; border: 1px solid #cfcfca; border-radius: 8px; }
-  .meta-item { font-size: 10.5px; color: #555; }
-  .meta-item b { color: #1c1c1a; font-weight: 700; margin-left: 5px; }
+  .rd-brand b { font-size: 17px; color: #111; font-weight: 800; }
+  .rd-brand small { display: block; color: #666; font-size: 10px; margin-top: 2px; font-weight: 500; text-transform: uppercase; letter-spacing: .5px; }
+  .rd-stamp { font-size: 10px; color: #666; text-align: right; font-weight: 500; }
+  h1 { font-size: 18px; font-weight: 800; margin: 14px 0 4px; color: #111; }
+  .rd-title p { margin: 0 0 8px; color: #555; font-size: 11px; font-weight: 500; }
+  .rd-meta { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 8px 0 10px; padding: 8px 12px; background: #f5f5f3; border: 1px solid #c0c0bc; border-radius: 4px; }
+  .meta-item { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: .3px; font-weight: 600; }
+  .meta-item b { color: #1c1c1a; font-weight: 700; margin-left: 5px; text-transform: none; letter-spacing: 0; font-size: 12px; }
   .rd-summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin: 8px 0 10px; break-inside: avoid; page-break-inside: avoid; }
-  .rd-summary-grid > div { min-width: 0; padding: 6px 8px; border: 1px solid #cfcfca; border-radius: 5px; background: #fafafa; }
+  .rd-summary-grid > div { min-width: 0; padding: 7px 9px; border: 1px solid #c0c0bc; border-radius: 4px; background: #fafaf8; }
   .rd-summary-grid span, .rd-summary-grid b { display: block; }
-  .rd-summary-grid span { color: #555; font-size: 10px; }
-  .rd-summary-grid b { margin-top: 2px; color: #111; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; }
-  table { width: 100%; border-collapse: collapse; font-size: ${config.compact ? "11.5px" : "13px"}; line-height: 1.35; page-break-inside: auto; }
+  .rd-summary-grid span { color: #666; font-size: 9px; text-transform: uppercase; letter-spacing: .3px; font-weight: 600; }
+  .rd-summary-grid b { margin-top: 3px; color: #111; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  table { width: 100%; border-collapse: collapse; font-size: ${config.compact ? "11.5px" : "13px"}; line-height: 1.4; page-break-inside: auto; }
   thead { display: table-header-group; }
   tbody tr { break-inside: avoid; page-break-inside: avoid; }
-  th { background: #ffffff; color: #111; font-weight: 700; text-align: left; padding: 5px 7px; border-top: 2px solid #111; border-bottom: 2px solid #111; white-space: nowrap; }
+  th { background: #f0f0ee; color: #111; font-weight: 700; text-align: left; padding: 7px 8px; border-top: 2px solid #111; border-bottom: 1.5px solid #555; white-space: nowrap; font-size: 11px; text-transform: uppercase; letter-spacing: .3px; }
   th.num, td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; overflow-wrap: normal; word-break: keep-all; }
-  td { padding: 5px 7px; font-weight: 500; border-bottom: 1px solid #d8d8d3; }
-  th, td { overflow-wrap: anywhere; } /* ป้องกันหัวคอลัมน์ไทยยาวดันตารางกว้างเกินหน้า A4 */
-  tbody tr:nth-child(even) { background: #f4f4f2; }
-  tfoot td { font-weight: 800; background: #ffffff; border-top: 3.5pt double #111; border-bottom: 2px solid #111; color: #111; }
+  td { padding: 6px 8px; font-weight: 500; border-bottom: 1px solid #e0e0dc; vertical-align: middle; }
+  th, td { overflow-wrap: anywhere; }
+  tbody tr:nth-child(even) { background: #f7f7f5; }
+  tfoot td { font-weight: 800; background: #f0f0ee; border-top: 2px solid #111; border-bottom: 2px solid #111; color: #111; padding: 8px; font-size: 13px; }
   .rd-note { margin-top: 10px; font-size: 10pt; color: #444; font-weight: 500; line-height: 1.5; break-inside: avoid; page-break-inside: avoid; }
-  .rd-foot { margin-top: 14px; border-top: 1px dashed #bbb; padding-top: 7px; font-size: 9.5pt; color: #666; display: flex; justify-content: space-between; break-inside: avoid; page-break-inside: avoid; }
 </style></head>
 <body><div class="doc">
   <div class="rd-head">
@@ -279,7 +278,6 @@ export function printReportDoc(config: ReportDocConfig) {
   ${summaryRows ? `<div class="rd-summary-grid">${summaryRows}</div>` : ""}
   <table><thead><tr>${headCells}</tr></thead><tbody>${bodyRows}</tbody>${totalsRow}</table>
   ${config.footnote ? `<div class="rd-note">${escapeHtml(config.footnote)}</div>` : ""}
-  <div class="rd-foot"><span>พิมพ์จากระบบร้านค้าสวัสดิการ</span><span>เอกสารรายงาน A4</span></div>
 </div>
 <script>window.addEventListener("load", () => { const go = () => window.setTimeout(() => window.print(), 120); if (document.fonts && document.fonts.ready) { document.fonts.ready.then(go); } else { go(); } });</script>
 </body></html>`;
