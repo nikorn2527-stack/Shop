@@ -160,16 +160,14 @@ export function PrintPreviewModal({
         </div>
 
         <div className="export-preview-summary">
-          <span className="preview-chip ok">{PAPER_LABEL[paper]}</span>
           {paper === "thermal" && contentMm != null && (
-            <span className="preview-chip mute" title="ความยาวที่เนื้อหาต้องการตามจำนวนรายการ — ตั้งขนาดกระดาษเครื่องพิมพ์ให้รองรับความยาวนี้ (ดูข้อแนะนำด้านล่าง)">
+            <span className="preview-chip mute" title="ความยาวที่เนื้อหาต้องการตามจำนวนรายการ">
               ความยาวเนื้อหา ≈ {contentMm.toLocaleString("th-TH")} มม.
             </span>
           )}
           {chips.map((chip) => (
             <span key={chip} className="preview-chip mute">{chip}</span>
           ))}
-          <span className="preview-chip mute">พิมพ์จากเครื่องพิมพ์เริ่มต้นของเครื่องนี้</span>
         </div>
 
         <div className={`print-preview-stage paper-${paper}`}>

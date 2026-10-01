@@ -151,7 +151,6 @@ export function ExportPreviewModal({
                 {formatIcon(format)}
                 <span>
                   <b>{FORMAT_META[format].label}</b>
-                  <small>{FORMAT_META[format].hint}</small>
                 </span>
                 {state.preferred === format && <i className="preferred-dot" aria-hidden="true" />}
               </button>
