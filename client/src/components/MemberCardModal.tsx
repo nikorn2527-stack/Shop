@@ -180,41 +180,24 @@ export function MemberCardModal({
     } finally { setBusy(false); }
   };
   // ROUND 51 — พิมพ์บัตรผ่านพรีวิวก่อน (เหมือนจุดพิมพ์อื่น) ตรวจบัตรให้ถูกคนก่อนสั่งพิมพ์จริง
-  // FIX-4 issue 4 — printPreviewOpen ค้างเปิดได้ ปุ่ม "พิมพ์อีกครั้ง" ใช้ setPrintPreviewOpen(true)
   // ซ้ำได้เลย (ปิดพรีวิวเก่าแล้วเปิดใหม่ในคลิกเดียว)
   // FIX-8 (user) — ปิด preview ได้ที่ตั้งค่า → ใบเสร็จและเครื่องพิมพ์ (ลดขั้นตอน กดแล้วพิมพ์เลย)
-  const settingsQuery = trpc.settings.get.useQuery(undefined);
-  const printPreviewBefore = settingsQuery.data?.printPreviewBefore !== false;
-  // FIX-17 (user) — ลบ printerName (เครื่องพิมพ์ตั้งใน Windows ไม่ใช่ในแอป)
-  const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
-  const printCardDirect = () => {
-    if (printPreviewBefore) {
-      setPrintPreviewOpen(true);
-    } else {
-      window.print();
-    }
-  };
-  const printCard = () => printCardDirect();
-  // FIX-8 — Enter = สั่งพิมพ์ทันที (shortcut เมื่อ modal เปิด และไม่ใช่ confirmForBill mode)
+  // FIX-26 (user) — ปุ่ม 'พิมพ์' พิมพ์เลย ไม่เข้าพรีวิวก่อน
+  const printCard = () => { window.print(); };
   useEffect(() => {
-    if (confirmForBill) return; // โหมดยืนยันสมาชิกไม่ผูก Enter (กันกดผิด)
+    if (confirmForBill) return;
     const handler = (event: KeyboardEvent) => {
       if (event.key !== "Enter") return;
       const target = event.target as HTMLElement;
       const tag = target?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || tag === "select") return;
       event.preventDefault();
-      printCardDirect();
+      window.print();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [confirmForBill, printPreviewBefore]);
-  const reprintCard = () => {
-    setPrintPreviewOpen(false);
-    // next tick so the old PrintPreviewModal unmounts before the new one mounts
-    setTimeout(() => setPrintPreviewOpen(true), 0);
-  };
+  }, [confirmForBill]);
+  const reprintCard = () => { window.print(); };
   return <div className="modal-backdrop" onClick={onClose}><div className={`member-card-modal${confirmForBill ? " confirm-mode" : ""}`} onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label={confirmForBill ? "ยืนยันข้อมูลสมาชิกก่อนทำรายการ" : "บัตรสมาชิก"}>
     <div className="modal-heading">
       <div>
@@ -245,10 +228,9 @@ export function MemberCardModal({
       </> : <>
         <button className="outline-button amber" disabled={busy} onClick={downloadCard} title="ดาวน์โหลดรูปบัตรสมาชิกเป็นไฟล์รูปภาพ"><Download size={16} /> {busy ? "กำลังสร้างรูป..." : "ดาวน์โหลดรูปบัตร"}</button>
         <button className="outline-button blue" onClick={reprintCard} title="เปิดหน้าต่างพรีวิวอีกครั้ง — ใช้เมื่อพิมพ์ครั้งแรกไม่สำเร็จ หรือต้องพิมพ์ซ้ำ"><Printer size={16} /> พิมพ์อีกครั้ง</button>
-        <button className="primary-button" onClick={printCard} title={printPreviewBefore ? "พรีวิวก่อนพิมพ์ (ปิดได้ที่นี่)" : "พิมพ์ทันที — Enter"}><Printer size={16} /> พิมพ์บัตรสมาชิก{!printPreviewBefore && <kbd className="enter-hint">Enter</kbd>}</button>
+        <button className="primary-button" onClick={printCard} title="พิมพ์บัตรสมาชิกเลย"><Printer size={16} /> พิมพ์บัตรสมาชิก</button>
       </>}
     </div>
-    {printPreviewOpen && <PrintPreviewModal targetId="member-card" title="พรีวิวก่อนพิมพ์บัตรสมาชิก" subtitle={`${displayName} · ${member.memberNumber}`} paper="card" chips={[`ยอดคงเหลือ ${money(member.balance)}`, member.status === "active" ? "สถานะใช้จ่ายได้" : "ระงับการใช้จ่าย"]} onClose={() => setPrintPreviewOpen(false)} />}
   </div></div>;
 }
 
@@ -280,11 +262,7 @@ export function MemberCardBatchModal({
       .catch(() => { if (alive) setQrMap(new Map()); });
     return () => { alive = false; };
   }, [members]);
-  const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
-  const printBatch = () => setPrintPreviewOpen(true);
   const reprintBatch = () => {
-    setPrintPreviewOpen(false);
-    setTimeout(() => setPrintPreviewOpen(true), 0);
   };
   return <div className="modal-backdrop" onClick={onClose}><div className="member-card-modal member-card-batch-modal" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="พิมพ์บัตรสมาชิกหลายคนพร้อมกัน">
     <div className="modal-heading">
@@ -306,8 +284,7 @@ export function MemberCardBatchModal({
     <div className="modal-actions">
       <button className="outline-button" onClick={onClose}>ปิด</button>
       <button className="outline-button" onClick={reprintBatch} title="เปิดหน้าต่างพรีวิวอีกครั้ง"><Printer size={16} /> พิมพ์อีกครั้ง</button>
-      <button className="primary-button" onClick={printBatch}><Printer size={16} /> พิมพ์บัตร {members.length} ใบ</button>
+      <button className="primary-button" onClick={() => window.print()}><Printer size={16} /> พิมพ์บัตร {members.length} ใบ</button>
     </div>
-    {printPreviewOpen && <PrintPreviewModal targetId="member-card-batch" title={`พรีวิวก่อนพิมพ์บัตรสมาชิก ${members.length} ใบ`} subtitle="ขนาด CR80 · 85.6 × 54 มม. ต่อใบ" paper="card" chips={[`${members.length} ใบ`, "CR80 · 85.6 × 54 มม."]} onClose={() => setPrintPreviewOpen(false)} />}
   </div></div>;
 }
