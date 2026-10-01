@@ -245,8 +245,8 @@ export function MemberCardModal({
         <button className="outline-button" onClick={onClose}><X size={16} /> ไม่ใช่สมาชิกนี้</button>
         <button className="primary-button" disabled={busy} onClick={() => onConfirm?.()}><UserCheck size={16} /> {confirmLabel}</button>
       </> : <>
-        <button className="outline-button" disabled={busy} onClick={downloadCard}><Download size={16} /> {busy ? "กำลังสร้างรูป..." : "ดาวน์โหลดรูปบัตร"}</button>
-        <button className="outline-button" onClick={reprintCard} title="เปิดหน้าต่างพรีวิวอีกครั้ง — ใช้เมื่อพิมพ์ครั้งแรกไม่สำเร็จ หรือต้องพิมพ์ซ้ำ"><Printer size={16} /> พิมพ์อีกครั้ง</button>
+        <button className="outline-button amber" disabled={busy} onClick={downloadCard} title="ดาวน์โหลดรูปบัตรสมาชิกเป็นไฟล์รูปภาพ"><Download size={16} /> {busy ? "กำลังสร้างรูป..." : "ดาวน์โหลดรูปบัตร"}</button>
+        <button className="outline-button blue" onClick={reprintCard} title="เปิดหน้าต่างพรีวิวอีกครั้ง — ใช้เมื่อพิมพ์ครั้งแรกไม่สำเร็จ หรือต้องพิมพ์ซ้ำ"><Printer size={16} /> พิมพ์อีกครั้ง</button>
         <button className="primary-button" onClick={printCard} title={`พิมพ์บัตรสมาชิก${printPreviewBefore ? " (พรีวิวก่อน — ปิดได้ที่ ตั้งค่า → ใบเสร็จและเครื่องพิมพ์)" : " (พิมพ์ทันที — Enter)"}${printerName ? ` · เครื่องพิมพ์: ${printerName}` : ""}`}><Printer size={16} /> พิมพ์บัตรสมาชิก{!printPreviewBefore && <kbd className="enter-hint">Enter</kbd>}</button>
       </>}
     </div>
