@@ -2167,48 +2167,17 @@ export function Settings({
                     </div>
                   </div>
                 </HelpDisclosure>
-                <div className="paper-width-block">
-                  <div className="paper-width-head">
-                    <b>ขนาดกระดาษสลิปของเครื่องพิมพ์</b>
-                    <small>
-                      เลือกตามความกว้างกระดาษจริงในเครื่องพิมพ์หน้าร้าน —
-                      ใบเสร็จ สลิปเติม/ถอนเงิน
-                      และสลิปทดสอบจะจัดหน้าตามขนาดนี้เวลาพิมพ์
-                      (หน้าจอยังเหมือนเดิม) · เลือกแล้วลอง “พิมพ์ทดสอบ”
-                      ได้เลยก่อนบันทึก
-                    </small>
-                  </div>
-                  <div className="number-mode-grid paper-width-grid">
-                    {PAPER_WIDTHS.map(option => (
-                      <button
-                        className={paperWidth === option.id ? "selected" : ""}
-                        key={option.id}
-                        onClick={() =>
-                          updateForm({ receiptPaperWidth: option.id })
-                        }
-                        disabled={!form}
-                        aria-pressed={paperWidth === option.id}
-                        title={`พิมพ์สลิปกว้าง ${option.label}`}
-                      >
-                        <span className="number-radio">
-                          {paperWidth === option.id && <i />}
-                        </span>
-                        <span>
-                          <b>{option.label}</b>
-                          <small>{option.detail}</small>
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                {/* FIX-8 (user) — toggle พรีวิวก่อนพิมพ์: ปิดเพื่อ window.print() ทันทีเมื่อกดปุ่มพิมพ์ */}
+                {/* FIX-17 (user) — ทำให้เรียบง่าย: toggle พรีวิว + ทดสอบพิมพ์ + note
+                    ลบ: paper width selector, 3 PrinterPicker dropdowns, printer tips
+                    เพราะ: เครื่องพิมพ์ + หน้ากระดาษ ตั้งในไดรเวอร์ของ Windows
+                    browser print dialog จะแสดงเครื่องพิมพ์ที่ติดตั้งไว้ให้เลือกเอง */}
                 <div className="toggle-row">
                   <div>
-                    <b>พรีวิวก่อนพิมพ์ (ใบเสร็จ · บัตรสมาชิก · รายงาน)</b>
+                    <b>พรีวิวก่อนพิมพ์</b>
                     <small>
                       {form?.printPreviewBefore
-                        ? "เปิดอยู่ — กดปุ่มพิมพ์จะเปิดหน้าต่างพรีวิวก่อน (ปลอดภัย ได้ตรวจทุกครั้ง)"
-                        : "ปิดอยู่ — กดปุ่มพิมพ์แล้ว browser สั่งพิมพ์ทันที (เร็วกว่า ใช้ Enter ได้ แต่ไม่มีโอกาสตรวจทวน)"}
+                        ? "เปิดอยู่ — กดปุ่มพิมพ์จะเปิดหน้าต่างพรีวิวก่อน (ปลอดภัย)"
+                        : "ปิดอยู่ — กดปุ่มพิมพ์แล้ว browser สั่งพิมพ์ทันที (เร็วกว่า ใช้ Enter ได้)"}
                     </small>
                   </div>
                   <button
@@ -2224,50 +2193,10 @@ export function Settings({
                     <span />
                   </button>
                 </div>
-                {/* FIX-15 (user) — 3 เครื่องพิมพ์แยกตามประเภทเอกสาร:
-                    ใบเสร็จ (thermal) / รายงาน (A4) / บัตรสมาชิก
-                    แต่ละหน้าจะใช้เครื่องพิมพ์ที่กำหนดไว้ที่นี่อัตโนมัติ
-                    ไม่ต้องโชว์ชื่อเครื่องพิมพ์บนปุ่ม (เก็บไว้ใน tooltip เฉยๆ) */}
-                <div className="printer-picker-block">
-                  <div className="printer-picker-head">
-                    <b>เครื่องพิมพ์ใบเสร็จ (thermal)</b>
-                    <small>ใช้พิมพ์ใบเสร็จ · สลิปเติม/ถอนเงิน — เลือกเครื่องพิมพ์ thermal ของร้าน</small>
-                  </div>
-                  <PrinterPicker
-                    value={form?.receiptPrinterName ?? ""}
-                    onChange={next => updateForm({ receiptPrinterName: next })}
-                    disabled={!form}
-                  />
-                </div>
-                <div className="printer-picker-block">
-                  <div className="printer-picker-head">
-                    <b>เครื่องพิมพ์รายงาน (A4)</b>
-                    <small>ใช้พิมพ์รายงานสมาชิก · สรุปยอด · เอกสาร A4 — เลือกเครื่องพิมพ์เลเซอร์/อิงค์เจ็ท</small>
-                  </div>
-                  <PrinterPicker
-                    value={form?.reportPrinterName ?? ""}
-                    onChange={next => updateForm({ reportPrinterName: next })}
-                    disabled={!form}
-                  />
-                </div>
-                <div className="printer-picker-block">
-                  <div className="printer-picker-head">
-                    <b>เครื่องพิมพ์บัตรสมาชิก</b>
-                    <small>ใช้พิมพ์บัตรสมาชิก — เลือกเครื่องพิมพ์ที่รองรับขนาด CR80 (85.6×54มม.)</small>
-                  </div>
-                  <PrinterPicker
-                    value={form?.cardPrinterName ?? ""}
-                    onChange={next => updateForm({ cardPrinterName: next })}
-                    disabled={!form}
-                  />
-                </div>
                 <div className="printer-test-row">
                   <div>
                     <b>ทดสอบการพิมพ์</b>
-                    <small>
-                      พรีวิวสลิปตัวอย่างก่อน แล้วส่งไปเครื่องพิมพ์เริ่มต้น —
-                      เช็คกระดาษ/หมึก/ความชัดก่อนเปิดร้าน
-                    </small>
+                    <small>พิมพ์สลิปตัวอย่างเพื่อเช็คกระดาษ/หมึกก่อนเปิดร้าน</small>
                   </div>
                   <button
                     type="button"
@@ -2277,16 +2206,13 @@ export function Settings({
                     <Printer size={16} /> พิมพ์ทดสอบ
                   </button>
                 </div>
-                <div className="printer-tips">
-                  <span className="eyebrow">ขนาดกระดาษที่ระบบออกแบบไว้</span>
-                  <div className="printer-tip-pills">
-                    <span>
-                      ใบเสร็จ / สลิปเติม–ถอน / สรุปรอบตัดยอด · เลือกได้ด้านบน
-                      (58–80 มม.)
-                    </span>
-                    <span>บัตรสมาชิก · 85.6 × 54 มม. (CR80)</span>
-                    <span>รายงาน PDF · A4</span>
-                  </div>
+                <div className="settings-inline-note">
+                  <Printer size={16} />
+                  <span>
+                    เครื่องพิมพ์และขนาดกระดาษตั้งที่ไดรเวอร์ใน Windows
+                    (Settings → Devices → Printers) —
+                    ตอนกดปุ่มพิมพ์ browser จะเปิดหน้าต่างให้เลือกเครื่องพิมพ์ที่ติดตั้งไว้
+                  </span>
                 </div>
                 {printerTestOpen && (
                   <div

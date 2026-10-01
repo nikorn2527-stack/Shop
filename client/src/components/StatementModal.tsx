@@ -116,9 +116,7 @@ export function StatementModal({ member, transactions, onClose }: { member: Stat
   // พร้อมจำนวนแถวก่อนสั่งพิมพ์จริง
   // FIX-8 (user) — ปิด preview ได้ที่ตั้งค่า → ใบเสร็จและเครื่องพิมพ์ (ลดขั้นตอน กดแล้วพิมพ์เลย)
   const printPreviewBefore = settingsQuery.data?.printPreviewBefore !== false;
-  // FIX-9 (user) — ชื่อเครื่องพิมพ์ที่บันทึกไว้ — แสดงใน tooltip
-  // FIX-15 (user) — เปลี่ยนเป็น reportPrinterName (แยกตามประเภทเอกสาร) + ไม่โชว์ badge แล้ว
-  const printerName = (settingsQuery.data?.reportPrinterName ?? "").trim();
+  // FIX-17 (user) — ลบ printerName (เครื่องพิมพ์ตั้งใน Windows ไม่ใช่ในแอป)
   const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
   const printStatement = () => {
     if (printPreviewBefore) {
@@ -213,7 +211,7 @@ export function StatementModal({ member, transactions, onClose }: { member: Stat
     <div className="statement-actions modal-actions">
       <span className="statement-hint"><FileText size={14} /> A4 · {totals.count} รายการ</span>
       <button className="outline-button red" disabled={busy} onClick={downloadPdf} title="ดาวน์โหลดรายงานเป็น PDF"><Download size={16} /> {busy ? "กำลังสร้าง PDF..." : "ดาวน์โหลด PDF"}</button>
-      <button className="primary-button" onClick={printStatement} title={`พิมพ์รายงาน${printPreviewBefore ? " (พรีวิวก่อน — ปิดได้ที่ ตั้งค่า → ใบเสร็จและเครื่องพิมพ์)" : " (พิมพ์ทันที — Enter)"}${printerName ? ` · เครื่องพิมพ์: ${printerName}` : ""}`}><Printer size={16} /> พิมพ์รายงาน{!printPreviewBefore && <kbd className="enter-hint">Enter</kbd>}</button>
+      <button className="primary-button" onClick={printStatement} title={printPreviewBefore ? "พรีวิวก่อนพิมพ์ (ปิดได้ที่นี่)" : "พิมพ์ทันที — Enter"}><Printer size={16} /> พิมพ์รายงาน{!printPreviewBefore && <kbd className="enter-hint">Enter</kbd>}</button>
     </div>
     {printPreviewOpen && <PrintPreviewModal targetId="member-statement" title="พรีวิวก่อนพิมพ์รายงานสมาชิก" subtitle={`${displayName} · ${member.memberNumber} · ยอดคงเหลือ ${money(member.balance)}`} paper="a4" chips={[`${totals.count} รายการ`, totals.truncated ? `แสดง ${TX_LIMIT} รายการล่าสุด` : "ครบทุกรายการ"]} onClose={() => setPrintPreviewOpen(false)} />}
   </div></div>;

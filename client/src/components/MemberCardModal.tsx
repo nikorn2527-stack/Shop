@@ -185,9 +185,7 @@ export function MemberCardModal({
   // FIX-8 (user) — ปิด preview ได้ที่ตั้งค่า → ใบเสร็จและเครื่องพิมพ์ (ลดขั้นตอน กดแล้วพิมพ์เลย)
   const settingsQuery = trpc.settings.get.useQuery(undefined);
   const printPreviewBefore = settingsQuery.data?.printPreviewBefore !== false;
-  // FIX-9 (user) — ชื่อเครื่องพิมพ์ที่บันทึกไว้ — แสดงใน tooltip
-  // FIX-15 (user) — เปลี่ยนเป็น cardPrinterName (แยกตามประเภทเอกสาร) + ไม่โชว์ badge แล้ว
-  const printerName = (settingsQuery.data?.cardPrinterName ?? "").trim();
+  // FIX-17 (user) — ลบ printerName (เครื่องพิมพ์ตั้งใน Windows ไม่ใช่ในแอป)
   const [printPreviewOpen, setPrintPreviewOpen] = useState(false);
   const printCardDirect = () => {
     if (printPreviewBefore) {
@@ -247,7 +245,7 @@ export function MemberCardModal({
       </> : <>
         <button className="outline-button amber" disabled={busy} onClick={downloadCard} title="ดาวน์โหลดรูปบัตรสมาชิกเป็นไฟล์รูปภาพ"><Download size={16} /> {busy ? "กำลังสร้างรูป..." : "ดาวน์โหลดรูปบัตร"}</button>
         <button className="outline-button blue" onClick={reprintCard} title="เปิดหน้าต่างพรีวิวอีกครั้ง — ใช้เมื่อพิมพ์ครั้งแรกไม่สำเร็จ หรือต้องพิมพ์ซ้ำ"><Printer size={16} /> พิมพ์อีกครั้ง</button>
-        <button className="primary-button" onClick={printCard} title={`พิมพ์บัตรสมาชิก${printPreviewBefore ? " (พรีวิวก่อน — ปิดได้ที่ ตั้งค่า → ใบเสร็จและเครื่องพิมพ์)" : " (พิมพ์ทันที — Enter)"}${printerName ? ` · เครื่องพิมพ์: ${printerName}` : ""}`}><Printer size={16} /> พิมพ์บัตรสมาชิก{!printPreviewBefore && <kbd className="enter-hint">Enter</kbd>}</button>
+        <button className="primary-button" onClick={printCard} title={printPreviewBefore ? "พรีวิวก่อนพิมพ์ (ปิดได้ที่นี่)" : "พิมพ์ทันที — Enter"}><Printer size={16} /> พิมพ์บัตรสมาชิก{!printPreviewBefore && <kbd className="enter-hint">Enter</kbd>}</button>
       </>}
     </div>
     {printPreviewOpen && <PrintPreviewModal targetId="member-card" title="พรีวิวก่อนพิมพ์บัตรสมาชิก" subtitle={`${displayName} · ${member.memberNumber}`} paper="card" chips={[`ยอดคงเหลือ ${money(member.balance)}`, member.status === "active" ? "สถานะใช้จ่ายได้" : "ระงับการใช้จ่าย"]} onClose={() => setPrintPreviewOpen(false)} />}
