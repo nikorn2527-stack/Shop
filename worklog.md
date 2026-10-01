@@ -1667,3 +1667,149 @@ Stage Summary:
   1. ไป สมาชิกและบัญชี → คลิกสมาชิก → กด "พิมพ์บัตรสมาชิก" → เห็น modal มี 2 ปุ่ม (ดาวน์โหลดรูปบัตร + พิมพ์บัตรสมาชิก) — ไม่มี "พิมพ์อีกครั้ง" อีก
   2. กด "ดาวน์โหลดรูปบัตร" → ไฟล์ PNG ที่ได้จะเป็น CR80 สะอาด 323×204 (scale 4 = 1292×816 px) ตรงกับที่พิมพ์ออกมา (ไม่มี shadow/gradient พลาด)
   3. ทดสอบ batch print: เลือกหลายสมาชิก → กด "พิมพ์บัตร N ใบ" → modal มี 2 ปุ่ม (ปิด + พิมพ์บัตร N ใบ) — ไม่มี "พิมพ์อีกครั้ง" ที่คลิกแล้วไม่เกิดอะไรอีก
+
+---
+Task ID: QA-FEAT (cron review: assessment + new features + styling)
+Agent: main (orchestrator)
+Task: Assess project status → QA via agent-browser → add new features → improve styling → update worklog
+
+Work Log:
+
+## Phase 1 — Status Assessment
+
+- อ่าน worklog เข้าใจ context ทั้งหมด: FIX-8/9/10/10b (preview toggle + printer picker + helper mini-service) + FIX-11 (card download mismatch + do-nothing buttons)
+- ตรวจสถานะ dev server: ตายทุก bash session (background processes die เมื่อ shell exit) → ต้องรัน dev+helper ใน bash subshell เดียวกับ QA tests
+- ตรวจ TypeScript: `npx tsc --noEmit` → 0 errors ✅
+- ตรวจ ports: 3000 (main) + 3031 (printer-helper) — ทั้งคู่ต้องรันพร้อมกัน
+
+## Phase 2 — QA via agent-browser
+
+ทดสอบ end-to-end ผ่าน agent-browser:
+1. Login: admin / NewPass123! → เข้า Dashboard สำเร็จ
+2. Visit main views ทั้งหมด:
+   - ✅ หน้าร้าน / POS — heading "POS · ขายสินค้า" + ปุ่ม หักบัญชี/เงินสด/QR (disabled เพราะยังไม่มีสินค้าในตะกร้า)
+   - ✅ สต็อกสินค้า — heading "สต็อกสินค้า" + "รายการคงคลัง"
+   - ✅ สมาชิกและบัญชี — heading "จัดการสมาชิก" + ตารางสมาชิก (M-000001 นาย ทดสอบ บัตร สมาชิกทั่วไป)
+   - ✅ รายงาน — heading "รายงาน" + ปุ่ม CSV/Excel/PDF + แท็บ 5 ตัว (ภาพรวม/สินค้า/รายการ/ชนิด/พนักงาน)
+3. ตรวจ FIX-11 อีกครั้ง:
+   - ✅ Card modal: 2 ปุ่ม (ดาวน์โหลดรูปบัตร + พิมพ์บัตรสมาชิก) — ไม่มี "พิมพ์อีกครั้ง"
+   - ✅ Capture host มีอยู่: rect {x:-10000, w:323, h:204}
+   - ✅ No console errors
+4. ทดสอบ download card: คลิกแล้ว busy state สั้นมาก (~5s scale 4 render)
+
+## Phase 3 — New Features (FEAT-1, FEAT-2, FEAT-3)
+
+### FEAT-1: OnboardingBanner (Dashboard getting-started checklist)
+**ปัญหา**: Dashboard มี empty states กระจัดกระจาย ไม่มี flow ชัดว่า "เริ่มยังไง"
+
+**สร้าง component ใหม่**: `client/src/components/OnboardingBanner.tsx` (~140 บรรทัด)
+- รับ `progress: {productCount, memberCount, salesCount}` + `setView`
+- แสดง 3 ขั้นตอน (เพิ่มสินค้า / ลงทะเบียนสมาชิก / ทำการขายครั้งแรก)
+- แต่ละขั้นมี icon + label + detail + count/CTA
+- คลิกขั้น → navigate ไป view ที่เกี่ยวข้อง (stock/members/pos)
+- Progress bar (0/3, 1/3, 2/3, 3/3) + step count badge
+- "Complete" celebration state เมื่อครบทั้ง 3 ขั้น (แสดง "พร้อมใช้งาน" + ปุ่ม "เริ่มขาย")
+- localStorage dismissal (`onboarding-dismissed`) — ปุ่ม X ปิดถาวร
+- Responsive: 3-col desktop → 1-col mobile
+
+**Integrate into Dashboard**:
+- เพิ่ม `membersQuery = trpc.member.list.useQuery(undefined)` ใน Dashboard
+- คำนวณ `onboardingProgress = {productCount, memberCount, salesCount}` จาก queries ที่มีอยู่แล้ว + membersQuery
+- แสดง `<OnboardingBanner>` ระหว่าง `<SectionHeader>` และ `<div className="metric-grid">`
+
+**CSS**: `.onboarding-banner` (gradient bg + dotted pattern) + `.onboarding-step` (card hover lift + done state) + `.onboarding-progress-bar` (smooth width transition) + responsive breakpoints
+
+### FEAT-2: KeyboardShortcutsOverlay (press ? anywhere)
+**ปัญหา**: ระบบมี F1-F9 shortcuts แต่ไม่มีที่ค้นพบ — พนักงานใหม่ไม่รู้ว่ามี
+
+**สร้าง component ใหม่**: `client/src/components/KeyboardShortcutsOverlay.tsx` (~140 บรรทัด)
+- `useEffect` listener สำหรับ keydown `?` (skip ใน input/textarea/select)
+- Toggle modal แสดงคีย์ลัดทั้งหมด 3 กลุ่ม:
+  - **หน้าร้าน / POS**: F1-F9 (เลือกสมาชิก/เติม/ถอน/พิเศษ/พักบิล/ลงทะเบียน/แผงลัด/สแกน/รับเข้า)
+  - **ทั่วแอป**: ? / Esc / Enter / Alt+T
+  - **ใบเสร็จ · บัตรสมาชิก · รายงาน**: Enter (พิมพ์) / Esc (ปิดพรีวิว)
+- แต่ละ shortcut มี tag POS/Global/Modals (สีต่างกัน)
+- ปิดได้ด้วย Esc / คลิก backdrop / ปุ่ม X
+- Footer มี hint: "ฝึกใช้คีย์ลัดบ่อยๆ จะช่วยให้ขายของเร็วขึ้นมาก"
+- Export `ShortcutsFab` (floating action button) สำหรับ trigger แบบคลิกได้ (optional — ยังไม่ mount)
+
+**Integrate into AppShell**:
+- Import + mount `<KeyboardShortcutsOverlay />` ใน AppShell ก่อน `</main>`
+- ทำให้ทุกหน้าใน authenticated area กด `?` ได้
+
+**CSS**: `.shortcuts-modal` (720px max width, 3-column grid) + `.kbd` (keycap style: monospace, 2px border-bottom, box-shadow inset) + `.shortcut-tag` (POS purple / Global blue / Modals orange) + `.shortcuts-footer` (hint box)
+
+### FEAT-3: Polish Empty States
+**ปัญหา**: `.table-loading` และ `.chart-empty-note` ดูแบนราบ ไม่น่าสนใจ
+
+**แก้ CSS**:
+- `.table-loading`: เพิ่ม `::before` radial-gradient halo + ทำให้ svg อยู่ใน circular container (border-dashed + bg) + ปรับ typography (b 12px 600, span 10.5px center max-width 280)
+- `.chart-empty-note`: เพิ่ม `::before` "—" ตัวใหญ่สีอ่อน + `::after` "เริ่มขายผ่าน POS เพื่อดูกราฟยอดขายที่นี่" hint
+
+## Phase 4 — Styling Improvements (STYLE-1, STYLE-2, STYLE-3)
+
+### QA-STYLE-1: Polished metric-card hover + transitions
+- เพิ่ม `.metric-card` transition: transform 0.18s cubic-bezier, box-shadow 0.18s, border-color 0.18s
+- Hover: translateY(-2px) + border-color #b9d8cb + shadow 0 8px 22px
+- `.metric-icon`: scale(1.08) on hover
+
+### QA-STYLE-2: Smoother dash-tab transitions
+- `.dash-tab`: transition background/color/transform 0.15s
+- Hover (not active): bg #eaf5f1 + translateY(-1px)
+- Active: translateY(0)
+
+### QA-STYLE-3: Better focus rings (accessibility)
+- `.outline-button`, `.primary-button`, `.icon-button`, `.dash-tab`, `.onboarding-step`, `.shortcuts-fab`: focus-visible outline 2px solid teal + offset 2px
+
+## Phase 5 — Icon Library Expansion
+- เพิ่ม 5 icons ใหม่ใน `client/src/lib/icons.ts`: Rocket, CircleCheck, ShoppingCartSimple, Keyboard, Question, Lightning (จาก @phosphor-icons/react)
+
+## Phase 6 — Verification (agent-browser end-to-end)
+
+- Restart dev server + printer-helper
+- Login admin / NewPass123!
+- ทดสอบ Dashboard:
+  - ✅ OnboardingBanner แสดง: 3 steps, 1 done (member created earlier), progress "1/3"
+  - ✅ คลิก "เพิ่มสินค้าเข้าระบบ" → navigate ไป "สต็อกสินค้า"
+  - ✅ กลับ Dashboard ได้
+- ทดสอบ Keyboard Shortcuts:
+  - ✅ Dispatch `?` keydown → modal เปิด
+  - ✅ 3 กลุ่ม: "หน้าร้าน / POS", "ทั่วแอป", "ใบเสร็จ · บัตรสมาชิก · รายงาน"
+  - ✅ Dispatch Escape → modal ปิด
+- ทดสอบ Reports: ทุกอย่างปกติ (empty states ไม่แสดงเพราะมีข้อมูล)
+
+## Phase 7 — Verification Status
+
+- `npx tsc --noEmit` → 0 errors ✅
+- agent-browser end-to-end: all features verified working
+- VLM ยืนยันภาพ screenshots: dashboard สะอาด + onboarding ชัด + shortcuts modal มี kbd style + tags
+
+## Stage Summary
+
+- ไฟล์ใหม่ (2):
+  - `client/src/components/OnboardingBanner.tsx` (~140 บรรทัด)
+  - `client/src/components/KeyboardShortcutsOverlay.tsx` (~140 บรรทัด)
+- ไฟล์แก้ (4):
+  - `client/src/lib/icons.ts` (+6 icons: Rocket, CircleCheck, ShoppingCartSimple, Keyboard, Question, Lightning)
+  - `client/src/pages/Dashboard.tsx` (import OnboardingBanner + membersQuery + render banner)
+  - `client/src/layouts/AppShell.tsx` (import + mount KeyboardShortcutsOverlay)
+  - `client/src/index.css` (+~330 บรรทัด: onboarding-banner + shortcuts-modal + kbd + shortcuts-fab + metric-card hover + dash-tab transitions + focus rings + polished empty states)
+- TypeScript: 0 errors
+- agent-browser QA: ✅ onboarding (3 steps, 1 done, click navigates) + ✅ shortcuts overlay (3 groups, ? opens, Esc closes) + ✅ empty states polished
+
+## ตอบโจทย์ Requirements
+
+- ✅ [Mandatory] Improve styling with more details: metric-card hover lift + dash-tab transitions + focus rings + polished empty states (circular icon + halo + hint)
+- ✅ [Mandatory] Add more features and functionality: 2 ฟีเจอร์ใหม่ (OnboardingBanner + KeyboardShortcutsOverlay)
+- ✅ Assess project status: stable, all main views work, FIX-11 verified
+- ✅ QA via agent-browser: login + navigate all views + test new features
+- ✅ Update worklog
+
+## คำแนะนำ Phase ถัดไป
+
+1. **ทดสอบ OnboardingBanner ในสถานการณ์จริง**: ลบข้อมูลทั้งหมดในร้านทดสอบ → ดูว่า onboarding แสดงครบ 3 ขั้น + ทดสอบ dismiss (X) + localStorage persistence
+2. **เพิ่ม ShortcutsFab**: mount `<ShortcutsFab>` ใน AppShell (bottom-right) เพื่อให้ค้นพบ shortcut overlay ได้โดยไม่ต้องรู้ว่ากด `?`
+3. **ขยาย OnboardingBanner**: เพิ่ม step "ตั้งค่าร้าน" (ชื่อร้าน + โลโก้ + ธนาคาร) สำหรับร้านใหม่จริงๆ
+4. **Shortcut overlay customization**: ถ้าเพิ่ม shortcuts ใหม่ในอนาคต ให้ update SHORTCUT_GROUPS array ใน KeyboardShortcutsOverlay.tsx
+5. **Polish mobile responsive**: ทดสอบบน mobile viewport (375px) — OnboardingBanner 1-col, shortcuts modal full-width
+

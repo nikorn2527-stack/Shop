@@ -7,6 +7,7 @@ import type { Role, View } from "./pageData";
 import { isAdminRole, money, roleThaiLabel } from "./pageData";
 import { ConfirmDialog, SectionHeader } from "./PagePrimitives";
 import { PrintPreviewModal } from "@/components/PrintPreviewModal";
+import { OnboardingBanner } from "@/components/OnboardingBanner";
 import { trpc } from "@/lib/trpc";
 import { formatAxisLabel, formatThaiDate, formatTimeShort, parseBahtFromDetail } from "./viewFormat";
 
@@ -190,6 +191,7 @@ export function Dashboard({ setView, role, userName }: { setView: (view: View) =
   const statsQuery = trpc.dashboard.stats.useQuery({ rangeDays });
   const logsQuery = trpc.logs.list.useQuery({ limit: 1000 });
   const productsQuery = trpc.product.list.useQuery(undefined);
+  const membersQuery = trpc.member.list.useQuery(undefined);
   const stats = statsQuery.data;
 
   const firstName = (userName || "ผู้ใช้ระบบ").trim().split(/\s+/)[0];
@@ -291,9 +293,17 @@ export function Dashboard({ setView, role, userName }: { setView: (view: View) =
   const expirySoon = stats?.expirySoon ?? [];
   const recentActivities = stats?.recentActivities ?? [];
   const loading = statsQuery.isLoading;
+  // QA-FEAT-1 — onboarding banner shows when the store is in early state
+  // (no products/members/sales). Each step has a CTA that jumps to the right view.
+  const onboardingProgress = {
+    productCount: productsQuery.data?.length ?? 0,
+    memberCount: membersQuery.data?.length ?? 0,
+    salesCount: stats?.totalOrders ?? 0,
+  };
   return (
     <>
       <SectionHeader eyebrow={`ภาพรวมการดำเนินงาน · ${role === "admin" ? "มุมมองผู้บริหาร" : role === "dev" ? "มุมมองผู้พัฒนา" : "มุมมองเจ้าหน้าที่"}`} title={`${greetingWord}, ${firstName}`} description="สรุปตัวเลขสำคัญอยู่บนสุด · เลือกมุมมองข้อมูลจากแถบด้านล่างเพื่อดูรายละเอียดแบบเต็มพื้นที่" action={<><div className={`permission-chip ${role}`}><span>{role === "admin" ? <Crown size={14} /> : role === "dev" ? <Terminal size={14} /> : <ShieldCheck size={14} />}</span>{role === "admin" ? "สิทธิ์ผู้บริหาร · วิเคราะห์เต็มรูปแบบ" : role === "dev" ? "สิทธิ์ผู้พัฒนา · เข้าถึงทุกส่วนของระบบ" : "สิทธิ์เจ้าหน้าที่ · ปฏิบัติงานหน้าร้าน"}</div><div className="permission-chip neutral" title="วันที่ปัจจุบัน"><span><CalendarDays size={14} /></span>วันนี้ · {formatThaiDate(new Date())}</div></>} />
+      <OnboardingBanner progress={onboardingProgress} setView={setView} />
       <div className="metric-grid">
         <div className="metric-card highlight"><div className="metric-top"><span>ยอดขายทั้งหมด · {range}</span><span className="metric-icon green"><ShoppingBag size={18} /></span></div><strong>{loading ? "…" : money(stats?.totalSales ?? 0)}</strong><div className="metric-foot"><span>{stats?.totalOrders ?? 0} บิล</span><span>สูงสุด {money(Math.max(...(stats?.revenueByDay ?? []).map((day) => day.total), 0))} ในหนึ่งวัน</span></div></div>
         <div className="metric-card"><div className="metric-top"><span>ออเดอร์ทั้งหมด</span><span className="metric-icon blue"><ReceiptText size={18} /></span></div><strong>{loading ? "…" : (stats?.totalOrders ?? 0).toLocaleString("th-TH")} <small>บิล</small></strong><div className="metric-foot"><span>เฉลี่ย {((stats?.totalOrders ?? 0) / rangeDays).toFixed(1)} บิล/วัน</span><span>ในช่วง{range}</span></div></div>

@@ -41,6 +41,7 @@ import {
 import { toast } from "sonner";
 import { EditionPill, useEditionStatus } from "@/components/EditionUi";
 import { GlobalSearch } from "@/components/GlobalSearch";
+import { KeyboardShortcutsOverlay } from "@/components/KeyboardShortcutsOverlay";
 import { Dashboard } from "../pages/Dashboard";
 import { Pos } from "../pages/Pos";
 import { Stock } from "../pages/Stock";
@@ -1011,6 +1012,8 @@ export function AppShell({
             setActiveView("reports");
           }}
         />
+        {/* QA-FEAT-2 — discoverable keyboard shortcuts overlay. Press ? anywhere. */}
+        <KeyboardShortcutsOverlay />
       </main>
     </div>
   );

@@ -304,9 +304,50 @@ body, button, input, select, textarea { font-family: var(--font-body); }
 .pos-loading { grid-column: 1 / -1; min-height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #959988; gap: 6px; border: 1px dashed #e3ede8; border-radius: 10px; margin-top: 15px; }
 .pos-loading b { color: #7e8270; font-size: 11px; }
 .pos-loading span { font-size: 11px; }
-.table-loading { min-height: 120px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #959988; gap: 6px; padding: 20px 0; }
-.table-loading b { color: #7e8270; font-size: 11px; }
-.table-loading span { font-size: 11px; }
+.table-loading {
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #959988;
+  gap: 8px;
+  padding: 30px 20px;
+  position: relative;
+}
+.table-loading::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle at 50% 50%, rgba(72, 128, 107, 0.04) 0 40px, transparent 41px);
+  pointer-events: none;
+}
+.table-loading > svg {
+  width: 38px;
+  height: 38px;
+  color: #b9c8c0;
+  background: #f4faf7;
+  padding: 9px;
+  border-radius: 50%;
+  border: 1px dashed #cfe4db;
+  position: relative;
+  z-index: 1;
+}
+.table-loading b {
+  color: #4c5a50;
+  font-size: 12px;
+  font-weight: 600;
+  position: relative;
+  z-index: 1;
+}
+.table-loading span {
+  font-size: 10.5px;
+  color: #8b9080;
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  max-width: 280px;
+}
 .pay-button:disabled, .pay-split button:disabled { opacity: .55; cursor: not-allowed; filter: saturate(.6); }
 .pay-button:disabled:hover, .pay-split button:disabled:hover { background: var(--teal); }
 .pay-split button:disabled:hover { background: #fff; }
@@ -3212,7 +3253,31 @@ th { font-weight: 600; }
 .line-x-labels span { flex: 1; text-align: center; font-size: 9px; color: #8b9080; visibility: hidden; min-width: 0; white-space: nowrap; }
 .line-x-labels span.show { visibility: visible; }
 .line-x-labels span.picked { color: var(--teal); font-weight: 700; }
-.chart-empty-note { flex: 1; display: grid; place-items: center; color: #8b9080; font-size: 11px; padding: 30px 0; }
+.chart-empty-note {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  color: #8b9080;
+  font-size: 11px;
+  padding: 36px 20px;
+  text-align: center;
+  position: relative;
+}
+.chart-empty-note::before {
+  content: "—";
+  display: block;
+  font-size: 22px;
+  color: #c5d4cb;
+  margin-bottom: 6px;
+  font-weight: 300;
+}
+.chart-empty-note::after {
+  content: "เริ่มขายผ่าน POS เพื่อดูกราฟยอดขายที่นี่";
+  display: block;
+  font-size: 10px;
+  color: #a8ad9d;
+  margin-top: 6px;
+}
 
 /* ═══ ROUND 34 — กราฟยอดขายออกแบบใหม่: เส้นเดียวอ่านง่าย + คำอธิบายครบ ═══ */
 /* ผู้ใช้บอกว่ากราฟเดิม "ออกแบบผิด ดูไม่เข้าใจ" — สองเส้นบนแกนเดียว (เส้นเติมเงินแบนราบ
@@ -5917,3 +5982,372 @@ button, .primary-button, .outline-button, .icon-button, .quick-amount-btn, .pay-
 .report-staff-option { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 12.5px; color: #4c5a50; transition: background 0.1s; }
 .report-staff-option:hover { background: var(--teal-mist, #eaf5f1); }
 .report-staff-option input { accent-color: var(--teal, #007a55); width: 16px; height: 16px; }
+
+/* ============================================================================
+ * QA-FEAT-1 — OnboardingBanner (Dashboard getting-started checklist)
+ *   Shows when store has no products/members/sales yet. Each step links to
+ *   the relevant view. Hidden via localStorage once dismissed or when all
+ *   three targets are met (shows celebratory "complete" state briefly).
+ * ========================================================================== */
+.onboarding-banner {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 16px;
+  background: linear-gradient(135deg, #f0f7f3 0%, #e9f2ec 50%, #f3eee7 100%);
+  border: 1px solid #d8e6dd;
+  border-radius: 13px;
+  padding: 14px 16px 14px 14px;
+  margin-bottom: 14px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 14px rgba(40, 70, 58, 0.08);
+}
+.onboarding-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle at 12% 18%, rgba(61, 140, 113, 0.07) 0 8px, transparent 9px),
+                    radial-gradient(circle at 88% 82%, rgba(195, 113, 75, 0.05) 0 14px, transparent 15px);
+  pointer-events: none;
+}
+.onboarding-banner.complete {
+  background: linear-gradient(135deg, #eaf6ee 0%, #e0f0e6 100%);
+  border-color: #c5e1cc;
+}
+.onboarding-icon-wrap {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 11px;
+  background: #fff;
+  color: var(--teal, #3d8c71);
+  box-shadow: 0 2px 8px rgba(40, 70, 58, 0.12);
+  position: relative;
+  z-index: 1;
+}
+.onboarding-banner.complete .onboarding-icon-wrap { color: #4b9d7f; }
+.onboarding-body { min-width: 0; position: relative; z-index: 1; }
+.onboarding-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+.onboarding-head .eyebrow {
+  font-size: 9.5px;
+  letter-spacing: 1.5px;
+  font-weight: 700;
+  color: #4b8a72;
+}
+.onboarding-head h2 {
+  margin: 2px 0 0;
+  font-size: 15px;
+  color: #2e463e;
+  font-weight: 700;
+}
+.onboarding-progress {
+  width: 100px;
+  height: 6px;
+  background: rgba(72, 128, 107, 0.16);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.onboarding-progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #4b9d7f 0%, #3d8c71 100%);
+  border-radius: 999px;
+  transition: width 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.onboarding-steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.onboarding-step {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid #d4e2d8;
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  font-family: inherit;
+}
+.onboarding-step:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(40, 70, 58, 0.12);
+  border-color: #b9d8cb;
+  background: #fff;
+}
+.onboarding-step.done {
+  background: #f1faf6;
+  border-color: #c5e1cc;
+}
+.onboarding-step .step-icon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #eef6f2;
+  color: #4b8a72;
+  flex-shrink: 0;
+}
+.onboarding-step.done .step-icon {
+  background: #4b9d7f;
+  color: #fff;
+}
+.onboarding-step .step-text { min-width: 0; }
+.onboarding-step .step-text b {
+  display: block;
+  font-size: 12.5px;
+  color: #2e463e;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.onboarding-step .step-text small {
+  display: block;
+  font-size: 10.5px;
+  color: #7b7f70;
+  margin-top: 2px;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.onboarding-step .step-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  color: #4b8a72;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+.onboarding-step .step-count.done {
+  color: #4b9d7f;
+  font-weight: 600;
+}
+.onboarding-step .step-count b { color: inherit; font-weight: 700; }
+.onboarding-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+}
+@media (max-width: 820px) {
+  .onboarding-banner { grid-template-columns: 1fr; padding: 14px; }
+  .onboarding-icon-wrap { width: 36px; height: 36px; }
+  .onboarding-steps { grid-template-columns: 1fr; }
+  .onboarding-head { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .onboarding-progress { width: 100%; }
+}
+
+/* ============================================================================
+ * QA-FEAT-2 — KeyboardShortcutsOverlay (press ? anywhere in the app)
+ *   Modal listing all F1-F9 shortcuts + Enter/Esc behavior. Also includes
+ *   a floating FAB-style trigger as a discoverable affordance.
+ * ========================================================================== */
+.shortcuts-modal {
+  width: min(720px, calc(100vw - 32px));
+  max-height: calc(100dvh - 64px);
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid #e4ede9;
+  border-radius: 14px;
+  box-shadow: 0 22px 55px rgba(35, 62, 52, 0.22);
+  padding: 20px 22px 18px;
+  font-family: "Sarabun", "TH Sarabun New", "Leelawadee UI", Tahoma, sans-serif;
+}
+.shortcuts-modal .modal-heading h2 {
+  font-size: 18px;
+  color: #2e463e;
+  margin: 0;
+}
+.shortcuts-modal .modal-heading p {
+  font-size: 11.5px;
+  color: #7b7f70;
+  margin: 5px 0 0;
+}
+.shortcuts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+  margin: 18px 0 14px;
+}
+.shortcut-group h3 {
+  margin: 0 0 10px;
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: #4b8a72;
+  font-weight: 700;
+  border-bottom: 1px solid #e7eeeb;
+  padding-bottom: 6px;
+}
+.shortcut-group ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.shortcut-group li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+}
+.shortcut-keys {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 56px;
+}
+.shortcut-key-seq {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.shortcut-key-seq .plus {
+  color: #b9c2bb;
+  font-size: 11px;
+  font-weight: 500;
+}
+.kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 11px;
+  font-weight: 600;
+  color: #2e463e;
+  background: #f7faf8;
+  border: 1px solid #d4e2d8;
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.04);
+  line-height: 1;
+}
+.shortcut-desc {
+  font-size: 12px;
+  color: #4c5a50;
+  line-height: 1.4;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.shortcut-tag {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 4px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+.shortcut-tag.tag-pos { background: #f0e6f6; color: #72589f; }
+.shortcut-tag.tag-global { background: #e6f0f6; color: #4a6f8a; }
+.shortcut-tag.tag-modals { background: #f6ece6; color: #a06f48; }
+.shortcuts-footer {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 13px;
+  background: #f4faf7;
+  border: 1px dashed #cfe4db;
+  border-radius: 9px;
+  font-size: 11.5px;
+  color: #5c6b60;
+  line-height: 1.55;
+}
+.shortcuts-footer svg { color: #4b9d7f; flex-shrink: 0; }
+
+/* Floating Action Button — discoverable shortcuts trigger */
+.shortcuts-fab {
+  position: fixed;
+  bottom: 18px;
+  right: 18px;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid #d4e2d8;
+  box-shadow: 0 4px 14px rgba(40, 70, 58, 0.18);
+  color: #4b8a72;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  z-index: 30;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+.shortcuts-fab:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(40, 70, 58, 0.22);
+  background: #f7faf8;
+  color: #3d8c71;
+}
+.shortcuts-fab:active { transform: translateY(0); }
+@media (max-width: 560px) {
+  .shortcuts-fab { bottom: 14px; right: 14px; width: 40px; height: 40px; }
+}
+
+/* ============================================================================
+ * QA-STYLE-1 — Polished metric-card hover + transitions
+ *   Adds subtle lift + border highlight on hover, plus smoother transitions
+ *   for icon background. Keeps existing layout intact.
+ * ========================================================================== */
+.metric-card {
+  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1),
+              box-shadow 0.18s ease,
+              border-color 0.18s ease;
+  cursor: default;
+}
+.metric-card:hover {
+  transform: translateY(-2px);
+  border-color: #b9d8cb;
+  box-shadow: 0 8px 22px rgba(40, 70, 58, 0.12);
+}
+.metric-card .metric-icon {
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+.metric-card:hover .metric-icon {
+  transform: scale(1.08);
+}
+
+/* QA-STYLE-2 — smoother dash-tab transitions */
+.dash-tab {
+  transition: background 0.15s ease, color 0.15s ease, transform 0.12s ease;
+}
+.dash-tab:hover:not(.active) {
+  background: #eaf5f1;
+  transform: translateY(-1px);
+}
+.dash-tab:active { transform: translateY(0); }
+
+/* QA-STYLE-3 — better focus ring for accessibility on key interactive elements */
+.outline-button:focus-visible,
+.primary-button:focus-visible,
+.icon-button:focus-visible,
+.dash-tab:focus-visible,
+.onboarding-step:focus-visible,
+.shortcuts-fab:focus-visible {
+  outline: 2px solid var(--teal, #3d8c71);
+  outline-offset: 2px;
+}
+
