@@ -174,6 +174,13 @@ export function StatementModal({ member, transactions, onClose }: { member: Stat
           <div><small>ซื้อสินค้ารวม</small><b className="st-buy">{money(totals.purchases)}</b></div>
         </div>
         <table className="statement-table">
+          <colgroup>
+            <col className="col-time" />
+            <col className="col-type" />
+            <col className="col-detail" />
+            <col className="col-num" />
+            <col className="col-num" />
+          </colgroup>
           <thead><tr><th>วันและเวลา</th><th>ประเภท</th><th>รายละเอียด</th><th className="st-num">จำนวนเงิน</th><th className="st-num">ยอดคงเหลือ</th></tr></thead>
           <tbody>
             {ordered.length === 0 ? <tr><td colSpan={5} className="st-empty">ยังไม่มีรายการทำธุรกรรม</td></tr> : ordered.map((tx) => {
