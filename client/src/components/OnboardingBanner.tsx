@@ -4,6 +4,7 @@ import {
   Check,
   CircleCheck,
   Rocket,
+  Store,
   UserPlus,
   PackagePlus,
   ShoppingCartSimple,
@@ -13,17 +14,20 @@ import type { View } from "../pages/pageData";
 
 /**
  * OnboardingBanner — shows on the Dashboard when the store is in an early
- * state (no products / no members / no sales yet). Renders a friendly
- * step-by-step checklist that jumps the user to the right view when clicked.
+ * state (store not configured / no products / no members / no sales yet).
+ * Renders a friendly step-by-step checklist that jumps the user to the right
+ * view when clicked.
  *
- * Hidden automatically once the store has products AND members AND sales.
- * Each step shows a green check when its target count > 0.
+ * Hidden automatically once the store has products AND members AND sales
+ * (the "ตั้งค่าร้าน" step is optional — it stays done once dismissed).
  *
  * Persisted dismissal: stores `onboarding-dismissed` in localStorage so the
  * banner doesn't reappear after the user dismisses it (until they reset
  * settings, which clears localStorage too in some flows).
  */
 export type OnboardingProgress = {
+  /** True when appName has been changed from default OR appLogo is set OR ≥1 bank account */
+  storeConfigured: boolean;
   productCount: number;
   memberCount: number;
   salesCount: number;
@@ -44,9 +48,21 @@ export function OnboardingBanner({
     }
   });
 
-  // Compute completion for each step
+  // Compute completion for each step — FEAT-5 adds the "ตั้งค่าร้าน" step
+  // as step 1 (most important for brand-new stores). 4 steps total now.
   const steps = useMemo(() => {
     return [
+      {
+        id: "store",
+        label: "ตั้งค่าร้านค้า",
+        detail: "ชื่อร้าน · โลโก้ · บัญชีธนาคารรับเงินโอน — แสดงบนใบเสร็จทุกใบ",
+        cta: "ไปตั้งค่าร้าน",
+        view: "settings" as View,
+        icon: Store,
+        done: progress.storeConfigured,
+        count: progress.storeConfigured ? 1 : 0,
+        countLabel: "พร้อม",
+      },
       {
         id: "products",
         label: "เพิ่มสินค้าเข้าระบบ",
@@ -140,7 +156,7 @@ export function OnboardingBanner({
             />
           </div>
         </div>
-        <div className="onboarding-steps">
+        <div className="onboarding-steps onboarding-steps-4">
           {steps.map((step) => {
             const Icon = step.icon;
             return (
@@ -158,7 +174,11 @@ export function OnboardingBanner({
                   <small>{step.detail}</small>
                 </span>
                 <span className={`step-count${step.done ? " done" : ""}`}>
-                  {step.count > 0 ? <><b>{step.count}</b> {step.countLabel}</> : <><ArrowRight size={13} /> {step.cta}</>}
+                  {step.id === "store"
+                    ? (step.done ? <><Check size={12} weight="bold" /> ตั้งแล้ว</> : <><ArrowRight size={13} /> {step.cta}</>)
+                    : step.count > 0
+                      ? <><b>{step.count}</b> {step.countLabel}</>
+                      : <><ArrowRight size={13} /> {step.cta}</>}
                 </span>
               </button>
             );

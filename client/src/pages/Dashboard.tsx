@@ -8,6 +8,7 @@ import { isAdminRole, money, roleThaiLabel } from "./pageData";
 import { ConfirmDialog, SectionHeader } from "./PagePrimitives";
 import { PrintPreviewModal } from "@/components/PrintPreviewModal";
 import { OnboardingBanner } from "@/components/OnboardingBanner";
+import { RecentBillsWidget } from "@/components/RecentBillsWidget";
 import { trpc } from "@/lib/trpc";
 import { formatAxisLabel, formatThaiDate, formatTimeShort, parseBahtFromDetail } from "./viewFormat";
 
@@ -192,6 +193,7 @@ export function Dashboard({ setView, role, userName }: { setView: (view: View) =
   const logsQuery = trpc.logs.list.useQuery({ limit: 1000 });
   const productsQuery = trpc.product.list.useQuery(undefined);
   const membersQuery = trpc.member.list.useQuery(undefined);
+  const settingsQuery = trpc.settings.get.useQuery(undefined);
   const stats = statsQuery.data;
 
   const firstName = (userName || "ผู้ใช้ระบบ").trim().split(/\s+/)[0];
@@ -295,7 +297,18 @@ export function Dashboard({ setView, role, userName }: { setView: (view: View) =
   const loading = statsQuery.isLoading;
   // QA-FEAT-1 — onboarding banner shows when the store is in early state
   // (no products/members/sales). Each step has a CTA that jumps to the right view.
+  // FEAT-5 — added "ตั้งค่าร้าน" step: considered configured when appName has
+  // been changed from the default, OR appLogo is set, OR ≥1 bank account exists.
+  const storeConfigured = useMemo(() => {
+    const s = settingsQuery.data;
+    if (!s) return false;
+    const hasCustomName = (s.appName ?? "").trim() !== "" && s.appName !== "ร้านค้าสวัสดิการ";
+    const hasLogo = Boolean(s.appLogo);
+    const hasBank = (s.bankAccounts ?? []).length > 0;
+    return hasCustomName || hasLogo || hasBank;
+  }, [settingsQuery.data]);
   const onboardingProgress = {
+    storeConfigured,
     productCount: productsQuery.data?.length ?? 0,
     memberCount: membersQuery.data?.length ?? 0,
     salesCount: stats?.totalOrders ?? 0,
@@ -310,6 +323,8 @@ export function Dashboard({ setView, role, userName }: { setView: (view: View) =
         <div className="metric-card"><div className="metric-top"><span>สินค้าขายดี</span><span className="metric-icon amber"><BarChart3 size={18} /></span></div><strong>{loading ? "…" : (stats?.bestSellerCount ?? 0).toLocaleString("th-TH")} <small>ชิ้น</small></strong><div className="metric-foot warning"><span>{bestSellers[0]?.name ?? "ยังไม่มีข้อมูลการขาย"}</span><span>อันดับ 1 ในช่วง{range}</span></div></div>
         <div className="metric-card"><div className="metric-top"><span>ยอดขายเฉลี่ยต่อวัน</span><span className="metric-icon purple"><CalendarDays size={18} /></span></div><strong>{loading ? "…" : money(stats?.avgDailySales ?? 0)}</strong><div className="metric-foot"><span>ขายไป {stats?.itemsSold ?? 0} ชิ้น</span><span>ในช่วง{range}</span></div></div>
       </div>
+      {/* FEAT-6 — Recent bills widget: 5 latest bills + summary + jump-to-reports CTA */}
+      <RecentBillsWidget setView={setView} range={range} />
       <section className="dash-workbench" aria-label="มุมมองข้อมูลภาพรวม">
         <div className="dash-tabbar" role="tablist" aria-label="เลือกมุมมองข้อมูล">
           {DASH_TABS.map((item) => <button type="button" role="tab" aria-selected={tab === item.id} className={`dash-tab${tab === item.id ? " active" : ""}`} key={item.id} onClick={() => setTab(item.id)}>{item.id === "sales" ? <BarChart3 size={15} /> : item.id === "best" ? <Crown size={15} /> : item.id === "watch" ? <PackageSearch size={15} /> : item.id === "activity" ? <Activity size={15} /> : <CalendarClock size={15} />}{item.label}{item.id === "watch" && lowStock.length > 0 && <i className="tab-badge red" title={`สินค้าใกล้หมดสต็อก ${lowStock.length} รายการ`}>{lowStock.length}</i>}{item.id === "watch" && expirySoon.length > 0 && <i className="tab-badge amber" title={`ใกล้หมดอายุ ${expirySoon.length} รายการ`}>{expirySoon.length}</i>}</button>)}

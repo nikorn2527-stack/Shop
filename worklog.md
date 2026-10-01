@@ -1813,3 +1813,163 @@ Work Log:
 4. **Shortcut overlay customization**: ถ้าเพิ่ม shortcuts ใหม่ในอนาคต ให้ update SHORTCUT_GROUPS array ใน KeyboardShortcutsOverlay.tsx
 5. **Polish mobile responsive**: ทดสอบบน mobile viewport (375px) — OnboardingBanner 1-col, shortcuts modal full-width
 
+
+---
+Task ID: FEAT-4-6 + STYLE-4-8 (cron review round 2: FAB + onboarding expansion + recent bills + styling)
+Agent: main (orchestrator)
+Task: Assess project status → QA → mount FAB + expand onboarding + add recent bills widget + polish styling
+
+Work Log:
+
+## Phase 1 — Status Assessment & QA
+
+- อ่าน worklog เข้าใจ context: FIX-1 ถึง FIX-11 + QA-FEAT รอบก่อน (OnboardingBanner 3 ขั้น + KeyboardShortcutsOverlay)
+- ตรวจสถานะ: dev server ตาย → รันใหม่ใน bash subshell เดียวกับ QA tests (pattern เดิม)
+- TypeScript: 0 errors
+- QA via agent-browser (login admin / NewPass123!):
+  - ✅ Dashboard: OnboardingBanner 3 steps (1 done — member created), 4 metric cards
+  - ✅ Shortcuts overlay: กด ? เปิดได้, 3 groups, Esc ปิด
+  - ✅ สต็อกสินค้า / สมาชิกและบัญชี / รายงาน — ทุก view โหลดปกติ
+- VLM ชี้ปัญหา: **ไม่มี FAB** ที่มุมขวาล่าง (ShortcutsFab สร้างไว้แต่ไม่ mount)
+- อ่านคำแนะนำ Phase ถัดไปจาก worklog ก่อนหน้า: mount ShortcutsFab, เพิ่ม step "ตั้งค่าร้าน", polish mobile
+
+## Phase 2 — FEAT-4: Mount ShortcutsFab
+
+**ปัญหา**: `ShortcutsFab` component สร้างไว้ใน KeyboardShortcutsOverlay.tsx แต่ไม่ถูก mount ใน AppShell → ผู้ใช้ไม่มีทางรู้ว่ากด `?` ได้
+
+**แก้**:
+1. **KeyboardShortcutsOverlay.tsx**:
+   - เพิ่ม custom event listener `shortcuts-open` ใน `useEffect` (นอกเหนือจาก `?` keydown)
+   - `ShortcutsFab` ตอนนี้ dispatch `window.dispatchEvent(new CustomEvent("shortcuts-open"))` เป็น default behavior (ยังรองรับ custom `onClick` อยู่)
+2. **AppShell.tsx**:
+   - Import `ShortcutsFab` (เพิ่มในบรรทัดเดียวกับ KeyboardShortcutsOverlay)
+   - Mount `<ShortcutsFab />` ใน AppShell หลัง `<KeyboardShortcutsOverlay />`
+   - เงื่อนไข: `{safeView !== "pos" && <ShortcutsFab />}` — ซ่อนบน POS terminal (มี rail ของตัวเองแล้ว)
+
+## Phase 3 — FEAT-5: Expand OnboardingBanner with "ตั้งค่าร้าน" step
+
+**ปัญหา**: OnboardingBanner เดิมมี 3 ขั้น (products/members/sales) — ขาดขั้น "ตั้งค่าร้าน" ที่สำคัญที่สุดสำหรับร้านใหม่จริงๆ (ชื่อร้าน/โลโก้/บัญชี)
+
+**แก้**:
+1. **OnboardingBanner.tsx** (เขียนใหม่ทั้งไฟล์ ~210 บรรทัด):
+   - เพิ่ม `storeConfigured: boolean` ใน `OnboardingProgress` type
+   - ใส่ step ใหม่เป็น step 1: "ตั้งค่าร้านค้า" (icon Store) — detail "ชื่อร้าน · โลโก้ · บัญชีธนาคารรับเงินโอน — แสดงบนใบเสร็จทุกใบ"
+   - CTA: "ไปตั้งค่าร้าน" → `setView("settings")`
+   - step-count พิเศษ: ถ้า done แสดง "ตั้งแล้ว" + checkmark (ไม่ใช่ count ตัวเลข)
+   - ตอนนี้มี 4 steps ใน array, ใช้ `onboarding-steps-4` class
+2. **Dashboard.tsx**:
+   - เพิ่ม `settingsQuery = trpc.settings.get.useQuery(undefined)` (Dashboard ไม่เคยมีมาก่อน)
+   - คำนวณ `storeConfigured` ด้วย `useMemo`:
+     - `hasCustomName`: appName != "ร้านค้าสวัสดิการ" (default) และ != ""
+     - `hasLogo`: appLogo truthy
+     - `hasBank`: bankAccounts.length > 0
+     - `storeConfigured = hasCustomName || hasLogo || hasBank`
+   - ส่ง `storeConfigured` ใน `onboardingProgress` object
+3. **index.css**:
+   - เพิ่ม `.onboarding-steps-4 { grid-template-columns: repeat(4, 1fr) }`
+   - responsive: `@media (max-width: 1120px) → repeat(2, 1fr)`
+
+## Phase 4 — FEAT-6: RecentBillsWidget (Dashboard "5 บิลล่าสุด")
+
+**ปัญหา**: Dashboard ไม่มี quick view บิลล่าสุด — ต้องไป Reports ทุกครั้ง
+
+**สร้าง component ใหม่**: `client/src/components/RecentBillsWidget.tsx` (~160 บรรทัด)
+- ใช้ `trpc.sales.list.useQuery({ limit: 5 })` ดึง 5 บิลล่าสุด
+- แสดง summary ใน header: "5 รายการล่าสุด · รวม X · เฉลี่ย Y/บิล"
+- ปุ่ม "ดูทั้งหมด" → `setView("reports")`
+- แต่ละ row: icon + order number + item label (first item + "+N") + time/date + payment tag + total + member name
+- payment tag มี 4 tone: cash (orange), qr (blue), wallet (purple), other (gray)
+- คลิก row → ไป Reports
+- Footer: "แสดง N บิลล่าสุด · ดูวิเคราะห์ยอดขายเต็มรูปแบบได้ที่รายงาน"
+- Loading state: skeleton shimmer rows
+- Hidden เมื่อไม่มี bills (OnboardingBanner จัดการ empty state อยู่แล้ว)
+- Responsive: บน mobile ซ่อน time/date column, payment tag ย้ายบรรทัด
+
+**Integrate into Dashboard**:
+- Import `RecentBillsWidget`
+- Mount ระหว่าง `<div className="metric-grid">` และ `<section className="dash-workbench">`
+
+**CSS**: `.recent-bills-widget` (panel) + `.recent-bill-row` (grid 5-col: icon/info/meta/payment/total) + `.recent-bill-payment` (4 tone classes) + `.recent-bills-skeleton` (shimmer animation) + responsive breakpoints
+
+## Phase 5 — STYLE-4: Polished notification bell + dropdown
+
+- `.top-icon`: เพิ่ม transition background/color/transform + hover (bg #eaf5f1, color teal, translateY(-1px)) + active (translateY(0)) + `[aria-expanded="true"]` state (bg teal-mist)
+- `@keyframes notif-dropdown-in`: from (opacity 0, translateY(-6px) scale 0.98) → to (opacity 1, translateY 0, scale 1) — transform-origin top right
+- `.notif-dropdown`: ใช้ animation ใหม่ (smooth entrance)
+
+## Phase 6 — STYLE-5: Subtle entrance animations
+
+- `@keyframes modal-fade-in` (opacity 0→1) ใช้กับ `.modal-backdrop`
+- `@keyframes modal-scale-in` (opacity 0 + scale 0.96 + translateY 8px → opacity 1 + scale 1 + translateY 0) ใช้กับ `.shortcuts-modal`, `.onboarding-banner`, `.recent-bills-widget`
+- `@media (prefers-reduced-motion: reduce)`: ปิด animation ทั้งหมด (accessibility)
+
+## Phase 7 — STYLE-6: Polished sidebar nav + buttons
+
+- `.sidebar nav button` / `.nav-item`: transition background/color + hover (bg #f4faf7)
+- `.sidebar nav button.active::before`: left accent bar (3px wide, gradient teal, top/bottom 8px inset)
+- `.primary-button`: linear-gradient background + box-shadow + hover (brightness 1.04, translateY(-1px)) + active (translateY(0), brightness 0.97)
+- `.outline-button`: transition + hover (bg #f4faf7, border #b9d8cb, translateY(-1px)) + active (translateY(0))
+
+## Phase 8 — Verification (agent-browser end-to-end)
+
+ทดสอบ 2 scenarios:
+
+### Scenario A: Empty store (no sales)
+- Login → Dashboard
+- ✅ OnboardingBanner แสดง 4 steps: "ตั้งค่าร้านค้า" (done — appName=TestStore), "เพิ่มสินค้าเข้าระบบ" (not done), "ลงทะเบียนสมาชิก" (done — 1 member), "ทำการขายครั้งแรก" (not done)
+- ✅ Progress: "2/4 ขั้นตอน"
+- ✅ FAB แสดงที่มุมขวาล่าง
+- ✅ คลิก FAB → shortcuts modal เปิด (3 groups)
+- ✅ Esc ปิด modal
+- ✅ คลิก "ตั้งค่าร้านค้า" → navigate ไป settings (heading "ตั้งค่า")
+- ✅ RecentBills widget hidden (no bills — expected)
+
+### Scenario B: Store with sales
+- สร้าง product "น้ำดื่ม 600ml" ผ่าน tRPC `product.create`
+- สร้าง 2 sales ผ่าน tRPC `pos.checkout`:
+  - RC-261002-001: 2 ขวด × ฿10 = ฿20 เงินสด
+  - RC-261002-002: 1 ขวด × ฿10 = ฿10 QR
+- กลับ Dashboard:
+  - ✅ RecentBills widget แสดง: "5 รายการล่าสุด · รวม ฿30.00 · เฉลี่ย ฿15.00/บิล"
+  - ✅ OnboardingBanner เปลี่ยนเป็น "complete" state: "ระบบพร้อมใช้งานแล้ว — เริ่มขายและติดตามยอดได้เลย" + ปุ่ม "เริ่มขาย"
+
+## Phase 9 — Verification Status
+
+- `npx tsc --noEmit` → 0 errors ✅
+- agent-browser end-to-end: ทุกฟีเจอร์ทำงานครบ
+- VLM ยืนยันภาพ screenshots: FAB ชัด, onboarding 4 steps, complete state แสดง checkmark สีเขียว, RecentBills widget มี summary
+
+## Stage Summary
+
+- ไฟล์ใหม่ (1):
+  - `client/src/components/RecentBillsWidget.tsx` (~160 บรรทัด)
+- ไฟล์แก้ (4):
+  - `client/src/components/KeyboardShortcutsOverlay.tsx` (เพิ่ม custom event listener + ShortcutsFab dispatch event)
+  - `client/src/components/OnboardingBanner.tsx` (เขียนใหม่ — เพิ่ม step "ตั้งค่าร้านค้า" เป็น step 1, 4 steps total)
+  - `client/src/pages/Dashboard.tsx` (เพิ่ม settingsQuery + storeConfigured memo + RecentBillsWidget mount)
+  - `client/src/layouts/AppShell.tsx` (import ShortcutsFab + mount ใน AppShell)
+  - `client/src/index.css` (+~170 บรรทัด: onboarding-steps-4 + recent-bills-widget + modal animations + notif-dropdown animation + sidebar active accent + primary/outline button polish + reduced-motion)
+- TypeScript: 0 errors
+
+## ตอบโจทย์ Requirements
+
+- ✅ [Mandatory] Improve styling with more details: notification bell hover/active, dropdown animation, sidebar active accent bar, primary/outline button gradient+shadow+hover lift, modal entrance animations, reduced-motion support
+- ✅ [Mandatory] Add more features and functionality: 3 ฟีเจอร์ใหม่ (ShortcutsFab mount + OnboardingBanner 4 steps with store config + RecentBillsWidget with 5 latest bills)
+- ✅ Assess project status: stable, all previous work verified intact
+- ✅ QA via agent-browser: 2 scenarios (empty store + store with sales) — ทั้งคู่ทำงานถูกต้อง
+- ✅ Update worklog
+
+## คำแนะนำ Phase ถัดไป
+
+1. **ทดสอบ edge cases ของ OnboardingBanner**: 
+   - ร้านที่ appName=default "ร้านค้าสวัสดิการ" แต่มี logo → storeConfigured ควรเป็น true (verified by code)
+   - ร้านที่ลบข้อมูลทั้งหมด → onboarding ควรกลับมาแสดง (localStorage ยัง dismissed — อาจต้องเคลียร์)
+2. **RecentBillsWidget enhancements**:
+   - เพิ่ม click row → เปิด ReceiptModal แสดงบิลเต็มรูปแบบ (ตอนนี้แค่ navigate ไป Reports)
+   - เพิ่ม filter: วันนี้ / 7 วัน / ทั้งหมด
+   - เพิ่ม void indicator (ถ้าบิลถูก void แล้ว)
+3. **ShortcutsFab responsive**: บน mobile อาจบัง content — ตรวจดูพิกัด bottom กับ app-footer
+4. **Performance**: RecentBillsWidget ดึง sales.list ทุกครั้งที่เข้า Dashboard — อาจใช้ stale-while-revalidate หรือ refetchOnWindowFocus
+5. **A11y**: เพิ่ม aria-label ที่ชัดเจนขึ้นสำหรับ onboarding steps (ตอนนี้ใช้ title และ text content)
+6. **OnboardingBanner dismissal reset**: เพิ่มปุ่ม "รีเซ็ต onboarding" ใน Settings → ขั้นสูง เพื่อเคลียร์ localStorage
+

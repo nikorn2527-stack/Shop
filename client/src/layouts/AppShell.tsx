@@ -41,7 +41,7 @@ import {
 import { toast } from "sonner";
 import { EditionPill, useEditionStatus } from "@/components/EditionUi";
 import { GlobalSearch } from "@/components/GlobalSearch";
-import { KeyboardShortcutsOverlay } from "@/components/KeyboardShortcutsOverlay";
+import { KeyboardShortcutsOverlay, ShortcutsFab } from "@/components/KeyboardShortcutsOverlay";
 import { Dashboard } from "../pages/Dashboard";
 import { Pos } from "../pages/Pos";
 import { Stock } from "../pages/Stock";
@@ -1014,6 +1014,8 @@ export function AppShell({
         />
         {/* QA-FEAT-2 — discoverable keyboard shortcuts overlay. Press ? anywhere. */}
         <KeyboardShortcutsOverlay />
+        {/* FEAT-4 — Floating Action Button to trigger shortcuts overlay. Bottom-right. */}
+        {safeView !== "pos" && <ShortcutsFab />}
       </main>
     </div>
   );

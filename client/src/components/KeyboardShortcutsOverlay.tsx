@@ -81,8 +81,15 @@ export function KeyboardShortcutsOverlay() {
         setOpen(false);
       }
     };
+    // FEAT-4: listen for custom event from ShortcutsFab so the FAB can open
+    // the overlay without lifting state up to AppShell.
+    const onOpenRequest = () => setOpen(true);
     window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
+    window.addEventListener("shortcuts-open", onOpenRequest);
+    return () => {
+      window.removeEventListener("keydown", handler);
+      window.removeEventListener("shortcuts-open", onOpenRequest);
+    };
   }, [open]);
 
   if (!open) return null;
@@ -152,13 +159,21 @@ export function KeyboardShortcutsOverlay() {
 /**
  * Floating "?" button — mounts a small button at the bottom-right corner
  * of the screen so users can discover the keyboard shortcuts overlay even
- * if they don't know about the `?` key.
+ * if they don't know about the `?` key. Dispatches the `shortcuts-open`
+ * custom event which KeyboardShortcutsOverlay listens for.
  */
 export function ShortcutsFab({ onClick }: { onClick?: () => void }) {
+  const handleClick = () => {
+    if (onClick) {
+      onClick();
+    } else {
+      window.dispatchEvent(new CustomEvent("shortcuts-open"));
+    }
+  };
   return (
     <button
       className="shortcuts-fab"
-      onClick={onClick}
+      onClick={handleClick}
       title="ดูคีย์ลัด (กด ? ที่ไหนก็ได้)"
       aria-label="ดูคีย์ลัดทั้งหมด"
     >
