@@ -3011,8 +3011,12 @@ th { font-weight: 600; }
 /* FIX-14 (user) — ถอด aspect-ratio ออกจากหน้าจอ (เดิม 85.6/54 บังคับความสูงน้อยเกิน → content ล้น บังรูป + ปุ่มลอย)
    ใช้ min-height แทน — การ์ดโตพอใส่ content ได้หมด ไม่มีอะไรล้นซ้อน
    ส่วนพิมพ์จริงยังเป็น CR80 แบบ 85.6×54mm อยู่แล้วใน @media print (บรรทัด 904) */
-.member-card-modal .member-card { width: 380px; max-width: 100%; min-height: 250px; padding: 14px 16px 12px; }
-.member-card-modal .member-card-body { display: flex; flex-direction: row; align-items: stretch; gap: 10px; flex: 1; min-height: 0; }
+/* FIX-24 (user) — แก้บาร์โค้ด/QR ซ้อนครั้งหลัง:
+   1. override aspect-ratio: auto (เอาค่าจาก base .member-card ที่บังคับความสูงน้อยเกินออก)
+   2. ลดขนาดบาร์โค้ด + QR ให้เล็กลง
+   3. เพิ่ม flex-shrink กันล้น */
+.member-card-modal .member-card { width: 380px; max-width: 100%; aspect-ratio: auto; min-height: auto; padding: 14px 16px 12px; }
+.member-card-modal .member-card-body { display: flex; flex-direction: row; align-items: stretch; gap: 10px; flex: 0 0 auto; min-height: 0; }
 .member-card-modal .member-card-identity { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 1px; }
 /* FIX-12 (user) — ป้องกันรูปซ้อนทับ barcode/QR ด้านล่าง
    ใช้ aspect-ratio: 3/4 ให้รูปมีขนาดตามสัดส่วนอัตโนมัติ (78px wide → 104px tall)
@@ -3020,11 +3024,11 @@ th { font-weight: 600; }
 .member-card-photo { flex: 0 0 auto; padding: 3px; background: #fff; border: 1px solid #d3e5dd; border-radius: 7px; box-shadow: 0 2px 6px rgba(40,70,58,.14); width: 78px; }
 .member-card-photo .member-photo, .member-card-photo .member-photo-fallback-photo { width: 100% !important; height: auto !important; aspect-ratio: 3 / 4; border-radius: 4px !important; display: block; object-fit: cover; object-position: center top; }
 .member-card-photo .member-photo.id-portrait, .member-card-photo .member-photo-fallback-photo.id-portrait { object-fit: cover; object-position: center top; }
-.member-card-codes { display: grid; grid-template-columns: 1.55fr 1fr; gap: 6px; margin-top: 7px; }
-.member-card-barcode, .member-card-qr { background: #fff; border: 1px solid #d8e6df; border-radius: 8px; padding: 6px 5px 4px; display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 0; }
-.member-card-barcode img { max-width: 100%; height: auto; display: block; }
-.member-card-qr img { width: 52px; height: 52px; display: block; }
-.member-card-barcode small, .member-card-qr small { font-size: 6.8px; color: #7b8170; display: flex; align-items: center; gap: 3px; letter-spacing: .2px; }
+.member-card-codes { display: grid; grid-template-columns: 1.55fr 1fr; gap: 6px; margin-top: 8px; flex-shrink: 0; }
+.member-card-barcode, .member-card-qr { background: #fff; border: 1px solid #d8e6df; border-radius: 6px; padding: 4px 4px 2px; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; overflow: hidden; }
+.member-card-barcode img { max-width: 100%; max-height: 38px; width: auto; height: auto; display: block; }
+.member-card-qr img { width: 44px; height: 44px; display: block; }
+.member-card-barcode small, .member-card-qr small { font-size: 6.5px; color: #7b8170; display: flex; align-items: center; gap: 2px; letter-spacing: .2px; }
 .member-card-code-fallback { height: 54px; display: grid; place-items: center; color: #b9beac; font-size: 12px; }
 .member-card-modal .member-card-foot { border-top: 1px dashed #cfe4db; padding-top: 6px; display: flex; justify-content: space-between; gap: 10px; }
 .member-card-modal .member-card-name { font-size: 14px; }
