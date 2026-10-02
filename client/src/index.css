@@ -935,12 +935,13 @@ tr.locked-row .user-avatar { background: #f6ecd4; color: #a97f2e; }
 .user-scope-note svg { color: #4b9d7f; flex-shrink: 0; }
 .user-scope-note b { color: #3d7d65; }
 
-/* 5) Member wallet card modal — CR80 proportions (85.6 × 54 mm ≈ 323 × 204 px on screen). */
+/* 5) Member wallet card modal — Thai business card standard (90 × 55 mm ≈ 360 × 220 px on screen).
+ *      Thai printers ใช้ 90×55 มม. เป็นมาตรฐานนามบัตร (ใหญ่กว่า CR80 85.6×54 เล็กน้อย แต่เป็นที่นิยมในไทย) */
 .member-card-modal { width: min(430px, calc(100vw - 32px)); background: #fff; border: 1px solid #e4ede9; border-radius: 14px; box-shadow: 0 22px 55px rgba(35, 62, 52, .22); padding: 20px; }
 .member-card-stage { display: grid; place-items: center; padding: 18px 0 4px; background:
   radial-gradient(circle at 12px 12px, #d9e9e2 2.5px, transparent 3px) 0 0 / 24px 24px,
   #f2f8f5; border: 1px solid #e3ede9; border-radius: 11px; margin-top: 4px; position: relative; }
-.member-card { width: 323px; max-width: 100%; aspect-ratio: 85.6 / 54; border-radius: 13px; background: linear-gradient(150deg, #f8fbf9 0%, #eef6f2 55%, #e2efe9 100%); border: 1px solid #d3e5dd; box-shadow: 0 10px 22px rgba(40, 70, 58, .16); padding: 13px 15px 11px; display: flex; flex-direction: column; color: #42584f; position: relative; overflow: hidden; }
+.member-card { width: 360px; max-width: 100%; aspect-ratio: 90 / 55; border-radius: 13px; background: linear-gradient(150deg, #f8fbf9 0%, #eef6f2 55%, #e2efe9 100%); border: 1px solid #d3e5dd; box-shadow: 0 10px 22px rgba(40, 70, 58, .16); padding: 14px 16px 12px; display: flex; flex-direction: column; color: #42584f; position: relative; overflow: hidden; }
 .member-card::after { content: ""; position: absolute; inset: 5px; border: 1px solid rgba(72, 128, 107, .16); border-radius: 9px; pointer-events: none; }
 .member-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
 .member-card-brand { display: flex; gap: 7px; align-items: center; }
@@ -980,7 +981,7 @@ tr.locked-row .user-avatar { background: #f6ecd4; color: #a97f2e; }
   body:has(#member-card) .modal-actions,
   body:has(#member-card) .member-card-note { display: none !important; }
   body:has(#member-card) .member-card-stage { background: none; border: 0; padding: 0; }
-  body:has(#member-card) .member-card { width: 85.6mm; aspect-ratio: auto; height: 54mm; box-shadow: none; border: 1px dashed #aeb49d; border-radius: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body:has(#member-card) .member-card { width: 90mm; aspect-ratio: auto; height: 55mm; box-shadow: none; border: 1px dashed #aeb49d; border-radius: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body:has(#member-card) .member-card::after { display: none; }
   /* FIX-11a — never print the hidden capture host (download-only) */
   body:has(#member-card) .member-card-capture-host { display: none !important; }
@@ -990,44 +991,44 @@ tr.locked-row .user-avatar { background: #f6ecd4; color: #a97f2e; }
       The on-screen #member-card uses aspect-ratio + ::after + box-shadow which
       html2canvas 1.4.x renders unreliably (height computed wrong, pseudo
       missing, shadow clipped). This host renders a duplicate card with CLEAN
-      CSS: explicit width×height (CR80 1.586:1), no pseudo-element, no shadow,
-      no border-radius — so the downloaded PNG matches the print output and
-      looks like a real CR80 card. Keep opacity:1 + display:block so
+      CSS: explicit width×height (Thai business card 90:55 = 1.636), no pseudo-element,
+      no shadow, no border-radius — so the downloaded PNG matches the print output
+      and looks like a real Thai business card. Keep opacity:1 + display:block so
       html2canvas can measure the element (display:none breaks it). */
 .member-card-capture-host {
   position: fixed;
   left: -10000px;
   top: 0;
-  width: 323px;
-  height: 204px;
+  width: 360px;
+  height: 220px;
   pointer-events: none;
   opacity: 1;
   z-index: -1;
   overflow: hidden;
 }
 .member-card-capture-host .member-card {
-  width: 323px !important;
-  height: 204px !important;
+  width: 360px !important;
+  height: 220px !important;
   aspect-ratio: auto !important;
   border-radius: 13px;
   background: linear-gradient(150deg, #f8fbf9 0%, #eef6f2 55%, #e2efe9 100%);
   border: 1px solid #d3e5dd;
   box-shadow: none;
-  padding: 13px 15px 11px;
+  padding: 14px 16px 12px;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
 .member-card-capture-host .member-card::after { display: none; }
 
-/* 6b) FIX-4 issue 4 — Batch print: multiple cards (CR80) one per page.
+/* 6b) FIX-4 issue 4 — Batch print: multiple cards (Thai 90×55mm) one per page.
       Same guard pattern as the single-card rule above. The grid wrapper
       carries id="member-card-batch"; each .member-card-batch-item page-
-      breaks after itself so every card lands on its own CR80 page. */
+      breaks after itself so every card lands on its own 90×55mm page. */
 .member-card-batch-modal { width: min(900px, calc(100vw - 32px)); }
 .member-card-batch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 14px; padding: 16px 0 4px; max-height: min(58vh, 580px); overflow-y: auto; background: repeating-linear-gradient(-45deg, #f4f8f6 0 14px, #eff4f1 14px 28px); border: 1px solid #e3ede9; border-radius: 11px; margin-top: 6px; }
 .member-card-batch-item { display: grid; place-items: center; }
-/* FIX-9 — batch cards ใช้ CR80 aspect เดียวกับ single card (360px wide) */
-.member-card-batch-item .member-card { width: 360px; max-width: 100%; aspect-ratio: 85.6 / 54; }
+/* Thai business card 90:55 ratio (same as single card) */
+.member-card-batch-item .member-card { width: 360px; max-width: 100%; aspect-ratio: 90 / 55; }
 @media (max-width: 560px) { .member-card-batch-grid { grid-template-columns: 1fr; } .member-card-batch-item .member-card { width: 100%; } }
 @media print {
   body:has(#member-card-batch) .sidebar,
@@ -1046,13 +1047,13 @@ tr.locked-row .user-avatar { background: #f6ecd4; color: #a97f2e; }
   body:has(#member-card-batch) .member-card-batch-grid { display: block; padding: 0; background: none; border: 0; max-height: none; overflow: visible; }
   body:has(#member-card-batch) .member-card-batch-item { page-break-after: always; break-after: page; }
   body:has(#member-card-batch) .member-card-batch-item:last-child { page-break-after: auto; break-after: auto; }
-  body:has(#member-card-batch) .member-card { width: 85.6mm; aspect-ratio: auto; height: 54mm; box-shadow: none; border: 1px dashed #aeb49d; border-radius: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body:has(#member-card-batch) .member-card { width: 90mm; aspect-ratio: auto; height: 55mm; box-shadow: none; border: 1px dashed #aeb49d; border-radius: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   body:has(#member-card-batch) .member-card::after { display: none; }
 }
 /* Preview (PrintPreviewModal clones #member-card-batch into .print-preview-paper) */
 .print-preview-paper .member-card-batch-grid { display: grid; grid-template-columns: 1fr; gap: 12px; padding: 8px; background: none; border: 0; max-height: none; overflow: visible; }
 .print-preview-paper .member-card-batch-item { padding: 0; }
-.print-preview-paper .member-card-batch-item .member-card { width: 323px; max-width: 100%; }
+.print-preview-paper .member-card-batch-item .member-card { width: 360px; max-width: 100%; }
 
 /* FIX-4 issue 4 — Batch-print checkbox column + sticky action bar.
    The checkbox column is in the entity-table; the action bar sticks to
@@ -1104,7 +1105,7 @@ tr.locked-row .user-avatar { background: #f6ecd4; color: #a97f2e; }
    (2) New settings-tab components: payment methods, role matrix,
        log stats, font-scale picker.
    (3) Print guard: html-level font zoom must never leak into the
-       72mm thermal slip or the CR80 member card.
+       72mm thermal slip or the 90×55mm Thai business card.
    ───────────────────────────────────────────────────────────── */
 
 /* (1) Global font bump — sidebar & topbar */
@@ -3088,13 +3089,13 @@ th { font-weight: 600; }
 /* --- 2) บัตรสมาชิก — รูป + บาร์โค้ด + คิวอาร์โค้ด ---------------------- */
 /* the wallet card grew a photo column and a codes row: scoped overrides
    neutralize the older aspect-locked / grid rules from earlier rounds */
-/* FIX-14 (user) — ถอด aspect-ratio ออกจากหน้าจอ (เดิม 85.6/54 บังคับความสูงน้อยเกิน → content ล้น บังรูป + ปุ่มลอย)
+/* FIX-14 (user) — ถอด aspect-ratio ออกจากหน้าจอ (เดิมบังคับความสูงน้อยเกิน → content ล้น บังรูป + ปุ่มลอย)
    ใช้ min-height แทน — การ์ดโตพอใส่ content ได้หมด ไม่มีอะไรล้นซ้อน
-   ส่วนพิมพ์จริงยังเป็น CR80 แบบ 85.6×54mm อยู่แล้วใน @media print (บรรทัด 904) */
-/* FIX-28 (user) — ขนาด CR80 จริง (85.6×54mm):
-   on-screen ใช้ 320px×202px (สัดส่วน 85.6:54) เหมาะกับการดู
-   print ใช้ 85.6mm×54mm ตรงตามขนาดนามบัตรจริง */
-.member-card-modal .member-card { width: 320px; max-width: 100%; aspect-ratio: 85.6 / 54; min-height: auto; padding: 10px 12px 8px; }
+   ส่วนพิมพ์จริงเป็นมาตรฐานนามบัตรไทย 90×55mm ใน @media print (บรรทัด 984) */
+/* FIX-28 (user) → ปรับเป็นมาตรฐานนามบัตรไทย (90×55mm):
+   on-screen ใช้ 360px×220px (สัดส่วน 90:55 = 1.636) เหมาะกับการดู
+   print ใช้ 90mm×55mm ตรงตามขนาดนามบัตรไทยจริง */
+.member-card-modal .member-card { width: 360px; max-width: 100%; aspect-ratio: 90 / 55; min-height: auto; padding: 12px 14px 10px; }
 .member-card-modal .member-card-body { display: flex; flex-direction: row; align-items: stretch; gap: 10px; flex: 0 0 auto; min-height: 0; }
 .member-card-modal .member-card-identity { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; gap: 1px; }
 /* FIX-28 — ลดขนาด photo ให้พอดีกับบัตร 320px */
@@ -3111,7 +3112,7 @@ th { font-weight: 600; }
 .member-card-modal .member-card-name { font-size: 14px; }
 .member-card-modal .member-card-number { font-size: 19.5px; }
 .member-card-modal .member-card-meta { flex-wrap: wrap; }
-/* print: taller card fits the codes — keep CR80 width, let height breathe */
+/* print: taller card fits the codes — keep Thai 90mm width, let height breathe */
 @media print {
   body:has(#member-card) .member-card { height: auto; min-height: 0; }
 }
@@ -4357,7 +4358,7 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .member-card-brand .brand-logo.member-card-logo { width: 22px; height: 22px; border-radius: 6px; object-fit: contain; background: #fff; border: 1px solid #cfe4db; flex: 0 0 auto; }
 .statement-brand .brand-logo.statement-logo { width: 34px; height: 34px; border-radius: 9px; object-fit: contain; background: #fff; border: 1px solid #dfe9e5; flex: 0 0 auto; }
 
-/* (1) พิมพ์บัตร — ชื่อ 2 บรรทัดยังต้องอยู่ในกรอบ 54 มม.: ย่อฟอนต์ลงตามขั้น */
+/* (1) พิมพ์บัตร — ชื่อ 2 บรรทัดยังต้องอยู่ในกรอบ 55 มม.: ย่อฟอนต์ลงตามขั้น */
 @media print {
   body:has(#member-card) .member-card-name { max-height: 3em; }
   body:has(#member-card) .member-card-name.fit-sm { font-size: 11.5px; }

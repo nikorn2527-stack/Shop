@@ -2121,3 +2121,91 @@ Work Log:
 6. **TodaySnapshot delta edge case**: ถ้า avgDaily = 0 แต่ today > 0 → delta คือ ∞ — ปิด delta ไว้ (ตอนนี้โชว์เฉพาะเมื่อ avgDaily > 0)
 7. **A11y**: TodaySnapshot buttons มี title แต่ขาด aria-label ที่ descriptive — เพิ่มได้
 
+
+---
+Task ID: FIX-THAI-CARD (user feedback: ใช้ CR80 มาตลอดทั้งที่ไม่ได้ research มาตรฐานนามบัตรไทย)
+Agent: main (orchestrator)
+Task: แก้ขนาดบัตรสมาชิกจาก CR80 (85.6×54 มม.) → มาตรฐานนามบัตรไทย (90×55 มม.) ทุกที่
+
+## ปัญหาที่ owner ชี้
+
+owner บอกว่า:
+1. "ขนาดนามบัตรมาตรฐานที่นิยมใช้มากที่สุดในประเทศไทยคือ 9 x 5.5 เซนติเมตร" = 90×55 มม.
+2. ผมไม่ได้ research มาตรฐานจริงมาก่อนทำ — ใช้ CR80 (85.6×54 มม. มาตรฐานบัตรเครดิตสากล) มาตลอดทั้งโปรเจกต์
+3. owner รู้สึกว่าหลายจุดที่ผมไม่ได้ทำเองก่อน รอให้ owner จี้ถึงทำ ทั้งที่ควรทำได้เอง
+
+## Work Log — แก้ทุกที่ที่อ้างถึง CR80/85.6×54
+
+หาที่อ้างอิงทั้งหมดก่อน: `grep -rn "CR80\|85\.6"` ใน client/src/ พบ 10 จุด
+
+แก้ทั้งหมด:
+
+**1. `client/src/index.css`** — CSS หลัก:
+- บรรทัด 938-944: comment + `.member-card` base rule
+  - เดิม: `width: 323px; aspect-ratio: 85.6 / 54; padding: 13px 15px 11px`
+  - ใหม่: `width: 360px; aspect-ratio: 90 / 55; padding: 14px 16px 12px`
+- บรรทัด 984: print rule (single card)
+  - เดิม: `width: 85.6mm; height: 54mm`
+  - ใหม่: `width: 90mm; height: 55mm`
+- บรรทัด 990-1020: capture host (html2canvas download)
+  - เดิม: `width: 323px; height: 204px` (CR80 1.586:1)
+  - ใหม่: `width: 360px; height: 220px` (Thai 90:55 = 1.636)
+- บรรทัด 1023-1031: batch grid + batch item
+  - เดิม: `aspect-ratio: 85.6 / 54`
+  - ใหม่: `aspect-ratio: 90 / 55`
+- บรรทัด 1050: print rule (batch)
+  - เดิม: `width: 85.6mm; height: 54mm`
+  - ใหม่: `width: 90mm; height: 55mm`
+- บรรทัด 1056: print-preview-paper batch card
+  - เดิม: `width: 323px`
+  - ใหม่: `width: 360px`
+- บรรทัด 3092-3098: FIX-14/FIX-28 modal-specific override
+  - เดิม: `width: 320px; aspect-ratio: 85.6 / 54; padding: 10px 12px 8px`
+  - ใหม่: `width: 360px; aspect-ratio: 90 / 55; padding: 12px 14px 10px`
+- บรรทัด 3115: comment "keep CR80 width" → "keep Thai 90mm width"
+- บรรทัด 4361: comment "ในกรอบ 54 มม." → "ในกรอบ 55 มม."
+- บรรทัด 1108: comment "CR80 member card" → "90×55mm Thai business card"
+
+**2. `client/src/components/MemberCardModal.tsx`**:
+- บรรทัด 168-172: comment เปลี่ยน CR80 → มาตรฐานนามบัตรไทย 90×55 มม.
+- บรรทัด 231-235: comment capture host เปลี่ยน CR80 → Thai business card 90×55mm
+- บรรทัด 247: button title "ดาวน์โหลดรูปบัตร" เปลี่ยน "CR80 จริง" → "นามบัตรไทย 90×55 มม."
+- บรรทัด 248: button title "พิมพ์บัตรสมาชิก" เปลี่ยน "CR80 85.6×54 มม." → "มาตรฐานนามบัตรไทย 90×55 มม."
+- บรรทัด 256: JSDoc comment เปลี่ยน CR80 → Thai business card 90×55mm
+- บรรทัด 287: batch modal description เปลี่ยน "CR80 · 85.6 × 54 มม." → "90 × 55 มม."
+
+**3. `client/src/pages/members/Members.tsx`**:
+- บรรทัด 418: batch print bar description เปลี่ยน "CR80 (85.6 × 54 มม.)" → "มาตรฐานนามบัตรไทย 90 × 55 มม."
+
+**4. `client/src/components/PrintPreviewModal.tsx`**:
+- บรรทัด 31: PAPER_LABEL.card เปลี่ยน "บัตรพลาสติก 85.6 × 54 มม. (CR80)" → "บัตรสมาชิก · นามบัตรไทย 90 × 55 มม."
+- บรรทัด 92: widthMm calculation เปลี่ยน `85.6` → `90`
+
+## Verification (agent-browser end-to-end)
+
+- Login admin / NewPass123!
+- ไป สมาชิกและบัญชี → คลิกสมาชิก → คลิก "พิมพ์บัตรสมาชิก"
+- ตรวจ DOM:
+  - ✅ on-screen card: `rect = {w: 360, h: 220, ratio: 1.636}` = 90:55 ตรงมาตรฐานนามบัตรไทย
+  - ✅ capture host: `rect = {w: 360, h: 220, ratio: 1.636}` = เดียวกัน → PNG ที่โหลดจะตรงกับพรีวิว/พิมพ์
+  - ✅ CSS @media print rules มี `90mm` ทั้ง single + batch
+  - ✅ button titles: "นามบัตรไทย 90×55 มม." + "มาตรฐานนามบัตรไทย 90×55 มม."
+- VLM ยืนยันภาพ: สัดส่วนใกล้เคียง 1.6:1 = มาตรฐานนามบัตรไทย 90×55 มม. + เนื้อหาครบ (ร้าน/ชื่อ/เลข/บาร์โค้ด/QR)
+
+## Stage Summary
+
+- ไฟล์แก้ (4):
+  - `client/src/index.css` (12 จุด: base rule + print single + print batch + capture host + print-preview + modal override + 4 comments)
+  - `client/src/components/MemberCardModal.tsx` (6 จุด: 3 comments + 2 button titles + 1 JSDoc)
+  - `client/src/pages/members/Members.tsx` (1 จุด: batch print bar description)
+  - `client/src/components/PrintPreviewModal.tsx` (2 จุด: PAPER_LABEL + widthMm calc)
+- TypeScript: 0 errors
+- ตอบโจทย์ owner:
+  - ✅ แก้ขนาดบัตรเป็นมาตรฐานนามบัตรไทย 90×55 มม. ทุกที่ (on-screen + print + capture host + comments + button titles)
+  - ✅ ยอมรับว่าผมผิดที่ไม่ research มาตรฐานก่อนทำ — ควรหาข้อมูลก่อนเสมอ ไม่ใช่รอให้ owner จี้
+
+## คำแนะนำตัวเองสำหรับรอบถัดไป
+
+1. **research ก่อนทำทุกครั้ง**: มาตรฐานขนาดกระดาษ, การ์ด, บัตร — หาข้อมูลก่อนเขียนโค้ด
+2. **ตรวจสอบ assumptions**: อย่าสมมติว่ามาตรฐานสากล (CR80) ใช้ได้ทุกที่ — แต่ละประเทศมีมาตรฐานเฉพาะ
+3. **proactive fixes**: ถ้าเห็นปัญหา แก้เลย อย่ารอให้ owner จี้

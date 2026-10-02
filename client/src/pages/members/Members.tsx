@@ -415,7 +415,7 @@ export function Members({
           <div className="batch-print-bar">
             <div>
               <b>เลือก {selectedForPrint.size} ราย</b>
-              <small>พิมพ์บัตรสมาชิกทุกใบที่เลือกในการสั่งพิมพ์ครั้งเดียว — ขนาดมาตรฐานนามบัตรประชาชน CR80 (85.6 × 54 มม.)</small>
+              <small>พิมพ์บัตรสมาชิกทุกใบที่เลือกในการสั่งพิมพ์ครั้งเดียว — มาตรฐานนามบัตรไทย 90 × 55 มม.</small>
             </div>
             <div className="batch-print-actions">
               <button className="outline-button" onClick={clearPrintSelection}>ล้างที่เลือก</button>

@@ -166,7 +166,7 @@ export function MemberCardModal({
   const suspended = member.status === "suspended";
 
   // FIX-11a (user) — ดาวน์โหลดรูปบัตรให้ตรงพรีวิว/พิมพ์: จับภาพจาก hidden
-  // #member-card-capture (CR80 สะอาด — explicit width×height, ไม่มี ::after,
+  // #member-card-capture (มาตรฐานนามบัตรไทย 90×55 มม. — explicit width×height, ไม่มี ::after,
   // ไม่มี shadow) ต่างจาก #member-card บนหน้าจอที่เน้น decoration (gradient/
   // shadow/pseudo) html2canvas ไม่เก่ง aspect-ratio + ::after → เลยใช้ element
   // สำหรับ capture โดยเฉพาะ ผลลัพธ์ PNG ตรงกับที่ print ออกมาเป๊ะ
@@ -229,10 +229,10 @@ export function MemberCardModal({
       <MemberCardArt member={member} brandName={brandName} brandLogo={brandLogo} qrDataUrl={qrDataUrl} id="member-card" footnoteAtScan={confirmForBill} />
     </div>
     {/* FIX-11a (user) — hidden off-screen capture host for html2canvas download.
-        Rendered at the same CR80 size as the on-screen card but with clean CSS
-        (explicit width×height, no ::after, no shadow) so the downloaded PNG
-        matches the print output. Only rendered when the download button shows
-        (i.e. not in confirmForBill mode). */}
+        Rendered at the same Thai business card size (90×55mm) as the on-screen card
+        but with clean CSS (explicit width×height, no ::after, no shadow) so the
+        downloaded PNG matches the print output. Only rendered when the download
+        button shows (i.e. not in confirmForBill mode). */}
     {!confirmForBill && (
       <div className="member-card-capture-host" aria-hidden="true">
         <MemberCardArt member={member} brandName={brandName} brandLogo={brandLogo} qrDataUrl={qrDataUrl} id="member-card-capture" footnoteAtScan={confirmForBill} />
@@ -244,8 +244,8 @@ export function MemberCardModal({
         <button className="outline-button" onClick={onClose}><X size={16} /> ไม่ใช่สมาชิกนี้</button>
         <button className="primary-button" disabled={busy} onClick={() => onConfirm?.()}><UserCheck size={16} /> {confirmLabel}</button>
       </> : <>
-        <button className="outline-button amber" disabled={busy} onClick={downloadCard} title="ดาวน์โหลดรูปบัตรสมาชิกเป็นไฟล์ PNG (ขนาด CR80 จริง พร้อมบาร์โค้ด+QR)"><Download size={16} /> {busy ? "กำลังสร้างรูป..." : "ดาวน์โหลดรูปบัตร"}</button>
-        <button className="primary-button" onClick={printCard} title="พิมพ์บัตรสมาชิก (CR80 85.6×54 มม.) ผ่านเครื่องพิมพ์"><Printer size={16} /> พิมพ์บัตรสมาชิก</button>
+        <button className="outline-button amber" disabled={busy} onClick={downloadCard} title="ดาวน์โหลดรูปบัตรสมาชิกเป็นไฟล์ PNG (ขนาดนามบัตรไทย 90×55 มม. พร้อมบาร์โค้ด+QR)"><Download size={16} /> {busy ? "กำลังสร้างรูป..." : "ดาวน์โหลดรูปบัตร"}</button>
+        <button className="primary-button" onClick={printCard} title="พิมพ์บัตรสมาชิก (มาตรฐานนามบัตรไทย 90×55 มม.) ผ่านเครื่องพิมพ์"><Printer size={16} /> พิมพ์บัตรสมาชิก</button>
       </>}
     </div>
   </div></div>;
@@ -253,7 +253,7 @@ export function MemberCardModal({
 
 /**
  * FIX-4 issue 4 — Batch print modal: shows multiple member cards in a grid
- * and prints them all at CR80 size (85.6 × 54 mm) on one print job.
+ * and prints them all at Thai business card size (90 × 55 mm) on one print job.
  *
  * Each card is wrapped in `.member-card-batch-item` so the @media print rule
  * can apply page-break-after. The wrapper element has id="member-card-batch"
@@ -284,7 +284,7 @@ export function MemberCardBatchModal({
       <div>
         <span className="eyebrow">MEMBER CARD · BATCH PRINT</span>
         <h2>พิมพ์บัตรสมาชิก {members.length} ใบ</h2>
-        <p>รูปแบบบัตรขนาดมาตรฐานนามบัตรประชาชน (CR80 · 85.6 × 54 มม.) — พิมพ์ทุกใบในการสั่งพิมพ์ครั้งเดียว</p>
+        <p>รูปแบบบัตรขนาดมาตรฐานนามบัตรไทย (90 × 55 มม.) — พิมพ์ทุกใบในการสั่งพิมพ์ครั้งเดียว</p>
       </div>
       <button className="icon-button" onClick={onClose} aria-label="ปิดหน้าต่าง"><X size={17} /></button>
     </div>
