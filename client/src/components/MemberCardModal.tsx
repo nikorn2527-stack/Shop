@@ -1,13 +1,11 @@
 import { useEffect, useState } from "react";
-import html2canvas from "html2canvas";
 import QRCode from "qrcode";
-import { Barcode, CreditCard, Download, Printer, QrCode as QrIcon, ScanLine, ShieldAlert, UserCheck, X } from "@/lib/icons";
+import { Barcode, CreditCard, Printer, QrCode as QrIcon, ScanLine, ShieldAlert, UserCheck, X } from "@/lib/icons";
 import { money } from "../pages/pageData";
 import { code128DataUrl } from "../barcode";
 import { MemberAvatar } from "./MemberAvatar";
 import { trpc } from "@/lib/trpc";
 import { brandInitial } from "@/theme";
-import { PrintPreviewModal } from "./PrintPreviewModal";
 
 /** Fields the wallet card actually renders (subset of the member record). */
 export type MemberCardData = {
@@ -165,33 +163,12 @@ export function MemberCardModal({
   const displayName = [member.prename?.trim() || "", member.firstName, member.lastName].filter(Boolean).join(" ");
   const suspended = member.status === "suspended";
 
-  // FIX-11a (user) — ดาวน์โหลดรูปบัตรให้ตรงพรีวิว/พิมพ์: จับภาพจาก hidden
-  // #member-card-capture (มาตรฐานนามบัตรไทย 90×55 มม. — explicit width×height, ไม่มี ::after,
-  // ไม่มี shadow) ต่างจาก #member-card บนหน้าจอที่เน้น decoration (gradient/
-  // shadow/pseudo) html2canvas ไม่เก่ง aspect-ratio + ::after → เลยใช้ element
-  // สำหรับ capture โดยเฉพาะ ผลลัพธ์ PNG ตรงกับที่ print ออกมาเป๊ะ
-  const downloadCard = async () => {
-    const element = document.getElementById("member-card-capture");
-    if (!element) return;
-    setBusy(true);
-    try {
-      // Round 43 — รอ Sarabun font load ก่อน html2canvas (กันตัวอักษรไทยตกหล่น)
-      if (document.fonts?.ready) await document.fonts.ready;
-      const canvas = await html2canvas(element, {
-        scale: 4,
-        backgroundColor: "#ffffff",
-        useCORS: true,
-        logging: false,
-      });
-      const link = document.createElement("a");
-      link.download = `card-${member.memberNumber}.png`;
-      link.href = canvas.toDataURL("image/png");
-      link.click();
-    } finally { setBusy(false); }
-  };
-  // ROUND 51 — พิมพ์บัตรผ่านพรีวิวก่อน (เหมือนจุดพิมพ์อื่น) ตรวจบัตรให้ถูกคนก่อนสั่งพิมพ์จริง
-  // FIX-26 (user) — ปุ่ม 'พิมพ์' พิมพ์เลย ไม่เข้าพรีวิวก่อน
-  // FIX-11c (user) — ลบปุ่ม 'พิมพ์อีกครั้ง' ที่ทำเหมือน 'พิมพ์บัตรสมาชิก' เป๊ะ (ชื่อต่างแต่ทำเหมือนกัน → งง)
+  // FIX-THAI-CARD (user) — เลิกใช้ html2canvas สำหรับดาวน์โหลด เพราะมันเรนเดอร์
+  // CSS ไม่ตรง browser จริง (gradient/shadow/pseudo เพี้ยน) ทำให้ไฟล์ที่โหลดไม่ตรงพรีวิว
+  // สามารถแก้ได้ถาวร = เปลี่ยนดาวน์โหลดไปใช้ window.print() เหมือนปุ่มพิมพ์
+  // ผู้ใช้เลือก "บันทึกเป็น PDF" ในหน้าต่างพิมพ์ → ไฟล์ PDF เวกเตอร์คมชัด ตรงพรีวิว 100%
+  // (เหมือนที่ Reports ใช้ printReportDoc แทน html2canvas ตั้งแต่ FIX-25)
+  const downloadCard = () => { window.print(); };
   const printCard = () => { window.print(); };
   useEffect(() => {
     if (confirmForBill) return;
@@ -228,23 +205,13 @@ export function MemberCardModal({
     <div className="member-card-stage">
       <MemberCardArt member={member} brandName={brandName} brandLogo={brandLogo} qrDataUrl={qrDataUrl} id="member-card" footnoteAtScan={confirmForBill} />
     </div>
-    {/* FIX-11a (user) — hidden off-screen capture host for html2canvas download.
-        Rendered at the same Thai business card size (90×55mm) as the on-screen card
-        but with clean CSS (explicit width×height, no ::after, no shadow) so the
-        downloaded PNG matches the print output. Only rendered when the download
-        button shows (i.e. not in confirmForBill mode). */}
-    {!confirmForBill && (
-      <div className="member-card-capture-host" aria-hidden="true">
-        <MemberCardArt member={member} brandName={brandName} brandLogo={brandLogo} qrDataUrl={qrDataUrl} id="member-card-capture" footnoteAtScan={confirmForBill} />
-      </div>
-    )}
     <div className="member-card-note"><CreditCard size={15} /> {confirmForBill ? "ทุกครั้งที่ยิงบัตรสมาชิก ระบบจะเด้งข้อมูลบัตรขึ้นมาให้ตรวจสอบเสมอ — ยืนยันเฉพาะเมื่อข้อมูลตรงกับลูกค้าที่ยื่นบัตรเท่านั้น" : "สมาชิกไม่มีบัญชีเข้าสู่ระบบแอป — บัตรใบนี้ใช้ระบุตัวตนที่เคาน์เตอร์ · ทุกครั้งที่สแกนบัตร พนักงานจะเห็นข้อมูลสมาชิกเพื่อยืนยันก่อนหักยอดเสมอ"}</div>
     <div className="modal-actions">
       {confirmForBill ? <>
         <button className="outline-button" onClick={onClose}><X size={16} /> ไม่ใช่สมาชิกนี้</button>
         <button className="primary-button" disabled={busy} onClick={() => onConfirm?.()}><UserCheck size={16} /> {confirmLabel}</button>
       </> : <>
-        <button className="outline-button amber" disabled={busy} onClick={downloadCard} title="ดาวน์โหลดรูปบัตรสมาชิกเป็นไฟล์ PNG (ขนาดนามบัตรไทย 90×55 มม. พร้อมบาร์โค้ด+QR)"><Download size={16} /> {busy ? "กำลังสร้างรูป..." : "ดาวน์โหลดรูปบัตร"}</button>
+        <button className="outline-button amber" onClick={downloadCard} title="ดาวน์โหลดบัตรสมาชิกเป็นไฟล์ PDF — ในหน้าต่างพิมพ์ เลือก 'บันทึกเป็น PDF' แทนเครื่องพิมพ์"><Printer size={16} /> ดาวน์โหลด PDF</button>
         <button className="primary-button" onClick={printCard} title="พิมพ์บัตรสมาชิก (มาตรฐานนามบัตรไทย 90×55 มม.) ผ่านเครื่องพิมพ์"><Printer size={16} /> พิมพ์บัตรสมาชิก</button>
       </>}
     </div>
