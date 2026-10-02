@@ -6317,6 +6317,8 @@ button, .primary-button, .outline-button, .icon-button, .quick-amount-btn, .pay-
   z-index: 30;
   transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
 }
+/* FIX — ซ่อน FAB เมื่อมี modal เปิดอยู่ (กันบัง/ซ้อน modal content) */
+body:has(.modal-backdrop) .shortcuts-fab { display: none; }
 .shortcuts-fab:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 20px rgba(40, 70, 58, 0.22);
