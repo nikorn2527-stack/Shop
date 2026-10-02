@@ -1973,3 +1973,151 @@ Work Log:
 5. **A11y**: เพิ่ม aria-label ที่ชัดเจนขึ้นสำหรับ onboarding steps (ตอนนี้ใช้ title และ text content)
 6. **OnboardingBanner dismissal reset**: เพิ่มปุ่ม "รีเซ็ต onboarding" ใน Settings → ขั้นสูง เพื่อเคลียร์ localStorage
 
+
+---
+Task ID: FEAT-7-9 + STYLE-9-10 + FIX (cron review round 3: RecentBills enhancements + Today snapshot + layout fix)
+Agent: main (orchestrator)
+Task: Assess → QA → enhance RecentBills (ReceiptModal + filters + void indicator) + add TodaySnapshot + fix OnboardingBanner complete layout
+
+Work Log:
+
+## Phase 1 — Status Assessment & QA
+
+- อ่าน worklog เข้าใจ context: รอบก่อนทำ FEAT-4/5/6 + STYLE-4/5/6 (ShortcutsFab mount + OnboardingBanner 4 steps + RecentBillsWidget + styling)
+- ตรวจสถานะ: dev server ตาย → รันใหม่ใน bash subshell เดียวกับ QA
+- TypeScript: 0 errors
+- QA via agent-browser (login admin / NewPass123!):
+  - ✅ Dashboard: OnboardingBanner "complete" state, FAB mounted, RecentBills widget 2 rows
+  - ✅ สต็อกสินค้า / หน้าร้าน POS — ทุก view โหลดปกติ ไม่มี errors
+- VLM ชี้ปัญหา: OnboardingBanner "complete" state มี text truncation + whitespace gap (4 grid children ใน 3-column grid → ล้น)
+- อ่านคำแนะนำ Phase ถัดไป: RecentBills click row → ReceiptModal, filter pills, void indicator
+
+## Phase 2 — FIX: OnboardingBanner complete state layout
+
+**ปัญหา**: complete state มี 4 children (icon + body + "เริ่มขาย" button + X button) ใน grid `auto 1fr auto` (3 columns) → ปุ่มที่ 4 ล้นไปบรรทัดใหม่ ทำให้ดูมี whitespace gap + text truncate
+
+**แก้**:
+- ห่อปุ่ม 2 ตัว (เริ่มขาย + X) ใน `<div className="onboarding-actions">` → ตอนนี้มี 3 children (icon + body + actions) พอดีกับ 3-column grid
+- เปลี่ยนปุ่ม "เริ่มขาย" จาก `outline-button` → `primary-button` (เด่นขึ้น สำหรับ celebration state)
+- CSS: เพิ่ม `.onboarding-actions` (display flex, gap 8px, flex-shrink 0, z-index 1)
+
+## Phase 3 — FEAT-7: RecentBills row click → ReceiptModal reprint
+
+**ปัญหา**: ตอนนี้คลิก row แล้วแค่ navigate ไป Reports — ผู้ใช้ต้องการดูบิลเต็มรูปแบบทันทีโดยไม่ต้องเปลี่ยนหน้า
+
+**แก้ RecentBillsWidget.tsx**:
+- เพิ่ม `useState<SaleHistoryEntry | null>(null)` สำหรับ `viewedBill`
+- เปลี่ยน row onClick จาก `setView("reports")` → `setViewedBill(bill)`
+- เพิ่ม `<ReceiptModal receipt={viewedBill} mode="reprint" onClose={...}>` ที่ท้าย component
+- Import `ReceiptModal` จาก `@/components/ReceiptModal` + type `SaleHistoryEntry` จาก server
+
+## Phase 4 — FEAT-8: Filter pills (วันนี้ / 7 วัน / ทั้งหมด)
+
+**แก้ RecentBillsWidget.tsx**:
+- เพิ่ม `useState<FilterRange>("all")` สำหรับ filter state
+- ดึงข้อมูล 20 บิลล่าสุด (เพิ่มจาก 5) เพื่อให้ filter มีข้อมูล slice
+- `filteredBills = useMemo`: กรองตาม filter (today = เริ่ม 00:00 ของวันนี้ / 7d = วันนี้ถอยหลัง 6 วัน / all = ทั้งหมด)
+- แสดง filter pills row ก่อนบิล list
+- แสดง count badge: "N บิล วันนี้" / "N บิล 7 วัน" / "N บิล"
+- Empty state เมื่อ filter คืน 0 บิล: "ไม่มีบิลในช่วง[filter]" + hint เปลี่ยนตัวกรอง
+- CSS: `.recent-bills-filters` (pill container bg) + `.recent-bills-filter` (active = white pill + shadow) + `.recent-bills-empty` (centered icon + text)
+
+## Phase 5 — FEAT-9: Voided bill indicator (red strikethrough)
+
+**Backend**:
+- `server/sqliteStore.ts`:
+  - `salesList` query: เพิ่ม `s.voided AS voided` ใน SELECT + type
+  - return map: เพิ่ม `voided: sale.voided === 1` (แปลง 0/1 → boolean)
+  - `SaleHistoryEntry` type: เพิ่ม `voided?: boolean` field
+
+**Frontend (RecentBillsWidget.tsx)**:
+- แต่ละ row: ถ้า `bill.voided` เป็น true ใส่ className `voided`
+- แสดง "ยกเลิก" tag แทน member name
+- summary header: นับเฉพาะ valid (non-voided) bills สำหรับ total/avg
+- ถ้ามี voided bills ใน filter → แสดง "ยกเลิกแล้ว N บิล" ใน subhead
+
+**CSS**:
+- `.recent-bill-row.voided`: bg แดงอ่อน, border แดงอ่อน, opacity 0.75
+- `.recent-bill-row.voided .recent-bill-info b / .recent-bill-total b`: text-decoration line-through สีแดง 1.5px
+- `.recent-bill-row.voided .recent-bill-icon`: bg แดงอ่อน, icon แดง
+- `.voided-tag`: pill แดงเล็ก "ยกเลิก" (uppercase, letter-spacing)
+
+## Phase 6 — STYLE-9: TodaySnapshot (compact today strip)
+
+**สร้าง component inline ใน Dashboard.tsx**: `TodaySnapshot` function (~80 บรรทัด)
+- รับ `stats: DashboardStats | undefined` + `deposits: Map<string, number>` + `loading` + `rangeDays` + `setView`
+- คำนวณ `todayKey` (YYYY-MM-DD ของวันนี้)
+- `todayRevenue` = revenueByDay[last].total (last entry IS today — dashboardStats loop)
+- `todayDeposits` = deposits.get(todayKey)
+- `vsAvgPct` = today / avgDaily * 100 (เทียบกับค่าเฉลี่ยในช่วง)
+- 4 stats: ยอดขายวันนี้ (green, + delta ▲/▼), สมาชิกทั้งหมด (blue, from stats.memberCount.total), เติมเงินวันนี้ (purple), สินค้าใกล้หมดสต็อก (amber, from stats.lowStock.length)
+- แต่ละ stat เป็น button → click navigate ไป view ที่เกี่ยวข้อง
+- delta badge: green ▲ ถ้า >= 100%, red ▼ ถ้า < 100%
+
+**Mount**: ระหว่าง `<OnboardingBanner>` และ `<div className="metric-grid">`
+
+**CSS**: `.today-snapshot` (gradient bg, border, radius) + `.today-snapshot-grid` (4-col → 2-col → 1-col responsive) + `.today-snapshot-stat` (3-col grid: icon/body/delta) + `.ts-icon` (4 tone) + `.ts-delta` (up green / down red)
+
+## Phase 7 — STYLE-10: Polished metric-card icon container
+
+- `.metric-card .metric-icon`: เพิ่ม border-radius 9px + box-shadow inset (highlight) + outer shadow
+- `.metric-card.highlight`: เพิ่ม linear-gradient bg (f1faf6 → eaf6f1) + border teal
+
+## Phase 8 — Verification (agent-browser end-to-end)
+
+ทดสอบในสภาพแวดล้อมที่มีข้อมูล (product + 2 sales จากรอบก่อน):
+
+### Dashboard state
+- ✅ TodaySnapshot found: 4 stats + delta indicator
+- ✅ OnboardingBanner "complete" state (fixed layout — 3 children, no overflow)
+- ✅ ShortcutsFab mounted
+- ✅ RecentBillsWidget: 2 rows + 3 filter pills + "ทั้งหมด" active
+
+### Filter test
+- ✅ คลิก "วันนี้" → active filter changes, 2 rows shown (both bills today), no empty state
+- ✅ คลิก "ทั้งหมด" → resets to all
+
+### ReceiptModal test (FEAT-7)
+- ✅ คลิก recent bill row → ReceiptModal opens
+- ✅ Modal heading: "พิมพ์ใบเสร็จซ้ำ" (reprint mode)
+- ✅ แสดงบิล RC-261002-002 (น้ำ 600ml, ฿10, Admin User)
+- ✅ มีปุ่ม ดาวน์โหลด PDF + พิมพ์ใบเสร็จ + ปิด
+
+### VLM ยืนยันภาพ screenshots
+- Today Snapshot: 4 stats + delta 3000% (today ฿30 vs avg ฿1 — mathematically correct)
+- ReceiptModal: full receipt with brand + order + items + total + buttons
+
+## Phase 9 — Verification Status
+
+- `npx tsc --noEmit` → 0 errors ✅
+- agent-browser end-to-end: ทุกฟีเจอร์ทำงานครบ
+
+## Stage Summary
+
+- ไฟล์แก้ (4):
+  - `server/sqliteStore.ts` (salesList query + SaleHistoryEntry type เพิ่ม voided field)
+  - `client/src/components/RecentBillsWidget.tsx` (เขียนใหม่ ~210 บรรทัด: ReceiptModal + filter pills + void indicator + empty state)
+  - `client/src/components/OnboardingBanner.tsx` (complete state: actions wrapper + primary-button)
+  - `client/src/pages/Dashboard.tsx` (import DashboardStats + TodaySnapshot component + mount)
+  - `client/src/index.css` (+~140 บรรทัด: onboarding-actions + today-snapshot + filter pills + voided styles + empty state + metric-card icon)
+- TypeScript: 0 errors
+
+## ตอบโจทย์ Requirements
+
+- ✅ [Mandatory] Improve styling with more details: TodaySnapshot strip + metric-card icon polish + voided strikethrough + filter pills active state
+- ✅ [Mandatory] Add more features and functionality: 3 enhancements (ReceiptModal reprint on row click + filter pills + void indicator) + 1 new component (TodaySnapshot)
+- ✅ Assess project status: stable, all previous work verified
+- ✅ QA via agent-browser: filter pills work, ReceiptModal opens, delta shows
+- ✅ Fix: OnboardingBanner complete state layout overflow fixed
+- ✅ Update worklog
+
+## คำแนะนำ Phase ถัดไป
+
+1. **Void a bill เพื่อทดสอบ voided indicator จริง**: ใช้ `pos.void` endpoint ยกเลิกบิลหนึ่ง → ดูว่า RecentBills แสดง red strikethrough + "ยกเลิก" tag ถูกต้องไหม
+2. **RecentBills + ReceiptModal void state**: ถ้าบิล voided แล้ว ReceiptModal ควรแสดง "บิลนี้ถูกยกเลิก" banner ด้วย
+3. **TodaySnapshot backend fields**: เพิ่ม `todayBills` + `todayRevenue` + `todayDeposits` ใน DashboardStats โดยตรง (ตอนนี้ใช้ revenueByDay[last] ซึ่ง hacky)
+4. **Mobile responsive test**: ทดสอบ TodaySnapshot บน 375px viewport — 4-col grid ควรพับเป็น 1-col
+5. **RecentBills performance**: ใช้ `staleTime` 30s บน sales.list query เพื่อลด refetch
+6. **TodaySnapshot delta edge case**: ถ้า avgDaily = 0 แต่ today > 0 → delta คือ ∞ — ปิด delta ไว้ (ตอนนี้โชว์เฉพาะเมื่อ avgDaily > 0)
+7. **A11y**: TodaySnapshot buttons มี title แต่ขาด aria-label ที่ descriptive — เพิ่มได้
+

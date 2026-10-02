@@ -116,22 +116,24 @@ export function OnboardingBanner({
           <h2>ระบบพร้อมใช้งานแล้ว — เริ่มขายและติดตามยอดได้เลย</h2>
           <p>ตัวเลขสรุปจะแสดงที่นี่เมื่อมีการขายจริง · ใช้เมนูด้านซ้ายเพื่อเข้าถึงแต่ละส่วนของระบบ</p>
         </div>
-        <button
-          className="outline-button"
-          onClick={() => setView("pos")}
-        >
-          <ShoppingCartSimple size={16} /> เริ่มขาย
-        </button>
-        <button
-          className="icon-button"
-          aria-label="ปิดแถบต้อนรับ"
-          onClick={() => {
-            try { localStorage.setItem("onboarding-dismissed", "1"); } catch {}
-            setDismissed(true);
-          }}
-        >
-          <X size={16} />
-        </button>
+        <div className="onboarding-actions">
+          <button
+            className="primary-button"
+            onClick={() => setView("pos")}
+          >
+            <ShoppingCartSimple size={16} /> เริ่มขาย
+          </button>
+          <button
+            className="icon-button"
+            aria-label="ปิดแถบต้อนรับ"
+            onClick={() => {
+              try { localStorage.setItem("onboarding-dismissed", "1"); } catch {}
+              setDismissed(true);
+            }}
+          >
+            <X size={16} />
+          </button>
+        </div>
       </section>
     );
   }

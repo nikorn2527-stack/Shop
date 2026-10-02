@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
 import {
-  Activity, BarChart3, CalendarClock, CalendarDays, Check, CircleAlert, Crown, MoreHorizontal, PackageSearch, Printer, ReceiptText, ShieldCheck, ShoppingBag, Terminal, Wallet, X,
+  Activity, BarChart3, CalendarClock, CalendarDays, Check, CircleAlert, Crown, MoreHorizontal, PackageSearch, Printer, ReceiptText, ShieldCheck, ShoppingBag, Terminal, Wallet, X, UsersRound,
 } from "@/lib/icons";
-import type { BusinessPeriodStatus, DayClosureRow } from "../../../server/sqliteStore";
+import type { BusinessPeriodStatus, DashboardStats, DayClosureRow } from "../../../server/sqliteStore";
 import type { Role, View } from "./pageData";
 import { isAdminRole, money, roleThaiLabel } from "./pageData";
 import { ConfirmDialog, SectionHeader } from "./PagePrimitives";
@@ -15,6 +15,98 @@ import { formatAxisLabel, formatThaiDate, formatTimeShort, parseBahtFromDetail }
 const THAI_WEEKDAYS = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."];
 const THAI_SHORT_MONTHS = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
 const RANGE_DAYS: Record<string, number> = { "7 วัน": 7, "30 วัน": 30, "12 เดือน": 365 };
+
+/**
+ * STYLE-9 — TodaySnapshot: a compact always-visible strip above the metric
+ * grid that shows today's sales / bills / deposits at a glance. The last
+ * entry of `stats.revenueByDay` IS today (the dashboardStats loop fills
+ * from `range-1` days ago through today). Clicking any stat jumps to the
+ * relevant view for deeper drill-down.
+ */
+function TodaySnapshot({
+  stats,
+  deposits,
+  loading,
+  rangeDays,
+  setView,
+}: {
+  stats: DashboardStats | undefined;
+  deposits: Map<string, number>;
+  loading: boolean;
+  rangeDays: number;
+  setView: (view: View) => void;
+}) {
+  const todayKey = (() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  })();
+  const todayRevenue = stats?.revenueByDay?.find((d) => d.date === todayKey)?.total ?? 0;
+  const todayDeposits = deposits.get(todayKey) ?? 0;
+  // Avg daily from range gives a "today vs avg" comparison
+  const avgDaily = stats?.avgDailySales ?? 0;
+  const vsAvgPct = avgDaily > 0 ? Math.round((todayRevenue / avgDaily) * 100) : 0;
+  return (
+    <section className="today-snapshot" aria-label="สรุปยอดวันนี้">
+      <div className="today-snapshot-head">
+        <span className="today-snapshot-label"><CalendarDays size={13} /> สรุปวันนี้</span>
+        <span className="today-snapshot-date">{formatThaiDate(new Date())}</span>
+      </div>
+      <div className="today-snapshot-grid">
+        <button
+          className="today-snapshot-stat highlight"
+          onClick={() => setView("reports")}
+          title="ดูรายงานยอดขายเต็มรูปแบบ"
+        >
+          <span className="ts-icon green"><ShoppingBag size={15} /></span>
+          <span className="ts-body">
+            <small>ยอดขายวันนี้</small>
+            <b>{loading ? "…" : money(todayRevenue)}</b>
+          </span>
+          {todayRevenue > 0 && avgDaily > 0 && (
+            <span className={`ts-delta ${vsAvgPct >= 100 ? "up" : "down"}`} title={`เทียบค่าเฉลี่ย ${money(avgDaily)}/วัน ในช่วง ${rangeDays} วัน`}>
+              {vsAvgPct >= 100 ? "▲" : "▼"} {vsAvgPct}%
+            </span>
+          )}
+        </button>
+        <button
+          className="today-snapshot-stat"
+          onClick={() => setView("members")}
+          title="ไปที่สมาชิกและบัญชี — ดูสมาชิกทั้งหมด"
+        >
+          <span className="ts-icon blue"><UsersRound size={15} /></span>
+          <span className="ts-body">
+            <small>สมาชิกทั้งหมด</small>
+            <b>{loading ? "…" : (stats?.memberCount?.total ?? 0)} <small>คน</small></b>
+          </span>
+        </button>
+        <button
+          className="today-snapshot-stat"
+          onClick={() => setView("members")}
+          title="ไปที่สมาชิกและบัญชี"
+        >
+          <span className="ts-icon purple"><Wallet size={15} /></span>
+          <span className="ts-body">
+            <small>เติมเงินวันนี้</small>
+            <b>{loading ? "…" : money(todayDeposits)}</b>
+          </span>
+        </button>
+        <button
+          className="today-snapshot-stat"
+          onClick={() => setView("stock")}
+          title="ไปที่สต็อกสินค้า"
+        >
+          <span className="ts-icon amber"><PackageSearch size={15} /></span>
+          <span className="ts-body">
+            <small>สินค้าใกล้หมดสต็อก</small>
+            <b>{loading ? "…" : (stats?.lowStock?.length ?? 0)} <small>รายการ</small></b>
+          </span>
+        </button>
+      </div>
+    </section>
+  );
+}
+
+
 
 /** Round 34 — compact baht for on-chart chips: 14900 → "฿14.9k", 1200000 → "฿1.2M", 0 → "฿0". */
 function compactBaht(value: number) {
@@ -317,6 +409,8 @@ export function Dashboard({ setView, role, userName }: { setView: (view: View) =
     <>
       <SectionHeader eyebrow={`ภาพรวมการดำเนินงาน · ${role === "admin" ? "มุมมองผู้บริหาร" : role === "dev" ? "มุมมองผู้พัฒนา" : "มุมมองเจ้าหน้าที่"}`} title={`${greetingWord}, ${firstName}`} description="สรุปตัวเลขสำคัญอยู่บนสุด · เลือกมุมมองข้อมูลจากแถบด้านล่างเพื่อดูรายละเอียดแบบเต็มพื้นที่" action={<><div className={`permission-chip ${role}`}><span>{role === "admin" ? <Crown size={14} /> : role === "dev" ? <Terminal size={14} /> : <ShieldCheck size={14} />}</span>{role === "admin" ? "สิทธิ์ผู้บริหาร · วิเคราะห์เต็มรูปแบบ" : role === "dev" ? "สิทธิ์ผู้พัฒนา · เข้าถึงทุกส่วนของระบบ" : "สิทธิ์เจ้าหน้าที่ · ปฏิบัติงานหน้าร้าน"}</div><div className="permission-chip neutral" title="วันที่ปัจจุบัน"><span><CalendarDays size={14} /></span>วันนี้ · {formatThaiDate(new Date())}</div></>} />
       <OnboardingBanner progress={onboardingProgress} setView={setView} />
+      {/* STYLE-9 — Today's snapshot mini-stats row (always visible, quick glance at today) */}
+      <TodaySnapshot stats={stats} deposits={deposits} loading={loading} rangeDays={rangeDays} setView={setView} />
       <div className="metric-grid">
         <div className="metric-card highlight"><div className="metric-top"><span>ยอดขายทั้งหมด · {range}</span><span className="metric-icon green"><ShoppingBag size={18} /></span></div><strong>{loading ? "…" : money(stats?.totalSales ?? 0)}</strong><div className="metric-foot"><span>{stats?.totalOrders ?? 0} บิล</span><span>สูงสุด {money(Math.max(...(stats?.revenueByDay ?? []).map((day) => day.total), 0))} ในหนึ่งวัน</span></div></div>
         <div className="metric-card"><div className="metric-top"><span>ออเดอร์ทั้งหมด</span><span className="metric-icon blue"><ReceiptText size={18} /></span></div><strong>{loading ? "…" : (stats?.totalOrders ?? 0).toLocaleString("th-TH")} <small>บิล</small></strong><div className="metric-foot"><span>เฉลี่ย {((stats?.totalOrders ?? 0) / rangeDays).toFixed(1)} บิล/วัน</span><span>ในช่วง{range}</span></div></div>

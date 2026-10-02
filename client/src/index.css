@@ -6015,6 +6015,15 @@ button, .primary-button, .outline-button, .icon-button, .quick-amount-btn, .pay-
   background: linear-gradient(135deg, #eaf6ee 0%, #e0f0e6 100%);
   border-color: #c5e1cc;
 }
+/* FEAT-FIX — actions wrapper for complete state (keeps buttons in 1 auto column) */
+.onboarding-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
 .onboarding-icon-wrap {
   width: 42px;
   height: 42px;
@@ -6537,6 +6546,110 @@ button, .primary-button, .outline-button, .icon-button, .quick-amount-btn, .pay-
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
+/* FEAT-8 — filter pills for RecentBillsWidget */
+.recent-bills-filters {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+  padding: 3px;
+  background: #f4f8f6;
+  border: 1px solid #ebeee9;
+  border-radius: 8px;
+  width: fit-content;
+}
+.recent-bills-filter {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border: 0;
+  background: transparent;
+  color: #7b7f70;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.recent-bills-filter:hover:not(.active) {
+  background: rgba(255, 255, 255, 0.7);
+  color: #4b8a72;
+}
+.recent-bills-filter.active {
+  background: #fff;
+  color: #2e463e;
+  box-shadow: 0 1px 3px rgba(40, 70, 58, 0.12);
+}
+.recent-bills-filter-count {
+  font-size: 10.5px;
+  color: #8b9080;
+  margin-left: 8px;
+  font-weight: 500;
+}
+/* FEAT-9 — voided bill row (red strikethrough) */
+.recent-bill-row.voided {
+  background: #fdf3f3;
+  border-color: #f0d4d4;
+  opacity: 0.75;
+}
+.recent-bill-row.voided:hover {
+  background: #fce8e8;
+  border-color: #e6b8b8;
+}
+.recent-bill-row.voided .recent-bill-info b,
+.recent-bill-row.voided .recent-bill-total b {
+  text-decoration: line-through;
+  text-decoration-color: #c26568;
+  text-decoration-thickness: 1.5px;
+  color: #a85355;
+}
+.recent-bill-row.voided .recent-bill-icon {
+  background: #fce8e8;
+  color: #c26568;
+}
+.recent-bills-void-note {
+  color: #c26568;
+  font-weight: 600;
+}
+.recent-bills-void-note svg {
+  vertical-align: -1px;
+}
+.recent-bill-total .voided-tag {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 700;
+  color: #c26568;
+  background: #fce8e8;
+  padding: 2px 5px;
+  border-radius: 3px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+/* FEAT-8 — empty state when filter returns 0 bills */
+.recent-bills-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 24px 16px;
+  color: #959988;
+  text-align: center;
+}
+.recent-bills-empty svg {
+  color: #c5d4cb;
+  background: #f4faf7;
+  padding: 10px;
+  border-radius: 50%;
+  border: 1px dashed #cfe4db;
+}
+.recent-bills-empty b {
+  font-size: 12px;
+  color: #4c5a50;
+  font-weight: 600;
+}
+.recent-bills-empty small {
+  font-size: 10.5px;
+  color: #8b9080;
+}
 @media (max-width: 560px) {
   .recent-bill-row {
     grid-template-columns: 24px 1fr auto;
@@ -6686,4 +6799,144 @@ button, .primary-button, .outline-button, .icon-button, .quick-amount-btn, .pay-
 }
 .outline-button:active:not(:disabled) {
   transform: translateY(0);
+}
+
+/* ============================================================================
+ * STYLE-9 — TodaySnapshot (compact always-visible strip above metric grid)
+ *   Shows today's revenue + vs-avg % delta, member count, today's deposits,
+ *   and low-stock count. Each stat is a button → relevant view.
+ * ========================================================================== */
+.today-snapshot {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #f7fbf9 0%, #f0f6f3 100%);
+  border: 1px solid #d8e6dd;
+  border-radius: 11px;
+  margin-bottom: 12px;
+}
+.today-snapshot-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.today-snapshot-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #4b8a72;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+.today-snapshot-label svg { color: #4b9d7f; }
+.today-snapshot-date {
+  font-size: 11px;
+  color: #7b7f70;
+  font-weight: 500;
+}
+.today-snapshot-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+.today-snapshot-stat {
+  display: grid;
+  grid-template-columns: 26px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: #fff;
+  border: 1px solid #ebeee9;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.today-snapshot-stat:hover {
+  transform: translateY(-1px);
+  border-color: #b9d8cb;
+  box-shadow: 0 3px 10px rgba(40, 70, 58, 0.1);
+}
+.today-snapshot-stat.highlight {
+  background: #f1faf6;
+  border-color: #c5e1cc;
+}
+.today-snapshot-stat .ts-icon {
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  flex-shrink: 0;
+}
+.ts-icon.green { background: #e0f0e6; color: #4b9d7f; }
+.ts-icon.blue { background: #e6f0f6; color: #4a6f8a; }
+.ts-icon.purple { background: #f0e6f6; color: #72589f; }
+.ts-icon.amber { background: #fff4e0; color: #a06f28; }
+.today-snapshot-stat .ts-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.today-snapshot-stat .ts-body small {
+  font-size: 10px;
+  color: #7b7f70;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.today-snapshot-stat .ts-body b {
+  font-size: 14px;
+  color: #2e463e;
+  font-weight: 700;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+.today-snapshot-stat .ts-body b small {
+  font-size: 10px;
+  color: #7e8173;
+  font-weight: 500;
+  margin-left: 2px;
+}
+.ts-delta {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 5px;
+  white-space: nowrap;
+}
+.ts-delta.up {
+  background: #e0f0e6;
+  color: #4b9d7f;
+}
+.ts-delta.down {
+  background: #fce8e8;
+  color: #c26568;
+}
+@media (max-width: 820px) {
+  .today-snapshot-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 560px) {
+  .today-snapshot-grid { grid-template-columns: 1fr; }
+  .today-snapshot-stat { padding: 10px; }
+}
+
+/* ============================================================================
+ * STYLE-10 — Polished metric-card with subtle icon container
+ * ========================================================================== */
+.metric-card .metric-icon {
+  border-radius: 9px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+.metric-card.highlight {
+  background-image: linear-gradient(135deg, #f1faf6 0%, #eaf6f1 100%);
+  border-color: #c5e1cc;
 }

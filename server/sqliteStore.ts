@@ -185,6 +185,8 @@ export type SaleHistoryEntry = CheckoutReceipt & {
   id: number;
   /** ROUND 63 — บิลนี้มีรูปหลักฐานการชำระแนบอยู่ไหม (ตัวรูปดึงแยกที่ sales.slip เพื่อไม่ให้ลิสต์หนัก) */
   hasSlip: boolean;
+  /** FEAT-9 — บิลนี้ถูกยกเลิกหรือไม่ (true = void, แสดง red strikethrough ใน RecentBillsWidget) */
+  voided?: boolean;
 };
 
 export type DailySalesRow = {
@@ -1958,7 +1960,7 @@ export function salesList(db: SqliteDb, input: SalesListInput = {}): SaleHistory
     params.push(`%${search}%`, `%${search}%`);
   }
   const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
-  const sales = db.prepare(`SELECT s.id, s.order_number AS orderNumber, s.payment_method AS paymentMethod, s.member_number AS memberNumber, s.subtotal, s.discount, s.total, s.cashier, s.created_at AS createdAt, s.slip_url IS NOT NULL AS hasSlip, s.received_cash AS receivedCash, s.change_due AS changeDue, s.payment_verified AS paymentVerified, CASE WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sales s LEFT JOIN members m ON m.member_number = s.member_number${where} ORDER BY s.created_at DESC, s.id DESC LIMIT ?`).all(...params, limit) as unknown as {
+  const sales = db.prepare(`SELECT s.id, s.order_number AS orderNumber, s.payment_method AS paymentMethod, s.member_number AS memberNumber, s.subtotal, s.discount, s.total, s.cashier, s.created_at AS createdAt, s.slip_url IS NOT NULL AS hasSlip, s.received_cash AS receivedCash, s.change_due AS changeDue, s.payment_verified AS paymentVerified, s.voided AS voided, CASE WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sales s LEFT JOIN members m ON m.member_number = s.member_number${where} ORDER BY s.created_at DESC, s.id DESC LIMIT ?`).all(...params, limit) as unknown as {
     id: number;
     orderNumber: string;
     paymentMethod: string;
@@ -1972,6 +1974,7 @@ export function salesList(db: SqliteDb, input: SalesListInput = {}): SaleHistory
     receivedCash: number | null;
     changeDue: number | null;
     paymentVerified: number | null;
+    voided: number;
     memberName: string | null;
   }[];
   if (sales.length === 0) return [];
@@ -2011,6 +2014,8 @@ export function salesList(db: SqliteDb, input: SalesListInput = {}): SaleHistory
     receivedCash: sale.receivedCash ?? null,
     changeDue: sale.changeDue ?? null,
     paymentVerified: sale.paymentVerified === 1 ? true : sale.paymentVerified === 0 ? false : null,
+    // FEAT-9 — voided flag for RecentBillsWidget red strikethrough indicator
+    voided: sale.voided === 1,
   }));
 }
 
