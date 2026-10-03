@@ -2534,3 +2534,87 @@ owner: "ให้เห็นสถานะและตัดสินใจเ
 4. **.rd-* dead CSS cleanup** — ใช้ sed/script ลบ (Edit ไม่ match Thai text ยาว)
 5. **POS pending state visual test** — ต้องทำ sale จริงเพื่อเห็น "กำลังบันทึก" (logic ใช้
    checkoutMutation.isPending เหมือน payDisabled ที่ทำงานอยู่แล้ว)
+
+---
+Task ID: P0-UX-02 part 2 (A4 sheet print system)
+Agent: main (user สั่ง 'ทำเลยครับ น่าจะมีงานใหญ่กว่านี้รออยู่')
+Task: A4 sheet print profile system — งานใหญ่ที่เหลือ เพื่อให้เห็นภาพระบบพิมพ์บัตรเต็มรูปแบบ
+
+## บทสรุป
+owner spec บัตรสมาชิกกำหนด output 3 รูปแบบ: PDF / PNG / A4 sheet print
+- PDF ✅ (commit 8c090b0 — 90×55มม. print-ready PNG lossless)
+- PNG ✅ (commit d98002d — 1440×880px @ 406 DPI)
+- **A4 sheet print ✅ (รอบนี้ — commit f6dfcb4)** — งานใหญ่ที่ขาดอยู่
+
+## Work Log — A4 sheet print profile system
+ไฟล์ใหม่ (1) + แก้ (2):
+
+### 1. `shared/cardSheet.ts` (ใหม่) — profile system
+- `CardSheetProfile` type: id/name/cols/rows/cardWmm/cardHmm/marginTop/Left/gapX/Y/offsetX/Y
+- `BUILT_IN_PROFILES`: A4 8-up (2×4), 10-up (2×5), custom
+  - 12-up ไม่ใช้ built-in เพราะ 3×90=270>210 ไม่พอดี A4 portrait → ให้ผู้ใช้กำหนดเอง
+- `loadCardSheetProfile()`/`saveCardSheetProfile()` localStorage persistence
+  (calibration ขึ้นเครื่องพิมพ์แต่ละเครื่อง → เก็บเฉพาะเครื่อง)
+- `slotPositions(profile)` คำนวณ left/top มม. ของแต่ละ slot รวม offset calibration
+- `slotsPerSheet(profile)` จำนวนบัตร/แผ่น
+
+### 2. `client/src/components/MemberCardModal.tsx` — MemberCardBatchModal
+- เพิ่ม 2 โหมดพิมพ์: "บัตรเดี่ยวต่อหน้า" (เดิม) vs "หลายบัตรต่อแผ่น A4" (ใหม่)
+- A4 sheet mode: profile selector (8/10-up/custom) + cols/rows/ขอบ/gap editor
+  + Offset X/Y calibration (editable, persisted) + capacity/sheetCount display
+- on-screen preview: scaled A4 (scale 0.32) พร้อม card slots (dashed outline)
+- `card-sheet-print-host` (hidden off-screen): A4 sheet(s) เต็มขนาดสำหรับ window.print()
+  - แบ่งสมาชิกเป็นกลุ่มตาม capacity → หลายแผ่นถ้าเกิน
+  - `slot-test-box` สำหรับ "พิมพ์แผ่นทดสอบ" (กล่องโครงร่าง ไม่มีบัตร) ตรวจแนวก่อนใช้กระดาพจริง
+- ปุ่ม: "พิมพ์แผ่นทดสอบ" + "พิมพ์ลง A4 (N แผ่น)"
+
+### 3. `client/src/index.css` — A4 sheet styles
+- `.batch-mode-tabs`/`.batch-mode-tab` mode toggle
+- `.sheet-profile-editor`/`.sheet-field`/`.sheet-field-row`/`.sheet-calib-row` editor
+- `.sheet-preview-wrap`/`.sheet-preview-scaler` (254×359px = A4 × 0.32) + `.card-sheet-a4.preview`
+- `.card-slot` absolute positioning + `.slot-empty`/`.slot-test-box`
+- `.card-sheet-print-host` hidden + `@media print` สำหรับ A4 (210×297mm, page-break-after,
+  .member-card fills 100% of slot, no border/radius, print-color-adjust: exact)
+- responsive (จอแคบ: scale 0.25 + field-row 3 cols)
+
+## Verification
+- `tsc --noEmit`: 0 errors
+- agent-browser: สมาชิก → เลือก → พิมพ์บัตร 1 ใบ → batch modal →
+  tab "หลายบัตรต่อแผ่น A4" → profile "A4 8 ใบ/แผ่น (2×4)" selected +
+  Offset X/Y editable + "พิมพ์แผ่นทดสอบ" + "พิมพ์ลง A4 (1 แผ่น)"
+- DOM eval: preview 8 slots (firstSlotHasCard=true) + print host 1 sheet/8 slots
+- ไม่มี console/page error
+- vector PDF endpoint ยังทำงาน (16KB application/pdf)
+
+## ภาพรวมระบบพิมพ์บัตรสมาชิก (เสร็จครบ)
+
+| Output | สถานะ | commit |
+|---|---|---|
+| Single-card PDF (90×55มม. PNG lossless white bg) | ✅ | 8c090b0 |
+| PNG download (1440×880px @ 406 DPI) | ✅ | d98002d |
+| A4 sheet print (8/10-up + custom + calibration + test print) | ✅ | f6dfcb4 |
+| Bleed 3mm (96×61มม.) | N/A | — |
+
+หมายเหตุ bleed: owner spec "include 3mm bleed IF artwork extends to edges"
+บัตรนี้มี border + มุมโค้ง (artwork ไม่ขยายถึงขอบ) → bleed เป็น optional
+PDF 90×55มม. (finished size) เพียงพอสำหรับดีไซน์นี้
+
+## Stage Summary
+- ไฟล์ (3): shared/cardSheet.ts (ใหม่ 87 บรรทัด) + MemberCardModal.tsx (+132) + index.css (+73)
+- commit: f6dfcb4
+- ตอบโจทย์ owner spec P0-UX-02 part 2 ครบ: profile selection + X/Y calibration +
+  test print + custom template + ไม่เดา template (12-up ให้ผู้ใช้กำหนดเอง)
+
+## สถานะทั้งหมด (P0 + P1 + extras)
+
+| งาน | commit |
+|---|---|
+| P0-UX-01 รวม template รายงาน | c18b37e |
+| P0-UX-02 บัตร balance+PDF | 8c090b0 |
+| P0-UX-02 PNG download | d98002d |
+| P0-UX-02 A4 sheet print system | f6dfcb4 |
+| P0-UX-03 PDF vector (server Chromium) | dcddb72 |
+| P1-UX-04 A4 document preview | f053229 |
+| P1-UX-05 POS state banner | f4c9135 |
+
+ระบบเอกสาร + บัตร + POS ครบตาม UX report ของ owner ทั้ง P0 และ P1
