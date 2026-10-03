@@ -12,6 +12,7 @@ import {
 } from "@/lib/icons";
 import { trpc } from "@/lib/trpc";
 import { downloadCsvFile } from "@/exportUtils";
+import { ThaiDatePicker } from "@/components/ThaiDatePicker";
 import {
   formatLogDateTime,
   getErrorMessage,
@@ -119,27 +120,9 @@ export function Logs() {
               />
             </div>
             <div className="date-range-filter">
-              <div className="search-field" title="ตั้งแต่วันที่">
-                <CalendarDays size={15} />
-                <input
-                  type="date"
-                  value={dateFrom}
-                  max={dateTo || undefined}
-                  aria-label="กรองตั้งแต่วันที่"
-                  onChange={event => setDateFrom(event.target.value)}
-                />
-              </div>
+              <ThaiDatePicker value={dateFrom} onChange={setDateFrom} max={dateTo || undefined} ariaLabel="กรองตั้งแต่วันที่" placeholder="ตั้งแต่วันที่" />
               <span className="date-range-sep">→</span>
-              <div className="search-field" title="ถึงวันที่">
-                <CalendarDays size={15} />
-                <input
-                  type="date"
-                  value={dateTo}
-                  min={dateFrom || undefined}
-                  aria-label="กรองถึงวันที่"
-                  onChange={event => setDateTo(event.target.value)}
-                />
-              </div>
+              <ThaiDatePicker value={dateTo} onChange={setDateTo} min={dateFrom || undefined} ariaLabel="กรองถึงวันที่" placeholder="ถึงวันที่" />
               {(dateFrom || dateTo) && (
                 <button
                   type="button"
