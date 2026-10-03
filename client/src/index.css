@@ -981,6 +981,10 @@ tr.locked-row .user-avatar { background: #f6ecd4; color: #a97f2e; }
 .member-verify-strip.suspended .verify-balance-chip { color: #7a2d30; border-color: #e9b4b6; background: #fff6f6; }
 .member-card-note { display: flex; align-items: flex-start; gap: 7px; margin-top: 12px; color: #7e846d; background: #f4faf7; border: 1px dashed #cfe4db; border-radius: 8px; padding: 9px 11px; font-size: 11px; line-height: 1.55; }
 .member-card-note svg { color: #4b9d7f; flex-shrink: 0; margin-top: 1px; }
+/* P0-UX-02 — 3 ปุ่ม (PDF/PNG/พิมพ์) ใน modal แคบ 430px: ให้ wrap ลงแถวใหม่ได้ + ปุ่มเติมเท่ากัน */
+.member-card-modal .modal-actions { flex-wrap: wrap; justify-content: stretch; }
+.member-card-modal .modal-actions button { flex: 1 1 0; min-width: 0; justify-content: center; }
+.member-card-modal .modal-actions button svg { flex-shrink: 0; }
 
 /* 6) Print — isolate the wallet card onto its own cut-ready page.
       Same guard pattern as the receipt slip: only takes effect when the

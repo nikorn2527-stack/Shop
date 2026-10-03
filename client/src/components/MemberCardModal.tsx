@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import QRCode from "qrcode";
-import { Barcode, CreditCard, Printer, QrCode as QrIcon, ScanLine, ShieldAlert, UserCheck, X } from "@/lib/icons";
+import { Barcode, CreditCard, FileImage, Printer, QrCode as QrIcon, ScanLine, ShieldAlert, UserCheck, X } from "@/lib/icons";
 import { money } from "../pages/pageData";
 import { code128DataUrl } from "../barcode";
 import { MemberAvatar } from "./MemberAvatar";
@@ -161,36 +161,52 @@ export function MemberCardModal({
   /** ข้อความบอกเหตุผลที่บัตรเด้ง (default อธิบายการสแกน) */
   confirmHint?: string;
 }) {
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<"" | "pdf" | "png">("");
   const { brandName, brandLogo } = useBrand();
   const qrDataUrl = useQrDataUrl(member.memberNumber);
   const displayName = [member.prename?.trim() || "", member.firstName, member.lastName].filter(Boolean).join(" ");
   const suspended = member.status === "suspended";
 
-  // P0-UX-02 — ดาวน์โหลดบัตรเป็น PDF print-ready 90×55 มม. (มาตรฐานนามบัตรไทย)
-  // PDF สำหรับส่งร้านพิมพ์: พื้นหลังขาวสะอาด (ไม่มี #f9fbfa tint ของ UI ติดไป) +
-  // PNG lossless (ตัด artifacts ของ JPEG บนตัวอักษร/บาร์โค้ด/QR) + scale 4 (≈406 DPI
-  // เกินมาตรฐานร้านพิมพ์ 300 DPI) เพื่อให้คมเมื่อ zoom 200% และสแกนได้หลังพิมพ์จริง
-  const downloadCard = async () => {
+  // P0-UX-02 — จับภาพบัตรเป็น canvas (ใช้ร่วมกัน PDF + PNG) เพื่อไม่ต้อง html2canvas ซ้อหลายรอบ
+  // scale 4: 360×220 → 1440×880px (≈406 DPI เกินมาตรฐานร้านพิมพ์ 300 DPI / 1063×650px ตาม owner spec)
+  // พื้นหลังขาวสะอาด (ไม่มี #f9fbfa tint ของ UI ติดไป) + useCORS รอรูปสมาชิก/โลโก้
+  const captureCardCanvas = async (): Promise<HTMLCanvasElement | null> => {
     const element = document.getElementById("member-card-capture");
-    if (!element) return;
-    setBusy(true);
+    if (!element) return null;
+    if (document.fonts?.ready) await document.fonts.ready;
+    return html2canvas(element, {
+      scale: 4,
+      backgroundColor: "#ffffff",
+      useCORS: true,
+      logging: false,
+    });
+  };
+  // P0-UX-02 owner spec output #1 — PDF 90×55มม. print-ready (ส่งร้านพิมพ์)
+  // PNG lossless (ตัด artifacts ของ JPEG บนตัวอักษร/บาร์โค้ด/QR)
+  const downloadCardPdf = async () => {
+    setBusy("pdf");
     try {
-      if (document.fonts?.ready) await document.fonts.ready;
-      const canvas = await html2canvas(element, {
-        scale: 4,
-        backgroundColor: "#ffffff",
-        useCORS: true,
-        logging: false,
-      });
-      const pdf = new jsPDF({
-        orientation: "landscape",
-        unit: "mm",
-        format: [90, 55],
-      });
+      const canvas = await captureCardCanvas();
+      if (!canvas) return;
+      const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: [90, 55] });
       pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, 90, 55);
       pdf.save(`card-${member.memberNumber}.pdf`);
-    } finally { setBusy(false); }
+    } finally { setBusy(""); }
+  };
+  // P0-UX-02 owner spec output #2 — PNG ความละเอียดสูง (ส่งไลน์/ตรวจภาพ/พิมพ์ด่วน)
+  // ไม่หุ้มใน PDF — เป็นไฟล์ภาพตรงๆ 1440×880px (เกินมาตรฐาน 1063×650 @ 300 DPI)
+  const downloadCardPng = async () => {
+    setBusy("png");
+    try {
+      const canvas = await captureCardCanvas();
+      if (!canvas) return;
+      const link = document.createElement("a");
+      link.href = canvas.toDataURL("image/png");
+      link.download = `card-${member.memberNumber}.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } finally { setBusy(""); }
   };
   const printCard = async () => {
     // Task A3 — สั่งพิมพ์ผ่าน Helper ไปยัง card printer ที่เลือกใน Settings (localStorage)
@@ -258,10 +274,11 @@ ${document.querySelector('style')?.textContent ?? ""}
     <div className="modal-actions">
       {confirmForBill ? <>
         <button className="outline-button" onClick={onClose}><X size={16} /> ไม่ใช่สมาชิกนี้</button>
-        <button className="primary-button" disabled={busy} onClick={() => onConfirm?.()}><UserCheck size={16} /> {confirmLabel}</button>
+        <button className="primary-button" disabled={busy !== ""} onClick={() => onConfirm?.()}><UserCheck size={16} /> {confirmLabel}</button>
       </> : <>
-        <button className="outline-button amber" disabled={busy} onClick={downloadCard} title="ดาวน์โหลดบัตรสมาชิกเป็นไฟล์ PDF (90×55 มม.)"><Printer size={16} /> {busy ? "กำลังสร้าง PDF..." : "ดาวน์โหลด PDF"}</button>
-        <button className="primary-button" onClick={printCard} title="พิมพ์บัตรสมาชิก (มาตรฐานนามบัตรไทย 90×55 มม.) ผ่านเครื่องพิมพ์"><Printer size={16} /> พิมพ์บัตรสมาชิก</button>
+        <button className="outline-button amber" disabled={busy !== ""} onClick={downloadCardPdf} title="ดาวน์โหลดบัตรสมาชิกเป็นไฟล์ PDF 90×55 มม. (ส่งร้านพิมพ์)"><Printer size={16} /> {busy === "pdf" ? "กำลังสร้าง PDF..." : "ดาวน์โหลด PDF"}</button>
+        <button className="outline-button" disabled={busy !== ""} onClick={downloadCardPng} title="ดาวน์โหลดบัตรเป็น PNG ความละเอียดสูง 1440×880px (ส่งไลน์/ตรวจภาพ/พิมพ์ด่วน)"><FileImage size={16} /> {busy === "png" ? "กำลังสร้าง PNG..." : "ดาวน์โหลด PNG"}</button>
+        <button className="primary-button" disabled={busy !== ""} onClick={printCard} title="พิมพ์บัตรสมาชิก (มาตรฐานนามบัตรไทย 90×55 มม.) ผ่านเครื่องพิมพ์"><Printer size={16} /> พิมพ์บัตรสมาชิก</button>
       </>}
     </div>
   </div></div>;
