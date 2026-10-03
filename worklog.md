@@ -2209,3 +2209,83 @@ owner บอกว่า:
 1. **research ก่อนทำทุกครั้ง**: มาตรฐานขนาดกระดาษ, การ์ด, บัตร — หาข้อมูลก่อนเขียนโค้ด
 2. **ตรวจสอบ assumptions**: อย่าสมมติว่ามาตรฐานสากล (CR80) ใช้ได้ทุกที่ — แต่ละประเทศมีมาตรฐานเฉพาะ
 3. **proactive fixes**: ถ้าเห็นปัญหา แก้เลย อย่ารอให้ owner จี้
+
+---
+Task ID: P0-UX-01
+Agent: main (orchestrator)
+Task: รวม rendering pipeline เอกสารรายงานเป็น Single Document Source (Preview/PDF/Print ใช้ template เดียว) — ตาม UX report ของ owner (Sprint 1, item 1)
+
+## บทสรุปปัญหา (จาก UX report ของ owner)
+
+owner ส่ง UX/UI report ชุดที่ 2 ระบุว่า Preview / PDF / Print ใช้ source คนละชุด:
+- Preview (ExportPreviewModal) = ตาราง UI อีกตัว
+- PDF (downloadReportPdf) = สร้าง DOM + html2canvas → JPEG → jsPDF (raster, เบลอ, copy ไม่ได้) โดยใช้ CSS จาก index.css
+- Print (printReportDoc) = HTML string อีกชุดใน iframe มี inline <style> คนละค่าจาก index.css
+ผล: PDF กับ Print มีขนาดตัวอักษร/padding/layout ต่างกัน + PDF เป็นภาพ screenshot ไม่คม
+
+## Work Log — P0-UX-01 (รวม template เป็น source เดียว)
+
+ไฟล์เดียวที่แก้: `client/src/reportDoc.ts` (refactor ในที่ ไม่สร้าง module ใหม่ เพื่อลด risk)
+
+1. เพิ่ม `REPORT_DOC_CSS` (constant) — single source of truth สำหรับ .rd-* classes
+   ยึดค่าจาก print template (vector, อ่านสบาย) เป็นฐาน: .rd-brand b 17px, .rd-table th 11px
+   uppercase, .rd-meta, .rd-summary-grid, .rd-note, .compact mode ครบ
+2. เพิ่ม `REPORT_DOC_PDF_STAGE_CSS` — ขนาด A4 (794×1123px) + padding 14mm ให้ตรง @page margin ของ Print
+3. เพิ่ม `REPORT_DOC_PRINT_FONT_FACE` — @font-face Sarabun (12 weights, thai+latin unicode-range) สำหรับ iframe
+4. `downloadReportPdf`:
+   - ฉีด `<style>{REPORT_DOC_CSS}{REPORT_DOC_PDF_STAGE_CSS}</style>` เข้า capture stage
+     → DOM ที่จับภาพใช้สไตล์เดียวกับ Print (แทนการพึ่ง index.css ที่ค่า .rd-* ต่างกัน)
+   - เปลี่ยน `canvas.toDataURL("image/jpeg", 0.95)` → `canvas.toDataURL("image/png")` (lossless ตัด artifacts)
+   - เปลี่ยน `pdf.addImage(..., "JPEG", ...)` → `"PNG"`
+   - เปลี่ยน html2canvas `scale: 2.5` → `scale: 3` + `useCORS: true, logging: false`
+   - โครงสร้าง pagination (fitRows / MAX_ROWS_PER_PAGE / totals หน้าสุดท้าย)  preserved
+5. `printReportDoc`:
+   - เปลี่ยน container จาก `<div class="doc">` → `<div class="report-doc">` (เดียวกับ PDF)
+   - เปลี่ยน `<table>` → `<table class="rd-table">` (เดียวกับ PDF)
+   - inline <style> ใช้ `REPORT_DOC_PRINT_FONT_FACE` + `@page` + `body` + `REPORT_DOC_CSS`
+     (ลบ .rd-* ซ้ำออก ใช้ REPORT_DOC_CSS แทน)
+   - โครงสร้าง head/title/meta/summary/table/totals/footnote  preserved
+
+## ผลลัพธ์
+
+- PDF กับ Print ใช้ CSS + class structure ชุดเดียวกัน (REPORT_DOC_CSS)
+- แก้ฟอนต์/สี/ตาราง ที่เดียว → มีผลทั้งสอง output
+- PDF คมขึ้น (PNG lossless + scale 3) และไม่มี JPEG artifacts
+- PDF กับ Print layout ตรงกัน
+
+## Verification
+
+- `bun run check` (tsc --noEmit): **0 errors**
+- agent-browser end-to-end:
+  - login admin / NewPass123! → dashboard → รายงาน page
+  - คลิก PDF (สรุปยอดขาย) → ExportPreviewModal เปิด → คลิก PDF ใน modal
+    → downloadReportPdf รันผ่าน ไม่มี console error / page error ใหม่
+  - คลิก พิมพ์ ใน modal → printReportDoc รันผ่าน
+    → ตรวจ iframe: srcdoc มี `class="report-doc"` + `class="rd-table"` + `rd-head` +
+      `rd-summary-grid` + `rd-meta` ครบ → ใช้ unified template แล้วจริง
+- ไม่มี test ใดแตะ reportDoc.ts → ไม่มี regression
+
+## Stage Summary
+
+- ไฟล์แก้ (1): `client/src/reportDoc.ts` (+119 / -92)
+- commit: c18b37e `refactor(P0-UX-01): รวม document template รายงานเป็น source เดียว (PDF = Print)`
+- ตอบโจทย์ owner ส่วน P0-UX-01 (Single Document Source) สำหรับรายงาน
+- PDF คมขึ้น + layout ตรง Print (ตามข้อ P0-UX-03 บางส่วน)
+
+## ข้อจำกัดที่ยังเหลือ (โอนไปรอบถัดไป)
+
+1. **PDF ยังเป็น raster** (PNG ฝังใน PDF): ตัวอักษรคมขึ้นแล้ว แต่ยัง copy/search text ใน PDF
+   ไม่ได้ — ต้อง migration ไป **server-side Chromium printToPDF** เพื่อ vector PDF จริง
+   (ตาม acceptance criteria: "select/copy text จาก PDF ได้") — งานใหญ่ ต้องประเมิน
+   deployment (Puppeteer + Chromium บน server) + endpoint `/api/report/pdf` ใหม่
+2. **Preview ยังเป็น data-table** (ExportPreviewModal แสดงตาราง ไม่ใช่ A4 document preview):
+   ตาม P1-UX-04 ต้องเพิ่ม A4 document preview tab โดย render REPORT_DOC_CSS ใน iframe
+3. **index.css .rd-* rules ซ้ำ**: ตอนนี้ index.css (บรรทัด 3497-3535) ยังมี .rd-* อยู่
+   แต่ถูก override โดย REPORT_DOC_CSS ที่ฉีดเข้า stage — ลบได้ในรอบทำความสะอาด
+   (low risk เพราะ .report-doc/.rd-* ใช้เฉพาะตอน export)
+
+## ลำดับงานถัดไป (ตาม UX report ของ owner)
+
+- **Sprint 1 ที่เหลือ**: P0-UX-03 (vector PDF ผ่าน server-side Chromium) + P1-UX-04 (A4 preview ใน ExportPreviewModal)
+- **Sprint 2**: P0-UX-02 บัตรสมาชิก — รวม #member-card + #member-card-capture ให้ใช้ template เดียว (ตอนนี้ hidden capture host CSS ต่างจากบัตรบนจอ) + ลบ background modal/stage ที่ติดไปใน PDF
+- **Sprint 3**: P1-UX-05 POS flow — transaction state banner + QR confirmation checkbox + กัน double-submit
