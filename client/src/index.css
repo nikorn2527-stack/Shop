@@ -3485,8 +3485,9 @@ th { font-weight: 600; }
 .thai-date-foot { display: flex; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e4ece8; }
 .range-picker .thai-date-picker:first-child .thai-date-pop, .tx-date-range .thai-date-picker:first-child .thai-date-pop { left: 0; }
 .tx-date-range .thai-date-picker:last-child .thai-date-pop { left: auto; right: 0; }
-/* FIX — Logs page date-range-filter: picker ตัวที่ 2 (ถึงวันที่) เปิดปฏิทินชิดขวา ไม่ล้นจอ */
-.date-range-filter .thai-date-picker:last-child .thai-date-pop { left: auto; right: 0; }
+/* FIX — Logs page date-range-filter: picker ตัวที่ 2 (ถึงวันที่) เปิดปฏิทินชิดขวา ไม่ล้นจอ
+   ใช้ :last-of-type แทน :last-child เพราะมี <button> ตามหลัง picker ตัวที่ 2 */
+.date-range-filter .thai-date-picker:last-of-type .thai-date-pop { left: auto; right: 0; }
 
 /* --- ROUND 31-10 : เอกสารรายงาน A4 (ออกจอ ใช้เฉพาะตอนจับภาพ) --------- */
 /* ROUND 77 (user) — ลูกค้าสรุปว่า "สารบรรณ 16 ใหญ่เกิน" → ลดทุกเอกสาร A4 ลง ~20%
