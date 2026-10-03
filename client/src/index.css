@@ -2263,24 +2263,15 @@ nav button.active small { color: #4c7a58; }
 .wallet-modal-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; border-top: 1px solid var(--line); margin-top: 13px; padding-top: 12px; }
 .wallet-modal-foot small { color: var(--muted); font-size: 10px; }
 
-/* ① one-screen lock for every non-POS view (tablets up) */
+/* ① one-screen lock disabled — ปล่อยให้ content scroll ตามธรรมชาติ
+   เดิม: overflow:hidden + min-height:0 ทำให้ตารางหายทุกหน้า
+   ใหม่: overflow:visible + ไม่บังคับ flex → ตารางแสดง + scroll ได้ */
 @media (min-width: 561px) {
-  .app-shell:not(.pos-terminal) .page-content { display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
+  .app-shell:not(.pos-terminal) .page-content { display: block; overflow: visible; }
   .app-shell:not(.pos-terminal) .page-content > * { flex-shrink: 0; }
-  /* main data panels absorb the remaining height and scroll inside */
-  .app-shell:not(.pos-terminal) .page-content > section.panel { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
   .app-shell:not(.pos-terminal) .page-content > section.panel > .table-wrap { flex: 1 1 auto; min-height: 0; overflow: auto; }
-  /* dashboard: metrics + both grid rows share the screen; each panel scrolls */
-  .app-shell:not(.pos-terminal) .page-content > .dashboard-grid { flex: 1 1 0; min-height: 0; grid-auto-rows: minmax(0, 1fr); }
-  .app-shell:not(.pos-terminal) .page-content > .dashboard-grid > .panel { min-height: 0; overflow-y: auto; }
-  /* bills history deserves the bigger share on the reports page */
-  .app-shell:not(.pos-terminal) .page-content > .dashboard-grid.report-lower { flex: 1 1 0; }
-  .app-shell:not(.pos-terminal) .page-content > section.table-panel.member-history-panel { flex: 1.25 1 0; }
-  /* settings: the content column scrolls inside its frame */
-  .app-shell:not(.pos-terminal) .settings-layout { flex: 1 1 0; min-height: 0; align-items: stretch; }
   .app-shell:not(.pos-terminal) .settings-content { overflow-y: auto; min-height: 0; padding-right: 6px; }
   .app-shell:not(.pos-terminal) .settings-save-bar { position: sticky; bottom: 0; z-index: 2; margin-top: auto; }
-  /* legacy scroll containers keep behaving inside their panels */
   .table-panel > .table-wrap { flex: 1 1 auto; min-height: 0; overflow: auto; }
 }
 
