@@ -2582,16 +2582,16 @@ nav button.active small { color: #4c7a58; }
        panel เดียว (หรือกริด 2 คอลัมน์) แล้วเลื่อนข้อมูลข้างใน */
 .dash-tab-body {
   flex: 1 1 auto;
-  min-height: 0;
+  min-height: auto;
   display: flex;
   flex-direction: column;
   background: var(--surface);
   border: 1px solid #e7eeeb;
   border-radius: 0 0 14px 14px;
   box-shadow: var(--shadow);
-  overflow: hidden;
+  overflow: visible;
 }
-.dash-tab-body > .panel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; border: 0; border-radius: 0; box-shadow: none; }
+.dash-tab-body > .panel { flex: 0 0 auto; display: flex; flex-direction: column; border: 0; border-radius: 0; box-shadow: none; }
 .dash-tab-body .panel-heading, .dash-tab-body .alert-heading, .dash-tab-body .chart-interactive-meta, .dash-tab-body .chart-summary, .dash-tab-body .ranking-insight, .dash-tab-body .alert-footer-action { flex: 0 0 auto; }
 
 /* tab ยอดขาย — กราฟยืดเต็มความสูงที่เหลือ */
