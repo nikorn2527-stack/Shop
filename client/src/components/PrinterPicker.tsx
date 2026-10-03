@@ -1,3 +1,6 @@
+// Helper URL — เชื่อมตรงไป localhost:3031 (ไม่ต้องผ่าน gateway)
+const HELPER_BASE = "http://localhost:3031";
+
 /**
  * PrinterPicker — Task A2 v2: รายชื่อเครื่องพิมพ์จริงจาก Windows
  *
@@ -52,7 +55,7 @@ export function PrinterPicker({ value, onChange, disabled = false, docType = "re
   const fetchPrinters = useCallback(async () => {
     setHelperState((prev) => ({ ...prev, loading: true, error: null }));
     try {
-      const res = await fetch("/printers?XTransformPort=3031");
+      const res = await fetch(`${HELPER_BASE}/printers`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setHelperState({
@@ -80,7 +83,7 @@ export function PrinterPicker({ value, onChange, disabled = false, docType = "re
     setTesting(true);
     setTestResult(null);
     try {
-      const res = await fetch("/printers/test?XTransformPort=3031", {
+      const res = await fetch(`${HELPER_BASE}/printers/test`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ printerName: value }),
@@ -194,7 +197,7 @@ export function PrinterHelperStatus() {
   const check = useCallback(async () => {
     setStatus("loading");
     try {
-      const res = await fetch("/printers?XTransformPort=3031");
+      const res = await fetch(`${HELPER_BASE}/printers`);
       if (!res.ok) throw new Error();
       const data = await res.json();
       setStatus("connected");

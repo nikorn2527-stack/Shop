@@ -62,8 +62,10 @@ type PrintResult = {
   usedFallback: boolean;
 };
 
+const HELPER_BASE = "http://localhost:3031";
+
 /**
- * สั่งพิมพ์ผ่าน Helper — ส่ง HTML content ไปยัง POST /print?XTransformPort=3031
+ * สั่งพิมพ์ผ่าน Helper — ส่ง HTML content ไปยัง POST http://localhost:3031/print
  * ถ้า Helper ไม่ตอบ → fallback window.print() แล้วแจ้งว่าใช้ fallback
  */
 export async function printViaHelper(
@@ -80,7 +82,7 @@ export async function printViaHelper(
   }
 
   try {
-    const res = await fetch("/print?XTransformPort=3031", {
+    const res = await fetch(`${HELPER_BASE}/print`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ printerName, content: htmlContent }),
@@ -114,7 +116,7 @@ export function getPrinterName(docType: PrintDocType): string {
  */
 export async function checkHelperHealth(): Promise<boolean> {
   try {
-    const res = await fetch("/?XTransformPort=3031");
+    const res = await fetch(`${HELPER_BASE}/`);
     if (!res.ok) return false;
     const data = await res.json();
     return data.ok === true;
