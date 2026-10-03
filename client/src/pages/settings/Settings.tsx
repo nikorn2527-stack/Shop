@@ -2111,17 +2111,17 @@ export function Settings({
                     แต่ละแถวมี: ชื่อเอกสาร + dropdown เลือกเครื่องพิมพ์ + toggle พรีวิว */}
                 <div className="printer-row-simple">
                   <b>ใบเสร็จ</b>
-                  <PrinterPicker value={form?.receiptPrinterName ?? ""} onChange={next => updateForm({ receiptPrinterName: next })} disabled={!form} />
+                  <PrinterPicker docType="receipt" value={form?.receiptPrinterName ?? ""} onChange={next => updateForm({ receiptPrinterName: next })} disabled={!form} />
                   <button type="button" className={`toggle ${form?.receiptPreviewBefore !== false ? "on" : ""}`} onClick={() => updateForm({ receiptPreviewBefore: !(form?.receiptPreviewBefore !== false) })} disabled={!form} aria-label="พรีวิวก่อนพิมพ์ใบเสร็จ"><span /></button>
                 </div>
                 <div className="printer-row-simple">
                   <b>รายงาน</b>
-                  <PrinterPicker value={form?.reportPrinterName ?? ""} onChange={next => updateForm({ reportPrinterName: next })} disabled={!form} />
+                  <PrinterPicker docType="report" value={form?.reportPrinterName ?? ""} onChange={next => updateForm({ reportPrinterName: next })} disabled={!form} />
                   <button type="button" className={`toggle ${form?.reportPreviewBefore !== false ? "on" : ""}`} onClick={() => updateForm({ reportPreviewBefore: !(form?.reportPreviewBefore !== false) })} disabled={!form} aria-label="พรีวิวก่อนพิมพ์รายงาน"><span /></button>
                 </div>
                 <div className="printer-row-simple">
                   <b>บัตรสมาชิก</b>
-                  <PrinterPicker value={form?.cardPrinterName ?? ""} onChange={next => updateForm({ cardPrinterName: next })} disabled={!form} />
+                  <PrinterPicker docType="card" value={form?.cardPrinterName ?? ""} onChange={next => updateForm({ cardPrinterName: next })} disabled={!form} />
                   <button type="button" className={`toggle ${form?.cardPreviewBefore !== false ? "on" : ""}`} onClick={() => updateForm({ cardPreviewBefore: !(form?.cardPreviewBefore !== false) })} disabled={!form} aria-label="พรีวิวก่อนพิมพ์บัตรสมาชิก"><span /></button>
                 </div>
                 <div className="printer-test-row">

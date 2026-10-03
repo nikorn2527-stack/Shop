@@ -6945,3 +6945,71 @@ body:has(.modal-backdrop) .shortcuts-fab { display: none; }
   background-image: linear-gradient(135deg, #f1faf6 0%, #eaf6f1 100%);
   border-color: #c5e1cc;
 }
+
+/* Task A2 — PrinterPicker new styles */
+.printer-picker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.printer-picker-fallback {
+  margin-top: 6px;
+  padding: 8px;
+  border: 1px dashed #d4e2d8;
+  border-radius: 7px;
+  background: #fbfdfc;
+}
+.printer-picker-fallback summary {
+  font-size: 10.5px;
+  color: #6e756a;
+  cursor: pointer;
+  font-weight: 600;
+}
+.printer-picker-fallback small {
+  display: block;
+  font-size: 9.5px;
+  color: #a0a595;
+  margin-top: 4px;
+}
+.test-print-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: 1px solid #cfe4db;
+  border-radius: 7px;
+  background: #f4faf7;
+  color: #4b8a72;
+  font-size: 10.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  margin-top: 4px;
+}
+.test-print-btn:hover:not(:disabled) {
+  background: #eaf5f1;
+  border-color: #b9d8cb;
+}
+.test-print-btn:disabled { opacity: 0.55; cursor: wait; }
+.test-print-result {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border-radius: 6px;
+  font-size: 10.5px;
+  margin-top: 4px;
+}
+.test-print-result.ok { background: #eaf6f1; color: #1f6b50; border: 1px solid #b3ddc8; }
+.test-print-result.error { background: #fff0f0; color: #c26568; border: 1px solid #f0d4d4; }
+.test-print-dismiss {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 2px;
+  opacity: 0.6;
+}
+.test-print-dismiss:hover { opacity: 1; }

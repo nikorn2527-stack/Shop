@@ -8,6 +8,7 @@ import { code128DataUrl } from "../barcode";
 import { MemberAvatar } from "./MemberAvatar";
 import { trpc } from "@/lib/trpc";
 import { brandInitial } from "@/theme";
+import { printViaHelper, getPrinterName } from "@/lib/printHelper";
 
 /** Fields the wallet card actually renders (subset of the member record). */
 export type MemberCardData = {
@@ -161,6 +162,7 @@ export function MemberCardModal({
 }) {
   const [busy, setBusy] = useState(false);
   const { brandName, brandLogo } = useBrand();
+  const settingsQuery = trpc.settings.get.useQuery(undefined);
   const qrDataUrl = useQrDataUrl(member.memberNumber);
   const displayName = [member.prename?.trim() || "", member.firstName, member.lastName].filter(Boolean).join(" ");
   const suspended = member.status === "suspended";
@@ -188,7 +190,25 @@ export function MemberCardModal({
       pdf.save(`card-${member.memberNumber}.pdf`);
     } finally { setBusy(false); }
   };
-  const printCard = () => { window.print(); };
+  const printCard = async () => {
+    // Task A3 — สั่งพิมพ์ผ่าน Helper ไปยัง card printer ที่เลือกใน Settings
+    const settings = settingsQuery.data;
+    const printerName = getPrinterName(
+      {
+        receiptPrinterName: settings?.receiptPrinterName ?? "",
+        reportPrinterName: settings?.reportPrinterName ?? "",
+        cardPrinterName: settings?.cardPrinterName ?? "",
+      },
+      "card"
+    );
+    const cardHtml = document.getElementById("member-card")?.outerHTML ?? "";
+    const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+@page { size: 90mm 55mm; margin: 0; }
+body { margin: 0; }
+${document.querySelector('style')?.textContent ?? ""}
+</style></head><body>${cardHtml}</body></html>`;
+    await printViaHelper(printerName, fullHtml);
+  };
   useEffect(() => {
     if (confirmForBill) return;
     const handler = (event: KeyboardEvent) => {
