@@ -1048,7 +1048,7 @@ tr.locked-row .user-avatar { background: #f6ecd4; color: #a97f2e; }
   height: 220px;
   pointer-events: none;
   opacity: 1;
-  z-index: -1;
+  background: #ffffff;
   overflow: hidden;
 }
 .member-card-capture-host .member-card {
