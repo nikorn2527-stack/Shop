@@ -2049,7 +2049,6 @@ export function Settings({
                 <div className="settings-heading">
                   <div>
                     <h2>ข้อมูลร้านบนใบเสร็จ</h2>
-                    <p>ชื่อ รหัส และที่อยู่ — แสดงที่หัวใบเสร็จและรายงาน</p>
                   </div>
                   <ShoppingBag size={20} className="muted-icon" />
                 </div>
@@ -2093,7 +2092,6 @@ export function Settings({
                 <div className="settings-heading">
                   <div>
                     <h2>ใบเสร็จรับเงิน</h2>
-                    <p>กำหนดรายละเอียดที่ต้องการแสดงบนใบเสร็จ</p>
                   </div>
                   <ReceiptText size={20} className="muted-icon" />
                 </div>
@@ -2134,7 +2132,6 @@ export function Settings({
                 <div className="settings-heading">
                   <div>
                     <h2>เครื่องพิมพ์หน้าร้าน</h2>
-                    <p>เลือกเครื่องพิมพ์จริงจาก Windows — บันทึกแยกตามเครื่อง</p>
                   </div>
                   <Printer size={20} className="muted-icon" />
                 </div>
@@ -2154,7 +2151,6 @@ export function Settings({
                 <div className="settings-heading">
                   <div>
                     <h2>การออกเลขสมาชิกใหม่</h2>
-                    <p>เลือกวิธีออกหมายเลขให้สมาชิกที่ลงทะเบียนใหม่</p>
                   </div>
                   <CreditCard size={20} className="muted-icon" />
                 </div>
@@ -2561,9 +2557,7 @@ export function Settings({
                 <div className="settings-heading">
                   <div>
                     <h2>รอบตัดยอดประจำวัน</h2>
-                    <p>ให้ระบบตัดยอดอัตโนมัติตามเวลา หรือเจ้าหน้าที่กดตัดเอง</p>
                   </div>
-                  <CalendarClock size={20} className="muted-icon" />
                 </div>
                 <div className="number-mode-grid">
                   {[
