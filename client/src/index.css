@@ -7108,3 +7108,40 @@ body:has(.modal-backdrop) .shortcuts-fab { display: none; }
 
 @keyframes spin { to { transform: rotate(360deg); } }
 .spin { animation: spin 1s linear infinite; }
+
+/* P0 — ErrorBoundary ภาษาไทย */
+.error-boundary-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  display: grid; place-items: center; padding: 20px;
+  background: rgba(30, 50, 43, .38); backdrop-filter: blur(4px);
+}
+.error-boundary-card {
+  max-width: 480px; width: 100%; padding: 28px 24px;
+  background: #fff; border-radius: 14px; box-shadow: 0 22px 55px rgba(35, 62, 52, .22);
+  text-align: center; font-family: "Sarabun", sans-serif;
+}
+.error-boundary-icon {
+  width: 56px; height: 56px; margin: 0 auto 14px;
+  display: grid; place-items: center; border-radius: 50%;
+  background: #fff0f0; color: #c26568;
+}
+.error-boundary-card h2 { font-size: 18px; color: #2e463e; margin: 0 0 8px; }
+.error-boundary-card p { font-size: 12.5px; color: #6e756a; line-height: 1.6; margin: 0 0 14px; }
+.error-boundary-ref {
+  font-size: 11px; color: #8b9080; background: #f4f7f5;
+  border: 1px solid #e7eeeb; border-radius: 8px; padding: 8px 12px;
+  margin-bottom: 14px; display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.error-boundary-ref b { font-family: "IBM Plex Mono", monospace; color: #4b8a72; }
+.error-boundary-copy {
+  border: 1px solid #cfe4db; border-radius: 5px; background: #fff;
+  color: #4b8a72; font-size: 9.5px; padding: 2px 6px; cursor: pointer;
+}
+.error-boundary-copy:hover { background: #eaf5f1; }
+.error-boundary-dev { margin-bottom: 14px; text-align: left; }
+.error-boundary-dev summary { font-size: 10px; color: #a0a595; cursor: pointer; }
+.error-boundary-dev pre {
+  font-size: 10px; color: #888; background: #f8f9f7; border-radius: 6px;
+  padding: 8px; overflow-x: auto; max-height: 200px; overflow-y: auto; margin-top: 6px;
+}
+.error-boundary-actions { display: flex; gap: 8px; justify-content: center; }
