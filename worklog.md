@@ -2470,3 +2470,67 @@ owner: "PDF ต้องคมเมื่อ zoom 200-400% + select/copy text �
 4. **index.css .rd-* ซ้ำ**: ตอนนี้ถูก override โดย REPORT_DOC_CSS (จาก shared) — ลบได้ในรอบทำความสะอาด
 5. **Puppeteer cold start**: browser แชร์ข้าม request แต่รอบแรกช้า (~1.5s launch) —
    รอบถัดไปเร็ว (229ms) แล้ว
+
+---
+Task ID: P1-UX-04 + P1-UX-05 + extras
+Agent: main (user สั่ง 'ทำที่เหลือได้เลย')
+Task: ทำงาน P1 ที่เหลือทั้งหมด — A4 document preview + POS transaction state banner + ทำความสะอาด
+
+## Work Log
+
+### P1-UX-04: ExportPreviewModal A4 document preview (commit f053229)
+owner: "Preview กับ PDF คนละ layout" — ก่อนหน้านี้ preview = data table แต่ PDF = document layout
+ไฟล์แก้ (2): `client/src/components/ExportPreviewModal.tsx` + `client/src/index.css`
+- เพิ่ม 2 tab: "เอกสาร A4" (default PDF/Print) + "ข้อมูล (N แถว)" (default CSV/Excel)
+- "เอกสาร A4" tab: iframe render `buildReportDocumentHtml` จาก @shared/reportDoc
+  (template เดียวกับ server PDF + client print) scale 0.82 (A4 794×1123 → 651×921px)
+- responsive: จอแคบ scale 0.55
+- ตรวจ: agent-browser → tab "เอกสาร A4" selected + iframe srcdoc มี report-doc + rd-table
+  + @font-face + tfoot ครบ (template เดียวกับไฟล์จริง)
+
+### P1-UX-05: POS transaction state banner (commit f4c9135)
+owner: "ให้เห็นสถานะและตัดสินใจเร็ว" — ก่อนหน้านี้ cart ไม่มี state banner ชัดเจน
+ไฟล์แก้ (2): `client/src/pages/Pos.tsx` + `client/src/index.css`
+- **ค้นพบ**: P1-UX-05 ข้อ B (กัน double-submit + ยอดในปุ่ม + "กำลังบันทึก…" label)
+  และข้อ C (QR confirmation checkbox gate) **มีอยู่แล้ว** — เหลือแค่ข้อ A state banner
+- `txState` derived: pending > idle > held > active (4 tones)
+  - pending: "กำลังบันทึกบิล… ห้ามกดซ้ำ" + spinner + pulse animation
+  - idle: "บิลใหม่ ยังไม่มีรายการ"
+  - held: "กำลังขาย · N รายการ · M ชิ้น" + "พักบิลแล้ว X รายการ"
+  - active: "กำลังขาย · N รายการ · M ชิ้น" + "ยอดต้องชำระ ฿X · เลขสมาชิก/ลูกค้าทั่วไป"
+- cart-state-banner JSX ที่หัว cart-mid role=status + aria-live=assertive (pending) / polite
+- CSS 4 tones (idle gray/active teal/held amber/pending red+pulse) + state-dot + spinner
+- ตรวจ: agent-browser → idle "บิลใหม่" → สแกนน้ำ → active "กำลังขาย · 1 รายการ · 1 ชิ้น ฿10.00"
+
+### Cleanup (commit cd26810)
+- ลบ tool-results/ ออกจาก git + เพิ่มใน .gitignore (scratch files ที่ติดมา)
+- พยายามลบ .rd-* dead CSS ใน index.css แต่ Edit ไม่ match (Thai text ยาว) —
+  ปล่อยไว้เพราะเป็น dead code ที่ถูก override โดย REPORT_DOC_CSS (inject ทีหลังใน cascade)
+  ไม่มีผลกระทบ แค่ไม่สะอาด — ทำได้ในรอบ cleanup แยกด้วย sed/script
+
+## สถานะ P0 + P1 ทั้งหมด (หลังรอบนี้)
+
+| งาน | สถานะ | commit |
+|---|---|---|
+| P0-UX-01 รวม template รายงาน | ✅ DONE | c18b37e |
+| P0-UX-02 บัตรสมาชิก (balance+PDF+PNG) | ✅ DONE | 8c090b0 + d98002d |
+| P0-UX-03 PDF vector (server Chromium) | ✅ DONE | dcddb72 |
+| P1-UX-04 A4 document preview | ✅ DONE | f053229 |
+| P1-UX-05 POS state banner | ✅ DONE | f4c9135 |
+| cleanup tool-results | ✅ DONE | cd26810 |
+
+## Verification สุดท้าย
+- `tsc --noEmit`: 0 errors
+- dev server: HTTP 200 (tsx watch + Vite HMR ทำงาน)
+- vector PDF endpoint: curl POST → HTTP 200, 16KB application/pdf (ยังทำงาน)
+- agent-browser: POS state banner (idle→active) + ExportPreviewModal A4 tab (iframe report-doc)
+
+## ข้อจำกัดที่ยังเหลือ (P0-UX-02 part 2 — ต่อรอบถัดไป หรือทำเป็น feature ใหม่)
+1. **A4 sheet print profile** (8/10/12-up + X/Y calibration + test print) — งานใหญ่ ต้อง
+   settings UI + storage + profile schema + "พิมพ์แผ่นทดสอบ" flow
+2. **bleed 3mm** สำหรับบัตร PDF ส่งร้านพิมพ์ (96×61mm with card centered) — design change
+3. **unified MEMBER_CARD_DOC_CSS** — ตอนนี้ on-screen/capture ใช้ style เดียวกันอยู่แล้ว
+   (index.css .member-card) — คุ้มค่าต่ำกว่า REPORT_DOC_CSS เพราะไม่มี server-side card render
+4. **.rd-* dead CSS cleanup** — ใช้ sed/script ลบ (Edit ไม่ match Thai text ยาว)
+5. **POS pending state visual test** — ต้องทำ sale จริงเพื่อเห็น "กำลังบันทึก" (logic ใช้
+   checkoutMutation.isPending เหมือน payDisabled ที่ทำงานอยู่แล้ว)
