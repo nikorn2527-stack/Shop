@@ -2289,3 +2289,90 @@ owner ส่ง UX/UI report ชุดที่ 2 ระบุว่า Preview 
 - **Sprint 1 ที่เหลือ**: P0-UX-03 (vector PDF ผ่าน server-side Chromium) + P1-UX-04 (A4 preview ใน ExportPreviewModal)
 - **Sprint 2**: P0-UX-02 บัตรสมาชิก — รวม #member-card + #member-card-capture ให้ใช้ template เดียว (ตอนนี้ hidden capture host CSS ต่างจากบัตรบนจอ) + ลบ background modal/stage ที่ติดไปใน PDF
 - **Sprint 3**: P1-UX-05 POS flow — transaction state banner + QR confirmation checkbox + กัน double-submit
+
+---
+Task ID: P0-UX-02 (part 1)
+Agent: main (cron webDevReview round 2)
+Task: บัตรสมาชิก — ลบยอดคงเหลือออกจากบัตร (owner rule) + ทำ PDF print-ready (ขาว/PNG lossless) — ตาม UX spec ของ owner (Sprint 2, ส่วนแรก)
+
+## บทสรุปปัญหา (จาก UX spec ของ owner — รอบนี้)
+
+owner ส่ง spec บัตรสมาชิกละเอียด (90×55มม. + 3 output formats) โดยชี้ rule ชัด:
+- "Do not show wallet balance as fixed text on the card" — ยอดเปลี่ยนทุกครั้ง ทำให้สมาชิกเข้าใจผิด
+- "No modal/stage/background/shadow from UI" — PDF ต้องสะอาด ไม่มี tint/ลาย UI ติดไป
+- PDF ต้อง print-ready (ส่งร้านพิมพ์ได้) ตัวอักษร/QR/บาร์โค้ดคม
+
+จากการตรวจโค้ดพบว่าก่อนแก้:
+- `MemberCardArt` foot (บรรทัด 123) มียอดคงเหลือพิมพ์บนบัตร → **ละเมิด rule โดยตรง**
+- `downloadCard` ใช้ `backgroundColor: "#f9fbfa"` (tint ของ UI ติดไปในมุมโค้ง) + JPEG 0.95 (artifacts)
+
+## Work Log — P0-UX-02 part 1
+
+ไฟล์แก้ (2): `client/src/components/MemberCardModal.tsx` + `client/src/index.css`
+
+**1. MemberCardModal.tsx** (4 จุด):
+- `MemberCardArt` foot: ลบ `<small>ยอดคงเหลือ {money(member.balance)}...</small>` (บรรทัดที่ 2)
+  เหลือเฉพาะคำแนะนำ "ยื่นบัตรนี้ให้สแกน..." → บัตรไม่มียอดคงเหลือติดถาวร
+- `downloadCard`: `backgroundColor: "#f9fbfa"` → `"#ffffff"` (ตัด tint) + `image/jpeg` → `image/png`
+  (lossless) + `pdf.addImage(...,"JPEG",...)` → `"PNG"` — ตัด artifacts บนตัวอักษร/QR/บาร์โค้ด
+  scale 4 เดิม (360×220×4=1440×880px ≈ 406 DPI เกินมาตรฐานร้านพิมพ์ 300 DPI)
+- เพิ่ม `.member-card-balance-bar` ใน modal (โหมดปกติ) — พนักงานยังเห็นยอด + สถานะ
+  (active/suspended) ก่อนออกบัตร เพราะยอดไม่อยู่บนบัตรอีก
+- เพิ่ม `.verify-balance-chip` ใน `member-verify-strip` (โหมดยืนยันสแกนบัตรที่ POS)
+  ยอดเด่นชัดก่อนกดยืนยัน เพราะยอดไม่อยู่บนบัตรอีกต่อไป
+
+**2. index.css** (5 จุด):
+- `.member-card-foot`: `justify-content: space-between` → `flex-start` (foot เหลือบรรทัดเดียว)
+- เพิ่ม `.member-card-balance-bar` (gradient bg teal + balance-amount 18px + status chips)
+- เพิ่ม `.member-card-balance-bar.suspended` (สีแดง เมื่อสมาชิกถูกระงับ)
+- เพิ่ม `.member-verify-strip .verify-balance-chip` (chip ขาว ยอด 16px + label เล็ก)
+- `@media print`: เพิ่ม `body:has(#member-card) .member-card-balance-bar { display:none !important }`
+  (ยอดไม่พิมพ์ — อยู่ใน modal เท่านั้น)
+
+## Verification (agent-browser end-to-end)
+
+- login admin (session persisted) → สมาชิกและบัญชี → คลิก นาย ทดสอบ บัตร → พิมพ์บัตรสมาชิก
+- DOM eval บน dialog:
+  - `cardFound: true`
+  - `footText: "ยื่นบัตรนี้ให้สแกน หรือแจ้งหมายเลขสมาชิก ที่เคาน์เตอร์..."` (เหลือคำแนะนำ)
+  - **`footHasBalance: false`** ✅ (ยอดไม่อยู่บนบัตรแล้ว — ตอบโจทย์ owner rule)
+  - **`balanceBarFound: true`** ✅ `balanceBarText: "ยอดคงเหลือ ณ วันออกบัตร฿100.00ใช้จ่ายได้ปกติ"`
+- คลิก "ดาวน์โหลด PDF" → downloadCard รันผ่าน ไม่มี console error / page error
+- capture host: width 360px (90:55 ตรงมาตรฐานนามบัตรไทย)
+- `bun run check` (tsc --noEmit): **0 errors**
+
+## Stage Summary
+
+- ไฟล์แก้ (2): `client/src/components/MemberCardModal.tsx` (+29/-4) + `client/src/index.css` (+19/-2)
+- commit: 8c090b0 `fix(P0-UX-02): ลบยอดคงเหลือออกจากบัตร + PDF print-ready (ขาว/PNG)`
+- ตอบโจทย์ owner rule 2 ข้อ:
+  - ✅ "Do not show wallet balance as fixed text on the card" (footHasBalance=false)
+  - ✅ "No modal/stage/background from UI" (PDF bg ขาว + ไม่มี tint ติดไป)
+  - ✅ "Sharp text, QR and barcode" (PNG lossless + scale 4 ≈ 406 DPI)
+- พนักงานยังเห็นยอดใน modal (balance-bar + verify-strip chip) — ไม่กระทบการทำงาน
+
+## ข้อจำกัดที่ยังเหลือ (โอนไปรอบถัดไป — ตาม spec เต็มของ owner)
+
+1. **PDF ยังเป็น raster** (PNG ใน PDF 90×55มม.): ยังไม่ใช่ vector (selectable text)
+   สำหรับบัตรเล็กๆ แบบนี้ raster คมพอใช้ แต่ถ้า owner อยากได้ vector จริงต้อง
+   server-side Chromium printToPDF (เหมือนรายงาน P0-UX-03)
+2. **capture host มุมโค้ง + border**: สำหรับร้านพิมพ์จริงควรตัดมุมตรง + เว้น bleed 3มม.
+   (ตาม spec: "output file must include 3 mm bleed if artwork extends to edges")
+   ตอนนี้ PDF มีมุมโค้ง + border ทำให้มีช่องขาวรอบ — พอใช้แต่ยังไม่สมบูรณ์ระดับร้านพิมพ์
+3. **ยังไม่มี A4 sheet print profile** (8/10/12-up + custom + X/Y calibration +
+   "พิมพ์แผ่นทดสอบ"): งานใหญ่ ต้อง settings UI + storage + profile schema
+   — ทำเป็น round ถัดไป (P0-UX-02 part 2)
+4. **ยังไม่มี PNG download แยก**: ตอนนี้มีแค่ PDF (PNG อยู่ใน PDF) —
+   owner spec อยากได้ PNG 1063×650px แยกสำหรับส่งไลน์/ตรวจภาพ
+5. **single template source**: ยังมี 3 ชุด CSS (on-screen / @media print / capture host)
+   ควรรวมเป็น MEMBER_CARD_DOC_CSS เดียวเหมือน REPORT_DOC_CSS — รอบถัดไป
+6. **verify-strip balance chip ยังไม่ได้ browser-verify ในโหมดยืนยัน**: ต้องเทียบสแกนบัตร
+   ที่ POS จริง — CSS พร้อม แต่ visual ยังไม่ได้ทดสอบ (tsc ผ่าน)
+
+## ลำดับงานถัดไป (ตาม owner spec)
+
+- **P0-UX-02 part 2**: A4 sheet print profile (8/10/12-up + calibration + test print)
+  + PNG download แยก + รวม CSS เป็น MEMBER_CARD_DOC_CSS + bleed 3มม. สำหรับร้านพิมพ์
+- **P0-UX-03**: report PDF vector (server-side Chromium) — ยังค้างจากรอบก่อน
+- **P1-UX-04**: ExportPreviewModal A4 document preview — ยังค้าง
+- **P1-UX-05**: POS flow (transaction state banner + QR confirm + กัน double-submit)
