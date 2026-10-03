@@ -1,14 +1,12 @@
-import { useEffect, useRef, useState } from "react";
-import { jsPDF } from "jspdf";
+import { useEffect, useState } from "react";
 import QRCode from "qrcode";
-import { Barcode, CreditCard, Download, FileImage, Printer, QrCode as QrIcon, ScanLine, ShieldAlert, UserCheck, X } from "@/lib/icons";
+import { Barcode, CreditCard, Printer, QrCode as QrIcon, ScanLine, ShieldAlert, UserCheck, X } from "@/lib/icons";
 import { money } from "../pages/pageData";
 import { code128DataUrl } from "../barcode";
 import { MemberAvatar } from "./MemberAvatar";
 import { trpc } from "@/lib/trpc";
 import { brandInitial } from "@/theme";
 import { printViaHelper, getPrinterName } from "@/lib/printHelper";
-import { renderCardToCanvas, CARD_W_PX, CARD_H_PX } from "@/lib/cardRenderer";
 
 /** Fields the wallet card actually renders (subset of the member record). */
 export type MemberCardData = {
@@ -161,84 +159,12 @@ export function MemberCardModal({
   confirmHint?: string;
 }) {
   const [busy, setBusy] = useState(false);
-  const [busyType, setBusyType] = useState<"png" | "pdf" | "">("");
   const { brandName, brandLogo } = useBrand();
   const qrDataUrl = useQrDataUrl(member.memberNumber);
   const displayName = [member.prename?.trim() || "", member.firstName, member.lastName].filter(Boolean).join(" ");
   const suspended = member.status === "suspended";
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Task C v2 — วาดบัตรลง Canvas ที่ 300 DPI (1063×650px)
-  // Preview = PNG = PDF = Print ทั้งหมดใช้ Canvas อันเดียวกัน
-  useEffect(() => {
-    let alive = true;
-    renderCardToCanvas({
-      member,
-      brandName,
-      brandLogo,
-      qrDataUrl,
-      photoUrl: member.photoUrl,
-    }).then((canvas) => {
-      if (!alive || !canvasRef.current) return;
-      // Copy rendered canvas to display canvas
-      const display = canvasRef.current;
-      const ctx = display.getContext("2d");
-      if (ctx) {
-        display.width = CARD_W_PX;
-        display.height = CARD_H_PX;
-        ctx.drawImage(canvas, 0, 0);
-      }
-    }).catch(() => { /* font/image load error — skip */ });
-    return () => { alive = false; };
-  }, [member, brandName, brandLogo, qrDataUrl]);
-
-  // ดาวน์โหลด PNG — จาก Canvas โดยตรง (1063×650px @ 300DPI)
-  const downloadPNG = async () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    setBusy(true);
-    setBusyType("png");
-    try {
-      const link = document.createElement("a");
-      link.download = `card-${member.memberNumber}.png`;
-      link.href = canvas.toDataURL("image/png");
-      link.click();
-    } finally { setBusy(false); setBusyType(""); }
-  };
-
-  // ดาวน์โหลด PDF — jsPDF 90×55mm + ภาพจาก Canvas
-  const downloadPDF = async () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    setBusy(true);
-    setBusyType("pdf");
-    try {
-      const pdf = new jsPDF({
-        orientation: "landscape",
-        unit: "mm",
-        format: [90, 55],
-      });
-      pdf.addImage(canvas.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, 90, 55);
-      pdf.save(`card-${member.memberNumber}.pdf`);
-    } finally { setBusy(false); setBusyType(""); }
-  };
-
-  // พิมพ์บัตร — ส่งภาพจาก Canvas ไปยัง Helper
-  const printCard = async () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    setBusy(true);
-    try {
-      const imgData = canvas.toDataURL("image/png");
-      const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
-@page { size: 90mm 55mm; margin: 0; }
-body { margin: 0; }
-img { width: 90mm; height: 55mm; }
-</style></head><body><img src="${imgData}" /></body></html>`;
-      const printerName = getPrinterName("card");
-      await printViaHelper(printerName, html);
-    } finally { setBusy(false); }
-  };
+  const printCard = () => { window.print(); };
   useEffect(() => {
     if (confirmForBill) return;
     const handler = (event: KeyboardEvent) => {
@@ -272,16 +198,7 @@ img { width: 90mm; height: 55mm; }
       </div>
     )}
     <div className="member-card-stage">
-      {/* Task C v2 — Preview = Canvas ที่ 300 DPI (1063×650px) สเกลลงพอดีจอ
-          Preview = PNG = PDF = Print ทั้งหมดใช้ Canvas อันเดียวกัน */}
-      <canvas
-        ref={canvasRef}
-        id="member-card"
-        width={CARD_W_PX}
-        height={CARD_H_PX}
-        style={{ width: "360px", height: "auto", borderRadius: "13px", border: "1px solid #d3e5dd" }}
-        aria-label={`บัตรสมาชิก ${displayName} ${member.memberNumber}`}
-      />
+      <MemberCardArt member={member} brandName={brandName} brandLogo={brandLogo} qrDataUrl={qrDataUrl} id="member-card" footnoteAtScan={confirmForBill} />
     </div>
     <div className="member-card-note"><CreditCard size={15} /> {confirmForBill ? "ทุกครั้งที่ยิงบัตรสมาชิก ระบบจะเด้งข้อมูลบัตรขึ้นมาให้ตรวจสอบเสมอ — ยืนยันเฉพาะเมื่อข้อมูลตรงกับลูกค้าที่ยื่นบัตรเท่านั้น" : "สมาชิกไม่มีบัญชีเข้าสู่ระบบแอป — บัตรใบนี้ใช้ระบุตัวตนที่เคาน์เตอร์ · ทุกครั้งที่สแกนบัตร พนักงานจะเห็นข้อมูลสมาชิกเพื่อยืนยันก่อนหักยอดเสมอ"}</div>
     <div className="modal-actions">
@@ -289,9 +206,7 @@ img { width: 90mm; height: 55mm; }
         <button className="outline-button" onClick={onClose}><X size={16} /> ไม่ใช่สมาชิกนี้</button>
         <button className="primary-button" disabled={busy} onClick={() => onConfirm?.()}><UserCheck size={16} /> {confirmLabel}</button>
       </> : <>
-        <button className="outline-button amber" disabled={busy} onClick={downloadPNG} title="ดาวน์โหลดรูปบัตรสมาชิก PNG 1063×650px @ 300DPI"><FileImage size={16} /> {busyType === "png" ? "กำลังสร้าง..." : "ดาวน์โหลดรูป"}</button>
-        <button className="outline-button blue" disabled={busy} onClick={downloadPDF} title="ดาวน์โหลดบัตรสมาชิก PDF 90×55 มม."><Download size={16} /> {busyType === "pdf" ? "กำลังสร้าง..." : "ดาวน์โหลด PDF"}</button>
-        <button className="primary-button" disabled={busy} onClick={printCard} title="พิมพ์บัตรสมาชิก 90×55 มม. ผ่านเครื่องพิมพ์ที่เลือก"><Printer size={16} /> พิมพ์บัตรสมาชิก</button>
+        <button className="primary-button" onClick={printCard} title="พิมพ์บัตรสมาชิก (90×55 มม.) ผ่านเครื่องพิมพ์"><Printer size={16} /> พิมพ์บัตรสมาชิก</button>
       </>}
     </div>
   </div></div>;
