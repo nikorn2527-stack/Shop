@@ -1610,11 +1610,11 @@ export function Reports({
         );
         setNotice(`ดาวน์โหลด${state.downloadNoticeBase} Excel แล้ว`);
       } else if (format === "pdf") {
-        // FIX-25 (user) — เปลี่ยนจาก html2canvas (raster/ไม่คม) เป็น printReportDoc (vector/คมชัด)
-        // ทั้ง PDF และพิมพ์ใช้ code path เดียวกัน → ผลลัพธ์เหมือนกันทุกประการ
-        printReportDoc(state.doc);
-        setNotice(`เปิดหน้าต่างบันทึก${state.downloadNoticeBase} PDF แล้ว — เลือก "บันทึกเป็น PDF" ในหน้าต่างพิมพ์`);
+        // P0-2 — ปุ่ม PDF ดาวน์โหลดไฟล์จริงโดยตรง (ไม่เปิด print dialog)
+        await downloadReportPdf(state.doc);
+        setNotice(`ดาวน์โหลด${state.downloadNoticeBase} PDF แล้ว`);
       } else {
+        // ปุ่ม "พิมพ์" เท่านั้นที่เปิด print flow
         printReportDoc(state.doc);
         setNotice(state.printNotice);
       }

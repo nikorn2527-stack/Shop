@@ -3116,10 +3116,8 @@ th { font-weight: 600; }
 .member-card-modal .member-card-name { font-size: 14px; }
 .member-card-modal .member-card-number { font-size: 19.5px; }
 .member-card-modal .member-card-meta { flex-wrap: wrap; }
-/* print: taller card fits the codes — keep Thai 90mm width, let height breathe */
-@media print {
-  body:has(#member-card) .member-card { height: auto; min-height: 0; }
-}
+/* P0-4 — ล็อกขนาดบัตร 90×55 มม. ทุก output (ลบ height:auto ที่ทำให้สูงไม่ตรงมาตรฐาน) */
+/* กฎหลักที่บรรทัด 984 กำหนด height: 55mm ไว้แล้ว — ไม่ต้อง override */
 
 /* --- 3) ยืนยันตัวตนสมาชิกก่อนใช้รายการ (MemberScanPicker) -------------- */
 .member-confirm-card { border: 1px solid #f0d9a8; background: linear-gradient(180deg, #fffdf6, #fdf8ea); border-radius: 10px; padding: 10px 11px 11px; box-shadow: 0 3px 10px rgba(122, 96, 38, .08); }
