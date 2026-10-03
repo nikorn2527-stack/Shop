@@ -133,3 +133,4 @@ start-dev.sh
 dev.log
 dev.pid
 .zscripts-*.log
+tool-results/
