@@ -2861,6 +2861,46 @@ export function Reports({
                     />
                   </div>
                 </div>
+                <div
+                  className="report-export-actions"
+                  aria-label="พรีวิวข้อมูลก่อนส่งออกประวัติธุรกรรม"
+                >
+                  <button
+                    className="outline-button compact"
+                    onClick={() => void openTxExportPreview("csv", true)}
+                    title="ดาวน์โหลด CSV — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
+                  >
+                    <Download size={15} /> CSV
+                  </button>
+                  <button
+                    className="outline-button compact"
+                    onClick={() => void openTxExportPreview("xlsx", true)}
+                    title="ดาวน์โหลด Excel — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
+                  >
+                    <FileBarChart size={15} /> Excel
+                  </button>
+                  <button
+                    className="outline-button compact"
+                    onClick={() => void openTxExportPreview("pdf", true)}
+                    title="ดาวน์โหลด PDF (vector) แบบเอกสาร A4 — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
+                  >
+                    <FileText size={15} /> PDF
+                  </button>
+                  <button
+                    className="outline-button compact"
+                    onClick={() => void openTxExportPreview("print", true)}
+                    title="สั่งพิมพ์ประวัติธุรกรรม A4 ทันที — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
+                  >
+                    <Printer size={15} /> พิมพ์
+                  </button>
+                  <button
+                    className="outline-button compact preview-btn"
+                    onClick={() => void openTxExportPreview()}
+                    title="ดูตัวอย่างเอกสาร A4 + ตารางข้อมูลก่อนส่งออก"
+                  >
+                    <Eye size={15} /> ดูพรีวิว
+                  </button>
+                </div>
                 <div className="report-filter-row-main tx-filter-row">
                   <MemberScanPicker
                     members={members}
@@ -2913,46 +2953,6 @@ export function Reports({
                       </button>
                     ))}
                   </div>
-                </div>
-                <div
-                  className="report-export-actions"
-                  aria-label="พรีวิวข้อมูลก่อนส่งออกประวัติธุรกรรม"
-                >
-                  <button
-                    className="outline-button compact"
-                    onClick={() => void openTxExportPreview("csv", true)}
-                    title="ดาวน์โหลด CSV — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
-                  >
-                    <Download size={15} /> CSV
-                  </button>
-                  <button
-                    className="outline-button compact"
-                    onClick={() => void openTxExportPreview("xlsx", true)}
-                    title="ดาวน์โหลด Excel — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
-                  >
-                    <FileBarChart size={15} /> Excel
-                  </button>
-                  <button
-                    className="outline-button compact"
-                    onClick={() => void openTxExportPreview("pdf", true)}
-                    title="ดาวน์โหลด PDF (vector) แบบเอกสาร A4 — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
-                  >
-                    <FileText size={15} /> PDF
-                  </button>
-                  <button
-                    className="outline-button compact"
-                    onClick={() => void openTxExportPreview("print", true)}
-                    title="สั่งพิมพ์ประวัติธุรกรรม A4 ทันที — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
-                  >
-                    <Printer size={15} /> พิมพ์
-                  </button>
-                  <button
-                    className="outline-button compact preview-btn"
-                    onClick={() => void openTxExportPreview()}
-                    title="ดูตัวอย่างเอกสาร A4 + ตารางข้อมูลก่อนส่งออก"
-                  >
-                    <Eye size={15} /> ดูพรีวิว
-                  </button>
                 </div>
               </div>
               <div className="tx-log-strip" role="note">
