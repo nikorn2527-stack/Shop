@@ -282,8 +282,11 @@ body, button, input, select, textarea { font-family: var(--font-body); }
 @media (max-width: 560px) { .member-detail-stats { grid-template-columns: 1fr 1fr; gap: 8px; }.member-detail-stats > div { padding: 10px; }.member-detail-stats strong { font-size: 11px; }.history-row { align-items: flex-start; }.history-row > strong { margin-left: auto; }.receipt-actions button { flex: 1 1 46%; justify-content: center; } }
 
 /* Daily sales export actions */
-.report-export-actions { display: flex; gap: 6px; align-items: center; }
+.report-export-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .report-export-actions .compact { display: inline-flex; align-items: center; gap: 5px; }
+/* P1-UX-direct — ปุ่มดูพรีวิว เด่นกว่าปุ่ม export ตรงๆ (เพราะเป็นทางเข้า modal ตรวจก่อน) */
+.report-export-actions .preview-btn { color: var(--teal); border-color: #b8dccd; background: #f0faf5; }
+.report-export-actions .preview-btn:hover { background: #e3f3ec; border-color: var(--teal); }
 @media (max-width: 640px) { .report-export-actions { width: 100%; } .report-export-actions .compact { flex: 1; justify-content: center; } }
 
 /* --- real-data POS/Stock additions (OLD-2-b) -------------------------------- */

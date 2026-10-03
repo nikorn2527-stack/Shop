@@ -25,6 +25,7 @@ import {
   Check,
   ChevronDown,
   Download,
+  Eye,
   FileBarChart,
   FileSpreadsheet,
   FileText,
@@ -1153,7 +1154,7 @@ export function Reports({
           : salesView === "cashier"
             ? cashierRows.length
             : reportRows.length) > 0;
-  const openSalesExportPreview = async (preferred: ExportFormat) => {
+  const openSalesExportPreview = async (preferred?: ExportFormat, direct = false) => {
     // เปิดจากแท็บอื่น (เช่น แท็บการส่งออกข้อมูล) → สลับมาแท็บสรุปยอดขายแวบเดียวให้ query ของมุมมองนี้รันก่อน
     if (reportTab !== "sales") {
       setReportTab("sales");
@@ -1169,7 +1170,7 @@ export function Reports({
       return;
     }
     const doc = dailySalesDocConfig();
-    setExportPreview({
+    const state: ExportPreviewState = {
       kind: "sales",
       title: doc.title,
       periodLabel: doc.periodLabel,
@@ -1178,13 +1179,18 @@ export function Reports({
       sheetName: pack.sheetName,
       rows: pack.rows,
       numericCols: doc.numericCols ?? [],
-      preferred,
+      preferred: preferred ?? "pdf",
       doc,
       hasTotalsRow: true,
       downloadNoticeBase: `รายงานยอดขาย${pack.label ? " " + pack.label : ""}`,
       printNotice:
         "สั่งพิมพ์รายงานยอดขายแล้ว — เอกสาร A4 ผ่านเครื่องพิมพ์เริ่มต้น",
-    });
+    };
+    if (direct && preferred) {
+      await executeExport(state, preferred);
+    } else {
+      setExportPreview(state);
+    }
   };
   const billsExportRows = () => [
     [
@@ -1257,13 +1263,13 @@ export function Reports({
       compact: true, // ตาราง 7 คอลัมน์ — ลดขนาดตามฟอร์มให้อยู่บรรทัดเดียว
     };
   };
-  const openBillsExportPreview = (preferred: ExportFormat) => {
+  const openBillsExportPreview = async (preferred?: ExportFormat, direct = false) => {
     if (salesHistory.length === 0) {
       setNotice("ยังไม่มีบิลที่จะส่งออก");
       return;
     }
     const doc = billsDocConfig();
-    setExportPreview({
+    const state: ExportPreviewState = {
       kind: "bills",
       title: doc.title,
       periodLabel: doc.periodLabel,
@@ -1272,12 +1278,17 @@ export function Reports({
       sheetName: "ประวัติบิล",
       rows: [...billsExportRows(), ...(doc.totalsRow ? [doc.totalsRow] : [])],
       numericCols: doc.numericCols ?? [],
-      preferred,
+      preferred: preferred ?? "pdf",
       doc,
       hasTotalsRow: true,
       downloadNoticeBase: `ประวัติบิล · ${salesHistory.length} บิล${billMember ? ` · สมาชิก ${billMember.memberNumber}` : ""}`,
       printNotice: `สั่งพิมพ์ประวัติบิลแล้ว · ${salesHistory.length} บิล`,
-    });
+    };
+    if (direct && preferred) {
+      await executeExport(state, preferred);
+    } else {
+      setExportPreview(state);
+    }
   };
   const txExportRows = () => [
     [
@@ -1388,13 +1399,13 @@ export function Reports({
       "ข้อมูลจากบัญชีสมาชิกโดยตรง · แยกสรุปยอดเติมเงิน ถอนเงิน ซื้อสินค้า เปิดใช้บัตร และคืนเงินด้านบน",
     compact: true, // ตาราง 10 คอลัมน์ — ลดขนาดตามฟอร์มให้อยู่บรรทัดเดียว
   });
-  const openTxExportPreview = (preferred: ExportFormat) => {
+  const openTxExportPreview = async (preferred?: ExportFormat, direct = false) => {
     if (txRows.length === 0) {
       setNotice("ยังไม่มีธุรกรรมที่จะส่งออกตามตัวกรองนี้");
       return;
     }
     const doc = txDocConfig();
-    setExportPreview({
+    const state: ExportPreviewState = {
       kind: "transactions",
       title: doc.title,
       periodLabel: doc.periodLabel,
@@ -1403,12 +1414,17 @@ export function Reports({
       sheetName: "ประวัติธุรกรรม",
       rows: [...txExportRows(), ...(doc.totalsRow ? [doc.totalsRow] : [])],
       numericCols: doc.numericCols ?? [],
-      preferred,
+      preferred: preferred ?? "pdf",
       doc,
       hasTotalsRow: true,
       downloadNoticeBase: `ประวัติธุรกรรม · ${txRows.length} รายการ${txMember ? ` · สมาชิก ${txMember.memberNumber}` : ""}`,
       printNotice: `สั่งพิมพ์ประวัติธุรกรรมแล้ว · ${txRows.length} รายการ`,
-    });
+    };
+    if (direct && preferred) {
+      await executeExport(state, preferred);
+    } else {
+      setExportPreview(state);
+    }
   };
   // ROUND 65 — ชุดส่งออกของรายงานใหม่ 2 ตัว (ยอดเงินในบัตร + สินค้าคงคลัง)
   const balancesDocConfig = (): ReportDocConfig => ({
@@ -1452,13 +1468,13 @@ export function Reports({
     footnote:
       "ยอดทั้งหมด = เปิดใช้บัตร + เติมเงิน · ยอดจ่าย = ใช้ซื้อ + ถอน + คืนบัตรเงินสด · คงเหลือ = ยอดปัจจุบัน",
   });
-  const openBalancesExportPreview = (preferred: ExportFormat) => {
+  const openBalancesExportPreview = async (preferred?: ExportFormat, direct = false) => {
     if (balanceRows.length === 0) {
       setNotice("ยังไม่มีข้อมูลสมาชิกที่จะส่งออก");
       return;
     }
     const doc = balancesDocConfig();
-    setExportPreview({
+    const state: ExportPreviewState = {
       kind: "balances",
       title: doc.title,
       periodLabel: doc.periodLabel,
@@ -1495,12 +1511,17 @@ export function Reports({
         ],
       ],
       numericCols: doc.numericCols ?? [],
-      preferred,
+      preferred: preferred ?? "pdf",
       doc,
       hasTotalsRow: true,
       downloadNoticeBase: `ยอดเงินในบัตร · ${balanceRows.length} ราย`,
       printNotice: `สั่งพิมพ์รายงานยอดเงินในบัตรแล้ว · ${balanceRows.length} ราย`,
-    });
+    };
+    if (direct && preferred) {
+      await executeExport(state, preferred);
+    } else {
+      setExportPreview(state);
+    }
   };
   const stockBalanceDocConfig = (): ReportDocConfig => ({
     fileName: "stock-balance-period.pdf",
@@ -1544,13 +1565,13 @@ export function Reports({
       "ยอดยกมา = จำนวนต้นช่วง · ยอดขาย = ขายออกในช่วงที่เลือก · คงเหลือ = สต็อกปัจจุบัน",
     compact: true, // ตาราง 7 คอลัมน์ — ลดขนาดตามฟอร์มให้อยู่บรรทัดเดียว
   });
-  const openStockBalanceExportPreview = (preferred: ExportFormat) => {
+  const openStockBalanceExportPreview = async (preferred?: ExportFormat, direct = false) => {
     if (stockBalanceRows.length === 0) {
       setNotice("ยังไม่มีรายการคงคลังที่จะส่งออก");
       return;
     }
     const doc = stockBalanceDocConfig();
-    setExportPreview({
+    const state: ExportPreviewState = {
       kind: "stockBalance",
       title: doc.title,
       periodLabel: doc.periodLabel,
@@ -1587,37 +1608,40 @@ export function Reports({
         ],
       ],
       numericCols: doc.numericCols ?? [],
-      preferred,
+      preferred: preferred ?? "pdf",
       doc,
       hasTotalsRow: true,
       downloadNoticeBase: `สินค้าคงคลัง · ${stockBalanceRows.length} รายการ · ${rangeLabel}`,
       printNotice: `สั่งพิมพ์รายงานสินค้าคงคลังแล้ว · ${stockBalanceRows.length} รายการ`,
-    });
+    };
+    if (direct && preferred) {
+      await executeExport(state, preferred);
+    } else {
+      setExportPreview(state);
+    }
+  };
+  // P1-UX-direct — สกัด executeExport ออกจาก onRun เพื่อให้ปุ่มบนการ์ดเรียกตรงๆ ได้
+  // (ไม่ต้องเปิด modal ก่อน) — CSV/Excel/PDF/พิมพ์ ทำตามชื่อปุ่มทันที
+  const executeExport = async (state: ExportPreviewState, format: ExportFormat) => {
+    if (format === "csv") {
+      downloadCsvFile(state.fileName, state.rows);
+      setNotice(`ดาวน์โหลด${state.downloadNoticeBase} CSV แล้ว`);
+    } else if (format === "xlsx") {
+      downloadXlsxFile(state.fileName, state.sheetName, state.rows, state.numericCols);
+      setNotice(`ดาวน์โหลด${state.downloadNoticeBase} Excel แล้ว`);
+    } else if (format === "pdf") {
+      await downloadReportPdf(state.doc);
+      setNotice(`ดาวน์โหลด${state.downloadNoticeBase} PDF แล้ว`);
+    } else {
+      printReportDoc(state.doc);
+      setNotice(state.printNotice);
+    }
   };
   const runExportPreview = async (format: ExportFormat) => {
     const state = exportPreview;
     if (!state) return;
     try {
-      if (format === "csv") {
-        downloadCsvFile(state.fileName, state.rows);
-        setNotice(`ดาวน์โหลด${state.downloadNoticeBase} CSV แล้ว`);
-      } else if (format === "xlsx") {
-        downloadXlsxFile(
-          state.fileName,
-          state.sheetName,
-          state.rows,
-          state.numericCols
-        );
-        setNotice(`ดาวน์โหลด${state.downloadNoticeBase} Excel แล้ว`);
-      } else if (format === "pdf") {
-        // P0-2 — ปุ่ม PDF ดาวน์โหลดไฟล์จริงโดยตรง (ไม่เปิด print dialog)
-        await downloadReportPdf(state.doc);
-        setNotice(`ดาวน์โหลด${state.downloadNoticeBase} PDF แล้ว`);
-      } else {
-        // ปุ่ม "พิมพ์" เท่านั้นที่เปิด print flow
-        printReportDoc(state.doc);
-        setNotice(state.printNotice);
-      }
+      await executeExport(state, format);
     } finally {
       setExportPreview(null);
     }
@@ -1855,24 +1879,38 @@ export function Reports({
                 >
                   <button
                     className="outline-button compact"
-                    onClick={() => void openSalesExportPreview("csv")}
-                    title="พรีวิวแล้วส่งออก CSV ตามมุมมองปัจจุบัน"
+                    onClick={() => void openSalesExportPreview("csv", true)}
+                    title="ดาวน์โหลด CSV ตามมุมมองปัจจุบัน — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <Download size={15} /> CSV
                   </button>
                   <button
                     className="outline-button compact"
-                    onClick={() => void openSalesExportPreview("xlsx")}
-                    title="พรีวิวแล้วส่งออก Excel ตามมุมมองปัจจุบัน"
+                    onClick={() => void openSalesExportPreview("xlsx", true)}
+                    title="ดาวน์โหลด Excel ตามมุมมองปัจจุบัน — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <FileBarChart size={15} /> Excel
                   </button>
                   <button
                     className="outline-button compact"
-                    onClick={() => void openSalesExportPreview("pdf")}
-                    title="พรีวิวแล้วส่งออก PDF ตามมุมมองปัจจุบัน"
+                    onClick={() => void openSalesExportPreview("pdf", true)}
+                    title="ดาวน์โหลด PDF (vector) ตามมุมมองปัจจุบัน — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
-                    <FileBarChart size={15} /> PDF
+                    <FileText size={15} /> PDF
+                  </button>
+                  <button
+                    className="outline-button compact"
+                    onClick={() => void openSalesExportPreview("print", true)}
+                    title="สั่งพิมพ์รายงานยอดขาย A4 ทันที — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
+                  >
+                    <Printer size={15} /> พิมพ์
+                  </button>
+                  <button
+                    className="outline-button compact preview-btn"
+                    onClick={() => void openSalesExportPreview()}
+                    title="ดูตัวอย่างเอกสาร A4 + ตารางข้อมูลก่อนส่งออก"
+                  >
+                    <Eye size={15} /> ดูพรีวิว
                   </button>
                 </div>
               </div>
@@ -2578,24 +2616,38 @@ export function Reports({
                 >
                   <button
                     className="outline-button compact"
-                    onClick={() => openBillsExportPreview("csv")}
-                    title="พรีวิวแล้วส่งออก CSV"
+                    onClick={() => void openBillsExportPreview("csv", true)}
+                    title="ดาวน์โหลด CSV — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <Download size={15} /> CSV
                   </button>
                   <button
                     className="outline-button compact"
-                    onClick={() => openBillsExportPreview("xlsx")}
-                    title="พรีวิวแล้วส่งออก Excel"
+                    onClick={() => void openBillsExportPreview("xlsx", true)}
+                    title="ดาวน์โหลด Excel — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <FileBarChart size={15} /> Excel
                   </button>
                   <button
                     className="outline-button compact"
-                    onClick={() => openBillsExportPreview("pdf")}
-                    title="พรีวิวแล้วดาวน์โหลด PDF แบบเอกสาร A4"
+                    onClick={() => void openBillsExportPreview("pdf", true)}
+                    title="ดาวน์โหลด PDF (vector) แบบเอกสาร A4 — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
-                    <FileBarChart size={15} /> PDF
+                    <FileText size={15} /> PDF
+                  </button>
+                  <button
+                    className="outline-button compact"
+                    onClick={() => void openBillsExportPreview("print", true)}
+                    title="สั่งพิมพ์ประวัติบิล A4 ทันที — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
+                  >
+                    <Printer size={15} /> พิมพ์
+                  </button>
+                  <button
+                    className="outline-button compact preview-btn"
+                    onClick={() => void openBillsExportPreview()}
+                    title="ดูตัวอย่างเอกสาร A4 + ตารางข้อมูลก่อนส่งออก"
+                  >
+                    <Eye size={15} /> ดูพรีวิว
                   </button>
                 </div>
               </div>
@@ -2868,24 +2920,38 @@ export function Reports({
                 >
                   <button
                     className="outline-button compact"
-                    onClick={() => openTxExportPreview("csv")}
-                    title="พรีวิวแล้วส่งออก CSV"
+                    onClick={() => void openTxExportPreview("csv", true)}
+                    title="ดาวน์โหลด CSV — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <Download size={15} /> CSV
                   </button>
                   <button
                     className="outline-button compact"
-                    onClick={() => openTxExportPreview("xlsx")}
-                    title="พรีวิวแล้วส่งออก Excel"
+                    onClick={() => void openTxExportPreview("xlsx", true)}
+                    title="ดาวน์โหลด Excel — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <FileBarChart size={15} /> Excel
                   </button>
                   <button
                     className="outline-button compact"
-                    onClick={() => openTxExportPreview("pdf")}
-                    title="พรีวิวแล้วดาวน์โหลด PDF แบบเอกสาร A4"
+                    onClick={() => void openTxExportPreview("pdf", true)}
+                    title="ดาวน์โหลด PDF (vector) แบบเอกสาร A4 — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
-                    <FileBarChart size={15} /> PDF
+                    <FileText size={15} /> PDF
+                  </button>
+                  <button
+                    className="outline-button compact"
+                    onClick={() => void openTxExportPreview("print", true)}
+                    title="สั่งพิมพ์ประวัติธุรกรรม A4 ทันที — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
+                  >
+                    <Printer size={15} /> พิมพ์
+                  </button>
+                  <button
+                    className="outline-button compact preview-btn"
+                    onClick={() => void openTxExportPreview()}
+                    title="ดูตัวอย่างเอกสาร A4 + ตารางข้อมูลก่อนส่งออก"
+                  >
+                    <Eye size={15} /> ดูพรีวิว
                   </button>
                 </div>
               </div>
@@ -3191,31 +3257,38 @@ export function Reports({
                 >
                   <button
                     className="outline-button compact"
-                    onClick={() => void openStockBalanceExportPreview("csv")}
-                    title="พรีวิวแล้วส่งออก CSV"
+                    onClick={() => void openStockBalanceExportPreview("csv", true)}
+                    title="ดาวน์โหลด CSV — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <Download size={15} /> CSV
                   </button>
                   <button
                     className="outline-button compact"
-                    onClick={() => void openStockBalanceExportPreview("xlsx")}
-                    title="พรีวิวแล้วส่งออก Excel"
+                    onClick={() => void openStockBalanceExportPreview("xlsx", true)}
+                    title="ดาวน์โหลด Excel — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <FileSpreadsheet size={15} /> Excel
                   </button>
                   <button
                     className="outline-button compact"
-                    onClick={() => void openStockBalanceExportPreview("pdf")}
-                    title="พรีวิวแล้วดาวน์โหลด PDF แบบเอกสาร A4"
+                    onClick={() => void openStockBalanceExportPreview("pdf", true)}
+                    title="ดาวน์โหลด PDF (vector) แบบเอกสาร A4 — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <FileText size={15} /> PDF
                   </button>
                   <button
                     className="outline-button compact"
-                    onClick={() => void openStockBalanceExportPreview("print")}
-                    title="พรีวิวก่อนสั่งพิมพ์"
+                    onClick={() => void openStockBalanceExportPreview("print", true)}
+                    title="สั่งพิมพ์รายงานสินค้าคงคลัง A4 ทันที — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <Printer size={15} /> พิมพ์
+                  </button>
+                  <button
+                    className="outline-button compact preview-btn"
+                    onClick={() => void openStockBalanceExportPreview()}
+                    title="ดูตัวอย่างเอกสาร A4 + ตารางข้อมูลก่อนส่งออก"
+                  >
+                    <Eye size={15} /> ดูพรีวิว
                   </button>
                 </div>
               </div>
@@ -3402,31 +3475,38 @@ export function Reports({
                 >
                   <button
                     className="outline-button compact"
-                    onClick={() => void openBalancesExportPreview("csv")}
-                    title="พรีวิวแล้วส่งออก CSV"
+                    onClick={() => void openBalancesExportPreview("csv", true)}
+                    title="ดาวน์โหลด CSV — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <Download size={15} /> CSV
                   </button>
                   <button
                     className="outline-button compact"
-                    onClick={() => void openBalancesExportPreview("xlsx")}
-                    title="พรีวิวแล้วส่งออก Excel"
+                    onClick={() => void openBalancesExportPreview("xlsx", true)}
+                    title="ดาวน์โหลด Excel — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <FileSpreadsheet size={15} /> Excel
                   </button>
                   <button
                     className="outline-button compact"
-                    onClick={() => void openBalancesExportPreview("pdf")}
-                    title="พรีวิวแล้วดาวน์โหลด PDF แบบเอกสาร A4"
+                    onClick={() => void openBalancesExportPreview("pdf", true)}
+                    title="ดาวน์โหลด PDF (vector) แบบเอกสาร A4 — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <FileText size={15} /> PDF
                   </button>
                   <button
                     className="outline-button compact"
-                    onClick={() => void openBalancesExportPreview("print")}
-                    title="พรีวิวก่อนสั่งพิมพ์"
+                    onClick={() => void openBalancesExportPreview("print", true)}
+                    title="สั่งพิมพ์รายงานยอดเงินในบัตร A4 ทันที — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <Printer size={15} /> พิมพ์
+                  </button>
+                  <button
+                    className="outline-button compact preview-btn"
+                    onClick={() => void openBalancesExportPreview()}
+                    title="ดูตัวอย่างเอกสาร A4 + ตารางข้อมูลก่อนส่งออก"
+                  >
+                    <Eye size={15} /> ดูพรีวิว
                   </button>
                 </div>
               </div>
