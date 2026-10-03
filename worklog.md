@@ -2376,3 +2376,97 @@ owner ส่ง spec บัตรสมาชิกละเอียด (90×55
 - **P0-UX-03**: report PDF vector (server-side Chromium) — ยังค้างจากรอบก่อน
 - **P1-UX-04**: ExportPreviewModal A4 document preview — ยังค้าง
 - **P1-UX-05**: POS flow (transaction state banner + QR confirm + กัน double-submit)
+
+---
+Task ID: P0-UX-02 finish (PNG download)
+Agent: main (user สั่ง 'ทำให้เสร็จก่อน')
+Task: บัตรสมาชิก — เพิ่ม PNG download ตาม owner spec output #2 (ยังขาดอยู่)
+
+## Work Log
+ไฟล์แก้ (2): `client/src/components/MemberCardModal.tsx` + `client/src/index.css`
+
+1. แยก `downloadCard` เป็น `captureCardCanvas` (shared) + `downloadCardPdf` + `downloadCardPng`
+   — ไม่ต้อง html2canvas ซ้ำหลายรอบ
+2. `downloadCardPng`: บันทึก `canvas.toDataURL("image/png")` เป็นไฟล์ .png ตรงๆ
+   1440×880px (scale 4 ≈ 406 DPI เกินมาตรฐาน 1063×650 @ 300 DPI ตาม owner spec)
+3. busy state เปลี่ยน boolean → `"" | "pdf" | "png"` เพื่อโชว์ label แยก + ล็อกทุกปุ่มขณะ capture
+4. layout: `.member-card-modal .modal-actions` flex-wrap + `flex:1` ปุ่มเท่ากัน (3 ปุ่มใน modal แคบ 430px ไม่ล้น)
+
+## Verification
+- tsc: 0 errors
+- agent-browser: เปิดบัตรสมาชิก → ปุ่ม 'ดาวน์โหลด PDF' + 'ดาวน์โหลด PNG' + 'พิมพ์บัตรสมาชิก' ครบ 3 → คลิก PNG รันผ่าน busy reset ไม่มี error
+- commit: d98002d
+
+---
+Task ID: P0-UX-03 (vector PDF for reports)
+Agent: main (user สั่ง 'ทำให้เสร็จก่อน')
+Task: รายงาน PDF เป็น vector จริง (selectable text) — ย้ายจาก html2canvas raster ไป server-side Chromium printToPDF
+
+## ปัญหา (จาก owner report)
+downloadReportPdf ใช้ html2canvas → JPEG/PNG → jsPDF = raster (เบลอ copy/search ไม่ได้ ไฟล์ใหญ่)
+owner: "PDF ต้องคมเมื่อ zoom 200-400% + select/copy text ได้หากใช้ vector PDF solution"
+
+## Work Log — server-side vector PDF
+ไฟล์ใหม่ (2) + แก้ (2):
+
+**1. `shared/reportDoc.ts` (ใหม่) — single source of truth (pure JS, ไม่มี browser API)**
+- ย้าย `ReportDocConfig` type, `thaiStamp`, `escapeHtml`, `REPORT_DOC_CSS`, `REPORT_DOC_PRINT_FONT_FACE` มาที่นี่
+- เพิ่ม `buildReportDocumentHtml(config, {mode, stampText, fontFace})` — สร้าง HTML doc string เต็มรูปแบบ
+- import ได้ทั้ง client (Vite @shared alias) และ server (tsx @shared alias)
+- `fontFace` override สำหรับ server ที่ฝัง font เป็น base64
+
+**2. `server/_core/reportPdf.ts` (ใหม่) — POST /api/report/pdf**
+- Puppeteer launch (headless, --no-sandbox) แชร์ browser instance ข้าม request (cache)
+- ฝัง Sarabun เป็น base64 data URL (12 weights thai+latin, อ่านจาก client/public/fonts ครั้งเดียว cache)
+- `page.setContent(html, {waitUntil:"load"})` + รอ `document.fonts.ready` + `fonts.load` ทุก weight
+- `page.pdf({format:A4, printBackground, margin:14mm, preferCSSPageSize})` → Uint8Array
+- **แปลงเป็น Node `Buffer.from(pdfBytes)` ก่อน `res.send`** — มิฉะนั้น Express ส่ง Uint8Array เป็น JSON object `{"0":37,...}` (bug แรกที่เจอ ทดสอบด้วย curl)
+- Content-Type: application/pdf + X-PDF-Mode: vector header
+
+**3. `server/_core/index.ts` — `registerReportPdfRoutes(app)` หลัง registerOAuthRoutes**
+
+**4. `client/src/reportDoc.ts` — downloadReportPdf ลอง vector ก่อน ย้อนกลับ raster**
+- `downloadReportPdf`: fetch POST /api/report/pdf → blob → download (vector path)
+  ถ้า fail (network/server error) → console.warn + เรียก `downloadReportPdfRaster` (html2canvas PNG fallback)
+- `printReportDoc`: ใช้ `buildReportDocumentHtml` จาก @shared (ชุดเดียวกับ server) → iframe + window.print
+- เก็บ `buildPage` + `REPORT_DOC_PDF_STAGE_CSS` สำหรับ raster fallback (ทนทาน)
+
+## Verification
+- `tsc --noEmit`: **0 errors** (client + server + shared)
+- `setContent` bug: `waitUntil:"networkidle0"` ไม่ใช่ option ของ setContent → แก้เป็น `"load"` + explicit `fonts.ready`/`fonts.load` wait
+- Express Uint8Array bug: แปลงเป็น Buffer ก่อนส่ง (curl ตรวจ: 30KB ไม่ใช่ 430KB JSON)
+- **curl POST /api/report/pdf**: HTTP 200, `application/pdf`, 30KB, `%PDF` magic, `/Font` resources
+  (vector = มี embedded fonts + text streams, ไม่ใช่ image-only raster)
+- **agent-browser end-to-end**: login → รายงาน → คลิก PDF → client fetch /api/report/pdf →
+  dev.log: `[reportPdf] ✓ daily-sales-summary.pdf 50KB in 229ms` ไม่มี console/page error
+
+## Stage Summary
+- ไฟล์ (6): shared/reportDoc.ts (ใหม่ 154 บรรทัด) + server/_core/reportPdf.ts (ใหม่ 119) +
+  server/_core/index.ts (+2) + client/src/reportDoc.ts (refactor) + package.json + bun.lock
+- puppeteer@25.12.0 installed (Chromium 154 ดาวน์โหลด auto ~170MB)
+- commit: dcddb72
+- **ตอบโจทย์ owner P0-UX-03 ครบ**:
+  - ✅ PDF vector (selectable text, /Font resources)
+  - ✅ คมเมื่อ zoom 200-400% (vector ไม่แตก)
+  - ✅ ไฟล์เล็ก (30-50KB เทียบ raster 500KB+)
+  - ✅ PDF = Print = buildReportDocumentHtml เดียวกัน (single source)
+  - ✅ มี raster fallback ถ้า Chromium ล้ม (ทนทาน)
+
+## สถานะ P0 ทั้ง 3 งาน (หลังรอบนี้)
+
+| งาน | สถานะ | commit |
+|---|---|---|
+| P0-UX-01 รวม template รายงาน | ✅ DONE | c18b37e |
+| P0-UX-02 บัตรสมาชิก (balance+PDF+PNG) | ✅ DONE | 8c090b0 + d98002d |
+| P0-UX-03 PDF vector | ✅ DONE | dcddb72 |
+
+## ข้อจำกัดที่ยังเหลือ (P1 + P0-UX-02 part 2 extras — ต่อรอบถัดไป)
+
+1. **P1-UX-04**: ExportPreviewModal ยังเป็น data-table preview ไม่ใช่ A4 document preview
+   (ควร render buildReportDocumentHtml ใน iframe สำหรับ preview)
+2. **P1-UX-05**: POS flow — transaction state banner + QR confirm + กัน double-submit
+3. **P0-UX-02 part 2 extras**: A4 sheet print profile (8/10/12-up + X/Y calibration +
+   test print) + bleed 3mm สำหรับร้านพิมพ์ + unified MEMBER_CARD_DOC_CSS
+4. **index.css .rd-* ซ้ำ**: ตอนนี้ถูก override โดย REPORT_DOC_CSS (จาก shared) — ลบได้ในรอบทำความสะอาด
+5. **Puppeteer cold start**: browser แชร์ข้าม request แต่รอบแรกช้า (~1.5s launch) —
+   รอบถัดไปเร็ว (229ms) แล้ว
