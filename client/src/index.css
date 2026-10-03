@@ -2509,7 +2509,7 @@ nav button.active small { color: #4c7a58; }
 
 /* (2) dash-workbench — แถบ tab + เนื้อหาเต็มความสูงที่เหลือ
        (metrics คงที่ด้านบน ไม่ถูกบีบ) */
-.dash-workbench { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
+.dash-workbench { display: flex; flex-direction: column; flex-shrink: 0; }
 .dash-tabbar {
   flex: 0 0 auto;
   display: flex;
@@ -2612,7 +2612,7 @@ nav button.active small { color: #4c7a58; }
        page-content ที่กินพื้นที่ที่เหลือทั้งหมด (metrics และ header
        คง shrink-0 ตามเดิม) */
 @media (min-width: 561px) {
-  .app-shell:not(.pos-terminal) .page-content > .dash-workbench { flex: 1 1 0; min-height: 0; }
+  /* dash-workbench ใช้ความสูงตามเนื้อหา ไม่ยืดแข่งกับ widget ด้านบน */
 }
 
 /* (4b) จอเตี้ย (สูง ≤880px) — บีบ header + KPI ให้กราฟ/ตารางได้พื้นที่
