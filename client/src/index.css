@@ -78,7 +78,7 @@ nav button.active small { color: #70a392; }
 .secure-badge b { color: #557469; font-size: 11px; }
 .secure-badge small { color: #7d826f; font-size: 11px; margin-top: 3px; }
 .sidebar-version { color: #848876; font-family: "IBM Plex Mono", monospace; font-size: 10px; padding: 0 6px; }
-.main-shell { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+.main-shell { flex: 1; min-width: 0; }
 .topbar { height: 72px; background: rgba(255,255,255,.82); border-bottom: 1px solid var(--line); padding: 0 38px; display: flex; align-items: center; justify-content: space-between; gap: 20px; position: sticky; top: 0; z-index: 5; backdrop-filter: blur(12px); }
 .breadcrumb { display: flex; align-items: center; gap: 10px; font-size: 12px; color: #838776; }
 .breadcrumb b { font-weight: 400; color: #d6d8d0; }
@@ -1614,8 +1614,9 @@ nav button.active .nav-badge { background: #fff; color: var(--teal-dark); box-sh
 
 /* (3) STICKY FOOTER + page rhythm — short pages pin the footer,
        long pages push it down naturally (never overlaps) */
-.main-shell { display: flex; flex-direction: column; min-height: 100vh; }
-.page-content { flex: 1 0 auto; padding: 26px 34px 20px; }
+/* FIX — คืนเป็น block ปกติ ไม่ใช้ flex column (ทำให้ตาราง scroll ไม่ได้) */
+.main-shell { flex: 1; min-width: 0; }
+.page-content { padding: 26px 34px 20px; }
 .app-footer { margin-top: auto; }
 
 /* (4) SECTION HEADERS — one compact line, less dead space */

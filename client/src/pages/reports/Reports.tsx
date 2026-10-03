@@ -1679,7 +1679,7 @@ export function Reports({
       <SectionHeader
         eyebrow="สรุปผลและวิเคราะห์ข้อมูล"
         title="รายงาน"
-        description="สลับมุมมองทีละแท็บ — 1. เลือกรายงาน (ยอดขาย/บิล/ธุรกรรม/สต็อก) → 2. กรองข้อมูล (ช่วงวันที่/พนักงาน/ประเภท) → 3. ส่งออก (ดูตัวอย่างก่อนดาวน์โหลด CSV/Excel/PDF)"
+        description=""
         action={
           <div className="page-template-action">
             <button
