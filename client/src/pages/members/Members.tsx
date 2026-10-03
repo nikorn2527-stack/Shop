@@ -188,7 +188,7 @@ export function Members({
       <SectionHeader
         eyebrow="สมาชิกและบัญชีสวัสดิการ"
         title="จัดการสมาชิก"
-        description="ดูรายละเอียด เติม/ถอนเงิน ระงับการใช้งาน และพิมพ์บัตรสมาชิกรายคน — ลงทะเบียนสมาชิกใหม่+พิมพ์บัตร ทำที่ POS · ขายสินค้า (F6) จุดเดียว"
+        description=""
       />
       <div className="member-scope-note compact" role="note">
         <span className="member-scope-icon">
