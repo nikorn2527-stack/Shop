@@ -15,6 +15,7 @@ import {
   requestLimitReduction,
   salesByProduct,
   seedSqliteDemoData,
+  setSettings,
   setMemberNumberMode,
   suspendMember,
   updateMember,
@@ -198,6 +199,8 @@ describe("day closure history (listDayClosures)", () => {
     expect(listDayClosures(db)).toEqual([]);
 
     const first = closeBusinessDay(db, { actor: "นายวรพจน์ ด." });
+    // Switch to manual mode so periodStart = lastClosure.closedAt (new period)
+    setSettings(db, { dailyCutOffMode: "manual" });
     const second = closeBusinessDay(db, { actor: "น.ส.กัญญาณัฐ พ." });
 
     const rows = listDayClosures(db);
