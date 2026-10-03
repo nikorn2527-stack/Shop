@@ -78,7 +78,7 @@ nav button.active small { color: #70a392; }
 .secure-badge b { color: #557469; font-size: 11px; }
 .secure-badge small { color: #7d826f; font-size: 11px; margin-top: 3px; }
 .sidebar-version { color: #848876; font-family: "IBM Plex Mono", monospace; font-size: 10px; padding: 0 6px; }
-.main-shell { flex: 1; min-width: 0; }
+.main-shell { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
 .topbar { height: 72px; background: rgba(255,255,255,.82); border-bottom: 1px solid var(--line); padding: 0 38px; display: flex; align-items: center; justify-content: space-between; gap: 20px; position: sticky; top: 0; z-index: 5; backdrop-filter: blur(12px); }
 .breadcrumb { display: flex; align-items: center; gap: 10px; font-size: 12px; color: #838776; }
 .breadcrumb b { font-weight: 400; color: #d6d8d0; }
@@ -1614,9 +1614,8 @@ nav button.active .nav-badge { background: #fff; color: var(--teal-dark); box-sh
 
 /* (3) STICKY FOOTER + page rhythm — short pages pin the footer,
        long pages push it down naturally (never overlaps) */
-/* FIX — คืนเป็น block ปกติ ไม่ใช้ flex column (ทำให้ตาราง scroll ไม่ได้) */
-.main-shell { flex: 1; min-width: 0; }
-.page-content { padding: 26px 34px 20px; }
+.main-shell { display: flex; flex-direction: column; min-height: 100vh; }
+.page-content { flex: 1 0 auto; padding: 26px 34px 20px; }
 .app-footer { margin-top: auto; }
 
 /* (4) SECTION HEADERS — one compact line, less dead space */
@@ -2263,15 +2262,24 @@ nav button.active small { color: #4c7a58; }
 .wallet-modal-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; border-top: 1px solid var(--line); margin-top: 13px; padding-top: 12px; }
 .wallet-modal-foot small { color: var(--muted); font-size: 10px; }
 
-/* ① one-screen lock disabled — ปล่อยให้ content scroll ตามธรรมชาติ
-   เดิม: overflow:hidden + min-height:0 ทำให้ตารางหายทุกหน้า
-   ใหม่: overflow:visible + ไม่บังคับ flex → ตารางแสดง + scroll ได้ */
+/* ① one-screen lock for every non-POS view (tablets up) */
 @media (min-width: 561px) {
-  .app-shell:not(.pos-terminal) .page-content { display: block; overflow: visible; }
+  .app-shell:not(.pos-terminal) .page-content { display: flex; flex-direction: column; overflow: hidden; min-height: 0; }
   .app-shell:not(.pos-terminal) .page-content > * { flex-shrink: 0; }
+  /* main data panels absorb the remaining height and scroll inside */
+  .app-shell:not(.pos-terminal) .page-content > section.panel { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
   .app-shell:not(.pos-terminal) .page-content > section.panel > .table-wrap { flex: 1 1 auto; min-height: 0; overflow: auto; }
+  /* dashboard: metrics + both grid rows share the screen; each panel scrolls */
+  .app-shell:not(.pos-terminal) .page-content > .dashboard-grid { flex: 1 1 0; min-height: 0; grid-auto-rows: minmax(0, 1fr); }
+  .app-shell:not(.pos-terminal) .page-content > .dashboard-grid > .panel { min-height: 0; overflow-y: auto; }
+  /* bills history deserves the bigger share on the reports page */
+  .app-shell:not(.pos-terminal) .page-content > .dashboard-grid.report-lower { flex: 1 1 0; }
+  .app-shell:not(.pos-terminal) .page-content > section.table-panel.member-history-panel { flex: 1.25 1 0; }
+  /* settings: the content column scrolls inside its frame */
+  .app-shell:not(.pos-terminal) .settings-layout { flex: 1 1 0; min-height: 0; align-items: stretch; }
   .app-shell:not(.pos-terminal) .settings-content { overflow-y: auto; min-height: 0; padding-right: 6px; }
   .app-shell:not(.pos-terminal) .settings-save-bar { position: sticky; bottom: 0; z-index: 2; margin-top: auto; }
+  /* legacy scroll containers keep behaving inside their panels */
   .table-panel > .table-wrap { flex: 1 1 auto; min-height: 0; overflow: auto; }
 }
 
@@ -2501,7 +2509,7 @@ nav button.active small { color: #4c7a58; }
 
 /* (2) dash-workbench — แถบ tab + เนื้อหาเต็มความสูงที่เหลือ
        (metrics คงที่ด้านบน ไม่ถูกบีบ) */
-.dash-workbench { display: flex; flex-direction: column; }
+.dash-workbench { flex: 1 1 0; min-height: 0; display: flex; flex-direction: column; }
 .dash-tabbar {
   flex: 0 0 auto;
   display: flex;
@@ -2573,16 +2581,16 @@ nav button.active small { color: #4c7a58; }
        panel เดียว (หรือกริด 2 คอลัมน์) แล้วเลื่อนข้อมูลข้างใน */
 .dash-tab-body {
   flex: 1 1 auto;
-  min-height: auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   background: var(--surface);
   border: 1px solid #e7eeeb;
   border-radius: 0 0 14px 14px;
   box-shadow: var(--shadow);
-  overflow: visible;
+  overflow: hidden;
 }
-.dash-tab-body > .panel { flex: 0 0 auto; display: flex; flex-direction: column; border: 0; border-radius: 0; box-shadow: none; }
+.dash-tab-body > .panel { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; border: 0; border-radius: 0; box-shadow: none; }
 .dash-tab-body .panel-heading, .dash-tab-body .alert-heading, .dash-tab-body .chart-interactive-meta, .dash-tab-body .chart-summary, .dash-tab-body .ranking-insight, .dash-tab-body .alert-footer-action { flex: 0 0 auto; }
 
 /* tab ยอดขาย — กราฟยืดเต็มความสูงที่เหลือ */
@@ -2604,7 +2612,7 @@ nav button.active small { color: #4c7a58; }
        page-content ที่กินพื้นที่ที่เหลือทั้งหมด (metrics และ header
        คง shrink-0 ตามเดิม) */
 @media (min-width: 561px) {
-  /* dash-workbench ใช้ความสูงตามเนื้อหา ไม่ยืดแข่งกับ widget ด้านบน */
+  .app-shell:not(.pos-terminal) .page-content > .dash-workbench { flex: 1 1 0; min-height: 0; }
 }
 
 /* (4b) จอเตี้ย (สูง ≤880px) — บีบ header + KPI ให้กราฟ/ตารางได้พื้นที่
@@ -6682,8 +6690,9 @@ body:has(.modal-backdrop) .shortcuts-fab { display: none; }
 .modal-backdrop {
   animation: modal-fade-in 0.18s ease-out;
 }
-/* เอา animation ออกจาก widget/onboarding — ทำให้ลอย/เด้ง ไม่เป็นธรรมชาติ */
-.shortcuts-modal {
+.shortcuts-modal,
+.onboarding-banner,
+.recent-bills-widget {
   animation: modal-scale-in 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 @media (prefers-reduced-motion: reduce) {

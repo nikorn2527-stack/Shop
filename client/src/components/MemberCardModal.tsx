@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
 import QRCode from "qrcode";
 import { Barcode, CreditCard, Printer, QrCode as QrIcon, ScanLine, ShieldAlert, UserCheck, X } from "@/lib/icons";
 import { money } from "../pages/pageData";
@@ -164,7 +166,40 @@ export function MemberCardModal({
   const displayName = [member.prename?.trim() || "", member.firstName, member.lastName].filter(Boolean).join(" ");
   const suspended = member.status === "suspended";
 
-  const printCard = () => { window.print(); };
+  // P0-3 — ดาวน์โหลดบัตรเป็นไฟล์ PDF จริง (jsPDF + html2canvas)
+  // ใช้หน้ากระดาษ 90×55 มม. (มาตรฐานนามบัตรไทย) สร้าง PDF โดยตรง ไม่เปิด print dialog
+  const downloadCard = async () => {
+    const element = document.getElementById("member-card-capture");
+    if (!element) return;
+    setBusy(true);
+    try {
+      if (document.fonts?.ready) await document.fonts.ready;
+      const canvas = await html2canvas(element, {
+        scale: 4,
+        backgroundColor: "#f9fbfa",
+        useCORS: true,
+        logging: false,
+      });
+      const pdf = new jsPDF({
+        orientation: "landscape",
+        unit: "mm",
+        format: [90, 55],
+      });
+      pdf.addImage(canvas.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, 90, 55);
+      pdf.save(`card-${member.memberNumber}.pdf`);
+    } finally { setBusy(false); }
+  };
+  const printCard = async () => {
+    // Task A3 — สั่งพิมพ์ผ่าน Helper ไปยัง card printer ที่เลือกใน Settings (localStorage)
+    const printerName = getPrinterName("card");
+    const cardHtml = document.getElementById("member-card")?.outerHTML ?? "";
+    const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
+@page { size: 90mm 55mm; margin: 0; }
+body { margin: 0; }
+${document.querySelector('style')?.textContent ?? ""}
+</style></head><body>${cardHtml}</body></html>`;
+    await printViaHelper(printerName, fullHtml);
+  };
   useEffect(() => {
     if (confirmForBill) return;
     const handler = (event: KeyboardEvent) => {
@@ -200,13 +235,20 @@ export function MemberCardModal({
     <div className="member-card-stage">
       <MemberCardArt member={member} brandName={brandName} brandLogo={brandLogo} qrDataUrl={qrDataUrl} id="member-card" footnoteAtScan={confirmForBill} />
     </div>
+    {/* P0-3 — hidden capture host สำหรับสร้าง PDF (ใช้ html2canvas จับภาพ 90×55 มม.) */}
+    {!confirmForBill && (
+      <div className="member-card-capture-host" aria-hidden="true">
+        <MemberCardArt member={member} brandName={brandName} brandLogo={brandLogo} qrDataUrl={qrDataUrl} id="member-card-capture" footnoteAtScan={confirmForBill} />
+      </div>
+    )}
     <div className="member-card-note"><CreditCard size={15} /> {confirmForBill ? "ทุกครั้งที่ยิงบัตรสมาชิก ระบบจะเด้งข้อมูลบัตรขึ้นมาให้ตรวจสอบเสมอ — ยืนยันเฉพาะเมื่อข้อมูลตรงกับลูกค้าที่ยื่นบัตรเท่านั้น" : "สมาชิกไม่มีบัญชีเข้าสู่ระบบแอป — บัตรใบนี้ใช้ระบุตัวตนที่เคาน์เตอร์ · ทุกครั้งที่สแกนบัตร พนักงานจะเห็นข้อมูลสมาชิกเพื่อยืนยันก่อนหักยอดเสมอ"}</div>
     <div className="modal-actions">
       {confirmForBill ? <>
         <button className="outline-button" onClick={onClose}><X size={16} /> ไม่ใช่สมาชิกนี้</button>
         <button className="primary-button" disabled={busy} onClick={() => onConfirm?.()}><UserCheck size={16} /> {confirmLabel}</button>
       </> : <>
-        <button className="primary-button" onClick={printCard} title="พิมพ์บัตรสมาชิก (90×55 มม.) ผ่านเครื่องพิมพ์"><Printer size={16} /> พิมพ์บัตรสมาชิก</button>
+        <button className="outline-button amber" disabled={busy} onClick={downloadCard} title="ดาวน์โหลดบัตรสมาชิกเป็นไฟล์ PDF (90×55 มม.)"><Printer size={16} /> {busy ? "กำลังสร้าง PDF..." : "ดาวน์โหลด PDF"}</button>
+        <button className="primary-button" onClick={printCard} title="พิมพ์บัตรสมาชิก (มาตรฐานนามบัตรไทย 90×55 มม.) ผ่านเครื่องพิมพ์"><Printer size={16} /> พิมพ์บัตรสมาชิก</button>
       </>}
     </div>
   </div></div>;
