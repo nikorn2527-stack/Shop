@@ -190,22 +190,6 @@ export function Members({
         title="จัดการสมาชิก"
         description=""
       />
-      <div className="member-scope-note compact" role="note">
-        <span className="member-scope-icon">
-          <IdCard size={16} />
-        </span>
-        <div>
-          <b>ระบบสมาชิกแยกจากผู้ใช้ระบบ</b>
-        </div>
-        <HelpDisclosure id="members-scope-help" label="ดูรายละเอียด">
-          <span>
-            บัญชีสมาชิกสวัสดิการใช้เพื่อใช้จ่ายที่เคาน์เตอร์เท่านั้น —
-            สมาชิกไม่มีบัญชีเข้าสู่ระบบแอปนี้ ·
-            แอปนี้สำหรับเจ้าหน้าที่และผู้บริหารร้านค้า
-            (จัดการบัญชีเข้าสู่ระบบที่เมนูผู้ใช้ระบบ)
-          </span>
-        </HelpDisclosure>
-      </div>
       <div className="member-top-grid">
         <div className="member-balance-card">
           <div>
