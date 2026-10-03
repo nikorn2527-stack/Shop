@@ -7013,3 +7013,95 @@ body:has(.modal-backdrop) .shortcuts-fab { display: none; }
   opacity: 0.6;
 }
 .test-print-dismiss:hover { opacity: 1; }
+
+/* Task A v2 — Printer settings (per-workstation, localStorage) */
+.printer-helper-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 11px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+.printer-helper-status.loading { background: #f4f7f5; border: 1px solid #e3ece8; color: #6e756a; }
+.printer-helper-status.connected { background: #eaf6f1; border: 1px solid #b3ddc8; color: #1f6b50; }
+.printer-helper-status.disconnected { background: #fff5e6; border: 1px solid #f0d89e; color: #9a7328; }
+.printer-helper-status b { font-weight: 700; }
+.printer-helper-status .detect-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #cfe4db;
+  border-radius: 6px;
+  background: #fff;
+  color: #4b8a72;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.printer-helper-status .detect-btn:hover { background: #eaf5f1; }
+.printer-install-hint { margin-left: auto; }
+.printer-install-hint summary { font-size: 10px; cursor: pointer; color: #8a9078; }
+.printer-install-hint code { font-family: "IBM Plex Mono", monospace; font-size: 9.5px; background: #f4f7f5; padding: 1px 4px; border-radius: 3px; }
+
+.printer-workstation-note {
+  padding: 6px 10px;
+  background: #f7faf8;
+  border: 1px solid #ebeee9;
+  border-radius: 7px;
+  margin-bottom: 10px;
+  font-size: 10.5px;
+  color: #6e756a;
+}
+.printer-workstation-note b { color: #4b8a72; font-family: "IBM Plex Mono", monospace; }
+
+.printer-settings-list { display: flex; flex-direction: column; gap: 10px; }
+.printer-doc-row {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 10px;
+  align-items: start;
+  padding: 10px 12px;
+  background: #fbfdfc;
+  border: 1px solid #ebeee9;
+  border-radius: 8px;
+}
+.printer-doc-label b { display: block; font-size: 12px; color: #2e463e; }
+.printer-doc-label small { display: block; font-size: 10px; color: #8b9080; margin-top: 2px; }
+
+.printer-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.printer-picker-loading { font-size: 10.5px; color: #8b9080; display: flex; align-items: center; gap: 5px; }
+.printer-picker-no-helper, .printer-picker-no-printer {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  color: #c26568;
+}
+.printer-picker-no-helper .detect-btn, .printer-picker-no-printer .detect-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid #cfe4db;
+  border-radius: 6px;
+  background: #fff;
+  color: #4b8a72;
+  font-size: 10px;
+  padding: 3px 8px;
+  cursor: pointer;
+}
+.printer-fallback-details { margin-top: 4px; }
+.printer-fallback-details summary { font-size: 10px; cursor: pointer; color: #a0a595; }
+.printer-fallback-details small { font-size: 9px; color: #a0a595; display: block; margin-top: 3px; }
+.printer-offline-warning { font-size: 9.5px; color: #c26568; font-weight: 600; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin { animation: spin 1s linear infinite; }

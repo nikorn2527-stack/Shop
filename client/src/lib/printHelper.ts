@@ -3,15 +3,58 @@
  *
  * ฟังก์ชันกลางที่ใช้ร่วมกันสำหรับทุกจุดพิมพ์ (ใบเสร็จ, รายงาน, บัตรสมาชิก)
  * ถ้า Helper ไม่ทำงาน → fallback ไป window.print() พร้อมแจ้งเตือน
+ *
+ * Task A3 v2 — บันทึกการตั้งค่าตามเครื่อง (localStorage) ไม่ใช่ server settings
+ * เพราะแต่ละเครื่องมี printer ไม่เหมือนกัน
  */
 
 export type PrintDocType = "receipt" | "report" | "card";
 
-export type PrintSettings = {
-  receiptPrinterName: string;
-  reportPrinterName: string;
-  cardPrinterName: string;
+export type LocalPrinterSettings = {
+  receipt: string;
+  report: string;
+  card: string;
 };
+
+const STORAGE_KEY = "local-printer-settings";
+
+/** อ่านการตั้งค่า printer จาก localStorage (ของเครื่องนี้) */
+export function getLocalPrinterSettings(): LocalPrinterSettings {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch { /* ignore */ }
+  return { receipt: "", report: "", card: "" };
+}
+
+/** บันทึกการตั้งค่า printer ลง localStorage (ของเครื่องนี้) */
+export function saveLocalPrinterSettings(settings: LocalPrinterSettings): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  } catch { /* ignore */ }
+}
+
+/** อัปเดตเพียง 1 ประเภท */
+export function updateLocalPrinterSetting(docType: PrintDocType, printerName: string): void {
+  const current = getLocalPrinterSettings();
+  current[docType] = printerName;
+  saveLocalPrinterSettings(current);
+}
+
+/** ดึงชื่อเครื่องปัจจุบัน (สุ่ม ID ครั้งเดียว เก็บใน localStorage) */
+export function getWorkstationId(): string {
+  const KEY = "workstation-id";
+  try {
+    let id = localStorage.getItem(KEY);
+    if (!id) {
+      id = `WS-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+      localStorage.setItem(KEY, id);
+    }
+    return id;
+  } catch {
+    return "WS-UNKNOWN";
+  }
+}
 
 type PrintResult = {
   ok: boolean;
@@ -28,7 +71,6 @@ export async function printViaHelper(
   htmlContent: string,
 ): Promise<PrintResult> {
   if (!printerName) {
-    // ไม่ได้เลือก printer → ใช้ browser print dialog
     window.print();
     return {
       ok: true,
@@ -50,8 +92,7 @@ export async function printViaHelper(
       message: data.message ?? "ส่งงานพิมพ์แล้ว",
       usedFallback: false,
     };
-  } catch (err) {
-    // Helper ไม่ทำงาน → fallback window.print()
+  } catch {
     window.print();
     return {
       ok: true,
@@ -62,14 +103,10 @@ export async function printViaHelper(
 }
 
 /**
- * เลือกชื่อ printer ตามประเภทเอกสาร
+ * เลือกชื่อ printer ตามประเภทเอกสาร (จาก localStorage ของเครื่องนี้)
  */
-export function getPrinterName(settings: PrintSettings, docType: PrintDocType): string {
-  switch (docType) {
-    case "receipt": return settings.receiptPrinterName;
-    case "report": return settings.reportPrinterName;
-    case "card": return settings.cardPrinterName;
-  }
+export function getPrinterName(docType: PrintDocType): string {
+  return getLocalPrinterSettings()[docType];
 }
 
 /**

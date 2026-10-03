@@ -162,7 +162,6 @@ export function MemberCardModal({
 }) {
   const [busy, setBusy] = useState(false);
   const { brandName, brandLogo } = useBrand();
-  const settingsQuery = trpc.settings.get.useQuery(undefined);
   const qrDataUrl = useQrDataUrl(member.memberNumber);
   const displayName = [member.prename?.trim() || "", member.firstName, member.lastName].filter(Boolean).join(" ");
   const suspended = member.status === "suspended";
@@ -191,16 +190,8 @@ export function MemberCardModal({
     } finally { setBusy(false); }
   };
   const printCard = async () => {
-    // Task A3 — สั่งพิมพ์ผ่าน Helper ไปยัง card printer ที่เลือกใน Settings
-    const settings = settingsQuery.data;
-    const printerName = getPrinterName(
-      {
-        receiptPrinterName: settings?.receiptPrinterName ?? "",
-        reportPrinterName: settings?.reportPrinterName ?? "",
-        cardPrinterName: settings?.cardPrinterName ?? "",
-      },
-      "card"
-    );
+    // Task A3 — สั่งพิมพ์ผ่าน Helper ไปยัง card printer ที่เลือกใน Settings (localStorage)
+    const printerName = getPrinterName("card");
     const cardHtml = document.getElementById("member-card")?.outerHTML ?? "";
     const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
 @page { size: 90mm 55mm; margin: 0; }

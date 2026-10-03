@@ -110,7 +110,8 @@ import { HelpDisclosure } from "@/components/HelpDisclosure";
 import { isValidPromptPayId } from "@/promptpay";
 import { PrintPreviewModal } from "@/components/PrintPreviewModal";
 import { BankAccountsPanel } from "@/components/BankAccountsPanel";
-import { PrinterPicker } from "@/components/PrinterPicker";
+import { PrinterPicker, PrinterHelperStatus } from "@/components/PrinterPicker";
+import { getLocalPrinterSettings, updateLocalPrinterSetting, getWorkstationId } from "@/lib/printHelper";
 import { trpc } from "@/lib/trpc";
 // V2-B — SettingsTab shared between Settings (this file) and AppShell (layouts/).
 import { SettingsTab } from "../shared";
@@ -578,6 +579,36 @@ const GO_LIVE_CHECKLIST: {
     action: "roles",
   },
 ];
+
+/** LocalPrinterSettings — 3 แถว dropdown + ปุ่มพิมพ์ทดสอบ บันทึก localStorage */
+function LocalPrinterSettings() {
+  const [settings, setSettings] = useState(() => getLocalPrinterSettings());
+  const docs: { type: "receipt" | "report" | "card"; label: string; hint: string }[] = [
+    { type: "receipt", label: "ใบเสร็จ", hint: "พิมพ์ใบเสร็จจากหน้า POS" },
+    { type: "report", label: "รายงาน", hint: "พิมพ์รายงาน A4" },
+    { type: "card", label: "บัตรสมาชิก", hint: "พิมพ์บัตรสมาชิก 90×55 มม." },
+  ];
+  return (
+    <div className="printer-settings-list">
+      {docs.map((doc) => (
+        <div key={doc.type} className="printer-doc-row">
+          <div className="printer-doc-label">
+            <b>{doc.label}</b>
+            <small>{doc.hint}</small>
+          </div>
+          <PrinterPicker
+            docType={doc.type}
+            value={settings[doc.type]}
+            onChange={(name) => {
+              updateLocalPrinterSetting(doc.type, name);
+              setSettings(getLocalPrinterSettings());
+            }}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export function Settings({
   setView,
@@ -2103,31 +2134,16 @@ export function Settings({
                 <div className="settings-heading">
                   <div>
                     <h2>เครื่องพิมพ์หน้าร้าน</h2>
-                    <p>เลือกเครื่องพิมพ์และโหมดพรีวิวสำหรับแต่ละประเภทเอกสาร</p>
+                    <p>เลือกเครื่องพิมพ์จริงจาก Windows — บันทึกแยกตามเครื่อง</p>
                   </div>
                   <Printer size={20} className="muted-icon" />
                 </div>
-                {/* FIX-18 (user) — 3 แถว หัวข้อละแถว: ใบเสร็จ / รายงาน / บัตรสมาชิก
-                    แต่ละแถวมี: ชื่อเอกสาร + dropdown เลือกเครื่องพิมพ์ + toggle พรีวิว */}
-                <div className="printer-row-simple">
-                  <b>ใบเสร็จ</b>
-                  <PrinterPicker docType="receipt" value={form?.receiptPrinterName ?? ""} onChange={next => updateForm({ receiptPrinterName: next })} disabled={!form} />
-                  <button type="button" className={`toggle ${form?.receiptPreviewBefore !== false ? "on" : ""}`} onClick={() => updateForm({ receiptPreviewBefore: !(form?.receiptPreviewBefore !== false) })} disabled={!form} aria-label="พรีวิวก่อนพิมพ์ใบเสร็จ"><span /></button>
+                {/* สถานะ Helper แสดงครั้งเดียวด้านบน */}
+                <PrinterHelperStatus />
+                <div className="printer-workstation-note">
+                  <small>💻 คอมพิวเตอร์เครื่องนี้: <b>{getWorkstationId()}</b> — การตั้งค่านี้ใช้กับเครื่องนี้เท่านั้น</small>
                 </div>
-                <div className="printer-row-simple">
-                  <b>รายงาน</b>
-                  <PrinterPicker docType="report" value={form?.reportPrinterName ?? ""} onChange={next => updateForm({ reportPrinterName: next })} disabled={!form} />
-                  <button type="button" className={`toggle ${form?.reportPreviewBefore !== false ? "on" : ""}`} onClick={() => updateForm({ reportPreviewBefore: !(form?.reportPreviewBefore !== false) })} disabled={!form} aria-label="พรีวิวก่อนพิมพ์รายงาน"><span /></button>
-                </div>
-                <div className="printer-row-simple">
-                  <b>บัตรสมาชิก</b>
-                  <PrinterPicker docType="card" value={form?.cardPrinterName ?? ""} onChange={next => updateForm({ cardPrinterName: next })} disabled={!form} />
-                  <button type="button" className={`toggle ${form?.cardPreviewBefore !== false ? "on" : ""}`} onClick={() => updateForm({ cardPreviewBefore: !(form?.cardPreviewBefore !== false) })} disabled={!form} aria-label="พรีวิวก่อนพิมพ์บัตรสมาชิก"><span /></button>
-                </div>
-                <div className="printer-test-row">
-                  <div><b>ทดสอบการพิมพ์</b><small>เช็คกระดาษ/หมึกก่อนเปิดร้าน</small></div>
-                  <button type="button" className="outline-button" onClick={testPrintReceipt}><Printer size={16} /> พิมพ์ทดสอบ</button>
-                </div>
+                <LocalPrinterSettings />
               </section>
 
             </>
