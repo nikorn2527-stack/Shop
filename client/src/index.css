@@ -4548,6 +4548,26 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .export-preview-table th.num, .export-preview-table td.num { text-align: right; }
 .export-preview-table th.rownum, .export-preview-table td.rownum { width: 36px; text-align: right; font-size: 9.5px; color: #9aa294; background: #f6f8f4; }
 .export-preview-table tfoot td { position: sticky; bottom: 0; background: #ffffff; font-weight: 800; border-top: 3.5px double #111111; border-bottom: 2.5px solid #111111; color: #111111; }
+/* P1-UX-04 — แท็บสลับมุมมองระหว่าง "เอกสาร A4" (PDF/Print) กับ "ข้อมูล" (CSV/Excel) */
+.export-preview-tabs { display: flex; gap: 6px; margin-bottom: 10px; padding: 4px; background: #f3f5f1; border: 1px solid var(--line); border-radius: 11px; }
+.preview-tab { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; color: #6a7263; font-size: 11.5px; font-weight: 600; padding: 7px 14px; border-radius: 8px; cursor: pointer; transition: .15s ease; }
+.preview-tab:hover { color: #2e463e; background: #fff; }
+.preview-tab.active { background: #fff; color: var(--teal); box-shadow: 0 1px 3px rgba(35, 62, 52, .1); }
+.preview-tab svg { flex: 0 0 auto; }
+/* P1-UX-04 — A4 document preview: iframe ที่ render buildReportDocumentHtml (template
+   เดียวกับ server PDF + client print) scale ลงให้พอดี modal 940px
+   A4 = 794×1123px @96dpi → scale 0.82 = 651×921px (พอดี modal 940 - padding) */
+.export-doc-preview { display: flex; flex-direction: column; align-items: center; gap: 8px; max-height: min(58vh, 620px); overflow: auto; background: #ededeb; border: 1px solid var(--line); border-radius: 11px; padding: 18px 12px 10px; }
+.export-doc-scaler { width: 651px; height: 921px; flex: 0 0 auto; position: relative; box-shadow: 0 8px 24px rgba(35, 62, 52, .16); border-radius: 3px; overflow: hidden; background: #fff; }
+.export-doc-iframe { position: absolute; top: 0; left: 0; width: 794px; height: 1123px; border: 0; background: #fff; transform: scale(0.82); transform-origin: top left; }
+.export-doc-hint { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 10.5px; color: #6a7263; text-align: center; line-height: 1.5; }
+.export-doc-hint svg { color: var(--teal); flex: 0 0 auto; }
+@media (max-width: 720px) {
+  /* จอแคบ: scale ลงอีก + scroll แนวนอน */
+  .export-doc-scaler { width: 437px; height: 618px; }
+  .export-doc-iframe { transform: scale(0.55); }
+  .export-doc-preview { align-items: flex-start; }
+}
 .export-preview-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; }
 .preview-format-list { display: flex; flex-wrap: wrap; gap: 8px; }
 .preview-format-btn { position: relative; display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 7px 12px; color: #4c554b; transition: .15s ease; text-align: left; }
