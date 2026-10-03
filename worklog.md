@@ -2618,3 +2618,42 @@ PDF 90×55มม. (finished size) เพียงพอสำหรับดี�
 | P1-UX-05 POS state banner | f4c9135 |
 
 ระบบเอกสาร + บัตร + POS ครบตาม UX report ของ owner ทั้ง P0 และ P1
+
+---
+Task ID: UX-direct-export (5 buttons)
+Agent: main (user สั่ง ปุ่มชุดแรกทำตรงๆ ไม่ต้องเข้า modal อีกชั้น)
+Task: ปุ่ม export บนหน้ารายงานทำตรงๆ ตามชื่อ + เพิ่มดูพรีวิว (5 ปุ่ม)
+
+## ปัญหา (owner)
+"พอเราเลือกกดก็จะเข้าไปหน้าพรีวิว ที่มีปุ่ม 4 ปุ่มคือเพิ่มพิมพ์เข้ามา ทั้งที่มัน
+ควรจะสั่งได้จากชุดแรกได้เลย แทนที่จะต้องเข้าไปอีกชั้น"
+ก่อนหน้านี้: กด CSV/Excel/PDF → เปิด ExportPreviewModal (4 ปุ่ม) → กดอีกที → ส่งออก = 2 ชั้น
+
+## Work Log
+ไฟล์แก้ (2): `client/src/pages/reports/Reports.tsx` + `client/src/index.css`
+
+1. สกัด `executeExport(state, format)` ออกจาก onRun — ใช้ได้ทั้งจาก modal และปุ่มตรง
+2. 5 ฟังก์ชัน open*ExportPreview (sales/bills/tx/balances/stockBalance):
+   - เพิ่มพารามิเตอร์ `preferred?, direct = false`
+   - ทำให้เป็น async (เพราะ executeExport เป็น async)
+   - direct=true + preferred → executeExport ตรงๆ ไม่เปิด modal
+   - ไม่มี args → เปิด modal (สำหรับดูพรีวิว)
+3. 5 การ์ดรายงาน → ครบ 5 ปุ่ม: CSV | Excel | PDF | พิมพ์ | ดูพรีวิว
+   - 4 ปุ่มแรก direct (ทำตรงๆ ตามชื่อ)
+   - ดูพรีวิว → เปิด modal (ตรวจเอกสาร A4 + ตารางก่อน)
+   - sales/bills/tx เดิม 3 ปุ่ม → +พิมพ์ +ดูพรีวิว
+   - stockBalance/balances เดิม 4 ปุ่ม → +ดูพรีวิว
+4. CSS: `.preview-btn` เด่น teal + flex-wrap สำหรับ 5 ปุ่มในจอแคบ
+5. เพิ่ม import Eye icon
+
+## Verification
+- tsc: 0 errors
+- agent-browser: รายงาน → sales card ครบ 5 ปุ่ม →
+  - คลิก CSV → ดาวน์โหลดตรงๆ ไม่เปิด modal ✓
+  - คลิก ดูพรีวิว → เปิด modal (แท็บ เอกสาร A4 + ข้อมูล 7 แถว) ✓
+  - ไม่มี console/page error
+
+## Stage Summary
+- ไฟล์ (2): Reports.tsx (+161/-78) + index.css (+4)
+- commit: 76eb282 (push main-v2)
+- ตอบโจทย์ owner: ปุ่มทำตรงๆ ตามชื่อ ไม่ต้องเข้า modal หลายชั้น
