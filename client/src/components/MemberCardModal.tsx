@@ -118,9 +118,10 @@ export function MemberCardArt({
           <small><QrIcon size={12} /> คิวอาร์โค้ด</small>
         </div>
       </div>
+      {/* P0-UX-02 (owner rule) — ห้ามพิมพ์ยอดคงเหลือติดบัตรถาวร เพราะยอดเปลี่ยนทุกครั้งที่ซื้อ/เติม/ถอน
+          และทำให้สมาชิกเข้าใจผิด ยอดคงเหลือแสดงเฉพาะในหน้าจอ POS/บัตร modal ไม่พิมพ์บนบัตร */}
       <div className="member-card-foot">
         <small>ยื่นบัตรนี้ให้สแกน หรือแจ้งหมายเลขสมาชิก ที่เคาน์เตอร์เพื่อใช้ยอดเงินสวัสดิการ</small>
-        <small>ยอดคงเหลือ <b>{money(member.balance)}</b>{footnoteAtScan ? " ณ ตอนสแกนบัตร" : " ณ วันออกบัตร"}</small>
       </div>
     </div>
   );
@@ -166,8 +167,10 @@ export function MemberCardModal({
   const displayName = [member.prename?.trim() || "", member.firstName, member.lastName].filter(Boolean).join(" ");
   const suspended = member.status === "suspended";
 
-  // P0-3 — ดาวน์โหลดบัตรเป็นไฟล์ PDF จริง (jsPDF + html2canvas)
-  // ใช้หน้ากระดาษ 90×55 มม. (มาตรฐานนามบัตรไทย) สร้าง PDF โดยตรง ไม่เปิด print dialog
+  // P0-UX-02 — ดาวน์โหลดบัตรเป็น PDF print-ready 90×55 มม. (มาตรฐานนามบัตรไทย)
+  // PDF สำหรับส่งร้านพิมพ์: พื้นหลังขาวสะอาด (ไม่มี #f9fbfa tint ของ UI ติดไป) +
+  // PNG lossless (ตัด artifacts ของ JPEG บนตัวอักษร/บาร์โค้ด/QR) + scale 4 (≈406 DPI
+  // เกินมาตรฐานร้านพิมพ์ 300 DPI) เพื่อให้คมเมื่อ zoom 200% และสแกนได้หลังพิมพ์จริง
   const downloadCard = async () => {
     const element = document.getElementById("member-card-capture");
     if (!element) return;
@@ -176,7 +179,7 @@ export function MemberCardModal({
       if (document.fonts?.ready) await document.fonts.ready;
       const canvas = await html2canvas(element, {
         scale: 4,
-        backgroundColor: "#f9fbfa",
+        backgroundColor: "#ffffff",
         useCORS: true,
         logging: false,
       });
@@ -185,7 +188,7 @@ export function MemberCardModal({
         unit: "mm",
         format: [90, 55],
       });
-      pdf.addImage(canvas.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, 90, 55);
+      pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, 90, 55);
       pdf.save(`card-${member.memberNumber}.pdf`);
     } finally { setBusy(false); }
   };
@@ -230,11 +233,21 @@ ${document.querySelector('style')?.textContent ?? ""}
         <span>{confirmHint ?? (suspended
           ? "บัตรใบนี้ถูกระงับการใช้จ่าย — ตรวจสอบกับสมาชิกและผู้บริหารก่อน หากยืนยันจะยังชำระด้วยเงินสด/QR ได้แต่หักบัญชีไม่ได้"
           : "ตรวจสอบว่าเป็นสมาชิกที่ถูกต้องแล้วกดยืนยัน — ยอดในบัญชียังไม่ถูกหักจนกว่าจะกดชำระเงินท้ายบิล")}{member.creditLimit != null ? <> · วงเงินซื้อ/วัน {money(member.creditLimit)}</> : null}</span>
+        <b className="verify-balance-chip">{money(member.balance)}<small>ยอดคงเหลือ ณ ตอนสแกน</small></b>
       </div>
     )}
     <div className="member-card-stage">
       <MemberCardArt member={member} brandName={brandName} brandLogo={brandLogo} qrDataUrl={qrDataUrl} id="member-card" footnoteAtScan={confirmForBill} />
     </div>
+    {/* P0-UX-02 (owner rule) — ยอดคงเหลือไม่พิมพ์บนบัตร แต่พนักงานยังเห็นใน modal
+        เพื่อยืนยันกับลูกค้าก่อนออกบัตร (โหมดยืนยันแสดงใน verify-strip แทน) */}
+    {!confirmForBill && (
+      <div className={`member-card-balance-bar${suspended ? " suspended" : ""}`}>
+        <span className="balance-label">ยอดคงเหลือ ณ วันออกบัตร</span>
+        <b className="balance-amount">{money(member.balance)}</b>
+        <span className={`balance-status ${member.status === "active" ? "ok" : "suspended"}`}>{member.status === "active" ? "ใช้จ่ายได้ปกติ" : "ระงับการใช้จ่าย"}</span>
+      </div>
+    )}
     {/* P0-3 — hidden capture host สำหรับสร้าง PDF (ใช้ html2canvas จับภาพ 90×55 มม.) */}
     {!confirmForBill && (
       <div className="member-card-capture-host" aria-hidden="true">

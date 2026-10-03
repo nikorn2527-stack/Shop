@@ -959,9 +959,26 @@ tr.locked-row .user-avatar { background: #f6ecd4; color: #a97f2e; }
 .member-card-meta { display: flex; justify-content: space-between; gap: 8px; margin-top: 5px; font-size: 9px; color: #666b57; }
 .member-card-meta .ok { color: #4b9d7f; font-weight: 600; }
 .member-card-meta .suspended { color: #c26568; font-weight: 600; }
-.member-card-foot { border-top: 1px dashed #cfe4db; padding-top: 6px; display: flex; justify-content: space-between; gap: 10px; }
+/* P0-UX-02 — foot เหลือบรรทัดเดียว (คำแนะนำ) หลังลบยอดคงเหลือออกจากบัตร
+   (owner rule: ห้ามพิมพ์ยอดคงเหลือติดบัตรถาวร เพราะยอดเปลี่ยนทุกครั้งที่ซื้อ/เติม/ถอน) */
+.member-card-foot { border-top: 1px dashed #cfe4db; padding-top: 6px; display: flex; justify-content: flex-start; gap: 10px; }
 .member-card-foot small { font-size: 7.3px; color: #71775d; line-height: 1.5; }
 .member-card-foot b { color: #3d8c71; font-variant-numeric: tabular-nums; }
+/* P0-UX-02 — balance bar ใน modal (นอกบัตร) ให้พนักงานเห็นยอดก่อนออกบัตร
+   ไม่พิมพ์บนบัตร แต่แสดงในหน้าจอเท่านั้น */
+.member-card-balance-bar { display: flex; align-items: center; gap: 10px; margin-top: 10px; padding: 9px 13px; background: linear-gradient(90deg, #f1faf6 0%, #eef6f1 100%); border: 1px solid #cfe4db; border-radius: 9px; }
+.member-card-balance-bar .balance-label { font-size: 10.5px; color: #6b7a70; font-weight: 600; letter-spacing: .2px; }
+.member-card-balance-bar .balance-amount { margin-left: auto; font-size: 18px; font-weight: 800; color: #1f4d3c; font-variant-numeric: tabular-nums; letter-spacing: .3px; }
+.member-card-balance-bar .balance-status { font-size: 10.5px; font-weight: 700; padding: 3px 10px; border-radius: 20px; }
+.member-card-balance-bar .balance-status.ok { color: #1c6e54; background: #d6f1e6; border: 1px solid #9fd8c4; }
+.member-card-balance-bar .balance-status.suspended { color: #9d3a3d; background: #fbe1e2; border: 1px solid #e9b4b6; }
+.member-card-balance-bar.suspended { background: linear-gradient(90deg, #fdf0f0 0%, #fbeaea 100%); border-color: #e9b4b6; }
+.member-card-balance-bar.suspended .balance-amount { color: #7a2d30; }
+/* P0-UX-02 — balance chip ใน verify-strip (โหมดยืนยันสแกนบัตร) ให้พนักงานเห็นยอดเด่นชัด
+   ก่อนกดยืนยัน เพราะยอดไม่อยู่บนบัตรอีกต่อไป */
+.member-verify-strip .verify-balance-chip { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 1px; padding: 4px 12px; background: #fff; border: 1px solid #cfe4db; border-radius: 8px; color: #1f4d3c; font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.member-verify-strip .verify-balance-chip small { font-size: 8.5px; font-weight: 600; color: #6b7a70; letter-spacing: .2px; }
+.member-verify-strip.suspended .verify-balance-chip { color: #7a2d30; border-color: #e9b4b6; background: #fff6f6; }
 .member-card-note { display: flex; align-items: flex-start; gap: 7px; margin-top: 12px; color: #7e846d; background: #f4faf7; border: 1px dashed #cfe4db; border-radius: 8px; padding: 9px 11px; font-size: 11px; line-height: 1.55; }
 .member-card-note svg { color: #4b9d7f; flex-shrink: 0; margin-top: 1px; }
 
@@ -984,6 +1001,8 @@ tr.locked-row .user-avatar { background: #f6ecd4; color: #a97f2e; }
   body:has(#member-card) .member-card-note { display: none !important; }
   body:has(#member-card) .member-card-stage { background: none; border: 0; padding: 0; }
   body:has(#member-card) .member-card { width: 90mm; aspect-ratio: auto; height: 55mm; box-shadow: none; border: 1px dashed #aeb49d; border-radius: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  /* P0-UX-02 — ไม่พิมพ์ balance bar (ยอดไม่อยู่บนบัตร) — อยู่ใน modal เท่านั้น */
+  body:has(#member-card) .member-card-balance-bar { display: none !important; }
   body:has(#member-card) .member-card::after { display: none; }
   /* FIX-11a — never print the hidden capture host (download-only) */
   body:has(#member-card) .member-card-capture-host { display: none !important; }
