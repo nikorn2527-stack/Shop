@@ -3891,7 +3891,6 @@ export function Settings({
                 <div className="settings-heading">
                   <div>
                     <h2>ขนาดตัวอักษร</h2>
-                    <p>ปรับขนาดตัวอักษรทั้งระบบให้อ่านง่ายขึ้น · มีผลทันที</p>
                   </div>
                   <Monitor size={20} className="muted-icon" />
                 </div>
@@ -4000,7 +3999,6 @@ export function Settings({
                 <div className="settings-heading">
                   <div>
                     <h2>การแจ้งเตือน</h2>
-                    <p>ช่วยให้เจ้าหน้าที่ติดตามรายการสำคัญได้ทันเวลา</p>
                   </div>
                   <Bell size={20} className="muted-icon" />
                 </div>
@@ -4095,7 +4093,6 @@ export function Settings({
                 <div className="settings-heading">
                   <div>
                     <h2>สิทธิ์และบทบาทผู้ใช้ระบบ</h2>
-                    <p>สิทธิ์ตามที่ระบบบังคับใช้จริงในปัจจุบัน</p>
                   </div>
                   <ShieldCheck size={20} className="muted-icon" />
                 </div>
@@ -4193,7 +4190,6 @@ export function Settings({
                 <div className="settings-heading">
                   <div>
                     <h2>ข้อควรทราบ</h2>
-                    <p>ความปลอดภัยของระบบ</p>
                   </div>
                   <LockKeyhole size={20} className="muted-icon" />
                 </div>
