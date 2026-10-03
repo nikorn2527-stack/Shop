@@ -165,10 +165,11 @@ const deltaChip = (delta: number | null, fallback: string) => (delta === null
   : <em className={delta >= 0 ? "up" : "down"}>{delta >= 0 ? "↑" : "↓"} {Math.abs(delta).toFixed(1)}%</em>);
 
 type ChartPoint = { label: string; date: string; revenue: number; deposit: number };
-type DashTab = "sales" | "best" | "watch" | "activity" | "cutoff";
+type DashTab = "sales" | "bills" | "best" | "watch" | "activity" | "cutoff";
 
 const DASH_TABS: { id: DashTab; label: string }[] = [
   { id: "sales", label: "ยอดขาย" },
+  { id: "bills", label: "บิลล่าสุด" },
   { id: "best", label: "สินค้าขายดี" },
   { id: "watch", label: "ต้องติดตาม" },
   { id: "activity", label: "กิจกรรมล่าสุด" },
@@ -417,16 +418,15 @@ export function Dashboard({ setView, role, userName }: { setView: (view: View) =
         <div className="metric-card"><div className="metric-top"><span>สินค้าขายดี</span><span className="metric-icon amber"><BarChart3 size={18} /></span></div><strong>{loading ? "…" : (stats?.bestSellerCount ?? 0).toLocaleString("th-TH")} <small>ชิ้น</small></strong><div className="metric-foot warning"><span>{bestSellers[0]?.name ?? "ยังไม่มีข้อมูลการขาย"}</span><span>อันดับ 1 ในช่วง{range}</span></div></div>
         <div className="metric-card"><div className="metric-top"><span>ยอดขายเฉลี่ยต่อวัน</span><span className="metric-icon purple"><CalendarDays size={18} /></span></div><strong>{loading ? "…" : money(stats?.avgDailySales ?? 0)}</strong><div className="metric-foot"><span>ขายไป {stats?.itemsSold ?? 0} ชิ้น</span><span>ในช่วง{range}</span></div></div>
       </div>
-      {/* FEAT-6 — Recent bills widget: 5 latest bills + summary + jump-to-reports CTA */}
-      <RecentBillsWidget setView={setView} range={range} />
       <section className="dash-workbench" aria-label="มุมมองข้อมูลภาพรวม">
         <div className="dash-tabbar" role="tablist" aria-label="เลือกมุมมองข้อมูล">
-          {DASH_TABS.map((item) => <button type="button" role="tab" aria-selected={tab === item.id} className={`dash-tab${tab === item.id ? " active" : ""}`} key={item.id} onClick={() => setTab(item.id)}>{item.id === "sales" ? <BarChart3 size={15} /> : item.id === "best" ? <Crown size={15} /> : item.id === "watch" ? <PackageSearch size={15} /> : item.id === "activity" ? <Activity size={15} /> : <CalendarClock size={15} />}{item.label}{item.id === "watch" && lowStock.length > 0 && <i className="tab-badge red" title={`สินค้าใกล้หมดสต็อก ${lowStock.length} รายการ`}>{lowStock.length}</i>}{item.id === "watch" && expirySoon.length > 0 && <i className="tab-badge amber" title={`ใกล้หมดอายุ ${expirySoon.length} รายการ`}>{expirySoon.length}</i>}</button>)}
+          {DASH_TABS.map((item) => <button type="button" role="tab" aria-selected={tab === item.id} className={`dash-tab${tab === item.id ? " active" : ""}`} key={item.id} onClick={() => setTab(item.id)}>{item.id === "sales" ? <BarChart3 size={15} /> : item.id === "bills" ? <ReceiptText size={15} /> : item.id === "best" ? <Crown size={15} /> : item.id === "watch" ? <PackageSearch size={15} /> : item.id === "activity" ? <Activity size={15} /> : <CalendarClock size={15} />}{item.label}{item.id === "watch" && lowStock.length > 0 && <i className="tab-badge red" title={`สินค้าใกล้หมดสต็อก ${lowStock.length} รายการ`}>{lowStock.length}</i>}{item.id === "watch" && expirySoon.length > 0 && <i className="tab-badge amber" title={`ใกล้หมดอายุ ${expirySoon.length} รายการ`}>{expirySoon.length}</i>}</button>)}
           <span className="dash-tabbar-spacer" aria-hidden="true" />
         </div>
         <div className="dash-tab-body" role="tabpanel">
           {/* Round 34 — กราฟยอดขายออกแบบใหม่: เส้นเดียวอ่านง่าย + คำอธิบายครบ (จุด/ป้ายค่า/
               เส้นเฉลี่ย/แถบสุดสัปดาห์/ป้ายวันนี้ยังไม่ครบวัน/การ์ดสรุปจุดที่เลือก) */}
+          {tab === "bills" && <RecentBillsWidget setView={setView} range={range} />}
           {tab === "sales" && <section className="panel chart-panel interactive-chart-panel">
             <div className="panel-heading">
               <div>
