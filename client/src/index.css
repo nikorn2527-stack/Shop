@@ -1097,6 +1097,70 @@ tr.locked-row .user-avatar { background: #f6ecd4; color: #a97f2e; }
 .print-preview-paper .member-card-batch-item { padding: 0; }
 .print-preview-paper .member-card-batch-item .member-card { width: 360px; max-width: 100%; }
 
+/* ═══ P0-UX-02 part 2 — A4 sheet print profile system ═══ */
+/* mode toggle: บัตรเดี่ยวต่อหน้า vs หลายบัตรต่อแผ่น A4 */
+.batch-mode-tabs { display: flex; gap: 5px; padding: 4px; background: #f3f5f1; border: 1px solid var(--line); border-radius: 10px; margin: 10px 0 6px; }
+.batch-mode-tab { display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; color: #6a7263; font-size: 11px; font-weight: 600; padding: 7px 13px; border-radius: 7px; cursor: pointer; transition: .15s ease; }
+.batch-mode-tab:hover { color: #2e463e; background: #fff; }
+.batch-mode-tab.active { background: #fff; color: var(--teal); box-shadow: 0 1px 3px rgba(35, 62, 52, .1); }
+/* profile editor: cols/rows/margins/gaps/offset */
+.sheet-profile-editor { background: #f8faf8; border: 1px solid var(--line); border-radius: 10px; padding: 12px 13px; margin-top: 8px; }
+.sheet-field { display: flex; flex-direction: column; gap: 3px; font-size: 10px; color: #7a7e6e; }
+.sheet-field span { font-weight: 600; }
+.sheet-field input, .sheet-field select { height: 30px; border: 1px solid #dde4e0; border-radius: 6px; padding: 0 7px; font-size: 11px; color: #4c554b; background: #fff; outline: none; }
+.sheet-field input:focus, .sheet-field select:focus { border-color: #9bcdba; box-shadow: 0 0 0 3px #eaf6f1; }
+.sheet-field input:disabled { background: #eef1ed; color: #9aa094; }
+.sheet-field-row { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; margin-top: 9px; }
+.sheet-calib-row { display: flex; align-items: flex-end; gap: 10px; margin-top: 10px; padding-top: 10px; border-top: 1px dashed #dfe6e1; }
+.sheet-calib-row .calib-label { font-size: 10px; font-weight: 700; color: #b8863d; white-space: nowrap; padding-bottom: 7px; }
+.sheet-calib-row .sheet-field { width: 110px; }
+.sheet-capacity { margin: 9px 0 0; font-size: 11px; color: #3d8c71; font-weight: 600; }
+/* on-screen sheet preview (scaled A4 — 210×297mm × scale 0.32 = 254×359px) */
+.sheet-preview-wrap { max-height: 420px; overflow: auto; background: #ededeb; border: 1px solid var(--line); border-radius: 11px; padding: 16px; margin-top: 10px; display: flex; justify-content: center; }
+.sheet-preview-scaler { width: 254px; height: 359px; flex: 0 0 auto; position: relative; overflow: hidden; }
+.card-sheet-a4 { width: 210mm; height: 297mm; position: relative; background: #fff; }
+.card-sheet-a4.preview { transform: scale(0.32); transform-origin: top left; box-shadow: 0 6px 18px rgba(35, 62, 52, .16); border-radius: 3px; }
+/* slot positioning (absolute) + empty/test states */
+.card-slot { position: absolute; overflow: hidden; background: #fff; }
+.card-sheet-a4.preview .card-slot { outline: 1px dashed #c8b48a; }
+.card-sheet-a4.preview .slot-empty { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; font-size: 8px; color: #b0a890; background: repeating-linear-gradient(-45deg, #f6f4ee 0 4px, #f0ede4 4px 8px); }
+.slot-test-box { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; border: 1px dashed #aeb49d; background: #fff; color: #888; font-size: 9px; }
+/* hidden print host — เห็นเฉพาะตอน @media print */
+.card-sheet-print-host { position: fixed; left: -10000px; top: 0; opacity: 1; pointer-events: none; }
+@media print {
+  body:has(.card-sheet-print-host) .sidebar,
+  body:has(.card-sheet-print-host) .topbar,
+  body:has(.card-sheet-print-host) .app-footer,
+  body:has(.card-sheet-print-host) .page-content > *:not(.modal-backdrop) { display: none !important; }
+  body:has(.card-sheet-print-host) .app-shell { display: block; min-height: 0; }
+  body:has(.card-sheet-print-host) .main-shell { min-width: 0; }
+  body:has(.card-sheet-print-host) .page-content { max-width: none; margin: 0; padding: 0; animation: none; }
+  body:has(.card-sheet-print-host) .modal-backdrop { position: static; display: block; padding: 0; background: none; backdrop-filter: none; animation: none; }
+  body:has(.card-sheet-print-host) { min-height: 0 !important; height: auto !important; }
+  body:has(.card-sheet-print-host) .member-card-modal { width: auto; border: 0; border-radius: 0; box-shadow: none; padding: 0; background: #fff; }
+  body:has(.card-sheet-print-host) .modal-heading,
+  body:has(.card-sheet-print-host) .modal-actions,
+  body:has(.card-sheet-print-host) .member-card-note,
+  body:has(.card-sheet-print-host) .batch-mode-tabs,
+  body:has(.card-sheet-print-host) .sheet-profile-editor,
+  body:has(.card-sheet-print-host) .sheet-preview-wrap,
+  body:has(.card-sheet-print-host) .member-card-batch-grid { display: none !important; }
+  body:has(.card-sheet-print-host) .card-sheet-print-host { display: block !important; position: static; left: auto; opacity: 1; }
+  body:has(.card-sheet-print-host) .card-sheet-a4 { width: 210mm; height: 297mm; page-break-after: always; }
+  body:has(.card-sheet-print-host) .card-sheet-a4:last-child { page-break-after: auto; }
+  body:has(.card-sheet-print-host) .card-slot { overflow: hidden; }
+  body:has(.card-sheet-print-host) .member-card { width: 100% !important; height: 100% !important; max-width: none !important; aspect-ratio: auto !important; border: 0 !important; border-radius: 0 !important; box-shadow: none !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body:has(.card-sheet-print-host) .member-card::after { display: none; }
+  body:has(.card-sheet-print-host) .slot-empty { display: none; }
+  @page { size: A4 portrait; margin: 0; }
+}
+@media (max-width: 720px) {
+  .sheet-field-row { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .sheet-calib-row { flex-wrap: wrap; }
+  .sheet-preview-scaler { width: 168px; height: 238px; }
+  .card-sheet-a4.preview { transform: scale(0.25); }
+}
+
 /* FIX-4 issue 4 — Batch-print checkbox column + sticky action bar.
    The checkbox column is in the entity-table; the action bar sticks to
    the bottom of the table-panel so it stays visible while the user scrolls. */

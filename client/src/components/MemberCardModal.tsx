@@ -1,14 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import QRCode from "qrcode";
-import { Barcode, CreditCard, FileImage, Printer, QrCode as QrIcon, ScanLine, ShieldAlert, UserCheck, X } from "@/lib/icons";
+import { Barcode, CreditCard, FileImage, LayoutGrid, Printer, QrCode as QrIcon, ScanLine, ShieldAlert, UserCheck, X } from "@/lib/icons";
 import { money } from "../pages/pageData";
 import { code128DataUrl } from "../barcode";
 import { MemberAvatar } from "./MemberAvatar";
 import { trpc } from "@/lib/trpc";
 import { brandInitial } from "@/theme";
 import { printViaHelper, getPrinterName } from "@/lib/printHelper";
+import { BUILT_IN_PROFILES, loadCardSheetProfile, saveCardSheetProfile, slotPositions, slotsPerSheet, type CardSheetProfile } from "@shared/cardSheet";
 
 /** Fields the wallet card actually renders (subset of the member record). */
 export type MemberCardData = {
@@ -285,12 +286,12 @@ ${document.querySelector('style')?.textContent ?? ""}
 }
 
 /**
- * FIX-4 issue 4 — Batch print modal: shows multiple member cards in a grid
- * and prints them all at Thai business card size (90 × 55 mm) on one print job.
- *
- * Each card is wrapped in `.member-card-batch-item` so the @media print rule
- * can apply page-break-after. The wrapper element has id="member-card-batch"
- * so the print CSS (body:has(#member-card-batch)) hides everything else.
+ * FIX-4 issue 4 + P0-UX-02 part 2 — Batch print modal: พิมพ์บัตรสมาชิกหลายใบ
+ * 2 โหมด:
+ *  1. บัตรเดี่ยวต่อหน้า (เดิม) — 90×55มม. ต่อหน้า ใช้ window.print() + @media print
+ *  2. หลายบัตรต่อแผ่น A4 (ใหม่) — เลือก profile (8/10-up หรือ custom) + X/Y calibration
+ *     + "พิมพ์แผ่นทดสอบ" (กล่องโครงร่าง เพื่อตรวจแนวก่อนใช้กระดาษจริง)
+ * แต่ละ profile เก็บใน localStorage เพราะ calibration ขึ้นกับเครื่องพิมพ์แต่ละเครื่อง
  */
 export function MemberCardBatchModal({
   members,
@@ -301,8 +302,6 @@ export function MemberCardBatchModal({
 }) {
   const { brandName, brandLogo } = useBrand();
   const qrByMember = new Map<string, string>();
-  // One QR per member number — pre-resolve so all cards render synchronously.
-  // (We can't call hooks in a loop, so we use the data-URL promise directly.)
   const [qrMap, setQrMap] = useState<Map<string, string>>(qrByMember);
   useEffect(() => {
     let alive = true;
@@ -312,6 +311,28 @@ export function MemberCardBatchModal({
       .catch(() => { if (alive) setQrMap(new Map()); });
     return () => { alive = false; };
   }, [members]);
+
+  // P0-UX-02 part 2 — A4 sheet mode
+  const [sheetMode, setSheetMode] = useState(false);
+  const [profile, setProfile] = useState<CardSheetProfile>(() => loadCardSheetProfile());
+  const [testPrint, setTestPrint] = useState(false);
+  const positions = useMemo(() => slotPositions(profile), [profile]);
+  const capacity = slotsPerSheet(profile);
+  const sheetCount = Math.max(1, Math.ceil(members.length / capacity));
+  const updateProfile = (patch: Partial<CardSheetProfile>) => {
+    setProfile((prev) => { const next = { ...prev, ...patch }; saveCardSheetProfile(next); return next; });
+  };
+  const pickProfileId = (id: string) => {
+    const found = BUILT_IN_PROFILES.find((p) => p.id === id);
+    if (found) { const next = { ...found, offsetXMm: profile.offsetXMm, offsetYMm: profile.offsetYMm }; saveCardSheetProfile(next); setProfile(next); }
+  };
+  // แบ่งสมาชิกเป็นกลุ่มตาม capacity แต่ละแผ่น
+  const sheets = useMemo(() => {
+    const out: MemberCardData[][] = [];
+    for (let i = 0; i < members.length; i += capacity) out.push(members.slice(i, i + capacity));
+    return out.length === 0 ? [[]] : out;
+  }, [members, capacity]);
+
   return <div className="modal-backdrop" onClick={onClose}><div className="member-card-modal member-card-batch-modal" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="พิมพ์บัตรสมาชิกหลายคนพร้อมกัน">
     <div className="modal-heading">
       <div>
@@ -321,17 +342,86 @@ export function MemberCardBatchModal({
       </div>
       <button className="icon-button" onClick={onClose} aria-label="ปิดหน้าต่าง"><X size={17} /></button>
     </div>
-    <div className="member-card-batch-grid" id="member-card-batch">
-      {members.map((member) => (
-        <div className="member-card-batch-item" key={member.memberNumber}>
-          <MemberCardArt member={member} brandName={brandName} brandLogo={brandLogo} qrDataUrl={qrMap.get(member.memberNumber) ?? ""} />
-        </div>
-      ))}
+
+    {/* P0-UX-02 part 2 — สลับโหมดพิมพ์ */}
+    <div className="batch-mode-tabs" role="tablist" aria-label="เลือกโหมดพิมพ์">
+      <button type="button" role="tab" aria-selected={!sheetMode} className={`batch-mode-tab${!sheetMode ? " active" : ""}`} onClick={() => setSheetMode(false)}><Printer size={14} /> บัตรเดี่ยวต่อหน้า</button>
+      <button type="button" role="tab" aria-selected={sheetMode} className={`batch-mode-tab${sheetMode ? " active" : ""}`} onClick={() => setSheetMode(true)}><LayoutGrid size={14} /> หลายบัตรต่อแผ่น A4</button>
     </div>
-    <div className="member-card-note"><CreditCard size={15} /> พรีวิวก่อนพิมพ์ทุกใบ — ตรวจชื่อ-รูป-เลขสมาชิกให้ถูกต้องก่อนสั่งพิมพ์จริง · ถ้าพิมพ์ไม่สำเร็จกด "พิมพ์บัตร {members.length} ใบ" ได้ทันที</div>
+
+    {sheetMode ? (
+      <>
+        {/* A4 sheet profile editor */}
+        <div className="sheet-profile-editor">
+          <label className="sheet-field">
+            <span>โปรไฟล์แผ่น</span>
+            <select value={profile.id === "custom" ? "custom" : profile.id} onChange={(e) => pickProfileId(e.target.value)}>
+              {BUILT_IN_PROFILES.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          </label>
+          <div className="sheet-field-row">
+            <label className="sheet-field"><span>คอลัมน์</span><input type="number" min="1" max="6" value={profile.cols} disabled={profile.id !== "custom"} onChange={(e) => updateProfile({ cols: Math.max(1, Number(e.target.value) || 1) })} /></label>
+            <label className="sheet-field"><span>แถว</span><input type="number" min="1" max="8" value={profile.rows} disabled={profile.id !== "custom"} onChange={(e) => updateProfile({ rows: Math.max(1, Number(e.target.value) || 1) })} /></label>
+            <label className="sheet-field"><span>ขอบซ้าย มม.</span><input type="number" step="0.5" value={profile.marginLeftMm} onChange={(e) => updateProfile({ marginLeftMm: Number(e.target.value) || 0 })} /></label>
+            <label className="sheet-field"><span>ขอบบน มม.</span><input type="number" step="0.5" value={profile.marginTopMm} onChange={(e) => updateProfile({ marginTopMm: Number(e.target.value) || 0 })} /></label>
+            <label className="sheet-field"><span>ช่องว่าง X มม.</span><input type="number" step="0.5" value={profile.gapXMm} onChange={(e) => updateProfile({ gapXMm: Number(e.target.value) || 0 })} /></label>
+            <label className="sheet-field"><span>ช่องว่าง Y มม.</span><input type="number" step="0.5" value={profile.gapYMm} onChange={(e) => updateProfile({ gapYMm: Number(e.target.value) || 0 })} /></label>
+          </div>
+          <div className="sheet-calib-row">
+            <span className="calib-label">ปรับแนว (calibration)</span>
+            <label className="sheet-field"><span>Offset X มม.</span><input type="number" step="0.1" value={profile.offsetXMm} onChange={(e) => updateProfile({ offsetXMm: Number(e.target.value) || 0 })} /></label>
+            <label className="sheet-field"><span>Offset Y มม.</span><input type="number" step="0.1" value={profile.offsetYMm} onChange={(e) => updateProfile({ offsetYMm: Number(e.target.value) || 0 })} /></label>
+          </div>
+          <p className="sheet-capacity">ความจุ {capacity} ใบ/แผ่น · {members.length} ใบ → {sheetCount} แผ่น{sheetCount > 1 ? ` (แผ่นละ ${capacity})` : ""}</p>
+        </div>
+
+        <div className="member-card-note"><LayoutGrid size={15} /> พรีวิวการจัดวางบน A4 — ปรับ offset X/Y จนตรงกับกระดาพจริง · กด "พิมพ์แผ่นทดสอบ" ก่อนใช้กระดาษจริง เพื่อตรวจแนวตำแหน่งทุกช่อง</div>
+
+        {/* On-screen sheet preview (scaled) */}
+        <div className="sheet-preview-wrap">
+          <div className="sheet-preview-scaler">
+            <div className="card-sheet-a4 preview" style={{ "--cw": `${profile.cardWmm}mm`, "--ch": `${profile.cardHmm}mm` } as React.CSSProperties}>
+              {positions.map((pos, i) => {
+                const member = sheets[0]?.[i];
+                return <div key={i} className="card-slot" style={{ left: `${pos.left}mm`, top: `${pos.top}mm`, width: `${profile.cardWmm}mm`, height: `${profile.cardHmm}mm` }}>
+                  {member ? <MemberCardArt member={member} brandName={brandName} brandLogo={brandLogo} qrDataUrl={qrMap.get(member.memberNumber) ?? ""} /> : <span className="slot-empty">ว่าง {i + 1}</span>}
+                </div>;
+              })}
+            </div>
+          </div>
+        </div>
+      </>
+    ) : (
+      <div className="member-card-batch-grid" id="member-card-batch">
+        {members.map((member) => (
+          <div className="member-card-batch-item" key={member.memberNumber}>
+            <MemberCardArt member={member} brandName={brandName} brandLogo={brandLogo} qrDataUrl={qrMap.get(member.memberNumber) ?? ""} />
+          </div>
+        ))}
+      </div>
+    )}
     <div className="modal-actions">
       <button className="outline-button" onClick={onClose}>ปิด</button>
-      <button className="primary-button" onClick={() => window.print()}><Printer size={16} /> พิมพ์บัตร {members.length} ใบ</button>
+      {sheetMode && <button className="outline-button amber" onClick={() => { setTestPrint(true); window.setTimeout(() => { window.print(); }, 60); }} title="พิมพ์โครงร่างกล่อง (ไม่มีบัตร) เพื่อตรวจแนวบนกระดาพจริง — วางทาบกับสติกเกอร์/กระดาษปรุแล้วดูว่าตรงทุกช่องไหม"><Printer size={16} /> พิมพ์แผ่นทดสอบ</button>}
+      <button className="primary-button" onClick={() => { setTestPrint(false); window.setTimeout(() => { window.print(); }, 60); }}><Printer size={16} /> {sheetMode ? `พิมพ์ลง A4 (${sheetCount} แผ่น)` : `พิมพ์บัตร ${members.length} ใบ`}</button>
     </div>
+
+    {/* P0-UX-02 part 2 — hidden A4 sheet print host (เห็นเฉพาะตอน @media print) */}
+    {sheetMode && (
+      <div className="card-sheet-print-host" aria-hidden="true">
+        {sheets.map((sheetMembers, sheetIdx) => (
+          <div key={sheetIdx} className="card-sheet-a4" style={{ "--cw": `${profile.cardWmm}mm`, "--ch": `${profile.cardHmm}mm` } as React.CSSProperties}>
+            {positions.map((pos, i) => {
+              const member = sheetMembers[i];
+              return <div key={i} className="card-slot" style={{ left: `${pos.left}mm`, top: `${pos.top}mm`, width: `${profile.cardWmm}mm`, height: `${profile.cardHmm}mm` }}>
+                {testPrint ? <span className="slot-test-box">ตำแหน่ง {i + 1}{member ? ` · ${member.memberNumber}` : ""}</span>
+                  : member ? <MemberCardArt member={member} brandName={brandName} brandLogo={brandLogo} qrDataUrl={qrMap.get(member.memberNumber) ?? ""} />
+                  : <span className="slot-empty">ว่าง {i + 1}</span>}
+              </div>;
+            })}
+          </div>
+        ))}
+      </div>
+    )}
   </div></div>;
 }
