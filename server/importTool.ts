@@ -13,7 +13,7 @@
  */
 import * as XLSX from "xlsx";
 import type { SqliteDb } from "./sqliteStore";
-import { StoreError, formatDateTime, logAction, money, round2, runInTransaction } from "./sqliteStore";
+import { StoreError, formatDateTime, generateMemberNumber, getMemberNumberMode, logAction, money, round2, runInTransaction } from "./sqliteStore";
 
 export type ImportKind = "members" | "products";
 export type DuplicateMode = "skip" | "replace";
@@ -251,8 +251,18 @@ function parseNumberCell(text: string): number | null {
 function parseCountCell(text: string): number | null {
   const value = parseNumberCell(text);
   if (value === null) return null;
-  const rounded = Math.round(value);
-  return rounded >= 0 ? rounded : null;
+  return Number.isInteger(value) && value >= 0 ? value : null;
+}
+
+function validateNumericCells(row: string[], fields: Array<[number | undefined, string, boolean, boolean]>) {
+  for (const [column, label, integer, nonnegative] of fields) {
+    const text = pick(row, column);
+    if (!text) continue;
+    const value = parseNumberCell(text);
+    if (value === null || (integer && !Number.isInteger(value)) || (nonnegative && value < 0)) {
+      throw new StoreError(`${label}ต้องเป็น${integer ? "จำนวนเต็ม" : "ตัวเลข"}${nonnegative ? "ที่ไม่ติดลบ" : ""} (พบ ${text})`);
+    }
+  }
 }
 
 function parseStatusCell(text: string): "active" | "suspended" | null {
@@ -270,16 +280,6 @@ function parseCreditLimitCell(text: string): number | null {
 // ---------------------------------------------------------------------------
 // import สมาชิก
 // ---------------------------------------------------------------------------
-
-function nextImportMemberNumber(db: SqliteDb): string {
-  const row = db.prepare(`SELECT member_number AS number FROM members WHERE member_number LIKE 'M-%'`).all() as unknown as { number: string }[];
-  let max = 0;
-  for (const entry of row) {
-    const tail = Number(entry.number.replace(/^M-/, ""));
-    if (Number.isFinite(tail) && tail > max) max = tail;
-  }
-  return `M-${String(max + 1).padStart(6, "0")}`;
-}
 
 /** บันทึกธุรกรรมยอดยกมา/ปรับยอด — ให้ statement สมาชิกอธิบายตัวเองได้เสมอ */
 function recordBalanceTransaction(db: SqliteDb, memberNumber: string, amount: number, balanceAfter: number, detail: string) {
@@ -320,6 +320,11 @@ export function importMembers(db: SqliteDb, options: ImportMembersOptions): Impo
       }
       const lastName = pick(row, mapping.lastName);
       const prename = pick(row, mapping.prename) || null;
+      validateNumericCells(row, [[mapping.balance, "ยอดเงิน", false, false]]);
+      const rawLimit = pick(row, mapping.creditLimit);
+      if (!["", "ไม่จำกัด", "ไม่กำหนด", "none", "null", "-"].includes(rawLimit)) {
+        validateNumericCells(row, [[mapping.creditLimit, "วงเงิน", false, true]]);
+      }
       const balance = mapping.balance !== undefined ? (parseNumberCell(pick(row, mapping.balance)) ?? 0) : 0;
       const creditLimit = mapping.creditLimit !== undefined ? parseCreditLimitCell(pick(row, mapping.creditLimit)) : null;
       const status = mapping.status !== undefined ? (parseStatusCell(pick(row, mapping.status)) ?? "active") : "active";
@@ -350,8 +355,7 @@ export function importMembers(db: SqliteDb, options: ImportMembersOptions): Impo
       }
 
       if (!memberNumber) {
-        memberNumber = nextImportMemberNumber(db);
-        while (seenNumbers.has(memberNumber)) memberNumber = `M-${String(Number(memberNumber.replace(/^M-/, "")) + 1).padStart(6, "0")}`;
+        memberNumber = generateMemberNumber(db, getMemberNumberMode(db));
         seenNumbers.add(memberNumber);
       }
       runInTransaction(db, () => {
@@ -433,6 +437,12 @@ export function importProducts(db: SqliteDb, options: ImportProductsOptions): Im
       for (const key of [barcodeKey, skuKey, nameKey]) if (key) seenKeys.add(key);
       const category = pick(row, mapping.category) || "อื่นๆ";
       const unit = pick(row, mapping.unit) || "ชิ้น";
+      validateNumericCells(row, [
+        [mapping.price, "ราคาขาย", false, false],
+        [mapping.cost, "ต้นทุน", false, true],
+        [mapping.stock, "สต็อก", true, true],
+        [mapping.reorderPoint, "จุดสั่งซื้อ", true, true],
+      ]);
       const price = mapping.price !== undefined ? (parseNumberCell(pick(row, mapping.price)) ?? 0) : 0;
       if (price < 0) {
         summary.errors.push({ row: rowNumber, message: `ราคาขายต้องไม่ติดลบ (พบ ${pick(row, mapping.price)})` });

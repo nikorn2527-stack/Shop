@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Printer, X } from "@/lib/icons";
 import { toast } from "sonner";
 import { HelpDisclosure } from "./HelpDisclosure";
+import { A4DocumentPreview } from "./A4DocumentPreview";
 
 /**
  * ROUND 51 (user) — "ทุกหน้าที่มีการสั่งพิมพ์ ควรมีการพรีวิวเหมือนกัน"
@@ -129,11 +130,13 @@ export function PrintPreviewModal({
         ? `@media print { @page { margin: 0; size: ${widthMm}mm ${heightMm}mm; } .receipt-paper, .receipt-line, .receipt-total, .receipt-meta, .receipt-customer, .receipt-payment, .receipt-balance, .receipt-thanks, .receipt-brand, .receipt-divider { break-inside: avoid; page-break-inside: avoid; } body { margin: 0; padding: 0; } }`
         : `@media print { @page { margin: 0; } .receipt-paper, .receipt-line, .receipt-total, .receipt-meta, .receipt-customer, .receipt-payment, .receipt-balance, .receipt-thanks, .receipt-brand, .receipt-divider { break-inside: avoid; page-break-inside: avoid; } body { margin: 0; padding: 0; } }`;
     } else {
-      styleEl.textContent = `@media print { @page { margin: 8mm; } }`;
+      const marginMm = targetId === "stock-count-sheet" ? 14 : 8;
+      styleEl.textContent = `@media print { @page { margin: ${marginMm}mm; ${paper === "a4" ? "size: A4;" : ""} } }`;
     }
+    const printClass = targetId === "stock-count-sheet" ? "printing-stock-count" : "printing-receipt";
     const cleanup = () => {
       styleEl?.remove();
-      document.body.classList.remove("printing-receipt");
+      document.body.classList.remove(printClass);
       window.removeEventListener("afterprint", cleanup);
     };
     window.addEventListener("afterprint", cleanup);
@@ -141,25 +144,25 @@ export function PrintPreviewModal({
     window.setTimeout(cleanup, 4000);
 
     // เพิ่ม class เพื่อซ่อนส่วนอื่นขณะพิมพ์ (รองรับเบราว์เซอร์ที่ไม่มี :has)
-    document.body.classList.add("printing-receipt");
+    document.body.classList.add(printClass);
     window.print();
-    document.body.classList.remove("printing-receipt");
+    document.body.classList.remove(printClass);
     onPrint?.();
   };
 
   return (
     <div className="modal-backdrop print-preview-scope" onClick={onClose} role="dialog" aria-modal="true" aria-label={`พรีวิวก่อนพิมพ์ ${title}`}>
-      <div className="form-modal print-preview-modal" onClick={(event) => event.stopPropagation()}>
+      <div className={`form-modal print-preview-modal${paper === "a4" ? " export-preview-modal print-preview-a4" : ""}`} onClick={(event) => event.stopPropagation()}>
         <div className="modal-heading">
           <div>
-            <span className="eyebrow">PRINT PREVIEW</span>
+            <span className="eyebrow">{paper === "a4" ? "พรีวิวเอกสาร" : "PRINT PREVIEW"}</span>
             <h2>{title}</h2>
             {subtitle && <p>{subtitle}</p>}
           </div>
           <button className="icon-button" onClick={onClose} aria-label="ปิดหน้าต่างพรีวิว"><X size={17} /></button>
         </div>
 
-        <div className="export-preview-summary">
+        {(chips.length > 0 || (paper === "thermal" && contentMm != null)) && <div className="export-preview-summary">
           {paper === "thermal" && contentMm != null && (
             <span className="preview-chip mute" title="ความยาวที่เนื้อหาต้องการตามจำนวนรายการ">
               ความยาวเนื้อหา ≈ {contentMm.toLocaleString("th-TH")} มม.
@@ -168,21 +171,40 @@ export function PrintPreviewModal({
           {chips.map((chip) => (
             <span key={chip} className="preview-chip mute">{chip}</span>
           ))}
-        </div>
+        </div>}
 
+        {paper === "a4" ? (
+          <A4DocumentPreview label={`พรีวิว ${title}`}>
+            <div className="print-preview-paper" ref={paperRef} />
+            {!ready && <div className="print-preview-empty">กำลังเตรียมตัวอย่างเอกสาร…</div>}
+          </A4DocumentPreview>
+        ) : (
         <div className={`print-preview-stage paper-${paper}`}>
           <div className="print-preview-paper" ref={paperRef} />
           {!ready && <div className="print-preview-empty">กำลังเตรียมตัวอย่างเอกสาร…</div>}
         </div>
+        )}
 
+        {paper === "a4" ? (
+          <div className="export-preview-actions">
+            <div className="preview-format-list">
+              <button type="button" className="preview-format-btn preferred" onClick={doPrint} disabled={!ready}>
+                <Printer size={15} /><span><b>พิมพ์</b></span>
+                <i className="preferred-dot" aria-hidden="true" />
+              </button>
+            </div>
+            <button type="button" className="ghost-button" onClick={onClose}><X size={15} /> ปิด</button>
+          </div>
+        ) : (
         <div className="print-preview-actions">
           <div className="print-preview-buttons">
             <button type="button" className="ghost-button" onClick={onClose}><X size={15} /> ปิด</button>
             <button type="button" className="primary-button" onClick={doPrint}><Printer size={16} /> พิมพ์เลย</button>
           </div>
         </div>
+        )}
 
-        <HelpDisclosure id="print-length-help" label={paper === "thermal" ? "พิมพ์แล้วกระดาษยาวเกิน / ขาด?" : "ข้อแนะนำการพิมพ์"}>
+        {paper !== "a4" && <HelpDisclosure id="print-length-help" label={paper === "thermal" ? "พิมพ์แล้วกระดาษยาวเกิน / ขาด?" : "ข้อแนะนำการพิมพ์"}>
           {paper === "thermal" ? (
             <div className="help-disclosure-steps">
               <p><b>ความยาวกระดาษเท่าไร มาจาก "ขนาดกระดาษ" ในไดรเวอร์เครื่องพิมพ์</b> — ระบบจัดหน้าให้เนื้อหายาวตามรายการสินค้าแล้ว (ไม่มีขอบกระดาษ) ถ้าออกมาแล้วมีส่วนเกิน ปรับตามนี้:</p>
@@ -198,7 +220,7 @@ export function PrintPreviewModal({
               <p>เอกสาร A4 พิมพ์ด้วยขอบกระดาษ 8 มม. ตามมาตรฐาน — ถ้าต้องการเต็มหน้า ปรับขอบกระดาษในหน้าต่างพิมพ์เป็น “ไม่มี” ได้</p>
             </div>
           )}
-        </HelpDisclosure>
+        </HelpDisclosure>}
       </div>
     </div>
   );

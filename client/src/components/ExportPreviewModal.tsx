@@ -2,6 +2,7 @@ import { useEffect, useMemo } from "react";
 import { FileSpreadsheet, FileText, Printer, Table2, X } from "@/lib/icons";
 import type { ReportDocConfig } from "@/reportDoc";
 import { buildReportDocumentHtml, thaiStamp } from "@shared/reportDoc";
+import { A4DocumentPreview } from "./A4DocumentPreview";
 
 /**
  * ExportPreviewModal — พรีวิวเอกสาร A4 ก่อนส่งออก (CSV/Excel/PDF/พิมพ์)
@@ -60,7 +61,7 @@ export function ExportPreviewModal({
   }, [onClose]);
 
   const docHtml = useMemo(
-    () => buildReportDocumentHtml(state.doc, { mode: "pdf", stampText: `พรีวิวเมื่อ ${thaiStamp(new Date())}` }),
+    () => buildReportDocumentHtml(state.doc, { mode: "preview", stampText: `พรีวิวเมื่อ ${thaiStamp(new Date())}` }),
     [state.doc],
   );
 
@@ -78,16 +79,7 @@ export function ExportPreviewModal({
           </button>
         </div>
 
-        <div className="export-doc-preview" role="tabpanel" aria-label="พรีวิวเอกสาร A4 ที่จะส่งออก">
-          <div className="export-doc-scaler">
-            <iframe
-              title="พรีวิวเอกสาร A4"
-              srcDoc={docHtml}
-              className="export-doc-iframe"
-              loading="lazy"
-            />
-          </div>
-        </div>
+        <A4DocumentPreview html={docHtml} label="พรีวิวเอกสาร A4 ที่จะส่งออก" />
 
         <div className="export-preview-actions">
           <div className="preview-format-list">

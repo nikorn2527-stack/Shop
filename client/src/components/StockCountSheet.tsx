@@ -1,4 +1,6 @@
 import type { SqliteProduct } from "../../../server/sqliteStore";
+import { createPortal } from "react-dom";
+import { REPORT_DOC_CSS } from "@shared/reportDoc";
 
 /**
  * ROUND 53 (user) — ใบนับสต๊อกสำหรับพิมพ์ออกมานับมือ
@@ -28,19 +30,30 @@ export function StockCountSheet({ products }: { products: SqliteProduct[] }) {
   const visible = groups.filter((group) => group.items.length > 0);
   let running = 0;
 
-  return (
-    <div className="stock-count-sheet" id="stock-count-sheet">
-      <div className="scs-head">
-        <div className="scs-brand">
+  return createPortal(
+    <div className="stock-count-sheet report-doc" id="stock-count-sheet">
+      <style>{REPORT_DOC_CSS}</style>
+      <style>{`
+        .stock-count-sheet .scs-table { width: 100%; min-width: 0; table-layout: fixed; font-size: 12px; line-height: 1.5; }
+        .stock-count-sheet .scs-table th, .stock-count-sheet .scs-table td { padding: 6px 4px; letter-spacing: 0; width: auto; }
+        .stock-count-sheet .scs-table th { font-size: 11px; white-space: nowrap; overflow-wrap: normal; }
+        .stock-count-sheet .scs-table :is(.scs-no, .scs-code, .scs-unit, .scs-num) { white-space: nowrap; overflow-wrap: normal; word-break: normal; }
+        .stock-count-sheet .scs-table :is(.scs-name, .scs-note) { white-space: normal; overflow-wrap: break-word; word-break: normal; }
+        .stock-count-sheet .scs-table td { height: 34px; }
+        .stock-count-sheet .scs-table .scs-cat td { white-space: normal; }
+      `}</style>
+      <div className="rd-head">
+        <div className="rd-brand">
           <div>
             <b>ร้านค้าสวัสดิการ</b>
-            <small>Welfare Store · ระบบร้านค้า</small>
+            <small>ระบบร้านค้าสวัสดิการ · Welfare Store</small>
           </div>
         </div>
-        <div className="scs-title">
-          <b>ใบนับสต็อกสินค้า (นับด้วยมือ)</b>
-          <small>ออกเมื่อ {countSheetDate()} · รวม {active.length} รายการ · {visible.length} หมวด</small>
-        </div>
+        <div className="rd-stamp">ออกเมื่อ {countSheetDate()}</div>
+      </div>
+      <div className="rd-title">
+        <h1>ใบนับสต็อกสินค้า</h1>
+        <p>รวม {active.length} รายการ · {visible.length} หมวด</p>
       </div>
 
       <div className="scs-fill-row">
@@ -50,13 +63,24 @@ export function StockCountSheet({ products }: { products: SqliteProduct[] }) {
         <div><span>เวลาเสร็จ</span><i /></div>
       </div>
 
-      <table className="scs-table">
+      <table className="rd-table scs-table">
+        <colgroup>
+          <col style={{ width: "5%" }} />
+          <col style={{ width: "14%" }} />
+          <col style={{ width: "32%" }} />
+          <col style={{ width: "8%" }} />
+          <col style={{ width: "9%" }} />
+          <col style={{ width: "9%" }} />
+          <col style={{ width: "9%" }} />
+          <col style={{ width: "14%" }} />
+        </colgroup>
         <thead>
           <tr>
             <th className="scs-no">ลำดับ</th>
+            <th className="scs-code">รหัสสินค้า</th>
             <th className="scs-name">ชื่อสินค้า</th>
             <th className="scs-unit">หน่วย</th>
-            <th className="scs-num">ระบบมี</th>
+            <th className="scs-num num">ระบบมี</th>
             <th className="scs-num">นับได้</th>
             <th className="scs-num">ผลต่าง</th>
             <th className="scs-note">หมายเหตุ</th>
@@ -65,20 +89,19 @@ export function StockCountSheet({ products }: { products: SqliteProduct[] }) {
         {visible.map((group) => (
           <tbody key={group.category}>
             <tr className="scs-cat">
-              <td colSpan={7}>{group.category} · {group.items.length} รายการ</td>
+              <td colSpan={8}>{group.category} · {group.items.length} รายการ</td>
             </tr>
             {group.items.map((product) => {
               running += 1;
               return (
                 <tr key={product.id}>
                   <td className="scs-no">{running}</td>
+                  <td className="scs-code">{product.sku}</td>
                   <td className="scs-name">
-                    <b>{product.name}</b>
-                    {product.size ? <small> {product.size}</small> : null}
-                    <small className="scs-sku"> {product.sku}</small>
+                    {product.name}{product.size ? ` ${product.size}` : ""}
                   </td>
                   <td className="scs-unit">{product.unit}</td>
-                  <td className="scs-num">{product.stock.toLocaleString("th-TH")}</td>
+                  <td className="scs-num num">{product.stock.toLocaleString("th-TH")}</td>
                   <td className="scs-num scs-blank" />
                   <td className="scs-num scs-blank" />
                   <td className="scs-note" />
@@ -99,9 +122,7 @@ export function StockCountSheet({ products }: { products: SqliteProduct[] }) {
           <small>ลงชื่อผู้ตรวจสอบ</small>
         </div>
       </div>
-      <div className="scs-note-line">
-        วิธีใช้: จดจำนวนที่นับได้จริงในช่อง “นับได้” แล้วคิดผลต่าง (นับได้ − ระบบมี) · จากนั้นนำตัวเลขกลับมาบันทึกที่เมนูสต็อกสินค้า → นับสต็อก ระบบจะปรับยอดและบันทึก Log ทุกครั้ง · หากผลต่างเยอะผิดปกติ ระบุสาเหตุในช่องหมายเหตุ
-      </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

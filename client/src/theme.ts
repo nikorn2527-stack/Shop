@@ -12,28 +12,25 @@
  * (เปลี่ยนสีเน้นแยกทีหลังได้ตามปกติผ่านพาเลตต์สี)
  */
 
-export type BrandSettings = { appName: string; appLogo: string; appTheme: string; appStyle?: string };
+export type BrandSettings = { appName: string; appLogo: string; appTheme: string; appStyle?: string; appBackground?: string };
 
 /** Preset สีหลัก — คุมโทนทั้งแอป (ปุ่ม / แถบเมนู / จุดเน้น) */
 export const THEME_PRESETS: { id: string; label: string; base: string }[] = [
-  { id: "emerald", label: "เขียวมรกต", base: "#007a55" },
-  { id: "forest", label: "เขียวสน", base: "#2f6b3a" },
-  { id: "matcha", label: "เขียวชา", base: "#6f7d2c" },
-  { id: "teal", label: "เขียวน้ำทะเล", base: "#0f766e" },
-  { id: "coffee", label: "น้ำตาลกาแฟ", base: "#8a5a34" },
-  { id: "amber", label: "ส้มอำพัน", base: "#b45309" },
+  { id: "pastel", label: "ชมพู · ฟ้า · มิ้นต์", base: "#ad3973" },
+  { id: "indigo", label: "ครามไอริส", base: "#4f46b8" },
+  { id: "blue", label: "น้ำเงินสด", base: "#1976d2" },
   { id: "rose", label: "แดงชาด", base: "#be4a5f" },
   { id: "violet", label: "ม่วงคราม", base: "#7c5cbf" },
 ];
 
-export const DEFAULT_THEME = "emerald";
+export const DEFAULT_THEME = "pastel";
 const BRAND_CACHE_KEY = "png-brand-v1";
 
 /** ROUND 38 (ข้อ 38) — สไตล์การแสดงผลทั้งระบบ (บุคลิกการออกแบบ)
  *  id ใช้เป็น data-style บน <html> · accent = สีเน้นประจำแพลตฟอร์มที่จะใช้ตอนเลือกสไตล์ */
 export type UiStyleId = "shop" | "apple" | "microsoft" | "android";
 export const UI_STYLE_PRESETS: { id: UiStyleId; label: string; detail: string; accent: string; fontFamily: string }[] = [
-  { id: "shop", label: "ร้านค้า (มาตรฐาน)", detail: "โทนอบอุ่น เขียวร้านค้า ปุ่มมนพอดีมือ — ธีมเดิมของระบบ", accent: "#007a55", fontFamily: "Sarabun" },
+  { id: "shop", label: "ร้านค้า (มาตรฐาน)", detail: "แถบน้ำเงินสด เมนูขาว และเทอร์ควอยซ์ — สว่าง คมชัด สมดุล", accent: "#1976d2", fontFamily: "Sarabun" },
   { id: "apple", label: "Apple", detail: "ขาวสะอาด ปุ่มทรงแคปซูล ฟอนต์ระบบ Apple — เรียบแบบ iOS/macOS", accent: "#0071e3", fontFamily: "SF / Helvetica" },
   { id: "microsoft", label: "Microsoft", detail: "แบบ Fluent — ขอบคม เรียบตึง ฟอนต์ Segoe UI แบบ Windows 11", accent: "#0f6cbd", fontFamily: "Segoe UI" },
   { id: "android", label: "Android", detail: "แบบ Material You — การ์ดมนมาก โทนม่วงพาสเทล แบบแอปบนมือถือ", accent: "#6750a4", fontFamily: "Roboto / Google Sans" },
@@ -43,7 +40,7 @@ export const DEFAULT_UI_STYLE: UiStyleId = "shop";
 
 /** สไตล์ id ที่รับรอง (กันค่าเพี้ยนจาก settings) */
 export function resolveUiStyle(style: string | undefined | null): UiStyleId {
-  if (style === "apple" || style === "microsoft" || style === "android") return style;
+  // Legacy saved styles remain readable, but the app now has one standard design.
   return DEFAULT_UI_STYLE;
 }
 
@@ -108,8 +105,21 @@ function hslToRgb(h: number, s: number, l: number): [number, number, number] {
   return [channel(hn + 1 / 3) * 255, channel(hn) * 255, channel(hn - 1 / 3) * 255];
 }
 
-/** preset id หรือ hex → สีหลัก hex (fallback emerald) */
+/** Retire green and copper decoration, including previously saved custom accents. */
+export function normalizeTheme(theme: string | undefined | null): string {
+  if (!theme || ["indigo", "emerald", "forest", "matcha", "teal", "coffee", "amber"].includes(theme) || theme.toLowerCase() === "#4f46b8") return DEFAULT_THEME;
+  const rgb = /^#[0-9a-f]{6}$/i.test(theme) ? hexToRgb(theme) : null;
+  if (rgb) {
+    const [h, s] = rgbToHsl(...rgb);
+    if (h >= 65 && h <= 180 && s > 0.1) return DEFAULT_THEME;
+    if (h >= 15 && h < 65 && s > 0.1) return DEFAULT_THEME;
+  }
+  return theme;
+}
+
+/** preset id หรือ hex → สีหลัก hex (fallback indigo) */
 export function resolveThemeColor(theme: string | undefined | null): string {
+  theme = normalizeTheme(theme);
   if (!theme) return THEME_PRESETS[0].base;
   const preset = THEME_PRESETS.find((item) => item.id === theme);
   if (preset) return preset.base;
@@ -119,7 +129,9 @@ export function resolveThemeColor(theme: string | undefined | null): string {
 
 /** เขียน CSS variables ทั้งกลุ่มจากสีหลักสีเดียว */
 export function applyThemeColor(theme: string | undefined | null): string {
-  const base = resolveThemeColor(theme);
+  // One application palette; legacy saved colors remain readable but no longer
+  // override the shared design after removing the theme selector.
+  const base = "#c65d16";
   const rgb = hexToRgb(base);
   if (!rgb) return base;
   const [r, g, b] = rgb;
@@ -130,11 +142,14 @@ export function applyThemeColor(theme: string | undefined | null): string {
     return rgbToHex(rr, gg, bb);
   };
   const root = document.documentElement;
+  root.dataset.palette = "slate-orange";
   const vars: Record<string, string> = {
     "--teal": base,
     "--teal-dark": build(clamp(l - 0.07, 0.12, 0.82)),
-    "--teal-soft": build(0.9, sat * 0.62),
-    "--teal-mist": build(0.945, sat * 0.38),
+    "--teal-soft": "#fed7aa",
+    "--teal-mist": "#fff7ed",
+    "--app-secondary": "#426b8c",
+    "--app-secondary-soft": "#eaf2f8",
     // เฉดเข้มของสีธีม — ยังใช้โดะ member-balance-card (การ์ดยอดเงินคงเหลือ)
     "--rail-a": build(0.2, sat * 0.92),
     // ROUND 48 — ราง POS ไม่ตามสีธีมแล้ว: ใช้สีเดียวกับแอปตามที่ผู้ใช้ขอ (ปุ่มเท่านั้นที่มีสีของใครของมัน)
@@ -145,21 +160,29 @@ export function applyThemeColor(theme: string | undefined | null): string {
   return base;
 }
 
+export function applyBackground(value: string | undefined): string {
+  const background = value && value.length <= 1_500_000 && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(value) ? value : "";
+  document.documentElement.style.setProperty("--workspace-image", background ? `url("${background}")` : "none");
+  return background;
+}
+
 /** ใช้แบรนด์ (ชื่อ+สี+สไตล์) — ตั้ง title และจำลง cache ให้ครั้งถัดไปโหลดไว */
 export function applyBrand(brand: Partial<BrandSettings> | null | undefined): BrandSettings | null {
   if (!brand) return null;
   const appName = (brand.appName ?? "").trim();
   const appLogo = brand.appLogo ?? "";
-  const appTheme = brand.appTheme ?? DEFAULT_THEME;
+  const appTheme = normalizeTheme(brand.appTheme);
   const appStyle = brand.appStyle ?? DEFAULT_UI_STYLE;
   if (!appName && !appLogo && !brand.appTheme && !brand.appStyle) return null;
   applyThemeColor(appTheme);
+  const appBackground = applyBackground(brand.appBackground);
   applyUiStyle(appStyle); // ROUND 38 — สไตล์บุคลิก (ฟอนต์/ความมน/พื้นหลัง) ตามไปกับแบรนด์ด้วย
   if (appName) document.title = appName;
   const cached = readBrandCache();
   const next: BrandSettings = {
     appName: appName || cached?.appName || "ร้านค้าสวัสดิการ",
     appLogo,
+    appBackground,
     appTheme,
     appStyle: resolveUiStyle(appStyle),
   };
@@ -180,7 +203,8 @@ export function readBrandCache(): BrandSettings | null {
     return {
       appName: parsed.appName || "ร้านค้าสวัสดิการ",
       appLogo: parsed.appLogo || "",
-      appTheme: parsed.appTheme || DEFAULT_THEME,
+      appBackground: parsed.appBackground || "",
+      appTheme: normalizeTheme(parsed.appTheme),
       appStyle: resolveUiStyle(parsed.appStyle),
     };
   } catch {

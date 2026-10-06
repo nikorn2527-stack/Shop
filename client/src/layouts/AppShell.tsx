@@ -12,6 +12,7 @@
  */
 import type { ComponentType } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Activity,
   ArrowDownToLine,
@@ -25,22 +26,23 @@ import {
   LockKeyhole,
   LogOut,
   Menu,
-  PackageSearch,
+  StockReceive,
   Pause,
   Plus,
   ScanLine,
   Search,
   Settings2,
   Sparkles,
-  Star,
+  TrendingDown,
   UserCog,
   UserPlus,
   UsersRound,
   X,
 } from "@/lib/icons";
-import { toast } from "sonner";
-import { EditionPill, useEditionStatus } from "@/components/EditionUi";
+import { pendingStockAlerts } from "@/lib/pendingAlerts";
+import { useEditionStatus } from "@/components/EditionUi";
 import { GlobalSearch } from "@/components/GlobalSearch";
+import { SharedSearchHost, SharedSearchProvider } from "@/components/SharedSearch";
 import { KeyboardShortcutsOverlay, ShortcutsFab } from "@/components/KeyboardShortcutsOverlay";
 import { Dashboard } from "../pages/Dashboard";
 import { Pos } from "../pages/Pos";
@@ -148,6 +150,7 @@ export function AppShell({
     return () => window.removeEventListener("pos-open-menu", onPosOpenMenu);
   }, []);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [pendingProductId, setPendingProductId] = useState<number | null>(null);
   const [pendingMemberNumber, setPendingMemberNumber] = useState<string | null>(
     null
   );
@@ -167,23 +170,7 @@ export function AppShell({
   const stockRowsQuery = trpc.stock.rows.useQuery(undefined, {
     refetchInterval: 60_000,
   });
-  const lowStock = useMemo(() => {
-    const rows = (stockRowsQuery.data ?? []).filter(
-      row => row.active && row.status === "สต็อกต่ำ"
-    );
-    // One alert per product (a product with several lots shares the same stock).
-    return rows.filter(
-      (row, index) =>
-        rows.findIndex(other => other.productId === row.productId) === index
-    );
-  }, [stockRowsQuery.data]);
-  const expiring = useMemo(
-    () =>
-      (stockRowsQuery.data ?? []).filter(
-        row => row.active && row.status === "ใกล้หมดอายุ"
-      ),
-    [stockRowsQuery.data]
-  );
+  const { lowStock, expiring } = useMemo(() => pendingStockAlerts(stockRowsQuery.data ?? []), [stockRowsQuery.data]);
   // Member low-balance alerts — driven by the real settings (ตั้งค่า → การแจ้งเตือน:
   // lowBalanceAlert + lowBalanceThreshold) and the member list. Mirrors the stock
   // poll cadence so the bell stays fresh after wallet top-ups/withdrawals too.
@@ -221,67 +208,7 @@ export function AppShell({
   // nav-badge on สต็อกสินค้า intentionally stays stock-only.
   const notifCount =
     lowStock.length + expiring.length + memberLowBalance.length;
-  // ROUND 37 (req 35) — แจ้งเตือนเชิงรุก: ตอนเปิดระบบสรุปครั้งเดียวว่ามีอะไร
-  // ต้องดู และระหว่างใช้งานถ้ามีรายการ “ใหม่” (ขายจนต่ำกว่าจุดสั่งซื้อ /
-  // สมาชิกยอดต่ำลง) toast เด้งทันทีโดยไม่ต้องเปิดกระดิ่ง
-  const notifiedAlertsRef = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    const keys: string[] = [];
-    lowStock.forEach(row => keys.push(`low-${row.productId}`));
-    expiring.forEach(row => keys.push(`exp-${row.id}`));
-    memberLowBalance.forEach(member => keys.push(`bal-${member.memberNumber}`));
-    if (keys.length === 0) return;
-    const fresh = keys.filter(key => !notifiedAlertsRef.current.has(key));
-    if (fresh.length === 0) return;
-    const isBoot = notifiedAlertsRef.current.size === 0;
-    fresh.forEach(key => notifiedAlertsRef.current.add(key));
-    if (isBoot) {
-      const parts: string[] = [];
-      if (lowStock.length > 0) parts.push(`สต็อกต่ำ ${lowStock.length} รายการ`);
-      if (expiring.length > 0)
-        parts.push(`ใกล้หมดอายุ ${expiring.length} รายการ`);
-      if (memberLowBalance.length > 0)
-        parts.push(`สมาชิกยอดคงเหลือต่ำ ${memberLowBalance.length} รายการ`);
-      toast.info("การแจ้งเตือนของระบบ", {
-        description: `${parts.join(" · ")} — ดูรายละเอียดได้ที่กระดิ่งมุมขวาบน`,
-        duration: 5200,
-      });
-      return;
-    }
-    let shown = 0;
-    fresh.forEach(key => {
-      if (shown >= 3) return;
-      shown += 1;
-      if (key.startsWith("low-")) {
-        const row = lowStock.find(entry => `low-${entry.productId}` === key);
-        if (row)
-          toast.warning("สต็อกต่ำกว่าจุดสั่งซื้อ", {
-            description: `${row.name} เหลือ ${row.stock} ${row.unit} · ต่ำกว่าจุดสั่งซื้อ ${row.reorderPoint}`,
-            duration: 5000,
-          });
-      } else if (key.startsWith("exp-")) {
-        const row = expiring.find(entry => `exp-${entry.id}` === key);
-        if (row)
-          toast.warning("สินค้าใกล้หมดอายุ", {
-            description: `${row.name}${row.expiry ? ` · หมดอายุ ${formatThaiDate(row.expiry)}` : ""}`,
-            duration: 5000,
-          });
-      } else {
-        const member = memberLowBalance.find(
-          entry => `bal-${entry.memberNumber}` === key
-        );
-        if (member)
-          toast.warning("สมาชิกยอดคงเหลือต่ำ", {
-            description: `${memberFullName(member)} · ${member.memberNumber} · คงเหลือ ${money(member.balance)}`,
-            duration: 5000,
-          });
-      }
-    });
-    if (fresh.length > shown)
-      toast.info(`+ การแจ้งเตือนใหม่อีก ${fresh.length - shown} รายการ`, {
-        description: "ดูรายการทั้งหมดได้ที่กระดิ่งแจ้งเตือนมุมขวาบน",
-      });
-  }, [lowStock, expiring, memberLowBalance]);
+  // Persistent conditions live in the bell; transaction feedback stays in each workflow.
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
@@ -299,7 +226,8 @@ export function AppShell({
       if (
         event.target instanceof Node &&
         notifRef.current &&
-        !notifRef.current.contains(event.target)
+        !notifRef.current.contains(event.target) &&
+        !(event.target instanceof Element && event.target.closest('.notif-dropdown'))
       )
         setNotifOpen(false);
     };
@@ -352,396 +280,14 @@ export function AppShell({
   const logout = () => {
     if (!logoutMutation.isPending) logoutMutation.mutate();
   };
-  return (
-    <div
-      className={safeView === "pos" ? "app-shell pos-terminal" : "app-shell"}
-    >
-      {safeView === "pos" && (
-        <aside className="pos-rail" aria-label="เมนูด่วนหน้าร้าน">
-          <div className="rail-brand" title={appName}>
-            {appLogo ? (
-              <img className="brand-logo" src={appLogo} alt={appName} />
-            ) : (
-              <span className="brand-mark">{brandInitial(appName)}</span>
-            )}
-            <span className="rail-caption">POS</span>
-          </div>
-          {!railHidden.has("scan") && (
-            <button
-              type="button"
-              className="rail-btn rail-scan"
-              title="โฟกัสช่องสแกนบาร์โค้ด — พร้อมรับค่าเสมอ (F8)"
-              onClick={() =>
-                window.dispatchEvent(
-                  new CustomEvent("pos-rail", { detail: "scan" })
-                )
-              }
-            >
-              <ScanLine size={20} />
-              <b>สแกน</b>
-              <kbd>F8</kbd>
-            </button>
-          )}
-          {!railHidden.has("customer") && (
-            <button
-              type="button"
-              className="rail-btn rail-customer"
-              title="เลือกลูกค้า / สมาชิกสำหรับบิลนี้ (F1)"
-              onClick={() =>
-                window.dispatchEvent(
-                  new CustomEvent("pos-rail", { detail: "member" })
-                )
-              }
-            >
-              <UsersRound size={20} />
-              <b>ลูกค้า</b>
-              <kbd>F1</kbd>
-            </button>
-          )}
-          {!railHidden.has("deposit") && (
-            <button
-              type="button"
-              className={`rail-btn rail-deposit${posShortcut === "เติมเงิน" ? " active" : ""}`}
-              title="เติมเงินเข้าบัญชีสมาชิก (F2)"
-              onClick={() =>
-                setPosShortcut(posShortcut === "เติมเงิน" ? "" : "เติมเงิน")
-              }
-            >
-              <ArrowDownToLine size={20} />
-              <b>เติมเงิน</b>
-              <kbd>F2</kbd>
-            </button>
-          )}
-          {!railHidden.has("withdraw") && (
-            <button
-              type="button"
-              className={`rail-btn rail-withdraw${posShortcut === "ถอนเงิน" ? " active" : ""}`}
-              title="ถอนเงินจากบัญชีสมาชิก (F3)"
-              onClick={() =>
-                setPosShortcut(posShortcut === "ถอนเงิน" ? "" : "ถอนเงิน")
-              }
-            >
-              <ArrowUpFromLine size={20} />
-              <b>ถอนเงิน</b>
-              <kbd>F3</kbd>
-            </button>
-          )}
-          {!railHidden.has("special") && (
-            <button
-              type="button"
-              className={`rail-btn rail-special${posShortcut === "สินค้าไม่ระบุตายตัว" ? " active" : ""}`}
-              title="เพิ่มรายการพิเศษ — ของสั่ง ค่าบริการ (F4)"
-              onClick={() => {
-                if (edition.status?.has("specialOrders"))
-                  setPosShortcut(
-                    posShortcut === "สินค้าไม่ระบุตายตัว"
-                      ? ""
-                      : "สินค้าไม่ระบุตายตัว"
-                  );
-                else openEditionTab();
-              }}
-            >
-              <Sparkles size={20} />
-              <b>รายการพิเศษ</b>
-              <kbd>F4</kbd>
-            </button>
-          )}
-          {!railHidden.has("hold") && (
-            <button
-              type="button"
-              className="rail-btn rail-hold"
-              title="พักบิลปัจจุบันไว้ แล้วเริ่มบิลใหม่ — เรียกคืนได้จากแถบใต้ช่องสแกน (F5)"
-              onClick={() =>
-                window.dispatchEvent(
-                  new CustomEvent("pos-rail", { detail: "hold" })
-                )
-              }
-            >
-              <Pause size={20} />
-              <b>พักบิล</b>
-              <kbd>F5</kbd>
-              {posHeldCount > 0 && (
-                <span className="rail-badge">{posHeldCount}</span>
-              )}
-            </button>
-          )}
-          {!railHidden.has("register") && (
-            <button
-              type="button"
-              className="rail-btn rail-register"
-              title="ลงทะเบียนสมาชิกใหม่ + พิมพ์บัตร — ทำที่นี่ที่เดียว (F6)"
-              onClick={() =>
-                window.dispatchEvent(
-                  new CustomEvent("pos-rail", { detail: "register" })
-                )
-              }
-            >
-              <UserPlus size={20} />
-              <b>สมาชิกใหม่</b>
-              <kbd>F6</kbd>
-            </button>
-          )}
-          {!railHidden.has("manage") && (
-            <button
-              type="button"
-              className="rail-btn rail-manage"
-              title="จัดแผงลัดหน้าร้าน — เลือกสินค้าที่หยิบบ่อยขึ้นแผง (F7)"
-              onClick={() =>
-                window.dispatchEvent(
-                  new CustomEvent("pos-rail", { detail: "quickmanage" })
-                )
-              }
-            >
-              <Star size={20} />
-              <b>จัดแผง</b>
-              <kbd>F7</kbd>
-            </button>
-          )}
-          {!railHidden.has("receive") && (
-            <button
-              type="button"
-              className="rail-btn rail-inventory"
-              title="รับเข้าสินค้าจากหน้า POS โดยตรง (F9)"
-              onClick={() =>
-                window.dispatchEvent(
-                  new CustomEvent("pos-rail", { detail: "receive" })
-                )
-              }
-            >
-              <PackageSearch size={20} />
-              <b>รับเข้าสินค้า</b>
-              <kbd>F9</kbd>
-            </button>
-          )}
-          {!railHidden.has("add") && (
-            <button
-              type="button"
-              className="rail-btn rail-add"
-              title="เพิ่มไอเทมใหม่จากหน้า POS โดยตรง (F10)"
-              onClick={() =>
-                window.dispatchEvent(
-                  new CustomEvent("pos-rail", { detail: "add" })
-                )
-              }
-            >
-              <Plus size={20} />
-              <b>เพิ่มไอเทม</b>
-              <kbd>F10</kbd>
-            </button>
-          )}
-          <span className="rail-spacer" aria-hidden="true" />
-          <button
-            type="button"
-            className="rail-btn rail-exit"
-            title="เปิดเมนูหลัก — ภาพรวมระบบ (Esc)"
-            onClick={() => setActiveView("dashboard")}
-          >
-            <LayoutDashboard size={20} />
-            <b>เมนู</b>
-            <kbd>Esc</kbd>
-          </button>
-        </aside>
-      )}
-      <aside
-        className={`sidebar${mobileNav ? " open" : ""}${sidebarCollapsed ? " collapsed" : ""}${safeView === "pos" ? " pos-context" : ""}`}
-      >
-        <div className="brand">
-          {appLogo ? (
-            <img className="brand-logo" src={appLogo} alt={appName} />
-          ) : (
-            <div className="brand-mark">
-              <span>{brandInitial(appName)}</span>
-            </div>
-          )}
-          <div className="brand-text">
-            <b>{appName}</b>
-            <small>Welfare Store</small>
-          </div>
-          <button
-            type="button"
-            className="mobile-close"
-            onClick={() => setMobileNav(false)}
-            aria-label="ปิดเมนูด้านข้าง"
-          >
-            <X size={19} />
-          </button>
-          <button
-            type="button"
-            className="sidebar-collapse-btn"
-            onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
-            title={sidebarCollapsed ? "ขยายเมนูด้านข้าง" : "ย่อเมนูด้านข้างเหลือไอคอน"}
-            aria-label={sidebarCollapsed ? "ขยายเมนูด้านข้าง" : "ย่อเมนูด้านข้างเหลือไอคอน"}
-            aria-expanded={!sidebarCollapsed}
-          >
-            {sidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-          </button>
-        </div>
-        <div className="role-card">
-          <div className={`role-avatar ${role}`}>{profileAvatar}</div>
-          <div>
-            <b>{profileName}</b>
-            <span>
-              {role === "admin"
-                ? "ผู้บริหารระบบ"
-                : role === "dev"
-                  ? "ผู้พัฒนาระบบ"
-                  : "เจ้าหน้าที่ร้านค้า"}
-              {role === "dev" && <i className="dev-role-badge">ผู้พัฒนา</i>}
-            </span>
-          </div>
-        </div>
-        <div className="nav-group-label">เมนูหลัก</div>
-        <nav>
-          {navItems.map(({ id, label, caption, icon: Icon, tileColor }) => (
-            <button
-              className={safeView === id ? "active" : ""}
-              key={id}
-              title={`${label} — ${caption}`}
-              onClick={() => {
-                setActiveView(id);
-                setMobileNav(false);
-              }}
-            >
-              <Icon size={20} weight="duotone" />
-              <b>{label}</b>
-              {/* PT-2 — badges show ONLY when the user must take action.
-                  Low stock → needs restocking; held bills → needs to resume.
-                  Member/bill totals are pure data so they live on the page. */}
-              {id === "stock" && lowStock.length > 0 && (
-                <i className="nav-badge">{lowStock.length}</i>
-              )}
-              {id === "pos" && posHeldCount > 0 && (
-                <i className="nav-badge">{posHeldCount}</i>
-              )}
-            </button>
-          ))}
-        </nav>
-        {isAdminRole(role) ? (
-          <div
-            className={`nav-admin-section${sidebarCollapsed ? " collapsed" : ""}${adminGroupOpen ? " open" : ""}`}
-          >
-            {!sidebarCollapsed && (
-              <button
-                type="button"
-                className="nav-group-toggle"
-                onClick={() => setAdminGroupOpen((open) => !open)}
-                aria-expanded={adminGroupOpen}
-                title="จัดการระบบ — ตั้งค่า / ผู้ใช้ระบบ / ประวัติระบบ"
-              >
-                <Settings2 size={20} />
-                <b>จัดการระบบ</b>
-                <ChevronDown size={14} className="toggle-chevron" />
-              </button>
-            )}
-            {(sidebarCollapsed || adminGroupOpen) && (
-              <nav className="nav-group-children">
-                <button
-                  className={safeView === "settings" ? "active" : ""}
-                  title="ตั้งค่า"
-                  onClick={() => {
-                    setActiveView("settings");
-                    setMobileNav(false);
-                  }}
-                >
-                  <Settings2 size={sidebarCollapsed ? 20 : 18} />
-                  {!sidebarCollapsed && <b>ตั้งค่า</b>}
-                </button>
-                <button
-                  className={safeView === "users" ? "active" : ""}
-                  title="ผู้ใช้ระบบ"
-                  onClick={() => {
-                    setActiveView("users");
-                    setMobileNav(false);
-                  }}
-                >
-                  <UserCog size={sidebarCollapsed ? 20 : 18} />
-                  {!sidebarCollapsed && <b>ผู้ใช้ระบบ</b>}
-                </button>
-                <button
-                  className={safeView === "logs" ? "active" : ""}
-                  title="ประวัติระบบ"
-                  onClick={() => {
-                    setActiveView("logs");
-                    setMobileNav(false);
-                  }}
-                >
-                  <Activity size={sidebarCollapsed ? 20 : 18} />
-                  {!sidebarCollapsed && <b>ประวัติระบบ</b>}
-                </button>
-              </nav>
-            )}
-          </div>
-        ) : (
-          <div className="locked-nav">
-            <LockKeyhole size={15} />
-            <span>เมนูผู้บริหารถูกซ่อน</span>
-          </div>
-        )}
-        <div className="sidebar-footer">
-          {edition.status && (
-            <EditionPill status={edition.status} onClick={openEditionTab} />
-          )}
-          <button
-            type="button"
-            className="sidebar-logout"
-            onClick={logout}
-            disabled={logoutMutation.isPending}
-            title="ออกจากระบบ"
-            aria-label="ออกจากระบบ"
-          >
-            <LogOut size={16} /> <b>ออกจากระบบ</b>
-          </button>
-          <div className="sidebar-version">v1.0.0 · ระบบร้านค้าสวัสดิการ</div>
-          <div className="sidebar-powered">
-            ⚡ Powered by <b>PNG TEAM</b>
-          </div>
-        </div>
-      </aside>
-      <main className="main-shell">
-        <header className="topbar">
-          <button className="mobile-menu" onClick={() => setMobileNav(true)}>
-            <Menu size={21} />
-          </button>
-          <div className="breadcrumb">
-            <span>{appName}</span>
-            <b>/</b>
-            <strong>{pageTitle}</strong>
-          </div>
-          <div className="topbar-actions">
-            <div
-              className="global-search"
-              role="button"
-              tabIndex={0}
-              aria-label="เปิดค้นหาเมนู สมาชิก หรือสินค้า"
-              onClick={() => setSearchOpen(true)}
-              onKeyDown={event => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  setSearchOpen(true);
-                }
-              }}
-            >
-              <Search size={17} />
-              <span>ค้นหาเมนูหรือรายการ...</span>
-              <kbd>⌘ K</kbd>
-            </div>
-            <button
-              type="button"
-              className="top-icon"
-              title="ออกจากระบบ"
-              aria-label="ออกจากระบบ"
-              onClick={logout}
-              disabled={logoutMutation.isPending}
-            >
-              <LogOut size={18} />
-            </button>
+  const notificationPanel = (
             <div className="notif-wrap" ref={notifRef}>
               <button
                 type="button"
                 className={`top-icon notif-bell${notifCount > 0 ? " has-alert" : ""}`}
                 title={
                   notifCount > 0
-                    ? `การแจ้งเตือน · ${notifCount} รายการรอดู`
+                    ? `การแจ้งเตือน · ${notifCount} รายการที่ต้องจัดการ`
                     : "การแจ้งเตือน"
                 }
                 aria-label={
@@ -753,20 +299,20 @@ export function AppShell({
                 aria-expanded={notifOpen}
                 onClick={() => setNotifOpen(current => !current)}
               >
-                <Bell size={18} />
+                <Bell size={18} /><span className="shell-notification-label">แจ้งเตือน</span>
                 {notifCount > 0 && (
                   <span className="notif-badge" aria-hidden="true">
                     {notifCount > 99 ? "99+" : notifCount}
                   </span>
                 )}
               </button>
-              {notifOpen && (
+              {notifOpen && createPortal(
                 <div
                   className="notif-dropdown"
                   role="menu"
                   aria-label="การแจ้งเตือน"
                 >
-                  <div className="notif-header">
+                  <div className="notif-header"><button type="button" className="notification-close" aria-label="ปิดแจ้งเตือน" onClick={() => setNotifOpen(false)}>×</button>
                     <b>การแจ้งเตือน</b>
                     {notifCount > 0 && (
                       <span className="notif-count">{notifCount}</span>
@@ -915,8 +461,181 @@ export function AppShell({
                     ดูสต็อกทั้งหมด →
                   </button>
                 </div>
-              )}
+              , document.body)}
             </div>
+  );
+
+  return (
+    <SharedSearchProvider>
+    <div
+      className={safeView === "pos" ? "app-shell pos-terminal" : "app-shell"}
+    >
+      {safeView === "pos" && (
+        <aside className="pos-rail" aria-label="เมนูด่วนหน้าร้าน">
+          <div className="rail-brand" title={appName}>
+            {appLogo ? (
+              <img className="brand-logo" src={appLogo} alt={appName} />
+            ) : (
+              <span className="brand-mark">{brandInitial(appName)}</span>
+            )}
+            <div className="rail-brand-text"><b>{appName}</b><small>Welfare Store</small></div>
+          </div>
+          {!railHidden.has("scan") || !railHidden.has("customer") || !railHidden.has("hold") ? <div className="pos-rail-group"><span className="pos-rail-group-label">งานขาย</span>
+          {!railHidden.has("scan") && (
+            <button
+              type="button"
+              className="rail-btn rail-scan"
+              title="โฟกัสช่องสแกนบาร์โค้ด — พร้อมรับค่าเสมอ (F8)"
+              onClick={() =>
+                window.dispatchEvent(
+                  new CustomEvent("pos-rail", { detail: "scan" })
+                )
+              }
+            >
+              <ScanLine size={20} />
+              <b>สแกน</b>
+              <kbd>F8</kbd>
+            </button>
+          )}
+          {!railHidden.has("customer") && (
+            <button
+              type="button"
+              className="rail-btn rail-customer"
+              title="เลือกลูกค้า / สมาชิกสำหรับบิลนี้ (F1)"
+              onClick={() =>
+                window.dispatchEvent(
+                  new CustomEvent("pos-rail", { detail: "member" })
+                )
+              }
+            >
+              <UsersRound size={20} />
+              <b>ลูกค้า</b>
+              <kbd>F1</kbd>
+            </button>
+          )}
+          {!railHidden.has("hold") && (
+            <button
+              type="button"
+              className="rail-btn rail-hold"
+              title="พักบิลปัจจุบันไว้ แล้วเริ่มบิลใหม่ — เรียกคืนได้จากแถบใต้ช่องสแกน (F5)"
+              onClick={() =>
+                window.dispatchEvent(
+                  new CustomEvent("pos-rail", { detail: "hold" })
+                )
+              }
+            >
+              <Pause size={20} />
+              <b>พักบิล</b>
+              <kbd>F5</kbd>
+              {posHeldCount > 0 && (
+                <span className="rail-badge">{posHeldCount}</span>
+              )}
+            </button>
+          )}
+          </div> : null}
+          {!railHidden.has("deposit") || !railHidden.has("withdraw") || !railHidden.has("register") || !railHidden.has("limit") ? <div className="pos-rail-group"><span className="pos-rail-group-label">งานสมาชิก</span>
+          {!railHidden.has("deposit") && (
+            <button
+              type="button"
+              className={`rail-btn rail-deposit${posShortcut === "เติมเงิน" ? " active" : ""}`}
+              title="เติมเงินเข้าบัญชีสมาชิก (F2)"
+              onClick={() =>
+                setPosShortcut(posShortcut === "เติมเงิน" ? "" : "เติมเงิน")
+              }
+            >
+              <ArrowDownToLine size={20} />
+              <b>เติมเงิน</b>
+              <kbd>F2</kbd>
+            </button>
+          )}
+          {!railHidden.has("withdraw") && (
+            <button
+              type="button"
+              className={`rail-btn rail-withdraw${posShortcut === "ถอนเงิน" ? " active" : ""}`}
+              title="ถอนเงินจากบัญชีสมาชิก (F3)"
+              onClick={() =>
+                setPosShortcut(posShortcut === "ถอนเงิน" ? "" : "ถอนเงิน")
+              }
+            >
+              <ArrowUpFromLine size={20} />
+              <b>ถอนเงิน</b>
+              <kbd>F3</kbd>
+            </button>
+          )}
+          {!railHidden.has("register") && (
+            <button
+              type="button"
+              className="rail-btn rail-register"
+              title="ลงทะเบียนสมาชิกใหม่ + พิมพ์บัตร — ทำที่นี่ที่เดียว (F6)"
+              onClick={() =>
+                window.dispatchEvent(
+                  new CustomEvent("pos-rail", { detail: "register" })
+                )
+              }
+            >
+              <UserPlus size={20} />
+              <b>สมาชิกใหม่</b>
+              <kbd>F6</kbd>
+            </button>
+          )}
+          {!railHidden.has("limit") && <button type="button" className="rail-btn rail-limit" title="ขอลดวงเงินซื้อสินค้าต่อวัน — รอผู้บริหารอนุมัติ" onClick={() => window.dispatchEvent(new CustomEvent("pos-rail", { detail: "limit" }))}><TrendingDown size={20} /><b>ขอลดวงเงิน</b></button>}
+          </div> : null}
+          {!railHidden.has("special") || !railHidden.has("receive") || !railHidden.has("add") ? <details className="pos-rail-more"><summary>งานอื่น</summary><div className="pos-rail-group">
+          {!railHidden.has("special") && (
+            <button
+              type="button"
+              className={`rail-btn rail-special${posShortcut === "สินค้าไม่ระบุตายตัว" ? " active" : ""}`}
+              title="เพิ่มรายการพิเศษ — ของสั่ง ค่าบริการ (F4)"
+              onClick={() => {
+                if (edition.status?.has("specialOrders"))
+                  setPosShortcut(
+                    posShortcut === "สินค้าไม่ระบุตายตัว"
+                      ? ""
+                      : "สินค้าไม่ระบุตายตัว"
+                  );
+                else openEditionTab();
+              }}
+            >
+              <Sparkles size={20} />
+              <b>รายการพิเศษ</b>
+              <kbd>F4</kbd>
+            </button>
+          )}
+          {!railHidden.has("receive") && (
+            <button
+              type="button"
+              className="rail-btn rail-inventory"
+              title="รับเข้าสินค้าจากหน้า POS โดยตรง (F9)"
+              onClick={() =>
+                window.dispatchEvent(
+                  new CustomEvent("pos-rail", { detail: "receive" })
+                )
+              }
+            >
+              <StockReceive size={20} weight="bold" />
+              <b>รับเข้าสินค้า</b>
+              <kbd>F9</kbd>
+            </button>
+          )}
+          {!railHidden.has("add") && (
+            <button
+              type="button"
+              className="rail-btn rail-add"
+              title="เพิ่มสินค้าใหม่จากหน้า POS โดยตรง (F10)"
+              onClick={() =>
+                window.dispatchEvent(
+                  new CustomEvent("pos-rail", { detail: "add" })
+                )
+              }
+            >
+              <Plus size={20} />
+              <b>เพิ่มสินค้าใหม่</b>
+              <kbd>F10</kbd>
+            </button>
+          )}
+          </div></details> : null}
+          <div className="shell-account-footer">
+            {notificationPanel}
             <div className="profile-pill">
               <span className={`profile-avatar ${role}`}>{profileAvatar}</span>
               <div>
@@ -931,8 +650,184 @@ export function AppShell({
                 </small>
               </div>
             </div>
+<button type="button" className="outline-button shell-logout" aria-label="ออกจากระบบ" title="ออกจากระบบ" onClick={logout} disabled={logoutMutation.isPending}><LogOut size={18} /><span>{logoutMutation.isPending ? "กำลังออก" : "ออกจากระบบ"}</span></button>
+</div>
+          <span className="rail-spacer" aria-hidden="true" />
+          <button
+            type="button"
+            className="rail-btn rail-exit"
+            title="เปิดเมนูหลัก — ภาพรวมระบบ (Esc)"
+            onClick={() => setActiveView("dashboard")}
+          >
+            <LayoutDashboard size={20} />
+            <b>เมนู</b>
+            <kbd>Esc</kbd>
+          </button>
+        </aside>
+      )}
+      <aside
+        className={`sidebar${mobileNav ? " open" : ""}${sidebarCollapsed ? " collapsed" : ""}${safeView === "pos" ? " pos-context" : ""}`}
+      >
+        <div className="brand">
+          {appLogo ? (
+            <img className="brand-logo" src={appLogo} alt={appName} />
+          ) : (
+            <div className="brand-mark">
+              <span>{brandInitial(appName)}</span>
+            </div>
+          )}
+          <div className="brand-text">
+            <b>{appName}</b>
+            <small>Welfare Store</small>
           </div>
-        </header>
+          <button
+            type="button"
+            className="mobile-close"
+            onClick={() => setMobileNav(false)}
+            aria-label="ปิดเมนูด้านข้าง"
+          >
+            <X size={19} />
+          </button>
+          <button
+            type="button"
+            className="sidebar-collapse-btn"
+            onClick={() => setSidebarCollapsed((collapsed) => !collapsed)}
+            title={sidebarCollapsed ? "ขยายเมนูด้านข้าง" : "ย่อเมนูด้านข้างเหลือไอคอน"}
+            aria-label={sidebarCollapsed ? "ขยายเมนูด้านข้าง" : "ย่อเมนูด้านข้างเหลือไอคอน"}
+            aria-expanded={!sidebarCollapsed}
+          >
+            {sidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+          </button>
+        </div>
+        <div className="nav-group-label">เมนูหลัก</div>
+        <nav>
+          {navItems.map(({ id, label, caption, icon: Icon, tileColor }) => (
+            <button
+              className={safeView === id ? "active" : ""}
+              data-nav-item={id}
+              key={id}
+              title={`${label} — ${caption}`}
+              onClick={() => {
+                setActiveView(id);
+                setMobileNav(false);
+              }}
+            >
+              <Icon size={20} weight="duotone" />
+              <b>{label}</b>
+              {/* PT-2 — badges show ONLY when the user must take action.
+                  Low stock → needs restocking; held bills → needs to resume.
+                  Member/bill totals are pure data so they live on the page. */}
+              {id === "stock" && lowStock.length > 0 && (
+                <i className="nav-badge">{lowStock.length}</i>
+              )}
+              {id === "pos" && posHeldCount > 0 && (
+                <i className="nav-badge">{posHeldCount}</i>
+              )}
+            </button>
+          ))}
+        </nav>
+        {isAdminRole(role) ? (
+          <div
+            className={`nav-admin-section${sidebarCollapsed ? " collapsed" : ""}${adminGroupOpen ? " open" : ""}`}
+          >
+            {!sidebarCollapsed && (
+              <button
+                type="button"
+                className="nav-group-toggle"
+                onClick={() => setAdminGroupOpen((open) => !open)}
+                aria-expanded={adminGroupOpen}
+                title="จัดการระบบ — ตั้งค่า / ผู้ใช้ระบบ / ประวัติระบบ"
+              >
+                <Settings2 size={20} />
+                <b>จัดการระบบ</b>
+                <ChevronDown size={14} className="toggle-chevron" />
+              </button>
+            )}
+            {(sidebarCollapsed || adminGroupOpen) && (
+              <nav className="nav-group-children">
+                <button
+                  className={safeView === "settings" ? "active" : ""}
+                  title="ตั้งค่า"
+                  onClick={() => {
+                    setActiveView("settings");
+                    setMobileNav(false);
+                  }}
+                >
+                  <Settings2 size={sidebarCollapsed ? 20 : 18} />
+                  {!sidebarCollapsed && <b>ตั้งค่า</b>}
+                </button>
+                <button
+                  className={safeView === "users" ? "active" : ""}
+                  title="ผู้ใช้ระบบ"
+                  onClick={() => {
+                    setActiveView("users");
+                    setMobileNav(false);
+                  }}
+                >
+                  <UserCog size={sidebarCollapsed ? 20 : 18} />
+                  {!sidebarCollapsed && <b>ผู้ใช้ระบบ</b>}
+                </button>
+                <button
+                  className={safeView === "logs" ? "active" : ""}
+                  title="ประวัติระบบ"
+                  onClick={() => {
+                    setActiveView("logs");
+                    setMobileNav(false);
+                  }}
+                >
+                  <Activity size={sidebarCollapsed ? 20 : 18} />
+                  {!sidebarCollapsed && <b>ประวัติระบบ</b>}
+                </button>
+              </nav>
+            )}
+          </div>
+        ) : (
+          <div className="locked-nav">
+            <LockKeyhole size={15} />
+            <span>เมนูผู้บริหารถูกซ่อน</span>
+          </div>
+        )}
+        <div className="sidebar-footer">{safeView !== "pos" && (<div className="shell-account-footer">
+            {notificationPanel}
+            <div className="profile-pill">
+              <span className={`profile-avatar ${role}`}>{profileAvatar}</span>
+              <div>
+                <b>{profileName}</b>
+                <small>
+                  {role === "admin"
+                    ? "ผู้บริหาร"
+                    : role === "dev"
+                      ? "ผู้พัฒนา"
+                      : "เจ้าหน้าที่"}
+                  {role === "dev" && <i className="dev-role-badge">ผู้พัฒนา</i>}
+                </small>
+              </div>
+            </div>
+<button type="button" className="outline-button shell-logout" aria-label="ออกจากระบบ" title="ออกจากระบบ" onClick={logout} disabled={logoutMutation.isPending}><LogOut size={18} /><span>{logoutMutation.isPending ? "กำลังออก" : "ออกจากระบบ"}</span></button>
+</div>)}</div>
+      </aside>
+      <main className="main-shell">
+        <button type="button" className="mobile-menu workspace-menu" aria-label="เปิดเมนู" onClick={() => setMobileNav(true)}><Menu size={21} />{notifCount > 0 && <span className="workspace-alert-dot" />}</button>
+            <SharedSearchHost fallback={
+            <div
+              className="global-search"
+              role="button"
+              tabIndex={0}
+              aria-label="เปิดค้นหาเมนู สมาชิก หรือสินค้า"
+              onClick={() => setSearchOpen(true)}
+              onKeyDown={event => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setSearchOpen(true);
+                }
+              }}
+            >
+              <Search size={17} />
+              <span>ค้นหาเมนูหรือรายการ...</span>
+              <kbd>⌘ K</kbd>
+            </div>
+            } />
+
         <div className="page-content" key={safeView}>
           {safeView === "dashboard" && (
             <Dashboard
@@ -947,6 +842,8 @@ export function AppShell({
               setShortcut={setPosShortcut}
               role={role}
               userName={profileName}
+              focusProductId={pendingProductId}
+              onFocusProductConsumed={() => setPendingProductId(null)}
             />
           )}
           {safeView === "stock" && <Stock role={role} userName={profileName} />}
@@ -996,6 +893,11 @@ export function AppShell({
           role={role}
           open={searchOpen}
           onClose={() => setSearchOpen(false)}
+          onOpenProduct={productId => {
+            setSearchOpen(false);
+            setPendingProductId(productId);
+            setActiveView("pos");
+          }}
           onNavigate={view => {
             setActiveView(view);
             setSearchOpen(false);
@@ -1018,5 +920,6 @@ export function AppShell({
         {safeView !== "pos" && <ShortcutsFab />}
       </main>
     </div>
+    </SharedSearchProvider>
   );
 }

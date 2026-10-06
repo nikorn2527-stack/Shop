@@ -84,6 +84,21 @@ export const REPORT_DOC_CSS = `
   .report-doc.compact .rd-table { font-size: 11.5px; }
   .report-doc.compact .rd-table th { font-size: 10px; padding: 5px 6px; }
   .report-doc.compact .rd-table td { padding: 4px 6px; }
+  /* Same monochrome paper in preview, vector PDF, raster fallback and print.
+     Scope to the document so application theme and controls stay unchanged. */
+  .report-doc, .report-doc * {
+    color: #000000 !important;
+    background: #ffffff !important;
+    border-color: #000000 !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+  .report-doc::before, .report-doc::after,
+  .report-doc *::before, .report-doc *::after {
+    color: #000000 !important;
+    background: none !important;
+    box-shadow: none !important;
+  }
 `;
 
 /** @font-face Sarabun (12 weights, thai+latin unicode-range) สำหรับ iframe/Puppeteer */
@@ -103,8 +118,8 @@ export const REPORT_DOC_PRINT_FONT_FACE = `
 `;
 
 export type BuildReportHtmlOptions = {
-  /** "print" = ฝัง script auto window.print() สำหรับ iframe print flow */
-  mode?: "print" | "pdf";
+  /** "print" = ฝัง script auto window.print(); "preview" = จำลองขอบ A4 บน iframe โดยไม่กระทบ PDF/Print จริง */
+  mode?: "print" | "pdf" | "preview";
   /** ข้อความแสตมป์เวลา เช่น "สร้างเมื่อ ..." / "พิมพ์เมื่อ ..." */
   stampText: string;
   /** override @font-face block (สำหรับ server-side ที่ฝัง font เป็น base64 data URL
@@ -131,6 +146,11 @@ export function buildReportDocumentHtml(config: ReportDocConfig, opts: BuildRepo
   const autoPrintScript = opts.mode === "print"
     ? `<script>window.addEventListener("load", () => { const go = () => window.setTimeout(() => window.print(), 120); if (document.fonts && document.fonts.ready) { document.fonts.ready.then(go); } else { go(); } });</script>`
     : "";
+  // @page margins are only applied by the print engine. Render the same safe area
+  // explicitly when this document is embedded in an on-screen preview iframe.
+  const previewPageCss = opts.mode === "preview"
+    ? `@media screen { body { min-height: 1123px; padding: 14mm; } }`
+    : "";
   const fontFace = opts.fontFace ?? REPORT_DOC_PRINT_FONT_FACE;
   return `<!DOCTYPE html>
 <html lang="th"><head><meta charset="utf-8" /><title>${escapeHtml(config.title)}</title>
@@ -139,6 +159,7 @@ export function buildReportDocumentHtml(config: ReportDocConfig, opts: BuildRepo
   @page { size: A4 portrait; margin: 14mm; }
   * { box-sizing: border-box; }
   body { margin: 0; background: #fff; }
+  ${previewPageCss}
   ${REPORT_DOC_CSS}
 </style></head>
 <body>

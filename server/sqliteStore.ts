@@ -254,6 +254,7 @@ export type StoreSettings = {
   appName: string;
   /** data-URL รูปโลโก้ (สูงสุด ~512KB) — ว่าง = ใช้อักษรย่อ */
   appLogo: string;
+  appBackground: string;
   /** สีธีมหลัก: preset id เช่น "emerald" หรือ hex "#007a55" */
   appTheme: string;
   /** ROUND 75 (user) — หน้าแจ้งผลหลังชำระเงิน ไม่เด้งไปหน้าสั่งพิมพ์อีกต่อไป:
@@ -458,6 +459,14 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
       wallet_total REAL NOT NULL DEFAULT 0,
       deposits REAL NOT NULL DEFAULT 0,
       withdrawals REAL NOT NULL DEFAULT 0,
+      deposit_count INTEGER NOT NULL DEFAULT 0,
+      deposit_amount REAL NOT NULL DEFAULT 0,
+      activation_count INTEGER NOT NULL DEFAULT 0,
+      activation_amount REAL NOT NULL DEFAULT 0,
+      withdrawal_count INTEGER NOT NULL DEFAULT 0,
+      withdrawal_amount REAL NOT NULL DEFAULT 0,
+      refund_count INTEGER NOT NULL DEFAULT 0,
+      refund_amount REAL NOT NULL DEFAULT 0,
       closed_by TEXT,
       note TEXT
     );
@@ -593,6 +602,16 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
   ensureColumn(db, "sales", "void_actor", "TEXT");
   ensureColumn(db, "sales", "voided_at", "TEXT");
   ensureColumn(db, "member_transactions", "slip_url", "TEXT");
+  // Hospital daily-cover-sheet snapshots. Keep separate amount/count columns so
+  // a closed document remains historically accurate after later ledger entries.
+  ensureColumn(db, "day_closures", "deposit_count", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "day_closures", "deposit_amount", "REAL NOT NULL DEFAULT 0");
+  ensureColumn(db, "day_closures", "activation_count", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "day_closures", "activation_amount", "REAL NOT NULL DEFAULT 0");
+  ensureColumn(db, "day_closures", "withdrawal_count", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "day_closures", "withdrawal_amount", "REAL NOT NULL DEFAULT 0");
+  ensureColumn(db, "day_closures", "refund_count", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "day_closures", "refund_amount", "REAL NOT NULL DEFAULT 0");
   // P2-b (idempotency) — client_request_id lets checkout() + walletTx()
   // short-circuit a retried submit and return the original receipt/ledger row
   // instead of double-charging the member or double-decrementing stock.
@@ -1124,7 +1143,9 @@ export function receiveStockLines(
       return { id: Number(result.lastInsertRowid), productId: input.productId, lot: lotLabel, expiry: input.expiryDate || null, qty: line.qty, cost: line.cost ?? previousCost, receivedAt: createdAt };
     });
     db.prepare(`UPDATE products SET stock = stock + ?, cost = ? WHERE id = ?`).run(totalQty, averageCost, input.productId);
-  recordMovement(db, { type: 'RECEIVE', productId: input.productId, qtyDelta: totalQty, unitCost: averageCost, refType: 'receive', reason: `รับเข้า Lot ${input.lot || ''}`, actor: input.actor?.trim() || undefined, actorRole: input.actorRole ?? undefined });
+    for (const lot of lots) {
+      recordMovement(db, { type: 'RECEIVE', productId: input.productId, qtyDelta: lot.qty, unitCost: lot.cost, refType: 'stock_lot', refId: lot.id, reason: `รับเข้า Lot ${lotLabel}`, actor: input.actor?.trim() || undefined, actorRole: input.actorRole ?? undefined });
+    }
     // Log: บรรทัดเดียวไม่ใส่ต้นทุน = ข้อความเดิม · มีต้นทุน/หลายบรรทัด = สรุปทุกบรรทัด + ต้นทุนเฉลี่ยใหม่
     const anyCost = parsed.some((line) => line.cost !== undefined);
     const lineSummary = anyCost ? ` · ${parsed.map((line) => `${line.qty}×${money(line.cost ?? previousCost)}${line.cost === 0 ? " แถม" : ""}`).join(" + ")}` : "";
@@ -1147,6 +1168,23 @@ export function receiveStock(
   const result = receiveStockLines(db, { productId, lot, expiryDate, lines: [{ qty, cost }], actor, actorRole });
   // รูปเอาต์พุตเดิม { lot, product } + เผื่อ averageCost ไว้ให้ผู้เรียกรุ่นใหม่
   return { lot: result.lot, product: result.product, averageCost: result.averageCost };
+}
+
+export function stockReceiptHistory(db: SqliteDb, input: { from?: string; to?: string; search?: string; actor?: string } = {}) {
+  return db.prepare(`SELECT l.id, p.sku, p.name, p.unit, l.lot,
+    l.received_at AS receivedAt, l.received_qty AS receivedQty,
+    l.expiry_date AS expiry, l.cost, m.actor,
+    CASE WHEN m.id IS NOT NULL THEN l.received_qty * m.unit_cost ELSE NULL END AS value
+    FROM stock_lots l JOIN products p ON p.id = l.product_id
+    LEFT JOIN stock_movements m ON m.ref_type = 'stock_lot' AND m.ref_id = l.id AND m.type = 'RECEIVE'
+    WHERE (? = '' OR substr(l.received_at, 1, 10) >= ?)
+      AND (? = '' OR substr(l.received_at, 1, 10) <= ?)
+      AND (? = '' OR instr(lower(p.name || ' ' || p.sku || ' ' || l.lot), lower(?)) > 0)
+      AND (? = '' OR instr(lower(coalesce(m.actor, '')), lower(?)) > 0)
+    ORDER BY l.received_at DESC, l.id DESC`).all(
+      input.from ?? '', input.from ?? '', input.to ?? '', input.to ?? '',
+      input.search?.trim() ?? '', input.search?.trim() ?? '', input.actor?.trim() ?? '', input.actor?.trim() ?? ''
+    ) as { id: number; sku: string; name: string; unit: string; lot: string; receivedAt: string; receivedQty: number; expiry: string | null; cost: number; actor: string | null; value: number | null }[];
 }
 
 export function listStockRows(db: SqliteDb): SqliteStockRow[] {
@@ -2060,7 +2098,7 @@ function nextMemberSequence(db: SqliteDb, prefix: string) {
   return max + 1;
 }
 
-function generateMemberNumber(db: SqliteDb, mode: "running" | "year" | "manual", provided?: string) {
+export function generateMemberNumber(db: SqliteDb, mode: "running" | "year" | "manual", provided?: string) {
   if (mode === "manual") {
     const manual = provided?.trim();
     if (!manual) throw new StoreError("โหมดกำหนดหมายเลขเอง: กรุณาระบุหมายเลขสมาชิก");
@@ -2139,12 +2177,13 @@ export function registerMember(db: SqliteDb, input: RegisterMemberInput) {
     );
     if (initialDeposit > 0) {
       // ROUND 65 — เงินเริ่มต้นตอนลงทะเบียน = "เปิดใช้บัตร" (ตรงกับรายงานโรงพยาบาล)
-      db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, created_at) VALUES (?, 'activation', ?, ?, 'เงินสด', ?, ?)`).run(
+      db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, created_at, actor) VALUES (?, 'activation', ?, ?, 'เงินสด', ?, ?, ?)`).run(
         memberNumber,
         `เปิดใช้บัตร · เงินเริ่มต้นตอนลงทะเบียน · เงินสด`,
         initialDeposit,
         initialDeposit,
         createdAt,
+        input.actor?.trim() || "ระบบ",
       );
     }
     logAction(db, "ลงทะเบียนสมาชิก", input.actor?.trim() || "ระบบ", `${memberNumber} · ${firstName} ${lastName}${initialDeposit > 0 ? ` · เปิดใช้บัตรพร้อมเงิน ${money(initialDeposit)}` : ""}`, "green", input.actorRole ?? null, createdAt);
@@ -2714,6 +2753,8 @@ export function salesByProduct(db: SqliteDb, input: DailyRangeInput = {}): Sales
 export type SalesLineItemRow = {
   orderNumber: string;
   createdAt: string;
+  /** SKU is the hospital-report product identifier; barcode is a legacy fallback. */
+  productCode: string | null;
   productName: string;
   unit: string;
   qty: number;
@@ -2730,7 +2771,7 @@ export function salesLineItems(db: SqliteDb, input: DailyRangeInput = {}): Sales
   const since = `${formatDate(fromDate)} 00:00:00`;
   const until = `${formatDate(toDate)} 23:59:59`;
   const filter = cashierWhere("s", input);
-  return db.prepare(`SELECT s.order_number AS orderNumber, s.created_at AS createdAt, si.name AS productName, COALESCE(si.unit, p.unit, 'ชิ้น') AS unit, si.qty, si.price, ROUND(si.qty * si.price, 2) AS amount, s.payment_method AS paymentMethod, COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, s.member_number AS memberNumber, CASE WHEN m.member_number IS NULL THEN NULL WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id LEFT JOIN members m ON m.member_number = s.member_number WHERE s.created_at >= ? AND s.created_at <= ?${filter.sql} ORDER BY s.created_at DESC, s.id DESC, si.id ASC LIMIT 1000`).all(since, until, ...filter.params) as unknown as SalesLineItemRow[];
+  return db.prepare(`SELECT s.order_number AS orderNumber, s.created_at AS createdAt, COALESCE(NULLIF(TRIM(p.sku), ''), NULLIF(TRIM(p.barcode), '')) AS productCode, si.name AS productName, COALESCE(si.unit, p.unit, 'ชิ้น') AS unit, si.qty, si.price, ROUND(si.qty * si.price, 2) AS amount, s.payment_method AS paymentMethod, COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, s.member_number AS memberNumber, CASE WHEN m.member_number IS NULL THEN NULL WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id LEFT JOIN members m ON m.member_number = s.member_number WHERE s.created_at >= ? AND s.created_at <= ?${filter.sql} ORDER BY s.created_at DESC, s.id DESC, si.id ASC LIMIT 1000`).all(since, until, ...filter.params) as unknown as SalesLineItemRow[];
 }
 
 export type SalesByCashierRow = { cashier: string; orders: number; items: number; memberBills: number; discount: number; total: number; cogs: number; profit: number };
@@ -3092,7 +3133,8 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   storeAddress: "ร้านค้าสวัสดิการ",
   appName: "ร้านค้าสวัสดิการ",
   appLogo: "",
-  appTheme: "emerald",
+  appBackground: "",
+  appTheme: "indigo",
   // ROUND 75 — เมนูลัดหน้าร้าน: "" = เปิดใช้ทุกปุ่มบนรางซ้าย POS
   posRailHidden: "",
   posShortcutKeys: "",
@@ -3157,6 +3199,14 @@ export type DayClosureRow = {
   walletTotal: number;
   deposits: number;
   withdrawals: number;
+  depositCount: number;
+  depositAmount: number;
+  activationCount: number;
+  activationAmount: number;
+  withdrawalCount: number;
+  withdrawalAmount: number;
+  refundCount: number;
+  refundAmount: number;
   closedBy: string | null;
   note: string | null;
 };
@@ -3177,11 +3227,19 @@ export type BusinessPeriodStatus = {
     walletTotal: number;
     deposits: number;
     withdrawals: number;
+    depositCount: number;
+    depositAmount: number;
+    activationCount: number;
+    activationAmount: number;
+    withdrawalCount: number;
+    withdrawalAmount: number;
+    refundCount: number;
+    refundAmount: number;
   };
   lastClosure: DayClosureRow | null;
 };
 
-const CLOSURE_SELECT = `SELECT id, period_start AS periodStart, closed_at AS closedAt, bills, pieces, ROUND(revenue, 2) AS revenue, ROUND(cash_total, 2) AS cashTotal, ROUND(qr_total, 2) AS qrTotal, ROUND(wallet_total, 2) AS walletTotal, ROUND(deposits, 2) AS deposits, ROUND(withdrawals, 2) AS withdrawals, closed_by AS closedBy, note FROM day_closures`;
+const CLOSURE_SELECT = `SELECT id, period_start AS periodStart, closed_at AS closedAt, bills, pieces, ROUND(revenue, 2) AS revenue, ROUND(cash_total, 2) AS cashTotal, ROUND(qr_total, 2) AS qrTotal, ROUND(wallet_total, 2) AS walletTotal, ROUND(deposits, 2) AS deposits, ROUND(withdrawals, 2) AS withdrawals, deposit_count AS depositCount, ROUND(deposit_amount, 2) AS depositAmount, activation_count AS activationCount, ROUND(activation_amount, 2) AS activationAmount, withdrawal_count AS withdrawalCount, ROUND(withdrawal_amount, 2) AS withdrawalAmount, refund_count AS refundCount, ROUND(refund_amount, 2) AS refundAmount, closed_by AS closedBy, note FROM day_closures`;
 
 function parseCutOffTime(value: string): { hours: number; minutes: number } {
   const match = /^(\d{1,2}):(\d{2})$/.exec(value?.trim() ?? "");
@@ -3189,11 +3247,11 @@ function parseCutOffTime(value: string): { hours: number; minutes: number } {
   return { hours: Math.min(23, Number(match[1])), minutes: Math.min(59, Number(match[2])) };
 }
 
-/** Totals of sales + wallet movements within [since, now]. */
-function periodTotals(db: SqliteDb, since: string) {
-  const salesRows = db.prepare(`SELECT COUNT(*) AS bills, COALESCE(SUM(total), 0) AS revenue, SUM(CASE WHEN payment_method = 'เงินสด' THEN total ELSE 0 END) AS cashTotal, SUM(CASE WHEN payment_method = 'QR / สแกน' THEN total ELSE 0 END) AS qrTotal, SUM(CASE WHEN payment_method = 'หักบัญชีสมาชิก' THEN total ELSE 0 END) AS walletTotal FROM sales WHERE created_at >= ?`).get(since) as { bills: number; revenue: number; cashTotal: number | null; qrTotal: number | null; walletTotal: number | null };
-  const piecesRow = db.prepare(`SELECT COALESCE(SUM(si.qty), 0) AS pieces FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE s.created_at >= ?`).get(since) as { pieces: number };
-  const walletRows = db.prepare(`SELECT COALESCE(SUM(CASE WHEN type = 'deposit' THEN amount ELSE 0 END), 0) AS deposits, COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN -amount ELSE 0 END), 0) AS withdrawals FROM member_transactions WHERE created_at >= ?`).get(since) as { deposits: number; withdrawals: number };
+/** Totals in [since, until); a transaction at cutoff belongs to the new period. */
+function periodTotals(db: SqliteDb, since: string, until = "9999-12-31 23:59:59") {
+  const salesRows = db.prepare(`SELECT COUNT(*) AS bills, COALESCE(SUM(total), 0) AS revenue, SUM(CASE WHEN payment_method = 'เงินสด' THEN total ELSE 0 END) AS cashTotal, SUM(CASE WHEN payment_method = 'QR / สแกน' THEN total ELSE 0 END) AS qrTotal, SUM(CASE WHEN payment_method = 'หักบัญชีสมาชิก' THEN total ELSE 0 END) AS walletTotal FROM sales WHERE created_at >= ? AND created_at < ?`).get(since, until) as { bills: number; revenue: number; cashTotal: number | null; qrTotal: number | null; walletTotal: number | null };
+  const piecesRow = db.prepare(`SELECT COALESCE(SUM(si.qty), 0) AS pieces FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE s.created_at >= ? AND s.created_at < ?`).get(since, until) as { pieces: number };
+  const walletRows = db.prepare(`SELECT COUNT(CASE WHEN type = 'deposit' THEN 1 END) AS depositCount, COALESCE(SUM(CASE WHEN type = 'deposit' THEN amount ELSE 0 END), 0) AS depositAmount, COUNT(CASE WHEN type = 'activation' THEN 1 END) AS activationCount, COALESCE(SUM(CASE WHEN type = 'activation' THEN amount ELSE 0 END), 0) AS activationAmount, COUNT(CASE WHEN type = 'withdrawal' THEN 1 END) AS withdrawalCount, COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN ABS(amount) ELSE 0 END), 0) AS withdrawalAmount, COUNT(CASE WHEN type = 'refund' THEN 1 END) AS refundCount, COALESCE(SUM(CASE WHEN type = 'refund' THEN ABS(amount) ELSE 0 END), 0) AS refundAmount FROM member_transactions WHERE created_at >= ? AND created_at < ?`).get(since, until) as { depositCount: number; depositAmount: number; activationCount: number; activationAmount: number; withdrawalCount: number; withdrawalAmount: number; refundCount: number; refundAmount: number };
   return {
     bills: salesRows.bills,
     pieces: piecesRow.pieces,
@@ -3201,8 +3259,16 @@ function periodTotals(db: SqliteDb, since: string) {
     cashTotal: round2(salesRows.cashTotal ?? 0),
     qrTotal: round2(salesRows.qrTotal ?? 0),
     walletTotal: round2(salesRows.walletTotal ?? 0),
-    deposits: round2(walletRows.deposits),
-    withdrawals: round2(Math.abs(walletRows.withdrawals)),
+    deposits: round2(walletRows.depositAmount),
+    withdrawals: round2(walletRows.withdrawalAmount),
+    depositCount: Number(walletRows.depositCount),
+    depositAmount: round2(walletRows.depositAmount),
+    activationCount: Number(walletRows.activationCount),
+    activationAmount: round2(walletRows.activationAmount),
+    withdrawalCount: Number(walletRows.withdrawalCount),
+    withdrawalAmount: round2(walletRows.withdrawalAmount),
+    refundCount: Number(walletRows.refundCount),
+    refundAmount: round2(walletRows.refundAmount),
   };
 }
 
@@ -3223,6 +3289,8 @@ export function businessPeriodStatus(db: SqliteDb): BusinessPeriodStatus {
     todayCut.setHours(hours, minutes, 0, 0);
     const start = now >= todayCut ? todayCut : new Date(todayCut.getTime() - 24 * 60 * 60 * 1000);
     periodStart = formatDateTime(start);
+    // A manual close inside the scheduled day starts a new live period too.
+    if (lastClosure && lastClosure.closedAt > periodStart) periodStart = lastClosure.closedAt;
     const next = new Date(start.getTime() + 24 * 60 * 60 * 1000);
     nextCutOffAt = formatDateTime(next);
   } else {
@@ -3250,9 +3318,11 @@ export type CloseDayInput = {
  */
 export function closeBusinessDay(db: SqliteDb, input: CloseDayInput = {}): DayClosureRow {
   const status = businessPeriodStatus(db);
-  const closedAt = formatDateTime();
-  const actor = input.actor?.trim() || "เจ้าหน้าที่ร้านค้า";
-  const totals = status.totals;
+  return saveBusinessClosure(db, status.periodStart, formatDateTime(), status.totals, input);
+}
+
+function saveBusinessClosure(db: SqliteDb, periodStart: string, closedAt: string, totals: BusinessPeriodStatus["totals"], input: CloseDayInput): DayClosureRow {
+  const actor = input.actor?.trim() || "??????????????????";
   runInTransaction(db, () => {
     // P2-b (double-close guard) — once this period is already snapshotted,
     // a second close must NOT insert a duplicate row. The early SELECT inside
@@ -3262,10 +3332,10 @@ export function closeBusinessDay(db: SqliteDb, input: CloseDayInput = {}): DayCl
     // concurrent closes could still both pass the SELECT — but the UI sends
     // closes serially per user, and the SELECT guard handles the realistic
     // double-submit race cleanly.
-    const alreadyClosed = db.prepare(`SELECT 1 FROM day_closures WHERE period_start = ?`).get(status.periodStart);
+    const alreadyClosed = db.prepare(`SELECT 1 FROM day_closures WHERE period_start = ?`).get(periodStart);
     if (alreadyClosed) throw new StoreError("รอบขายนี้ถูกตัดยอดไปแล้ว — ไม่สามารถตัดซ้อนได้");
-    db.prepare(`INSERT INTO day_closures (period_start, closed_at, bills, pieces, revenue, cash_total, qr_total, wallet_total, deposits, withdrawals, closed_by, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
-      status.periodStart,
+    db.prepare(`INSERT INTO day_closures (period_start, closed_at, bills, pieces, revenue, cash_total, qr_total, wallet_total, deposits, withdrawals, deposit_count, deposit_amount, activation_count, activation_amount, withdrawal_count, withdrawal_amount, refund_count, refund_amount, closed_by, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+      periodStart,
       closedAt,
       totals.bills,
       totals.pieces,
@@ -3275,6 +3345,14 @@ export function closeBusinessDay(db: SqliteDb, input: CloseDayInput = {}): DayCl
       totals.walletTotal,
       totals.deposits,
       totals.withdrawals,
+      totals.depositCount,
+      totals.depositAmount,
+      totals.activationCount,
+      totals.activationAmount,
+      totals.withdrawalCount,
+      totals.withdrawalAmount,
+      totals.refundCount,
+      totals.refundAmount,
       actor,
       input.note?.trim() || null,
     );
@@ -3282,13 +3360,62 @@ export function closeBusinessDay(db: SqliteDb, input: CloseDayInput = {}): DayCl
       db,
       "ตัดยอดรอบขาย",
       actor,
-      `รอบ ${status.periodStart} → ${closedAt} · ${totals.bills} บิล · ${money(totals.revenue)}${input.note?.trim() ? ` · ${input.note.trim()}` : ""}`,
+      `รอบ ${periodStart} → ${closedAt} · ${totals.bills} บิล · ${money(totals.revenue)}${input.note?.trim() ? ` · ${input.note.trim()}` : ""}`,
       "purple",
       input.actorRole ?? null,
       closedAt,
     );
   });
   return db.prepare(`${CLOSURE_SELECT} ORDER BY closed_at DESC, id DESC LIMIT 1`).get() as DayClosureRow;
+}
+
+/** Persist elapsed automatic periods, including catch-up after a server restart.
+ * The cursor is separate from business settings and advances only after saving.
+ * Work is bounded per tick so an old installation cannot block the server.
+ */
+export function closeElapsedBusinessPeriods(db: SqliteDb, now = new Date()): DayClosureRow[] {
+  const settings = getSettings(db);
+  if (settings.dailyCutOffMode === "manual") return [];
+  const { hours, minutes } = parseCutOffTime(settings.dailyCutOffTime);
+  const boundary = new Date(now);
+  boundary.setHours(hours, minutes, 0, 0);
+  if (boundary > now) boundary.setDate(boundary.getDate() - 1);
+  const boundaryText = formatDateTime(boundary);
+  const latest = db.prepare(`${CLOSURE_SELECT} ORDER BY closed_at DESC, id DESC LIMIT 1`).get() as DayClosureRow | undefined;
+  const cursorKey = "automaticCutoffCursor";
+  const cursor = db.prepare(`SELECT value FROM store_settings WHERE key = ?`).get(cursorKey) as { value: string } | undefined;
+  let since = cursor?.value;
+  if (!since) {
+    const first = db.prepare(`SELECT MIN(created_at) AS createdAt FROM (SELECT created_at FROM sales UNION ALL SELECT created_at FROM member_transactions)`).get() as { createdAt: string | null };
+    const start = first.createdAt ? new Date(first.createdAt.replace(" ", "T")) : new Date(boundary);
+    start.setHours(hours, minutes, 0, 0);
+    if (first.createdAt && formatDateTime(start) > first.createdAt) start.setDate(start.getDate() - 1);
+    since = formatDateTime(start);
+  }
+  if (latest && latest.closedAt > since) since = latest.closedAt;
+  const saveCursor = (value: string) => db.prepare(`INSERT INTO store_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(cursorKey, value);
+  const closures: DayClosureRow[] = [];
+  for (let i = 0; since < boundaryText && i < 31; i++) {
+    const end = new Date(since.replace(" ", "T"));
+    end.setHours(hours, minutes, 0, 0);
+    if (formatDateTime(end) <= since) end.setDate(end.getDate() + 1);
+    const until = formatDateTime(end);
+    if (until > boundaryText) break;
+    // A crash after saving but before advancing the cursor must not duplicate it.
+    const existing = db.prepare(`SELECT closed_at AS closedAt FROM day_closures WHERE period_start = ?`).get(since) as { closedAt: string } | undefined;
+    if (existing) {
+      if (existing.closedAt <= since) throw new StoreError("รอบตัดยอดเดิมมีช่วงเวลาไม่ถูกต้อง");
+      since = existing.closedAt;
+    } else {
+      closures.push(saveBusinessClosure(db, since, until, periodTotals(db, since, until), {
+        actor: "ระบบอัตโนมัติ", note: "ตัดยอดตามเวลาที่กำหนด",
+      }));
+      since = until;
+    }
+    saveCursor(since);
+  }
+  saveCursor(since);
+  return closures;
 }
 
 /** Day-closure history (ประวัติการตัดยอดรอบขาย), newest first. */
@@ -3335,6 +3462,44 @@ export function setEditionSettings(db: SqliteDb, patch: Partial<Pick<StoreSettin
 
 /** Login account role for the welfare store app itself (local session auth). */
 export type AppUserRole = "staff" | "admin" | "dev";
+
+/**
+ * หลัง RBAC migration (ensureRbacSeed) ค่าใน app_users.role ถูกเขียนใหม่เป็นชื่อ
+ * บทบาทแบบละเอียด (cashier / stock_officer / supervisor / manager / auditor /
+ * administrator) แต่ทั้ง client และ logic ส่วนอื่นยังพูดศัพท์เดิม 3 ค่า
+ * (staff / admin / dev) อยู่ ถ้าไม่ normalize ตรงนี้ ตัวนับสิทธิ์ ฟิลเตอร์ และ
+ * last-admin guard จะเทียบค่าไม่ทันกันเงียบ ๆ (นับได้ 0 ทั้งที่มีผู้ใช้อยู่)
+ *
+ * อ่าน: DB value → AppUserRole · เขียน: AppUserRole → DB value
+ */
+const APP_ROLE_BY_STORED_ROLE: Record<string, AppUserRole> = {
+  cashier: "staff",
+  stock_officer: "staff",
+  supervisor: "staff",
+  auditor: "staff",
+  staff: "staff",
+  manager: "admin",
+  administrator: "admin",
+  admin: "admin",
+  dev: "dev",
+};
+
+/** ค่าที่เขียนลง app_users.role จริง ๆ เมื่อผู้ดูแลเลือกสิทธิ์แบบ 3 ค่า */
+const STORED_ROLE_BY_APP_ROLE: Record<AppUserRole, string> = {
+  staff: "cashier",
+  admin: "administrator",
+  dev: "dev",
+};
+
+/** แปลงค่า role ที่อ่านมาจากฐานข้อมูลให้อยู่ในสัญญา 3 ค่าที่ทั้งแอปเข้าใจ */
+export function normalizeAppRole(role: string | null | undefined): AppUserRole {
+  return APP_ROLE_BY_STORED_ROLE[String(role ?? "")] ?? "staff";
+}
+
+/** แปลงสิทธิ์ 3 ค่ากลับเป็นชื่อบทบาทที่เก็บใน DB (ต้องอยู่ในตาราง roles) */
+export function storedRoleFor(appRole: AppUserRole): string {
+  return STORED_ROLE_BY_APP_ROLE[appRole] ?? "cashier";
+}
 
 // ============================================================================
 // RBAC — Role-Based Access Control with granular permissions
@@ -3637,8 +3802,9 @@ export function isAdminRole(role: string): boolean {
 
 
 /** Thai display label for an app user role (audit log actorRole / UI badges). */
-export function appRoleThai(role: AppUserRole): string {
-  return role === "admin" ? "ผู้บริหาร" : role === "dev" ? "ผู้พัฒนา" : "เจ้าหน้าที่";
+export function appRoleThai(role: AppUserRole | string): string {
+  const normalized = normalizeAppRole(role);
+  return normalized === "admin" ? "ผู้บริหาร" : normalized === "dev" ? "ผู้พัฒนา" : "เจ้าหน้าที่";
 }
 
 // ROUND 36 (ข้อ 31) — กฎความแข็งแรงของรหัสผ่าน (มิเรอร์กันทั้ง server และ client/src/components/PasswordMeter.tsx)
@@ -3831,27 +3997,34 @@ function purgeExpiredAppSessions(db: SqliteDb): void {
   db.prepare(`DELETE FROM app_sessions WHERE expires_at < ?`).run(formatDateTime());
 }
 
+/** คืนแถวที่มี role พร้อมแปลงให้อยู่ในสัญญา 3 ค่า (DB เก็บชื่อบทบาทแบบ RBAC) */
+function withAppRole<T extends { role: string }>(row: T | undefined): (T & { role: AppUserRole }) | undefined {
+  return row ? { ...row, role: normalizeAppRole(row.role) } : undefined;
+}
+
 /**
  * Lists every unexpired session with its owning user, newest login first.
  * Suspended users keep their sessions listed (revoking them is the point).
  */
 export function listAppSessions(db: SqliteDb): AppSessionSummary[] {
   purgeExpiredAppSessions(db);
-  return db.prepare(
+  const rows = db.prepare(
     `SELECT s.id AS sessionId, u.username, u.display_name AS displayName, u.role, u.active, s.created_at AS createdAt, s.expires_at AS expiresAt
      FROM app_sessions s JOIN app_users u ON u.id = s.user_id
      WHERE s.expires_at > ?
      ORDER BY s.created_at DESC, s.id DESC`,
-  ).all(formatDateTime()) as unknown as AppSessionSummary[];
+  ).all(formatDateTime()) as AppSessionSummary[];
+  return rows.map((row) => withAppRole(row)!);
 }
 
 /** Finds one unexpired session (with user info) by id. */
 function findAppSessionById(db: SqliteDb, sessionId: string): AppSessionSummary | undefined {
-  return db.prepare(
+  const row = db.prepare(
     `SELECT s.id AS sessionId, u.username, u.display_name AS displayName, u.role, u.active, s.created_at AS createdAt, s.expires_at AS expiresAt
      FROM app_sessions s JOIN app_users u ON u.id = s.user_id
      WHERE s.id = ? AND s.expires_at > ?`,
   ).get(sessionId, formatDateTime()) as AppSessionSummary | undefined;
+  return withAppRole(row);
 }
 
 /** Session revoke audit detail, e.g. "@kanyanat · เข้าสู่ระบบ 18 ก.ย. 09:12". */
@@ -3906,12 +4079,14 @@ export type AppUserSummary = {
 const APP_USER_SUMMARY_SELECT = `SELECT id, username, display_name AS displayName, role, active, created_at AS createdAt, failed_attempts AS failedAttempts, locked_until AS lockedUntil, must_change_password AS mustChangePassword FROM app_users`;
 
 function getAppUserSummaryById(db: SqliteDb, userId: number): AppUserSummary | undefined {
-  return db.prepare(`${APP_USER_SUMMARY_SELECT} WHERE id = ?`).get(userId) as AppUserSummary | undefined;
+  const row = db.prepare(`${APP_USER_SUMMARY_SELECT} WHERE id = ?`).get(userId) as AppUserSummary | undefined;
+  return withAppRole(row);
 }
 
 /** Lists every login account, oldest first. Never exposes password hashes. */
 export function listAppUsers(db: SqliteDb): AppUserSummary[] {
-  return db.prepare(`${APP_USER_SUMMARY_SELECT} ORDER BY id`).all() as unknown as AppUserSummary[];
+  const rows = db.prepare(`${APP_USER_SUMMARY_SELECT} ORDER BY id`).all() as AppUserSummary[];
+  return rows.map((row) => withAppRole(row)!);
 }
 
 /**
@@ -3985,7 +4160,7 @@ export function setupInitialAdmin(db: SqliteDb, input: SetupInitialAdminInput): 
   if (storeName) {
     setSettings(db, { storeName, appName: storeName }, displayName, "ผู้บริหาร");
   }
-  logAction(db, "ตั้งค่าระบบครั้งแรก", displayName, `สร้างบัญชีผู้บริหารหลัก @${username} · ชื่อร้าน ${storeName || "-"}`, "green", "ผู้บริหาร", createdAt);
+  logAction(db, "ตั้งค่าระบบครั้งแรก", displayName, `สร้างบัญชีผู้บริหารหลัก @${username} · ชื่อร้าน ${storeName || "-"}`, "green", "ผู้บริหาร");
   return getAppUserSummaryById(db, Number(result.lastInsertRowid))!;
 }
 
@@ -4062,7 +4237,7 @@ export function createAppUser(db: SqliteDb, input: CreateAppUserInput): AppUserS
     username,
     hashPassword(input.password),
     displayName,
-    input.role,
+    storedRoleFor(input.role),
     createdAt,
   );
   const roleThai = appRoleThai(input.role);
@@ -4091,20 +4266,26 @@ export function updateAppUser(db: SqliteDb, input: UpdateAppUserInput): AppUserS
   // ROUND 36 (ข้อ 31) — รหัสที่ผู้บริหารตั้งให้ผู้อื่น ต้องผ่านกฎความแข็งแรงตามบทบาท
   // เป้าหมาย (บทบาทจะเปลี่ยนพร้อมกันก็ใช้บทบาทใหม่เลย)
   if (newPassword !== undefined) {
-    const strengthIssues = validatePasswordStrength(newPassword, input.role ?? user.role);
+    const strengthIssues = validatePasswordStrength(newPassword, input.role ?? normalizeAppRole(user.role));
     if (strengthIssues.length > 0) {
       throw new StoreError(strengthIssues.join(" · "));
     }
   }
 
   const nextDisplayName = input.displayName !== undefined && input.displayName.trim() !== user.displayName ? input.displayName.trim() : undefined;
-  const nextRole = input.role !== undefined && input.role !== user.role ? input.role : undefined;
+  // user.role อ่านมาจาก DB เป็นชื่อบทบาท RBAC (administrator/cashier/…)
+  // ต้อง normalize ให้เทียบกับสัญญา 3 ค่าได้ ไม่งั้นการเปลี่ยนแปลงจะถูกมองว่า "ไม่มีอะไรเปลี่ยน"
+  const currentRole = normalizeAppRole(user.role);
+  const nextRole = input.role !== undefined && input.role !== currentRole ? input.role : undefined;
   const nextActive = input.active !== undefined && (input.active ? 1 : 0) !== user.active ? (input.active ? 1 : 0) : undefined;
 
   // Last-admin guard: the final active admin cannot be demoted or deactivated.
-  if (user.role === "admin" && user.active === 1 && (nextRole !== undefined || nextActive === 0)) {
-    const others = db.prepare(`SELECT COUNT(*) AS count FROM app_users WHERE role = 'admin' AND active = 1 AND id != ?`).get(input.userId) as { count: number };
-    if (others.count === 0) {
+  if (currentRole === "admin" && user.active === 1 && (nextRole !== undefined || nextActive === 0)) {
+    const remaining = db
+      .prepare(`SELECT role, active FROM app_users WHERE active = 1 AND id != ?`)
+      .all(input.userId) as { role: string; active: number }[];
+    const otherAdmins = remaining.filter((row) => normalizeAppRole(row.role) === "admin").length;
+    if (otherAdmins === 0) {
       throw new StoreError("ต้องมีผู้ดูแลระบบ (ผู้บริหาร) ที่ใช้งานได้อย่างน้อย 1 รายเสมอ");
     }
   }
@@ -4119,7 +4300,7 @@ export function updateAppUser(db: SqliteDb, input: UpdateAppUserInput): AppUserS
   }
   if (nextRole !== undefined) {
     assignments.push("role = ?");
-    values.push(nextRole);
+    values.push(storedRoleFor(nextRole));
     changedLabels.push("สิทธิ์การใช้งาน");
   }
   if (nextActive !== undefined) {

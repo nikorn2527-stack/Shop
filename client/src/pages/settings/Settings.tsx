@@ -1,3 +1,5 @@
+import { ActionButton } from "@/components/ActionButton";
+import { SharedSearch } from "@/components/SharedSearch";
 /**
  * V2-C4 — Settings view extracted from `client/src/pages/Home.tsx` (pure move).
  *
@@ -28,6 +30,7 @@ import {
   ArrowDownToLine,
   ArrowRight,
   ArrowUpFromLine,
+  TrendingDown,
   Bank,
   Bell,
   CalendarClock,
@@ -123,14 +126,12 @@ import {
 } from "../../fontScale";
 import {
   applyPaperWidth,
+  applyBackground,
   applyThemeColor,
   applyUiStyle,
   brandInitial,
   PAPER_WIDTHS,
   resolvePaperWidth,
-  resolveThemeColor,
-  THEME_PRESETS,
-  UI_STYLE_PRESETS,
 } from "../../theme";
 import {
   formatLogDateTime,
@@ -152,6 +153,7 @@ type SettingsForm = {
   storeAddress: string;
   appName: string;
   appLogo: string;
+  appBackground: string;
   appTheme: string;
   /** ROUND 38 (ข้อ 38) — บุคลิกการออกแบบทั้งระบบ: shop | apple | microsoft | android */
   appStyle: string;
@@ -277,6 +279,13 @@ const POS_RAIL_BUTTONS: {
     kbd: "F3",
     detail: "ถอนเงินจากบัญชีสมาชิก — ระบบตรวจยอดก่อนทุกครั้ง",
     icon: ArrowUpFromLine,
+  },
+  {
+    key: "limit",
+    label: "ขอลดวงเงิน",
+    kbd: "",
+    detail: "ขอลดวงเงินซื้อสินค้าต่อวันของสมาชิก — รอผู้บริหารพิจารณา",
+    icon: TrendingDown,
   },
   {
     key: "special",
@@ -1187,7 +1196,7 @@ export function Settings({
   const saveSettings = () => {
     if (!form) return;
     setSaved(false);
-    saveMutation.mutate(form);
+    saveMutation.mutate({ ...form, appStyle: "shop" });
   };
   const chooseFontScale = (id: FontScaleId) => {
     setFontScale(id);
@@ -1225,22 +1234,6 @@ export function Settings({
   };
   // ROUND 25 — แบรนด์และธีม: พรีวิวสี/ชื่อ/โลโก้สดก่อนบันทึก
   const logoInputRef = useRef<HTMLInputElement>(null);
-  const chooseTheme = (theme: string) => {
-    updateForm({ appTheme: theme });
-    applyThemeColor(theme); // พรีวิวทันที — ทุกเครื่องใช้จริงหลังกดบันทึก
-  };
-  // ROUND 38 (ข้อ 38) — เลือกสไตล์ = เปลี่ยนบุคลิก + สีเน้นของแพลตฟอร์มนั้นพร้อมกัน (พรีวิวสด เหมือนสีธีม)
-  const chooseStyle = (styleId: string) => {
-    const preset = UI_STYLE_PRESETS.find(item => item.id === styleId);
-    if (!preset) return;
-    const theme = styleId === "shop" ? "emerald" : preset.accent; // กลับร้านค้า = กลับเขียวมรกตมาตรฐาน
-    updateForm({ appStyle: styleId, appTheme: theme });
-    applyUiStyle(styleId);
-    applyThemeColor(theme);
-  };
-  const customThemeHex = /^#[0-9a-fA-F]{6}$/.test(form?.appTheme ?? "")
-    ? (form?.appTheme ?? "#007a55")
-    : resolveThemeColor(form?.appTheme);
   const onLogoPick = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -1274,6 +1267,29 @@ export function Settings({
           updateForm({ appLogo: dataUrl });
           setError("");
         });
+    };
+    reader.readAsDataURL(file);
+  };
+  const onBackgroundPick = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    if (!/^image\/(png|jpeg|webp)$/.test(file.type) || file.size > 2_000_000) {
+      setError("เลือกภาพ PNG JPG WEBP ขนาดไม่เกิน 2MB");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onerror = () => setError("อ่านภาพพื้นหลังไม่สำเร็จ");
+    reader.onload = async () => {
+      try {
+        const image = await shrinkLogoToDataUrl(String(reader.result), 1600);
+        if (image.length > 1_500_000) throw new Error("ภาพหลังย่อยังใหญ่เกินไป กรุณาเลือกรูปขนาดเล็กลง");
+        updateForm({ appBackground: image });
+        applyBackground(image);
+        setError("");
+      } catch (error) {
+        setError(getErrorMessage(error));
+      }
     };
     reader.readAsDataURL(file);
   };
@@ -1374,6 +1390,9 @@ export function Settings({
     )
   );
   const activeCategory = settingsCategories[activeCategoryIndex];
+  const [settingsSearch, setSettingsSearch] = useState("");
+  const matchingSettings = settingsCategories.flatMap(group => group.tabs)
+    .filter(item => item.label.toLowerCase().includes(settingsSearch.trim().toLowerCase()));
   const logs = logsStatsQuery.data ?? [];
   const lastLog = logs[0];
   // Round 31-7 — ทดสอบเครื่องพิมพ์: เปิดพรีวิวสลิปตัวอย่างก่อน (ROUND 51 — เหมือนจุดพิมพ์อื่น) แล้วค่อยสั่งพิมพ์
@@ -1394,7 +1413,7 @@ export function Settings({
       <SectionHeader
         eyebrow="ระบบและการกำหนดค่า"
         title="ตั้งค่า"
-        description="เลือกหมวดและแท็บด้านบน"
+        description=""
         action={
           <button
             className="primary-button"
@@ -1411,6 +1430,20 @@ export function Settings({
         }
       />
       <div className="settings-layout">
+        <SharedSearch label="ตั้งค่า · ค้นหาเมนู">
+          <div className="settings-search-wrap">
+            <div className="search-field">
+              <input value={settingsSearch} onChange={event => setSettingsSearch(event.target.value)}
+                placeholder="ค้นหาเมนูตั้งค่า" aria-label="ค้นหาเมนูตั้งค่า" autoComplete="off" />
+            </div>
+            {settingsSearch.trim() && <div className="member-scan-list">
+              {matchingSettings.length === 0 ? <div className="command-empty">ไม่พบเมนูตั้งค่า</div> : matchingSettings.map(item =>
+                <button type="button" className="member-option" key={item.id} onClick={() => { setTab(item.id); setSettingsSearch(""); }}>
+                  {item.label}
+                </button>)}
+            </div>}
+          </div>
+        </SharedSearch>
         <div
           className="settings-cat-row"
           role="group"
@@ -1929,6 +1962,16 @@ export function Settings({
                     />
                   </label>
                 </div>
+                <div className="background-settings">
+                  <label>ภาพพื้นหลังพื้นที่ทำงาน
+                    <input type="file" accept="image/png,image/jpeg,image/webp" onChange={onBackgroundPick} disabled={!form} />
+                  </label>
+                  <p>PNG JPG WEBP ไม่เกิน 2MB · แสดงหลังการ์ดเท่านั้น ไม่ติดเอกสารพิมพ์ · กดบันทึกเพื่อใช้ครั้งถัดไป</p>
+                  {form?.appBackground && <>
+                    <img src={form.appBackground} alt="ตัวอย่างภาพพื้นหลัง" style={{ width: "100%", maxHeight: 180, objectFit: "cover", borderRadius: 8 }} />
+                    <button type="button" className="outline-button" onClick={() => { updateForm({ appBackground: "" }); applyBackground(""); }}>ลบภาพพื้นหลัง</button>
+                  </>}
+                </div>
                 <div className="brand-live-preview" aria-label="ตัวอย่างหน้าจอ">
                   <span className="eyebrow">ตัวอย่างการแสดงผล</span>
                   <div className="brand-preview-card">
@@ -1950,97 +1993,7 @@ export function Settings({
                   </div>
                 </div>
               </section>
-              <section className="panel settings-card">
-                <div className="settings-heading">
-                  <div>
-                    <h2>สีธีมของแอป</h2>
-                    <p>
-                      สีหลักของระบบ · เห็นพรีวิวทันที
-                      กดบันทึกเพื่อใช้กับทุกเครื่อง
-                    </p>
-                  </div>
-                  <Palette size={20} className="muted-icon" />
-                </div>
-                <div className="theme-swatches">
-                  {THEME_PRESETS.map(preset => (
-                    <button
-                      type="button"
-                      key={preset.id}
-                      className={`theme-swatch${(form?.appTheme ?? "") === preset.id ? " active" : ""}`}
-                      onClick={() => chooseTheme(preset.id)}
-                    >
-                      <span
-                        className="swatch-dot"
-                        style={{ background: preset.base }}
-                      />
-                      <b>{preset.label}</b>
-                      <small>{preset.base.toUpperCase()}</small>
-                    </button>
-                  ))}
-                </div>
-                <div className="theme-custom-row">
-                  <span>สีกำหนดเอง</span>
-                  <input
-                    type="color"
-                    value={customThemeHex}
-                    onChange={event => chooseTheme(event.target.value)}
-                    aria-label="เลือกสีธีมกำหนดเอง"
-                  />
-                  <code>{customThemeHex.toUpperCase()}</code>
-                  <small>เลือกจากพาเลตต์ด้านบน หรือกำหนดโค้ดสีเอง</small>
-                </div>
-              </section>
-              <section className="panel settings-card">
-                <div className="settings-heading">
-                  <div>
-                    <h2>สไตล์หน้าตาแอป (Design Style)</h2>
-                    <p>
-                      บุคลิกการออกแบบทั้งระบบ — ฟอนต์ ความมนของปุ่ม พื้นหลัง ·
-                      เลือกแล้วเห็นทันทีบนหน้าจอนี้
-                      กดบันทึกเพื่อใช้กับทุกเครื่อง
-                    </p>
-                  </div>
-                  <Sparkles size={20} className="muted-icon" />
-                </div>
-                <div className="ui-style-grid">
-                  {UI_STYLE_PRESETS.map(style => (
-                    <button
-                      type="button"
-                      key={style.id}
-                      className={`ui-style-card${(form?.appStyle ?? "shop") === style.id ? " active" : ""}`}
-                      onClick={() => chooseStyle(style.id)}
-                      disabled={!form}
-                      aria-pressed={(form?.appStyle ?? "shop") === style.id}
-                    >
-                      <span
-                        className="ui-style-preview"
-                        data-preview={style.id}
-                        aria-hidden="true"
-                      >
-                        <i className="pv-side" />
-                        <span className="pv-body">
-                          <b className="pv-title" />
-                          <b className="pv-chip" />
-                          <b className="pv-btn" />
-                        </span>
-                      </span>
-                      <b>{style.label}</b>
-                      <small>{style.detail}</small>
-                      <small className="style-font-hint">
-                        ฟอนต์: {style.fontFamily}
-                      </small>
-                    </button>
-                  ))}
-                </div>
-                <div className="settings-inline-note style-note-row">
-                  <Sparkles size={16} />
-                  <span>
-                    สไตล์จะพาสีเน้นของแพลตฟอร์มนั้นมาด้วย (เช่น Apple = น้ำเงิน)
-                    — ปรับสีเน้นแยกได้ที่พาเลตต์ด้านบน · กลับ “ร้านค้า” =
-                    คืนเขียวมรกตมาตรฐาน
-                  </span>
-                </div>
-              </section>
+
             </>
           )}
           {tab === "receipt" && (
@@ -2389,21 +2342,17 @@ export function Settings({
             </div>
           )}
           {tab === "payment" && (
-            <div className="settings-single">
+            <div className="settings-single payment-settings-compact">
               <section className="panel settings-card">
                 <div className="settings-heading">
                   <div>
-                    <h2>บัญชีพร้อมเพย์ร้าน (QR รับเงิน)</h2>
-                    <p>
-                      ใส่ครั้งเดียว —
-                      หน้ายืนยันชำระเงินจะขึ้นคิวอาร์ให้ลูกค้าสแกนจ่ายตามยอดบิลอัตโนมัติ
-                    </p>
+                    <h2>พร้อมเพย์รับเงิน</h2>
                   </div>
                   <QrCode size={20} className="muted-icon" />
                 </div>
                 <div className="form-grid">
                   <label className="wide">
-                    เบอร์โทรศัพท์หรือเลขบัตรประชาชนของบัญชีพร้อมเพย์ร้าน
+                    เบอร์โทร / เลขประจำตัวประชาชน
                     <input
                       value={form?.promptpayId ?? ""}
                       onChange={event =>
@@ -2421,33 +2370,21 @@ export function Settings({
                   <div className="settings-inline-note amber">
                     <CircleAlert size={16} />
                     <span>
-                      ยังไม่ได้ตั้ง — หน้า POS ยังยืนยันบิล QR ได้ตามปกติ
-                      แต่จะไม่มีคิวอาร์ให้ลูกค้าสแกน และเก็บหลักฐานสลิปเอง
+                      ยังไม่ได้ตั้งค่าพร้อมเพย์
                     </span>
                   </div>
                 ) : !isValidPromptPayId(form?.promptpayId ?? "") ? (
                   <div className="notice-bar error">
-                    <CircleAlert size={16} /> รูปแบบไม่ถูกต้อง —
-                    ต้องเป็นเบอร์โทร 9–10 หลัก หรือเลขบัตรประชาชน 13 หลัก
-                    (ตัวเลขเท่านั้น)
+                    <CircleAlert size={16} /> ใช้เบอร์โทร 9–10 หลัก หรือเลขประจำตัวประชาชน 13 หลัก
                   </div>
                 ) : (
                   <div className="settings-inline-note">
                     <ShieldCheck size={16} />
                     <span>
-                      พร้อมใช้ — คิวอาร์ที่ขึ้นหน้า POS เป็นแบบระบุยอดตามบิล
-                      (พร้อมเพย์มาตรฐานธนาคาร) ลูกค้าสแกนแล้วโอนได้เลย
+                      พร้อมสร้าง QR ตามยอดบิล
                     </span>
                   </div>
                 )}
-                <div className="settings-inline-note">
-                  <ShieldCheck size={16} />
-                  <span>
-                    ตอนขายด้วยวิธี “QR / สแกน”
-                    เจ้าหน้าที่ยังถ่ายรูปหรือแนบสลิปการโอนไว้กับบิลได้ —
-                    เปิดดูย้อนหลังได้ที่รายงาน → ประวัติบิล
-                  </span>
-                </div>
               </section>
               <BankAccountsPanel
                 value={form?.bankAccounts ?? []}
@@ -2617,26 +2554,13 @@ export function Settings({
                         aria-label="เวลาตัดยอด (ชั่วโมง:นาที)"
                       />
                     </label>
-                    <div className="cutoff-time-hint">
-                      <CalendarClock size={15} />
-                      <span>
-                        รอบการขาย 1 วัน จะเริ่ม–จบตามเวลานี้ เช่น 02:00 =
-                        รอบวิ่ง 02:00 ของวันนี้ ถึง 02:00 ของวันถัดไป ·
-                        เหมาะกับร้านที่ปิดหลังเที่ยงคืน
-                        แล้วให้ยอดข้ามคืนไปรวมกับวันเดียวกัน
-                      </span>
-                    </div>
                   </div>
                 )}
               </section>
               <section className="panel settings-card">
                 <div className="settings-heading">
                   <div>
-                    <h2>รอบปัจจุบัน (สดจากระบบ)</h2>
-                    <p>
-                      ตามการตั้งค่าที่บันทึกไว้ในขณะนี้ —
-                      ไม่ใช่ค่าที่ยังแก้ไม่ได้บันทึก
-                    </p>
+                    <h2>รอบปัจจุบัน</h2>
                   </div>
                   <Activity size={20} className="muted-icon" />
                 </div>
@@ -2715,14 +2639,6 @@ export function Settings({
                         </div>
                       </div>
                     )}
-                    <div className="settings-inline-note">
-                      <ShieldCheck size={16} />
-                      <span>
-                        ปุ่ม “ตัดยอดรอบนี้” อยู่ที่หน้าภาพรวม —
-                        ทั้งเจ้าหน้าที่และผู้บริหารกดได้ · ทุกครั้งที่ตัดยอด
-                        ระบบสร้างสรุปรอบใหม่และบันทึกลง Log ทันที
-                      </span>
-                    </div>
                     <div className="settings-jump">
                       <button
                         className="outline-button"
@@ -2849,9 +2765,7 @@ export function Settings({
                   <div>
                     <h2>นำเข้าข้อมูลจากไฟล์ Excel / CSV</h2>
                     <p>
-                      ขึ้นข้อมูลจริงจากไฟล์ที่ร้านมีอยู่ — ระบบอ่านหัวตารางให้
-                      จับคู่คอลัมน์ให้อัตโนมัติ
-                      และสำรองข้อมูลเป็นไฟล์ป้องกันก่อนนำเข้าทุกครั้ง
+                      เลือกประเภทข้อมูล · ระบบสำรองข้อมูลก่อนนำเข้าทุกครั้ง
                     </p>
                   </div>
                   <FileSpreadsheet size={20} className="muted-icon" />
@@ -2861,13 +2775,13 @@ export function Settings({
                     [
                       "members",
                       "สมาชิกและยอดเงิน",
-                      "เลขสมาชิก · ชื่อ-นามสกุล · ยอดคงเหลือ · วงเงิน · สถานะ · เบอร์โทร",
+                      "ข้อมูลสมาชิก · ยอดคงเหลือ · วงเงิน",
                       <UsersRound size={19} key="icon-m" />,
                     ],
                     [
                       "products",
                       "สินค้าและสต็อก",
-                      "บาร์โค้ด · ชื่อสินค้า · หมวด · หน่วย · ราคา · ต้นทุน · สต็อก · จุดสั่งซื้อ",
+                      "ข้อมูลสินค้า · ราคา · จำนวนสต็อก",
                       <ShoppingBag size={19} key="icon-p" />,
                     ],
                   ].map(([value, title, detail, icon]) => (
@@ -2888,10 +2802,9 @@ export function Settings({
                 </div>
                 <div className="import-template-row">
                   <div>
-                    <b>ยังไม่มีไฟล์ หรือจะเริ่มจากต้นแบบ?</b>
+                    <b>เริ่มจากไฟล์ตัวอย่าง</b>
                     <small>
-                      ดาวน์โหลดเทมเพลต .xlsx ที่หัวคอลัมน์ภาษาไทยตรงกับระบบ —
-                      กรอกเสร็จแล้วกลับมาอัปโหลดที่นี่ได้เลย
+                      ดาวน์โหลด กรอกข้อมูล แล้วอัปโหลด
                     </small>
                   </div>
                   <button
@@ -2914,9 +2827,7 @@ export function Settings({
                   <div>
                     <h2>อัปโหลดไฟล์ข้อมูล</h2>
                     <p>
-                      รองรับ .xlsx .xls .csv · ขนาดไม่เกิน 5MB ·
-                      ไฟล์จะถูกอ่านเพื่อพรีวิวก่อนเสมอ —
-                      ยังไม่แตะข้อมูลจริงจนกว่าจะกดยืนยัน
+                      .xlsx / .xls / .csv ไม่เกิน 5MB · ตรวจข้อมูลก่อนยืนยันนำเข้า
                     </p>
                   </div>
                   <FileUp size={20} className="muted-icon" />
@@ -2941,15 +2852,12 @@ export function Settings({
                     }}
                   >
                     <FileSpreadsheet size={30} />
-                    <b>คลิกเลือกไฟล์ หรือลากไฟล์มาวางที่นี่</b>
+                    <b>เลือกไฟล์ หรือลากมาวาง</b>
                     <small>
                       {importKind === "members"
-                        ? "ไฟล์รายชื่อสมาชิก เช่น รายชื่อสมาชิก.xlsx · สมาชิก.csv"
-                        : "ไฟล์รายการสินค้า เช่น สินค้าทั้งหมด.xlsx · คลังสินค้า.csv"}
+                        ? "ไฟล์รายชื่อสมาชิก"
+                        : "ไฟล์รายการสินค้า"}
                     </small>
-                    <span className="import-drop-hint">
-                      ระบบจะอ่านหัวตารางและจับคู่คอลัมน์ให้อัตโนมัติ
-                    </span>
                   </div>
                 ) : (
                   <div className="import-file-info">
@@ -3308,21 +3216,18 @@ export function Settings({
               <section className="panel settings-card">
                 <div className="settings-heading">
                   <div>
-                    <h2>สำรองข้อมูลด้วยตนเอง (Manual)</h2>
+                    <h2>สำรองข้อมูล</h2>
                     <p>
-                      กดปุ่มเดียวจบ —
-                      ได้ไฟล์สำรองข้อมูลร้านทั้งหมดตรวจสอบความถูกต้องแล้ว
+                      เก็บข้อมูลร้านทั้งหมดเป็นไฟล์เดียว
                     </p>
                   </div>
                   <HardDriveDownload size={20} className="muted-icon" />
                 </div>
                 <div className="backup-now-row">
                   <div>
-                    <b>สำรองข้อมูลร้านทั้งหมดเป็นไฟล์เดียว</b>
+                    <b>สร้างไฟล์สำรอง</b>
                     <small>
-                      สมาชิก · สต็อก · ธุรกรรม · บิล · ผู้ใช้ระบบ · การตั้งค่า —
-                      ตรวจสอบความถูกต้อง (integrity check) อัตโนมัติทุกไฟล์
-                      ใช้เวลาไม่กี่วินาที
+                      รวมข้อมูลและการตั้งค่า · ตรวจสอบไฟล์อัตโนมัติ
                     </small>
                   </div>
                   <button
@@ -3338,13 +3243,9 @@ export function Settings({
                 </div>
                 <div className="backup-now-row backup-upload-row">
                   <div>
-                    <b>นำไฟล์ฐานข้อมูลจากเครื่องอื่นเข้าระบบ</b>
+                    <b>อัปโหลดไฟล์จากเครื่องอื่น</b>
                     <small>
-                      เช่น welfare-store.sqlite จากเครื่องร้านเดิม —
-                      ระบบตรวจสอบไฟล์ให้ก่อนทุกครั้ง แล้วเพิ่มเข้า
-                      “ไฟล์สำรองทั้งหมด” ด้านล่าง กด “กู้คืน”
-                      เพื่อย้ายข้อมูลทั้งระบบ (สมาชิก · สต็อก · บิล ·
-                      ผู้ใช้และรหัสผ่านเดิม) มาใช้ที่นี่ได้เลย
+                      ตรวจสอบไฟล์ก่อนเพิ่มในรายการ · กด “กู้คืน” เพื่อแทนที่ข้อมูลทั้งระบบ รวมบัญชีและรหัสผ่าน
                     </small>
                   </div>
                   <button
@@ -3370,19 +3271,16 @@ export function Settings({
                 <div className="settings-inline-note">
                   <ShieldCheck size={16} />
                   <span>
-                    แนะนำกดสำรองก่อนปิดร้านทุกวัน และกด “ดาวน์โหลด” เก็บไฟล์ลง
-                    USB หรือคลาวด์เป็นชุดที่สอง — กันกรณีเครื่องพังทั้งเครื่อง
-                    ไฟล์ในเครื่องจะหายไปด้วย
+                    สำรองทุกวัน และดาวน์โหลดเก็บใน USB หรือคลาวด์ เผื่อเครื่องเสีย
                   </span>
                 </div>
               </section>
               <section className="panel settings-card">
                 <div className="settings-heading">
                   <div>
-                    <h2>สำรองข้อมูลอัตโนมัติ (Auto)</h2>
+                    <h2>สำรองอัตโนมัติ</h2>
                     <p>
-                      ระบบสำรองให้เองตามรอบเวลา — ไม่ต้องจำ ไม่ต้องกด ·
-                      ปรับแล้วกด “บันทึกการตั้งค่า” ด้านล่าง
+                      ตั้งรอบเวลา แล้วกด “บันทึกการตั้งค่า”
                     </p>
                   </div>
                   <CalendarClock size={20} className="muted-icon" />
@@ -3391,8 +3289,7 @@ export function Settings({
                   <div>
                     <b>เปิดสำรองข้อมูลอัตโนมัติ</b>
                     <small>
-                      ตรวจทุก 10 นาที — ครบรอบเวลาที่กำหนดจะสำรองให้เอง
-                      พร้อมเก็บไว้เท่าจำนวนที่ตั้ง
+                      ตรวจรอบเวลาทุก 10 นาที
                     </small>
                   </div>
                   <button
@@ -3464,9 +3361,7 @@ export function Settings({
                 <div className="settings-inline-note">
                   <CalendarClock size={16} />
                   <span>
-                    ไฟล์เก่ากว่าจำนวนที่ตั้ง
-                    จะถูกลบออกเองเพื่อไม่ให้ฮาร์ดดิสก์เต็ม —
-                    ไฟล์ที่ดาวน์โหลดเก็บไว้นอกเครื่องจะไม่ถูกลบ
+                    ลบไฟล์เก่าที่เกินจำนวนที่ตั้ง · ไม่ลบไฟล์ที่ดาวน์โหลดไว้นอกเครื่อง
                   </span>
                 </div>
               </section>
@@ -3475,8 +3370,7 @@ export function Settings({
                   <div>
                     <h2>ไฟล์สำรองทั้งหมด</h2>
                     <p>
-                      ใหม่สุดขึ้นก่อน · ดาวน์โหลดเก็บนอกเครื่อง
-                      หรือกู้คืนกลับมาใช้เมื่อข้อมูลมีปัญหา
+                      ล่าสุดอยู่บนสุด · ดาวน์โหลดหรือกู้คืนได้
                     </p>
                   </div>
                   <ArchiveRestore size={20} className="muted-icon" />
@@ -3927,77 +3821,8 @@ export function Settings({
                     สมาชิก M-000001 · บิล RC-260918-010 · 18 ก.ย. 2569
                   </small>
                 </div>
-                <div className="settings-inline-note">
-                  <Monitor size={16} />
-                  <span>
-                    ค่านี้เก็บไว้ในเครื่องที่ใช้อยู่ ไม่กระทบเครื่องอื่น ·
-                    ไม่ต้องกดบันทึก · ไม่มีผลกับใบเสร็จและบัตรสมาชิก
-                    ซึ่งใช้ขนาดมาตรฐานของกระดาษเสมอ
-                  </span>
-                </div>
               </section>
-              <section className="panel settings-card windows-card">
-                <div className="settings-heading">
-                  <div>
-                    <h2>ติดตั้งเป็นแอปบนเดสก์ท็อป (Windows)</h2>
-                    <p>
-                      ติดตั้งเป็นแอปบนเดสก์ท็อป — ใช้งานเหมือนโปรแกรมทั่วไป
-                      เปิดได้เต็มจอ ไม่ต้องเปิดเบราว์เซอร์ทุกครั้ง
-                    </p>
-                  </div>
-                  <Download size={20} className="muted-icon" />
-                </div>
-                <HelpDisclosure
-                  id="windows-install-steps"
-                  label="ขั้นตอนการติดตั้ง"
-                  className="windows-install-disclosure"
-                >
-                  <div className="printer-flow-steps">
-                    <div className="printer-step">
-                      <b>1</b>
-                      <div>
-                        <b>ติดตั้งแอปจากเบราว์เซอร์ (ใช้ได้วันนี้)</b>
-                        <small>
-                          เปิดระบบด้วย Chrome หรือ Edge → เมนู ⋮ มุมขวาบน →
-                          “ติดตั้งแอป” (Edge: “สร้างทางลัด”) →
-                          ไอคอนขึ้นบนเดสก์ท็อปและ Start ทันที ·
-                          ทำทีละเครื่องของจุดขาย
-                        </small>
-                      </div>
-                    </div>
-                    <div className="printer-step">
-                      <b>2</b>
-                      <div>
-                        <b>เสียบเครื่องพิมพ์สลิปแล้วทดสอบ</b>
-                        <small>
-                          ติดตั้งไดรเวอร์ที่มาพร้อมเครื่อง →
-                          ตั้งเป็นเครื่องพิมพ์เริ่มต้น →
-                          เลือกขนาดกระดาษให้ตรงกระดาษจริง แล้วกด “พิมพ์ทดสอบ” —
-                          ดูวิธีละเอียดที่แท็บใบเสร็จและเครื่องพิมพ์
-                        </small>
-                      </div>
-                    </div>
-                    <div className="printer-step">
-                      <b>3</b>
-                      <div>
-                        <b>แผนต่อยอดเป็นโปรแกรม .exe (Tauri)</b>
-                        <small>
-                          จะแพ็กเป็นไฟล์ติดตั้ง Windows ไฟล์เดียว (~10-20MB ใช้
-                          WebView2 ที่มีใน Win 11 แล้ว) — ติดตั้งง่าย
-                          พิมพ์สลิปแบบเงียบ (ESC/POS)
-                          ไม่ต้องผ่านหน้าต่างพิมพ์ของเบราว์เซอร์
-                        </small>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="initial-balance-note">
-                    <ShieldCheck size={15} />
-                    <span>
-                      ทุกขั้นใช้ข้อมูลชุดเดิม — ไม่ต้องย้ายข้อมูลหรือตั้งค่าใหม่
-                    </span>
-                  </div>
-                </HelpDisclosure>
-              </section>
+
             </>
           )}
           {tab === "alert" && (
@@ -4100,8 +3925,7 @@ export function Settings({
               <section className="panel settings-card">
                 <div className="settings-heading">
                   <div>
-                    <h2>สิทธิ์และบทบาทผู้ใช้ระบบ</h2>
-                    <p>สิทธิ์ตามที่ระบบบังคับใช้จริงในปัจจุบัน</p>
+                    <h2>สิทธิ์ผู้ใช้</h2>
                   </div>
                   <ShieldCheck size={20} className="muted-icon" />
                 </div>
@@ -4134,10 +3958,9 @@ export function Settings({
               <section className="panel settings-card dev-warning-card">
                 <div className="settings-heading">
                   <div>
-                    <h2>การเข้าใช้งานสำหรับผู้พัฒนา (Dev Access)</h2>
+                    <h2>การเข้าถึงของผู้พัฒนา</h2>
                     <p>
-                      ประตูพิเศษสำหรับบัญชีผู้พัฒนา (dev) เท่านั้น —
-                      ปิดไว้เป็นค่าเริ่มต้น
+                      สำหรับบัญชี dev · ปิดไว้เป็นค่าเริ่มต้น
                     </p>
                   </div>
                   <Terminal size={20} className="muted-icon" />
@@ -4145,18 +3968,14 @@ export function Settings({
                 <div className="dev-access-warning">
                   <ShieldCheck size={16} />
                   <span>
-                    บัญชีผู้พัฒนา (dev) สามารถเข้าถึง
-                    <b>ข้อมูลของร้านได้ทั้งหมด</b> เท่าผู้บริหารทุกอย่าง ·
-                    ระบบปิดการเข้าใช้งานไว้โดยอัตโนมัติ และ
-                    <b>บันทึกทุกการเข้าสู่ระบบลงประวัติระบบ เป็นสีแดง</b>เสมอ
+                    ผู้พัฒนาเข้าถึง<b>ข้อมูลทั้งหมดเท่าผู้บริหาร</b> · บันทึกทุกการเข้าสู่ระบบเป็นสีแดงในประวัติ
                   </span>
                 </div>
                 <div className="toggle-row">
                   <div>
                     <b>อนุญาตให้บัญชีผู้พัฒนาเข้าสู่ระบบ</b>
                     <small>
-                      เปิดเฉพาะช่วงที่ผู้พัฒนามาตรวจสอบ/ซ่อมแซมระบบ
-                      แล้วปิดกลับทันทีเมื่อเสร็จ
+                      เปิดเฉพาะตอนซ่อมระบบ แล้วปิดเมื่อเสร็จ
                     </small>
                   </div>
                   <button
@@ -4174,7 +3993,7 @@ export function Settings({
                   <i aria-hidden="true" />
                   {form?.devAccess
                     ? "เปิดอยู่ — บัญชีผู้พัฒนาเข้าสู่ระบบได้"
-                    : "ปิดอยู่ (แนะนำ) — บัญชีผู้พัฒนาไม่สามารถเข้าสู่ระบบได้"}
+                    : "ปิดอยู่ (แนะนำ) — ผู้พัฒนาเข้าสู่ระบบไม่ได้"}
                 </div>
                 <div className="dev-account-count">
                   บัญชีผู้พัฒนาในระบบ <b>{devAccounts.length} บัญชี</b>
@@ -4185,7 +4004,7 @@ export function Settings({
                       {devAccounts.map(user => `@${user.username}`).join(", ")}
                     </span>
                   )}{" "}
-                  · สร้าง/จัดการบัญชีผู้พัฒนาได้ที่หน้า{" "}
+                  · จัดการที่{" "}
                   <button
                     type="button"
                     className="link-button"
@@ -4198,17 +4017,14 @@ export function Settings({
               <section className="panel settings-card">
                 <div className="settings-heading">
                   <div>
-                    <h2>ข้อควรทราบ</h2>
-                    <p>ความปลอดภัยของระบบ</p>
+                    <h2>การล็อกบัญชี</h2>
                   </div>
                   <LockKeyhole size={20} className="muted-icon" />
                 </div>
                 <div className="settings-inline-note">
                   <LockKeyhole size={16} />
                   <span>
-                    บัญชีผู้ใช้ระบบถูกระงับชั่วคราวเมื่อกรอกรหัสผ่านผิด 5 ครั้ง
-                    และปลดล็อกอัตโนมัติใน 15 นาที ·
-                    ผู้บริหารสามารถปลดล็อกก่อนกำหนดได้ที่หน้าผู้ใช้ระบบ
+                    รหัสผ่านผิด 5 ครั้ง ล็อกบัญชี 15 นาที · ผู้บริหารปลดล็อกได้ที่หน้าผู้ใช้ระบบ
                   </span>
                 </div>
                 <div className="settings-jump">
@@ -4223,9 +4039,9 @@ export function Settings({
               <section className="panel settings-card">
                 <div className="settings-heading">
                   <div>
-                    <h2>ระบบบันทึก Log</h2>
+                    <h2>ประวัติระบบ</h2>
                     <p>
-                      ทุกกิจกรรมสำคัญถูกบันทึกอัตโนมัติ พร้อมผู้ทำรายการและเวลา
+                      บันทึกกิจกรรม ผู้ทำรายการ และเวลาอัตโนมัติ
                     </p>
                   </div>
                   <Activity size={20} className="muted-icon" />
@@ -4252,14 +4068,6 @@ export function Settings({
                     </small>
                   </div>
                 </div>
-                <div className="settings-inline-note">
-                  <Activity size={16} />
-                  <span>
-                    ตัวอย่างกิจกรรมที่บันทึก: ขายสินค้า · เติมเงิน · ถอนเงิน ·
-                    รับสินค้าเข้า · นับสต็อก · แก้ไขสินค้า · ลงทะเบียนสมาชิก ·
-                    จัดการผู้ใช้ระบบ · การตั้งค่า
-                  </span>
-                </div>
                 <div className="settings-jump">
                   <button
                     className="outline-button"
@@ -4275,7 +4083,7 @@ export function Settings({
             <div className="settings-save-bar" role="status" aria-live="polite">
               <span className="save-dot" aria-hidden="true" />
               <div className="save-bar-text">
-                <b>มีการเปลี่ยนแปลงที่ยังไม่ได้บันทึก</b>
+                <b>ยังไม่ได้บันทึก · {dirtyCount} รายการ</b>
                 <small>
                   แก้ไขแล้ว: {dirtyKeys.slice(0, 3).join(" · ")}
                   {dirtyCount > 3 ? ` และอีก ${dirtyCount - 3} รายการ` : ""}
@@ -4290,7 +4098,7 @@ export function Settings({
                 >
                   ย้อนการแก้ไข
                 </button>
-                <button
+                <ActionButton busy={saveMutation.isPending}
                   type="button"
                   className="primary-button"
                   disabled={saveMutation.isPending}
@@ -4298,7 +4106,7 @@ export function Settings({
                 >
                   <Check size={16} />{" "}
                   {saveMutation.isPending ? "กำลังบันทึก…" : "บันทึกการตั้งค่า"}
-                </button>
+                </ActionButton>
               </div>
             </div>
           )}

@@ -13,6 +13,7 @@ import {
 import { trpc } from "@/lib/trpc";
 import { downloadCsvFile } from "@/exportUtils";
 import { ThaiDatePicker } from "@/components/ThaiDatePicker";
+import { SharedSearch } from "@/components/SharedSearch";
 import {
   formatLogDateTime,
   getErrorMessage,
@@ -111,6 +112,7 @@ export function Logs() {
             <p>ข้อมูลสำหรับตรวจสอบย้อนหลังของเจ้าหน้าที่และผู้บริหาร</p>
           </div>
           <div className="toolbar-actions">
+            <SharedSearch label="ประวัติระบบ · กิจกรรม / ผู้ใช้งาน">
             <div className="search-field">
               <Search size={16} />
               <input
@@ -119,6 +121,7 @@ export function Logs() {
                 placeholder="ค้นหากิจกรรม หรือผู้ใช้งาน"
               />
             </div>
+            </SharedSearch>
             <div className="date-range-filter">
               <ThaiDatePicker value={dateFrom} onChange={setDateFrom} max={dateTo || undefined} ariaLabel="กรองตั้งแต่วันที่" placeholder="ตั้งแต่วันที่" />
               <span className="date-range-sep">→</span>

@@ -91,7 +91,7 @@ export function MemberCardArt({
   const nameLength = displayName.length;
   const nameFit = nameLength > 36 ? " fit-xs" : nameLength > 26 ? " fit-sm" : "";
   return (
-    <div className="member-card" id={id}>
+    <div className="member-card member-card-document" id={id}>
       <div className="member-card-top">
         <div className="member-card-brand">{brandLogo ? <img className="brand-logo member-card-logo" src={brandLogo} alt={brandName} /> : <span>{brandInitial(brandName)}</span>}<div><b>{brandName}</b><small>Welfare Store</small></div></div>
         <span className="member-card-type">{member.type}</span>
@@ -175,8 +175,15 @@ export function MemberCardModal({
     const element = document.getElementById("member-card-capture");
     if (!element) return null;
     if (document.fonts?.ready) await document.fonts.ready;
+    const { width, height } = element.getBoundingClientRect();
+    if (Math.round(width) !== 360 || Math.round(height) !== 220) {
+      console.error("Member-card capture artboard must be 360×220px", { width, height });
+      return null;
+    }
     return html2canvas(element, {
       scale: 4,
+      width: 360,
+      height: 220,
       backgroundColor: "#ffffff",
       useCORS: true,
       logging: false,

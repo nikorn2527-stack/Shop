@@ -51,15 +51,18 @@ function crc16(payload: string): string {
 export type PromptPayInput = {
   /** เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก ของบัญชีพร้อมเพย์ร้าน */
   promptpayId: string;
-  /** จำนวนเงินที่จะเรียกเก็บ — มีค่า > 0 = QR แบบระบุยอด (dynamic จ่ายได้ครั้งเดียว) */
+  /** จำนวนเงินที่จะเรียกเก็บ — QR ระบุยอด ไม่ยืนยันเงินเข้าและไม่ป้องกันการจ่ายซ้ำ */
   amount?: number;
 };
 
 /** สร้าง payload สตริง QR พร้อมเพย์พร้อมส่งต่อให้ qrcode.toDataURL / toCanvas */
 export function buildPromptPayPayload({ promptpayId, amount }: PromptPayInput): string {
   const numbers = sanitizeTarget(promptpayId);
-  if (numbers.length < 9 || numbers.length > 16) {
+  if (!isValidPromptPayId(promptpayId)) {
     throw new Error("รูปแบบบัญชีพร้อมเพย์ไม่ถูกต้อง — ใช้เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก");
+  }
+  if (amount !== undefined && (!Number.isFinite(amount) || amount <= 0 || amount.toFixed(2) === "0.00")) {
+    throw new Error("ยอดชำระพร้อมเพย์ต้องมากกว่า 0 และเป็นตัวเลขที่ถูกต้อง");
   }
   const hasAmount = typeof amount === "number" && amount > 0;
   const merchant = fmd("29", fmd("00", "A000000677010111") + fmd(targetType(numbers), formatTarget(numbers)));

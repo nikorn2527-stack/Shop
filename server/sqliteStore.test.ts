@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   checkout,
+  businessPeriodStatus,
   closeBusinessDay,
   createProduct,
   createSqliteStore,
@@ -13,6 +14,8 @@ import {
   listProducts,
   memberTransactions,
   requestLimitReduction,
+  registerMember,
+  salesLineItems,
   salesByProduct,
   seedSqliteDemoData,
   setSettings,
@@ -31,6 +34,26 @@ afterEach(() => {
 });
 
 describe("SQLite local test store", () => {
+  it("records the activation operator alongside the registration audit log", () => {
+    db = createSqliteStore();
+    const detail = registerMember(db, {
+      firstName: "ทดสอบ",
+      lastName: "เปิดบัตร",
+      initialDeposit: 100,
+      actor: " เจ้าหน้าที่ทดสอบ ",
+      actorRole: "admin",
+    });
+    const transaction = db.prepare("SELECT actor, amount, balance_after FROM member_transactions WHERE member_number = ? AND type = 'activation'").get(detail.member.memberNumber);
+    expect(transaction).toMatchObject({ actor: "เจ้าหน้าที่ทดสอบ", amount: 100, balance_after: 100 });
+    expect(listAuditLogs(db).some(log => log.actor === "เจ้าหน้าที่ทดสอบ")).toBe(true);
+  });
+  it("starts a new live period after manually closing an automatic period", () => {
+    db = createSqliteStore();
+    setSettings(db, { dailyCutOffMode: "auto", dailyCutOffTime: "00:00" });
+    const closure = closeBusinessDay(db, { actor: "test" });
+    expect(businessPeriodStatus(db).periodStart).toBe(closure.closedAt);
+    expect(listDayClosures(db)).toHaveLength(1);
+  });
   it("stores a member with purchase, deposit and withdrawal history", () => {
     db = createSqliteStore();
     seedSqliteDemoData(db);
@@ -212,6 +235,38 @@ describe("day closure history (listDayClosures)", () => {
     expect(rows[0].closedAt >= rows[1].closedAt).toBe(true);
 
     expect(listDayClosures(db, 1)).toHaveLength(1);
+  });
+});
+
+describe("hospital report snapshots", () => {
+  it("returns SKU in sales line items and snapshots all receipt/payment wallet totals", () => {
+    db = createSqliteStore();
+    seedSqliteDemoData(db);
+    const product = createProduct(db, { name: "สินค้ารหัสทดสอบ", sku: "HOSP-001", unit: "ชิ้น", price: 25, cost: 10, stock: 10 });
+    checkout(db, { items: [{ productId: product.id, qty: 1 }], paymentMethod: "เงินสด" });
+    const now = new Date();
+    const timestamp = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}`;
+    db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .run("M-000218", "deposit", "เติมเงินทดสอบ", 40, "เงินสด", 1280, timestamp);
+    db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .run("M-000218", "activation", "เปิดใช้บัตรทดสอบ", 30, "เงินสด", 1310, timestamp);
+    db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .run("M-000218", "withdrawal", "ลดยอดทดสอบ", -15, "เงินสด", 1295, timestamp);
+    db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`)
+      .run("M-000218", "refund", "คืนบัตรทดสอบ", -20, "เงินสด", 1275, timestamp);
+
+    expect(salesLineItems(db, {}).find(row => row.productName === "สินค้ารหัสทดสอบ")?.productCode).toBe("HOSP-001");
+    const closed = closeBusinessDay(db, { actor: "ผู้ทดสอบ" });
+    expect(closed.depositCount).toBe(1);
+    expect(closed.depositAmount).toBe(closed.deposits);
+    expect(closed.depositAmount).toBe(40);
+    expect(closed.activationCount).toBe(1);
+    expect(closed.activationAmount).toBe(30);
+    expect(closed.withdrawalCount).toBe(1);
+    expect(closed.withdrawalAmount).toBe(closed.withdrawals);
+    expect(closed.withdrawalAmount).toBe(15);
+    expect(closed.refundCount).toBe(1);
+    expect(closed.refundAmount).toBe(20);
   });
 });
 

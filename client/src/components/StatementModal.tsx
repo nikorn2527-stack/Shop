@@ -5,6 +5,7 @@ import { WALLET_TX_META } from "../pages/viewFormat";
 import { trpc } from "@/lib/trpc";
 import { downloadReportPdf, printReportDoc, type ReportDocConfig } from "@/reportDoc";
 import { buildReportDocumentHtml, thaiStamp } from "@shared/reportDoc";
+import { A4DocumentPreview } from "./A4DocumentPreview";
 
 /** A wallet transaction row as returned by member.detail (DESC order, ≤50). */
 export type StatementTx = {
@@ -114,9 +115,9 @@ export function StatementModal({ member, transactions, onClose }: { member: Stat
     compact: false,
   }), [member, displayName, generatedAt, ordered, totals, brandName]);
 
-  // on-screen A4 preview (iframe rendering the unified template)
+  // On-screen A4 preview uses the same template, including the printable safe area.
   const docHtml = useMemo(
-    () => buildReportDocumentHtml(config, { mode: "pdf", stampText: `ออกเมื่อ ${thaiStamp(generatedAt)}` }),
+    () => buildReportDocumentHtml(config, { mode: "preview", stampText: `ออกเมื่อ ${thaiStamp(generatedAt)}` }),
     [config, generatedAt],
   );
 
@@ -152,11 +153,7 @@ export function StatementModal({ member, transactions, onClose }: { member: Stat
       <button className="icon-button" onClick={onClose} aria-label="ปิดหน้าต่าง"><X size={17} /></button>
     </div>
     <div className="statement-stage">
-      <div className="export-doc-preview" role="tabpanel" aria-label="พรีวิวเอกสาร A4">
-        <div className="export-doc-scaler">
-          <iframe title="พรีวิวเอกสาร A4" srcDoc={docHtml} className="export-doc-iframe" loading="lazy" />
-        </div>
-      </div>
+      <A4DocumentPreview html={docHtml} label="พรีวิวเอกสาร A4" />
     </div>
     <div className="statement-actions modal-actions">
       <span className="statement-hint"><FileText size={14} /> A4 · {totals.count} รายการ · เอกสารทางการ (template เดียวกับรายงานอื่น)</span>

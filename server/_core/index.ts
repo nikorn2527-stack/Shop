@@ -12,7 +12,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { backupSqliteDatabase, listSqliteBackups, pruneSqliteBackupsByCount } from "../sqliteBackup";
 import { getBackupDir, getWelfareDb, getWelfareDbPath } from "../welfareStore";
-import { getSettings, logAction } from "../sqliteStore";
+import { closeElapsedBusinessPeriods, getSettings, logAction } from "../sqliteStore";
 import { ensureLanHttpsCert, getHttpsCertDir } from "./https";
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -58,6 +58,19 @@ function startBackupScheduler() {
   const timer = setInterval(checkAutoBackup, 10 * 60_000);
   timer.unref();
   setTimeout(checkAutoBackup, 30_000).unref();
+}
+
+function startCutoffScheduler() {
+  const check = () => {
+    try {
+      closeElapsedBusinessPeriods(getWelfareDb());
+    } catch (error) {
+      console.warn("[Cutoff] auto:", String(error));
+    }
+  };
+  check();
+  const timer = setInterval(check, 10_000);
+  timer.unref();
 }
 
 async function startServer() {
@@ -122,6 +135,7 @@ async function startServer() {
     }
     // ROUND 38 (ข้อ 39) — ตัวตรวจสำรองข้อมูลอัตโนมัติ (รอบแรกหลังบูต 30 วินาที)
     startBackupScheduler();
+    startCutoffScheduler();
   });
 }
 

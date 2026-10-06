@@ -1,3 +1,4 @@
+import { SharedSearch } from "@/components/SharedSearch";
 /**
  * V2-C3 — Extracted from `client/src/pages/Home.tsx` (lines 210-215 + 377-452 + 454-4058).
  * Pure move/extract — no business-logic changes.
@@ -74,6 +75,7 @@ import {
 import { MemberScanPicker } from "@/components/ScanPickers";
 import { SlipViewButton } from "@/components/SlipViewModal";
 import { ReceiptModal } from "@/components/ReceiptModal";
+import { transactionReceipt } from "@/lib/transactionReceipt";
 import { TimelineDrilldown } from "./TimelineDrilldown";
 import { trpc } from "@/lib/trpc";
 import {
@@ -127,6 +129,19 @@ const TX_TYPE_TONE: Record<
   limit_request: "purple",
 };
 
+type HospitalReportPreset = "standard" | "sales" | "balances" | "deposit" | "withdrawal" | "refund" | "activation" | "stock";
+
+const HOSPITAL_REPORT_PRESETS: { value: HospitalReportPreset; label: string }[] = [
+  { value: "standard", label: "รายงานมาตรฐาน" },
+  { value: "sales", label: "รพ. 1 · รายงานการขายสินค้า" },
+  { value: "balances", label: "รพ. 2 · ยอดเงินในบัตร" },
+  { value: "deposit", label: "รพ. 3 · เติมเงินบัตร" },
+  { value: "withdrawal", label: "รพ. 4 · ลดยอดเงินบัตร" },
+  { value: "refund", label: "รพ. 5 · คืนบัตรเงินสด" },
+  { value: "activation", label: "รพ. 6 · เปิดใช้บัตร" },
+  { value: "stock", label: "รพ. 7 · สินค้าคงคลัง" },
+];
+
 /** ROUND 34 (req 23.2) — สถานะคำขอลดวงเงิน → ป้ายสี (แถว kind "limit" ในตารางธุรกรรม) */
 const LIMIT_STATUS_META: Record<
   "pending" | "approved" | "rejected",
@@ -171,6 +186,12 @@ const REPORT_GROUPBY_CHIPS: { value: ReportGroupBy; label: string }[] = [
   { value: "month", label: "รายเดือน" },
 ];
 
+/** Local calendar date for report defaults; avoids UTC rollover from toISOString(). */
+function todayIso() {
+  const date = new Date();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
 export function Reports({
   focusBill,
   onFocusBillConsumed,
@@ -190,7 +211,7 @@ export function Reports({
   const [upgradeFeature, setUpgradeFeature] =
     useState<EditionFeatureKey | null>(null);
   // ROUND 49 — ช่วงเวลา (ปุ่มลัด) แยกจากการจัดกลุ่มแถว (รายวัน/สัปดาห์/เดือน) อย่างชัดเจน
-  const [rangeMode, setRangeMode] = useState<ReportRangeMode>("7d");
+  const [rangeMode, setRangeMode] = useState<ReportRangeMode>("today");
   const [groupBy, setGroupBy] = useState<ReportGroupBy>("day");
   // กำหนดเอง: เว้นวันสิ้นสุดว่าง = วันเดียวกับวันเริ่มต้น (เลือกวันเดียวแบบกดครั้งเดียว)
   const [rangeFrom, setRangeFrom] = useState("");
@@ -203,6 +224,7 @@ export function Reports({
   const [salesView, setSalesView] = useState<
     "timeline" | "category" | "product" | "items" | "cashier"
   >("timeline");
+  const [hospitalPreset, setHospitalPreset] = useState<HospitalReportPreset>("standard");
   // ROUND 48 — แถวช่วงเวลาที่กดขยายอยู่ (ดูรายการสินค้าของช่วงนั้น)
   const [expandedPeriod, setExpandedPeriod] = useState<string | null>(null);
   const [billMember, setBillMember] = useState<MemberLite | null>(null);
@@ -234,8 +256,24 @@ export function Reports({
         : [...current, value]
     );
   };
-  const [txFrom, setTxFrom] = useState("");
-  const [txTo, setTxTo] = useState("");
+  const applyHospitalPreset = (preset: HospitalReportPreset) => {
+    setHospitalPreset(preset);
+    if (preset === "sales") {
+      setReportTab("sales");
+      setSalesView("items");
+    } else if (preset === "balances") {
+      setReportTab("balances");
+    } else if (preset === "stock") {
+      setReportTab("stock");
+    } else if (preset !== "standard") {
+      setReportTab("transactions");
+      setTxTypes([preset]);
+    }
+  };
+  const [txFrom, setTxFrom] = useState(todayIso);
+  const [txTo, setTxTo] = useState(todayIso);
+  const [txCustomRange, setTxCustomRange] = useState(false);
+  const [viewedTransaction, setViewedTransaction] = useState<MemberTransactionRow | null>(null);
   // ROUND 49 — เลือกวันเดียวในแท็บธุรกรรม: กดวันที่ฝั่งเดียว อีกฝั่งเว้นว่าง → วันเดียวกันทันที (ไม่ดึงถึงวันนี้แบบเดิม)
   const pickTxFrom = (iso: string) => {
     setTxFrom(iso);
@@ -247,9 +285,8 @@ export function Reports({
   };
   // UI-9 — ปุ่มลัดช่วงเวลาของธุรกรรมสมาชิก (เหมือนแท็บยอดขาย/สต็อก)
   const pickTxRangeChip = (mode: ReportRangeMode) => {
+    setTxCustomRange(mode === "custom");
     if (mode === "custom") {
-      setTxFrom("");
-      setTxTo("");
       return;
     }
     const quick = quickRangeOf(mode);
@@ -259,19 +296,15 @@ export function Reports({
     }
   };
   const txRangeActive = (mode: ReportRangeMode): boolean => {
+    if (mode === "custom") return txCustomRange;
+    if (txCustomRange) return false;
     if (!txFrom && !txTo) return false;
-    if (mode === "custom") {
-      return !REPORT_RANGE_CHIPS.some(chip => {
-        if (chip.value === "custom") return false;
-        const quick = quickRangeOf(chip.value);
-        return !!quick && quick.from === txFrom && quick.to === txTo;
-      });
-    }
     const quick = quickRangeOf(mode);
     return !!quick && quick.from === txFrom && quick.to === txTo;
   };
   // ROUND 65 — ช่องค้นหาของรายงานใหม่: ยอดเงินในบัตร + สินค้าคงคลัง (debounce เหมือนประวัติบิล)
   const [balanceSearch, setBalanceSearch] = useState("");
+  const [includeZeroBalances, setIncludeZeroBalances] = useState(false);
   const [debouncedBalanceSearch, setDebouncedBalanceSearch] = useState("");
   const [stockSearch, setStockSearch] = useState("");
   const [debouncedStockSearch, setDebouncedStockSearch] = useState("");
@@ -307,8 +340,8 @@ export function Reports({
     return null;
   };
   const lastQuickRange = useRef({
-    from: isoDay(new Date(Date.now() - 6 * 86_400_000)),
-    to: isoDay(new Date()),
+    from: todayIso(),
+    to: todayIso(),
   });
   const pickRangeChip = (mode: ReportRangeMode) => {
     if (mode === "custom") {
@@ -347,12 +380,12 @@ export function Reports({
   const rangeChipLabel =
     rangeMode !== "custom"
       ? (REPORT_RANGE_CHIPS.find(chip => chip.value === rangeMode)?.label ??
-        "7 วันล่าสุด")
+        "วันนี้")
       : rangeFrom || rangeTo
         ? rangeFrom === rangeTo || !rangeFrom || !rangeTo
           ? formatThaiDate(effectiveFrom)
           : `${formatShortDay(effectiveFrom)}–${formatShortDay(effectiveTo)}`
-        : "ล่าสุด (7 วัน)";
+        : "วันนี้";
   const rangeLabel =
     effectiveFrom === effectiveTo
       ? formatThaiDate(effectiveFrom)
@@ -392,16 +425,18 @@ export function Reports({
         : [...current, name]
     );
   const resetReportFilters = () => {
-    setRangeMode("7d");
+    setRangeMode("today");
     setRangeFrom("");
     setRangeTo("");
     setGroupBy("day");
     setStaffFilters([]);
     setSalesView("timeline");
+    setHospitalPreset("standard");
     setTxMember(null);
     setTxTypes([]);
-    setTxFrom("");
-    setTxTo("");
+    setTxFrom(todayIso());
+    setTxCustomRange(false);
+    setTxTo(todayIso());
     setBalanceSearch("");
     setStockSearch("");
     setReportTab("sales");
@@ -478,7 +513,10 @@ export function Reports({
     { search: debouncedBalanceSearch || undefined },
     { enabled: reportTab === "balances" }
   );
-  const balanceRows = balancesQuery.data ?? [];
+  const balanceRows = useMemo(
+    () => (balancesQuery.data ?? []).filter(row => includeZeroBalances || row.balance !== 0),
+    [balancesQuery.data, includeZeroBalances]
+  );
   const stockBalanceQuery = trpc.reports.stockBalance.useQuery(
     {
       from: effectiveFrom,
@@ -906,41 +944,21 @@ export function Reports({
       };
     }
     if (salesView === "items") {
+      const hospitalSales = hospitalPreset === "sales";
       return {
-        fileName: "sales-line-items",
-        sheetName: "รายการขายรายบิล",
-        label: "แยกตามรายการในบิล",
+        fileName: hospitalSales ? "hospital-sales-report" : "sales-line-items",
+        sheetName: hospitalSales ? "รายงานการขายสินค้า" : "รายการขายรายบิล",
+        label: hospitalSales ? "ฟอร์มโรงพยาบาล" : "แยกตามรายการในบิล",
         rows: [
-          [
-            "วันที่ · เวลา",
-            "เลขที่บิล",
-            "รายการสินค้า",
-            "ชิ้น",
-            "ราคา/ชิ้น (บาท)",
-            "ยอดรวม (บาท)",
-            "ชำระโดย",
-            "พนักงานขาย",
-          ],
-          ...lineItemRows.map(row => [
-            formatLogDateTime(row.createdAt),
-            row.orderNumber,
-            row.productName,
-            exportCount(row.qty),
-            exportNumber(row.price),
-            exportNumber(row.amount),
-            row.paymentMethod,
-            row.cashier,
-          ]),
-          [
-            "รวม",
-            `${exportCount(lineItemTotals.bills)} บิล`,
-            `${exportCount(lineItemTotals.lines)} รายการ`,
-            exportCount(lineItemTotals.qty),
-            "—",
-            exportNumber(lineItemTotals.revenue),
-            "—",
-            "—",
-          ],
+          hospitalSales
+            ? ["วันที่ · เวลา", "รหัสสินค้า", "ชื่อสินค้า", "จำนวน", "ราคา/หน่วย (บาท)", "รวมเงิน (บาท)"]
+            : ["วันที่ · เวลา", "เลขที่บิล", "รายการสินค้า", "ชิ้น", "ราคา/ชิ้น (บาท)", "ยอดรวม (บาท)", "ชำระโดย", "พนักงานขาย"],
+          ...lineItemRows.map(row => hospitalSales
+            ? [formatLogDateTime(row.createdAt), row.productCode ?? "—", row.productName, exportCount(row.qty), exportNumber(row.price), exportNumber(row.amount)]
+            : [formatLogDateTime(row.createdAt), row.orderNumber, row.productName, exportCount(row.qty), exportNumber(row.price), exportNumber(row.amount), row.paymentMethod, row.cashier]),
+          hospitalSales
+            ? ["รวม", `${exportCount(lineItemTotals.lines)} รายการ`, "", exportCount(lineItemTotals.qty), "—", exportNumber(lineItemTotals.revenue)]
+            : ["รวม", `${exportCount(lineItemTotals.bills)} บิล`, `${exportCount(lineItemTotals.lines)} รายการ`, exportCount(lineItemTotals.qty), "—", exportNumber(lineItemTotals.revenue), "—", "—"],
         ],
       };
     }
@@ -1054,9 +1072,10 @@ export function Reports({
       };
     }
     if (salesView === "items") {
+      const hospitalSales = hospitalPreset === "sales";
       return {
-        fileName: "sales-line-items.pdf",
-        title: "รายงานรายการสินค้าที่ขาย (รายบิล)",
+        fileName: hospitalSales ? "hospital-sales-report.pdf" : "sales-line-items.pdf",
+        title: hospitalSales ? "รายงานการขายสินค้า" : "รายงานรายการสินค้าที่ขาย (รายบิล)",
         periodLabel: `ช่วงข้อมูล ${rangeLabel}${staffSuffix}`,
         meta: [
           ["จำนวนบิล", `${lineItemTotals.bills.toLocaleString("th-TH")} บิล`],
@@ -1066,40 +1085,19 @@ export function Reports({
           ],
           ["ยอดขายรวม", money(lineItemTotals.revenue)],
         ],
-        columns: [
-          "วันที่ · เวลา",
-          "เลขที่บิล",
-          "รายการสินค้า",
-          "ชิ้น",
-          "ราคา/ชิ้น (บาท)",
-          "ยอดรวม (บาท)",
-          "ชำระโดย",
-          "พนักงานขาย",
-        ],
+        columns: hospitalSales
+          ? ["วันที่ · เวลา", "รหัสสินค้า", "ชื่อสินค้า", "จำนวน", "ราคา/หน่วย (บาท)", "รวมเงิน (บาท)"]
+          : ["วันที่ · เวลา", "เลขที่บิล", "รายการสินค้า", "ชิ้น", "ราคา/ชิ้น (บาท)", "ยอดรวม (บาท)", "ชำระโดย", "พนักงานขาย"],
         numericCols: [3, 4, 5],
-        rows: lineItemRows.map(row => [
-          formatLogDateTime(row.createdAt),
-          row.orderNumber,
-          row.productName,
-          exportCount(row.qty),
-          exportNumber(row.price),
-          exportNumber(row.amount),
-          row.paymentMethod,
-          row.cashier,
-        ]),
-        totalsRow: [
-          "รวม",
-          `${exportCount(lineItemTotals.bills)} บิล`,
-          `${exportCount(lineItemTotals.lines)} รายการ`,
-          exportCount(lineItemTotals.qty),
-          "—",
-          exportNumber(lineItemTotals.revenue),
-          "—",
-          "—",
-        ],
+        rows: lineItemRows.map(row => hospitalSales
+          ? [formatLogDateTime(row.createdAt), row.productCode ?? "—", row.productName, exportCount(row.qty), exportNumber(row.price), exportNumber(row.amount)]
+          : [formatLogDateTime(row.createdAt), row.orderNumber, row.productName, exportCount(row.qty), exportNumber(row.price), exportNumber(row.amount), row.paymentMethod, row.cashier]),
+        totalsRow: hospitalSales
+          ? ["รวม", `${exportCount(lineItemTotals.lines)} รายการ`, "", exportCount(lineItemTotals.qty), "—", exportNumber(lineItemTotals.revenue)]
+          : ["รวม", `${exportCount(lineItemTotals.bills)} บิล`, `${exportCount(lineItemTotals.lines)} รายการ`, exportCount(lineItemTotals.qty), "—", exportNumber(lineItemTotals.revenue), "—", "—"],
         brandName: "ร้านค้าสวัสดิการ",
         footnote:
-          "ทุกบรรทัดสินค้าจากทุกบิลในช่วงเวลาที่เลือก · เรียงจากล่าสุดขึ้นก่อน · แสดงสูงสุด 1,000 รายการ",
+          hospitalSales ? "รหัสสินค้าใช้ SKU เป็นหลัก และใช้ barcode เมื่อ SKU ว่าง · แสดงสูงสุด 1,000 รายการ" : "ทุกบรรทัดสินค้าจากทุกบิลในช่วงเวลาที่เลือก · เรียงจากล่าสุดขึ้นก่อน · แสดงสูงสุด 1,000 รายการ",
         compact: true, // ตาราง 8 คอลัมน์ — ลดขนาดตามฟอร์มให้อยู่บรรทัดเดียว
       };
     }
@@ -1290,25 +1288,31 @@ export function Reports({
       setExportPreview(state);
     }
   };
+  const hospitalTxPreset = hospitalPreset === "deposit" || hospitalPreset === "withdrawal" || hospitalPreset === "refund" || hospitalPreset === "activation";
+  const hospitalTxTitle: Record<Exclude<HospitalReportPreset, "standard" | "sales" | "balances" | "stock">, string> = {
+    deposit: "รายงานการเติมเงินบัตรเงินสด",
+    withdrawal: "รายงานการลดยอดเงินบัตร",
+    refund: "รายงานการคืนบัตรเงินสด",
+    activation: "รายงานการเปิดใช้บัตรเงินสด",
+  };
+  const txAmountForReport = (row: typeof txRows[number]) => hospitalTxPreset ? Math.abs(row.amount) : row.amount;
   const txExportRows = () => [
     [
       "วันที่ · เวลา",
       "เลขสมาชิก",
       "ชื่อสมาชิก",
-      "ประเภท",
-      "รายละเอียด",
+      ...(hospitalTxPreset ? [] : ["ประเภท", "รายละเอียด"]),
       "ยอด (บาท)",
-      "คงเหลือ(บาท)",
+      ...(hospitalTxPreset ? [] : ["คงเหลือ(บาท)"]),
       "ผู้ทำรายการ",
     ],
     ...txRows.map(row => [
       formatLogDateTime(row.createdAt),
       row.memberNumber,
       row.memberName ?? "—",
-      TX_TYPE_LABEL[row.type],
-      row.detail,
-      exportNumber(row.amount),
-      row.balanceAfter !== null ? exportNumber(row.balanceAfter) : "—",
+      ...(hospitalTxPreset ? [] : [TX_TYPE_LABEL[row.type], row.detail]),
+      exportNumber(txAmountForReport(row)),
+      ...(hospitalTxPreset ? [] : [row.balanceAfter !== null ? exportNumber(row.balanceAfter) : "—"]),
       row.actor ?? "ไม่ระบุ",
     ]),
   ];
@@ -1317,7 +1321,7 @@ export function Reports({
     : "member-transactions";
   const txDocConfig = (): ReportDocConfig => ({
     fileName: `${txExportBase}.pdf`,
-    title: "รายงานประวัติธุรกรรมสมาชิก",
+    title: hospitalTxPreset ? hospitalTxTitle[hospitalPreset] : "รายงานประวัติธุรกรรมสมาชิก",
     periodLabel: txMember
       ? `สมาชิก ${txMember.memberNumber} · สมาชิก${txMember.firstName} ${txMember.lastName}`
       : "ทุกสมาชิก · แสดง 300 รายการล่าสุด",
@@ -1336,29 +1340,21 @@ export function Reports({
       ],
       ["จำนวนรายการ", `${txRows.length} รายการ`],
     ],
-    columns: [
-      "วันที่ · เวลา",
-      "เลขสมาชิก",
-      "ชื่อสมาชิก",
-      "ประเภท",
-      "รายละเอียด",
-      "ยอด (บาท)",
-      "คงเหลือ(บาท)",
-      "ผู้ทำรายการ",
-    ],
-    numericCols: [5, 6],
+    columns: hospitalTxPreset
+      ? ["วันที่ · เวลา", "เลขสมาชิก", "ชื่อสมาชิก", "ยอด (บาท)", "ผู้ทำรายการ"]
+      : ["วันที่ · เวลา", "เลขสมาชิก", "ชื่อสมาชิก", "ประเภท", "รายละเอียด", "ยอด (บาท)", "คงเหลือ(บาท)", "ผู้ทำรายการ"],
+    numericCols: hospitalTxPreset ? [3] : [5, 6],
     rows: txRows.map(row => [
       formatLogDateTime(row.createdAt),
       row.memberNumber,
       row.memberName ?? "—",
-      TX_TYPE_LABEL[row.type],
-      row.detail,
-      exportNumber(row.amount),
-      row.balanceAfter !== null ? exportNumber(row.balanceAfter) : "—",
+      ...(hospitalTxPreset ? [] : [TX_TYPE_LABEL[row.type], row.detail]),
+      exportNumber(txAmountForReport(row)),
+      ...(hospitalTxPreset ? [] : [row.balanceAfter !== null ? exportNumber(row.balanceAfter) : "—"]),
       row.actor ?? "ไม่ระบุ",
     ]),
     // แยกสรุปประเภทเงินออกเป็นกล่อง เพื่อไม่ให้ข้อความยาวถูกบีบอยู่ในคอลัมน์รายละเอียด
-    summaryBlocks: [
+    summaryBlocks: hospitalTxPreset ? [["จำนวนรายการ", `${exportCount(txRows.length)} รายการ`], ["ยอดรวม", exportNumber(txRows.reduce((sum, row) => sum + Math.abs(row.amount), 0))]] : [
       [
         "เติมเงิน",
         `+${exportNumber(txTotals.deposit)} · ${exportCount(txTotals.depositCount)} รายการ`,
@@ -1384,19 +1380,12 @@ export function Reports({
         exportNumber(txRows.reduce((sum, row) => sum + row.amount, 0)),
       ],
     ],
-    totalsRow: [
-      `รวมทั้งหมด ${txRows.length} รายการ`,
-      "—",
-      "—",
-      "—",
-      "—",
-      "—",
-      "—",
-      "—",
-    ],
+    totalsRow: hospitalTxPreset
+      ? [`รวม ${exportCount(txRows.length)} รายการ`, "", "", exportNumber(txRows.reduce((sum, row) => sum + Math.abs(row.amount), 0)), ""]
+      : [`รวมทั้งหมด ${txRows.length} รายการ`, "—", "—", "—", "—", "—", "—", "—"],
     brandName: "ร้านค้าสวัสดิการ",
     footnote:
-      "ข้อมูลจากบัญชีสมาชิกโดยตรง · แยกสรุปยอดเติมเงิน ถอนเงิน ซื้อสินค้า เปิดใช้บัตร และคืนเงินด้านบน",
+      hospitalTxPreset ? "ข้อมูลจากบัญชีสมาชิกโดยตรง · ยอดเงินแสดงเป็นจำนวนบวกตามฟอร์มโรงพยาบาล" : "ข้อมูลจากบัญชีสมาชิกโดยตรง · แยกสรุปยอดเติมเงิน ถอนเงิน ซื้อสินค้า เปิดใช้บัตร และคืนเงินด้านบน",
     compact: true, // ตาราง 10 คอลัมน์ — ลดขนาดตามฟอร์มให้อยู่บรรทัดเดียว
   });
   const openTxExportPreview = async (preferred?: ExportFormat, direct = false) => {
@@ -1428,9 +1417,9 @@ export function Reports({
   };
   // ROUND 65 — ชุดส่งออกของรายงานใหม่ 2 ตัว (ยอดเงินในบัตร + สินค้าคงคลัง)
   const balancesDocConfig = (): ReportDocConfig => ({
-    fileName: "member-card-balances.pdf",
-    title: "รายงานยอดเงินในบัตรสมาชิก",
-    periodLabel: `ณ วันที่สร้างรายงาน ${formatThaiDate(new Date())}${debouncedBalanceSearch ? ` · ค้นหา “${debouncedBalanceSearch}”` : ""}`,
+    fileName: hospitalPreset === "balances" ? "hospital-member-card-balance.pdf" : "member-card-balances.pdf",
+    title: hospitalPreset === "balances" ? "รายงานแสดงยอดเงินในบัตรเงินสด" : "รายงานยอดเงินในบัตรสมาชิก",
+    periodLabel: `ณ วันที่สร้างรายงาน ${formatThaiDate(new Date())} · ${includeZeroBalances ? "รวมสมาชิกยอด 0 บาท" : "เฉพาะยอดคงเหลือไม่เท่ากับ 0 บาท"}${debouncedBalanceSearch ? ` · ค้นหา “${debouncedBalanceSearch}”` : ""}`,
     meta: [
       ["จำนวนสมาชิก", `${balanceTotals.members.toLocaleString("th-TH")} ราย`],
       ["ยอดเงินเข้ารวม", money(balanceTotals.totalIn)],
@@ -1439,8 +1428,8 @@ export function Reports({
     columns: [
       "ลำดับ",
       "เลขสมาชิก",
-      "ชื่อ-นามสกุล",
-      "วันที่เปิดใช้สมาชิก",
+      "ชื่อสมาชิก",
+      "วันที่เปิดใช้บัตร",
       "ยอดทั้งหมด (บาท)",
       "ยอดจ่าย (บาท)",
       "คงเหลือ (บาท)",
@@ -1524,7 +1513,7 @@ export function Reports({
     }
   };
   const stockBalanceDocConfig = (): ReportDocConfig => ({
-    fileName: "stock-balance-period.pdf",
+    fileName: hospitalPreset === "stock" ? "hospital-stock-balance.pdf" : "stock-balance-period.pdf",
     title: "รายงานสินค้าคงคลัง",
     periodLabel: `ช่วงข้อมูล ${rangeLabel} · ยอดยกมา ณ ต้นช่วง${debouncedStockSearch ? ` · ค้นหา “${debouncedStockSearch}”` : ""}`,
     meta: [
@@ -1532,34 +1521,16 @@ export function Reports({
       ["ขายออกในช่วง", `${stockTotals.sold.toLocaleString("th-TH")} ชิ้น`],
       ["คงเหลือรวม", `${stockTotals.remaining.toLocaleString("th-TH")} ชิ้น`],
     ],
-    columns: [
-      "ลำดับ",
-      "รหัสสินค้า",
-      "ชื่อสินค้า",
-      "หน่วย",
-      "ยอดยกมา",
-      "ยอดขาย",
-      "คงเหลือ",
-    ],
-    numericCols: [4, 5, 6],
-    rows: stockBalanceRows.map((row, index) => [
-      exportCount(index + 1),
-      row.code,
-      row.name,
-      row.unit,
-      exportCount(row.opening),
-      exportCount(row.sold),
-      exportCount(row.remaining),
-    ]),
-    totalsRow: [
-      "รวม",
-      `${stockTotals.items} รายการ`,
-      "",
-      "",
-      exportCount(stockTotals.opening),
-      exportCount(stockTotals.sold),
-      exportCount(stockTotals.remaining),
-    ],
+    columns: hospitalPreset === "stock"
+      ? ["รหัสสินค้า", "ชื่อสินค้า", "ยอดยกมา", "ยอดขาย", "คงเหลือ"]
+      : ["ลำดับ", "รหัสสินค้า", "ชื่อสินค้า", "หน่วย", "ยอดยกมา", "ยอดขาย", "คงเหลือ"],
+    numericCols: hospitalPreset === "stock" ? [2, 3, 4] : [4, 5, 6],
+    rows: stockBalanceRows.map((row, index) => hospitalPreset === "stock"
+      ? [row.code, row.name, exportCount(row.opening), exportCount(row.sold), exportCount(row.remaining)]
+      : [exportCount(index + 1), row.code, row.name, row.unit, exportCount(row.opening), exportCount(row.sold), exportCount(row.remaining)]),
+    totalsRow: hospitalPreset === "stock"
+      ? ["รวม", `${stockTotals.items} รายการ`, exportCount(stockTotals.opening), exportCount(stockTotals.sold), exportCount(stockTotals.remaining)]
+      : ["รวม", `${stockTotals.items} รายการ`, "", "", exportCount(stockTotals.opening), exportCount(stockTotals.sold), exportCount(stockTotals.remaining)],
     brandName: "ร้านค้าสวัสดิการ",
     footnote:
       "ยอดยกมา = จำนวนต้นช่วง · ยอดขาย = ขายออกในช่วงที่เลือก · คงเหลือ = สต็อกปัจจุบัน",
@@ -1703,7 +1674,7 @@ export function Reports({
       <SectionHeader
         eyebrow="สรุปผลและวิเคราะห์ข้อมูล"
         title="รายงาน"
-        description="สลับมุมมองทีละแท็บ — 1. เลือกรายงาน (ยอดขาย/บิล/ธุรกรรม/สต็อก) → 2. กรองข้อมูล (ช่วงวันที่/พนักงาน/ประเภท) → 3. ส่งออก (ดูตัวอย่างก่อนดาวน์โหลด CSV/Excel/PDF)"
+        description=""
         action={
           <div className="page-template-action">
             <button
@@ -1730,6 +1701,14 @@ export function Reports({
         }
       />
       <div className="dash-workbench report-workbench">
+        <div className="report-filter-bar" aria-label="รูปแบบรายงานโรงพยาบาล">
+          <label className="report-filter-select">
+            <span>รูปแบบรายงาน</span>
+            <select value={hospitalPreset} onChange={event => applyHospitalPreset(event.target.value as HospitalReportPreset)}>
+              {HOSPITAL_REPORT_PRESETS.map(preset => <option key={preset.value} value={preset.value}>{preset.label}</option>)}
+            </select>
+          </label>
+        </div>
         <div className="dash-tabbar">
           <button
             type="button"
@@ -2591,7 +2570,7 @@ export function Reports({
               {/* PT-3 Layer 3 — FilterBar: search + member picker + export (no date range) */}
               <div className="report-filter-bar">
                 <div className="report-filter-row-main bills-filter-row">
-                  <div className="search-field">
+                  <SharedSearch label="รายงาน · ค้นหาในแท็บนี้"><div className="search-field">
                     <Search size={16} />
                     <input
                       value={billSearch}
@@ -2599,7 +2578,7 @@ export function Reports({
                       placeholder="ค้นหาเลขที่บิล หรือเลขสมาชิก (คีย์/สแกนได้)"
                       aria-label="ค้นหาประวัติบิล"
                     />
-                  </div>
+                  </div></SharedSearch>
                   <div className="bill-member-filter">
                     <MemberScanPicker
                       members={members}
@@ -2814,8 +2793,7 @@ export function Reports({
           )}
           {reportTab === "transactions" && (
             <section className="panel table-panel" id="tx-report">
-              {/* PT-3 Layer 3 — consolidated FilterBar: date chips + tx-date-range +
-                  MemberScanPicker + tx-type-pills + export buttons (all in one row) */}
+              {/* Keep filters together; export actions have their own toolbar below. */}
               <div className="report-filter-bar">
                 <div className="report-range-row report-filter-row-main">
                   <div
@@ -2841,7 +2819,7 @@ export function Reports({
                       </button>
                     ))}
                   </div>
-                  <div
+                  {txCustomRange && <div
                     className="tx-date-range"
                     role="group"
                     aria-label="ช่วงวันที่ของธุรกรรม"
@@ -2859,47 +2837,7 @@ export function Reports({
                       min={txFrom || undefined}
                       ariaLabel="วันสิ้นสุดของธุรกรรม"
                     />
-                  </div>
-                </div>
-                <div
-                  className="report-export-actions"
-                  aria-label="พรีวิวข้อมูลก่อนส่งออกประวัติธุรกรรม"
-                >
-                  <button
-                    className="outline-button compact"
-                    onClick={() => void openTxExportPreview("csv", true)}
-                    title="ดาวน์โหลด CSV — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
-                  >
-                    <Download size={15} /> CSV
-                  </button>
-                  <button
-                    className="outline-button compact"
-                    onClick={() => void openTxExportPreview("xlsx", true)}
-                    title="ดาวน์โหลด Excel — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
-                  >
-                    <FileBarChart size={15} /> Excel
-                  </button>
-                  <button
-                    className="outline-button compact"
-                    onClick={() => void openTxExportPreview("pdf", true)}
-                    title="ดาวน์โหลด PDF (vector) แบบเอกสาร A4 — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
-                  >
-                    <FileText size={15} /> PDF
-                  </button>
-                  <button
-                    className="outline-button compact"
-                    onClick={() => void openTxExportPreview("print", true)}
-                    title="สั่งพิมพ์ประวัติธุรกรรม A4 ทันที — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
-                  >
-                    <Printer size={15} /> พิมพ์
-                  </button>
-                  <button
-                    className="outline-button compact preview-btn"
-                    onClick={() => void openTxExportPreview()}
-                    title="ดูตัวอย่างเอกสาร A4 + ตารางข้อมูลก่อนส่งออก"
-                  >
-                    <Eye size={15} /> ดูพรีวิว
-                  </button>
+                  </div>}
                 </div>
                 <div className="report-filter-row-main tx-filter-row">
                   <MemberScanPicker
@@ -2955,6 +2893,46 @@ export function Reports({
                   </div>
                 </div>
               </div>
+                <div
+                  className="report-export-actions tx-export-toolbar"
+                  aria-label="พรีวิวข้อมูลก่อนส่งออกประวัติธุรกรรม"
+                >
+                  <button
+                    className="outline-button compact"
+                    onClick={() => void openTxExportPreview("csv", true)}
+                    title="ดาวน์โหลด CSV — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
+                  >
+                    <Download size={15} /> CSV
+                  </button>
+                  <button
+                    className="outline-button compact"
+                    onClick={() => void openTxExportPreview("xlsx", true)}
+                    title="ดาวน์โหลด Excel — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
+                  >
+                    <FileBarChart size={15} /> Excel
+                  </button>
+                  <button
+                    className="outline-button compact"
+                    onClick={() => void openTxExportPreview("pdf", true)}
+                    title="ดาวน์โหลด PDF (vector) แบบเอกสาร A4 — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
+                  >
+                    <FileText size={15} /> PDF
+                  </button>
+                  <button
+                    className="outline-button compact"
+                    onClick={() => void openTxExportPreview("print", true)}
+                    title="สั่งพิมพ์ประวัติธุรกรรม A4 ทันที — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
+                  >
+                    <Printer size={15} /> พิมพ์
+                  </button>
+                  <button
+                    className="outline-button compact preview-btn"
+                    onClick={() => void openTxExportPreview()}
+                    title="ดูตัวอย่างเอกสาร A4 + ตารางข้อมูลก่อนส่งออก"
+                  >
+                    <Eye size={15} /> ดูพรีวิว
+                  </button>
+                </div>
               <div className="tx-log-strip" role="note">
                 <WalletCards size={14} />
                 <span>
@@ -3069,6 +3047,7 @@ export function Reports({
                               >
                                 {formatLogDateTime(row.createdAt)}
                               </small>
+                              {transactionReceipt(row) && <button type="button" className="outline-button compact" onClick={() => setViewedTransaction(row)}><ReceiptText size={14} /> ใบเสร็จ</button>}
                             </td>
                             <td>
                               <span className="cell-strong">
@@ -3241,7 +3220,7 @@ export function Reports({
                       />
                     </div>
                   )}
-                  <div className="search-field">
+                  <SharedSearch label="รายงาน · ค้นหาในแท็บนี้"><div className="search-field">
                     <Search size={16} />
                     <input
                       value={stockSearch}
@@ -3249,7 +3228,7 @@ export function Reports({
                       placeholder="ค้นหาชื่อสินค้า / รหัส / บาร์โค้ด"
                       aria-label="ค้นหารายการสินค้าคงคลัง"
                     />
-                  </div>
+                  </div></SharedSearch>
                 </div>
                 <div
                   className="report-export-actions"
@@ -3459,7 +3438,7 @@ export function Reports({
               {/* PT-3 Layer 3 — FilterBar: search + export (snapshot, no date range) */}
               <div className="report-filter-bar">
                 <div className="report-range-row report-filter-row-main">
-                  <div className="search-field">
+                  <SharedSearch label="รายงาน · ค้นหาในแท็บนี้"><div className="search-field">
                     <Search size={16} />
                     <input
                       value={balanceSearch}
@@ -3467,7 +3446,16 @@ export function Reports({
                       placeholder="ค้นหาชื่อ / เลขสมาชิก"
                       aria-label="ค้นหารายงานยอดเงินในบัตร"
                     />
-                  </div>
+                  </div></SharedSearch>
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={includeZeroBalances}
+                      onChange={event => setIncludeZeroBalances(event.target.checked)}
+                      data-testid="include-zero-balances"
+                    />{" "}
+                    แสดงสมาชิกทั้งหมด รวมยอด 0 บาท
+                  </label>
                 </div>
                 <div
                   className="report-export-actions"
@@ -3512,7 +3500,7 @@ export function Reports({
               </div>
               <div className="tx-summary-cards">
                 <div>
-                  <small>สมาชิกทั้งหมด</small>
+                  <small>สมาชิกในรายงาน</small>
                   <strong>
                     {balancesQuery.isLoading ? (
                       "…"
@@ -3553,7 +3541,7 @@ export function Reports({
                       ? "…"
                       : money(balanceTotals.balance)}
                   </strong>
-                  <span>ยอดเงินในบัตรทุกใบขณะนี้</span>
+                  <span>ยอดเงินคงเหลือของสมาชิกในรายงาน</span>
                 </div>
               </div>
               <div className="table-wrap">
@@ -3767,6 +3755,7 @@ export function Reports({
           mode="reprint"
         />
       )}
+      {viewedTransaction && transactionReceipt(viewedTransaction) && <ReceiptModal receipt={transactionReceipt(viewedTransaction)!} documentTitle={viewedTransaction.type === "deposit" ? "ใบเสร็จเติมเงิน" : viewedTransaction.type === "refund" ? "ใบยืนยันการคืนเงินบัตร" : "ใบยืนยันการถอนเงิน"} mode="reprint" onClose={() => setViewedTransaction(null)} />}
       {exportPreview && (
         <ExportPreviewModal
           state={exportPreview}

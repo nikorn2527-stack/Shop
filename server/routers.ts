@@ -57,6 +57,7 @@ import {
   listMembers,
   listProducts,
   listStockRows,
+  stockReceiptHistory,
   logAction,
   loginLockRemainingMinutes,
   memberBalances,
@@ -512,6 +513,7 @@ const settingsPatchInput = z
     storeAddress: z.string().optional(),
     appName: z.string().max(80).optional(),
     appLogo: z.string().max(600_000).optional(),
+    appBackground: z.string().max(1_500_000).refine(value => value === "" || /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(value), "รองรับภาพ PNG JPG WEBP เท่านั้น").optional(),
     appTheme: z.string().max(32).optional(),
     // ROUND 75 (user) — ลบ autoPrintReceipt (ห้ามเด้งหน้าสั่งพิมพ์หลังชำระเงิน) ·
     // เพิ่มเมนูลัดหน้าร้าน: JSON array ของ key ปุ่ม POS ที่ปิดใช้งาน เช่น ["withdraw","special"]
@@ -968,6 +970,12 @@ export const appRouter = router({
   }),
 
   stock: router({
+    receipts: publicProcedure
+      .input(z.object({ from: z.string().optional(), to: z.string().optional(), search: z.string().optional(), actor: z.string().optional() }))
+      .query(({ ctx, input }) => withStoreErrors(() => {
+        requireLogin(ctx);
+        return stockReceiptHistory(getWelfareDb(), input);
+      })),
     rows: publicProcedure
       .input(z.unknown().optional())
       .query(({ ctx }) => withStoreErrors(() => {
@@ -1084,6 +1092,7 @@ export const appRouter = router({
     void: publicProcedure
       .input(z.object({ saleId: z.number().int(), reason: z.string().min(1).max(500) }))
       .mutation(({ input, ctx }) => {
+        requireLogin(ctx);
         const actor = ctx.user?.name ?? "เจ้าหน้าที่";
         const actorRole = ctx.user?.role === "admin" ? (ctx.user?.appRole === "dev" ? "ผู้พัฒนา" : "ผู้บริหาร") : "เจ้าหน้าที่";
         return withStoreErrors(() => voidSale(getWelfareDb(), { saleId: input.saleId, reason: input.reason, actor, actorRole }));
@@ -1723,16 +1732,19 @@ export const appRouter = router({
 
   // === Cashier Shift ===
   shift: {
-    list: publicProcedure.input(z.object({ status: z.enum(["open", "closed"]).optional() }).optional()).query(({ input }) => {
+    list: publicProcedure.input(z.object({ status: z.enum(["open", "closed"]).optional() }).optional()).query(({ input, ctx }) => {
+      requireLogin(ctx);
       return listShifts(getWelfareDb(), input?.status);
     }),
     open: publicProcedure.input(z.object({ cashierName: z.string().min(1), openingCash: z.number().min(0).default(0), note: z.string().max(500).optional() })).mutation(({ input, ctx }) => {
+      requireLogin(ctx);
       const actor = ctx.user?.name ?? input.cashierName;
       const actorRole = ctx.user?.role === "admin" ? (ctx.user.appRole === "dev" ? "ผู้พัฒนา" : "ผู้บริหาร") : "เจ้าหน้าที่";
       const shift = openShift(getWelfareDb(), { cashierName: actor, openingCash: input.openingCash, note: input.note });
       return shift;
     }),
     close: publicProcedure.input(z.object({ shiftId: z.number().int(), countedCash: z.number().min(0), note: z.string().max(500).optional() })).mutation(({ input, ctx }) => {
+      requireLogin(ctx);
       const actor = ctx.user?.name ?? "เจ้าหน้าที่";
       const actorRole = ctx.user?.role === "admin" ? (ctx.user.appRole === "dev" ? "ผู้พัฒนา" : "ผู้บริหาร") : "เจ้าหน้าที่";
       const shift = closeShift(getWelfareDb(), { shiftId: input.shiftId, countedCash: input.countedCash, note: input.note });

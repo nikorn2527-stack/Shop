@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { CalendarDays, ChevronLeft, ChevronRight } from "@/lib/icons";
 
 /**
@@ -35,6 +36,8 @@ export function ThaiDatePicker({ value, onChange, min, max, ariaLabel = "เล�
 }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement | null>(null);
+  const popRef = useRef<HTMLDivElement | null>(null);
+  const [position, setPosition] = useState({ top: 0, left: 0 });
   const selected = fromIso(value);
   const today = new Date();
   const [viewYear, setViewYear] = useState(selected?.getFullYear() ?? today.getFullYear());
@@ -42,16 +45,35 @@ export function ThaiDatePicker({ value, onChange, min, max, ariaLabel = "เล�
   useEffect(() => {
     if (open && selected) { setViewYear(selected.getFullYear()); setViewMonth(selected.getMonth()); }
   }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!open) return;
+    const updatePosition = () => {
+      const rect = wrapRef.current?.getBoundingClientRect();
+      const popup = popRef.current;
+      if (!rect || !popup) return;
+      const gap = 6;
+      const margin = 8;
+      const height = popup.getBoundingClientRect().height;
+      const width = popup.getBoundingClientRect().width;
+      const below = window.innerHeight - rect.bottom - gap - margin;
+      const above = rect.top - gap - margin;
+      const top = below >= height || below >= above ? rect.bottom + gap : rect.top - height - gap;
+      setPosition({
+        top: Math.max(margin, Math.min(top, window.innerHeight - height - margin)),
+        left: Math.max(margin, Math.min(rect.left, window.innerWidth - width - margin)),
+      });
+    };
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
     const onDocClick = (event: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(event.target as Node)) setOpen(false);
+      if (wrapRef.current && !wrapRef.current.contains(event.target as Node) && !popRef.current?.contains(event.target as Node)) setOpen(false);
     };
     const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
     document.addEventListener("mousedown", onDocClick);
     document.addEventListener("keydown", onKey);
-    return () => { document.removeEventListener("mousedown", onDocClick); document.removeEventListener("keydown", onKey); };
-  }, [open]);
+    return () => { document.removeEventListener("mousedown", onDocClick); document.removeEventListener("keydown", onKey); window.removeEventListener("resize", updatePosition); window.removeEventListener("scroll", updatePosition, true); };
+  }, [open, viewMonth, viewYear]);
   const minDate = useMemo(() => fromIso(min ?? "") ?? null, [min]);
   const maxDate = useMemo(() => fromIso(max ?? "") ?? null, [max]);
   const grid = useMemo(() => {
@@ -77,8 +99,8 @@ export function ThaiDatePicker({ value, onChange, min, max, ariaLabel = "เล�
         <span>{value ? formatThai(value) : placeholder}</span>
         <ChevronRight size={13} className="thai-date-caret" />
       </button>
-      {open && (
-        <div className="thai-date-pop" role="dialog" aria-label={`ปฏิทิน ${THAI_MONTHS_FULL[viewMonth]} ${viewYear + 543}`}>
+      {open && createPortal(
+        <div ref={popRef} className="thai-date-pop" style={{ position: "fixed", top: position.top, left: position.left, right: "auto", bottom: "auto", zIndex: 10000, maxWidth: "calc(100vw - 16px)", maxHeight: "calc(100dvh - 16px)", overflowY: "auto" }} role="dialog" aria-label={`ปฏิทิน ${THAI_MONTHS_FULL[viewMonth]} ${viewYear + 543}`}>
           <div className="thai-date-nav">
             <button type="button" onClick={() => stepMonth(-1)} aria-label="เดือนก่อนหน้า"><ChevronLeft size={15} /></button>
             <b>{THAI_MONTHS_FULL[viewMonth]} {viewYear + 543}</b>
@@ -97,7 +119,7 @@ export function ThaiDatePicker({ value, onChange, min, max, ariaLabel = "เล�
             {value && <button type="button" className="mini-button" onClick={() => { onChange(""); setOpen(false); }}>ล้างวันที่</button>}
           </div>
         </div>
-      )}
+      , document.body)}
     </div>
   );
 }

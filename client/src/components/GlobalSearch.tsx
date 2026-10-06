@@ -40,13 +40,14 @@ type CommandItem = {
 
 const SECTION_ORDER: CommandSection[] = ["การดำเนินการด่วน", "เมนู", "สมาชิก", "สินค้า", "บิลขาย"];
 
-export function GlobalSearch({ role, open, onClose, onNavigate, onOpenMember, onOpenBill }: {
+export function GlobalSearch({ role, open, onClose, onNavigate, onOpenMember, onOpenBill, onOpenProduct }: {
   role: Role;
   open: boolean;
   onClose: () => void;
   onNavigate: (view: View) => void;
   onOpenMember: (memberNumber: string) => void;
   onOpenBill: (orderNumber: string) => void;
+  onOpenProduct: (productId: number) => void;
 }) {
   const [query, setQuery] = useState("");
   const [highlighted, setHighlighted] = useState(0);
@@ -113,9 +114,9 @@ export function GlobalSearch({ role, open, onClose, onNavigate, onOpenMember, on
         list.push({ key: `member-${member.memberNumber}`, section: "สมาชิก", icon: UsersRound, label: `${member.firstName} ${member.lastName}`, sub: `${member.memberNumber} · ยอดคงเหลือ ${money(member.balance)} · ${member.type}`, select: () => onOpenMember(member.memberNumber) });
       }
       for (const product of productsQuery.data ?? []) {
-        const haystack = `${product.name} ${product.sku}`.toLowerCase();
+        const haystack = `${product.name} ${product.sku} ${product.barcode ?? ""}`.toLowerCase();
         if (!haystack.includes(needle)) continue;
-        list.push({ key: `product-${product.id}`, section: "สินค้า", icon: Package, label: product.name, sub: `${product.sku} · คงเหลือ ${product.stock} ${product.unit} · ${money(product.price)}`, select: () => onNavigate("pos") });
+        list.push({ key: `product-${product.id}`, section: "สินค้า", icon: Package, label: product.name, sub: `${product.sku} · คงเหลือ ${product.stock} ${product.unit} · ${money(product.price)}`, select: () => onOpenProduct(product.id) });
       }
       if (trimmed.length >= 2) {
         for (const bill of billsQuery.data ?? []) {
@@ -136,7 +137,7 @@ export function GlobalSearch({ role, open, onClose, onNavigate, onOpenMember, on
       capped.push(item);
     }
     return capped;
-  }, [open, needle, trimmed, quickActions, menuEntries, membersQuery.data, productsQuery.data, billsQuery.data, onNavigate, onOpenMember, onOpenBill]);
+  }, [open, needle, trimmed, quickActions, menuEntries, membersQuery.data, productsQuery.data, billsQuery.data, onNavigate, onOpenMember, onOpenBill, onOpenProduct]);
 
   useEffect(() => {
     setHighlighted((current) => (items.length === 0 ? 0 : Math.min(current, items.length - 1)));

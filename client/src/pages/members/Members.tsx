@@ -1,3 +1,4 @@
+import { SharedSearch } from "@/components/SharedSearch";
 import { useEffect, useState } from "react";
 import {
   ArrowDownToLine,
@@ -33,6 +34,7 @@ import { SectionHeader, StatusPill } from "../PagePrimitives";
 // The old circular ESM via "../Home" is gone; MemberDetail is now imported
 // directly from "./MemberDetail". Safe at module-eval time and render time.
 import { MemberDetail } from "./MemberDetail";
+import { MemberRegistrationModal } from "@/components/MemberRegistrationModal";
 
 /**
  * Members — list view with search + status filter + per-row drilldown to
@@ -53,6 +55,7 @@ export function Members({
   onFocusMemberConsumed: () => void;
 }) {
   const [query, setQuery] = useState("");
+  const [registrationOpen, setRegistrationOpen] = useState(false);
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ทั้งหมด");
   const [notice, setNotice] = useState("");
@@ -227,7 +230,6 @@ export function Members({
             <strong>
               {newThisMonth} <em>ราย</em>
             </strong>
-            <p>ลงทะเบียนที่ POS (F6) · ดูยอดรวมได้ในรายงาน</p>
           </div>
         </div>
       </div>
@@ -238,6 +240,10 @@ export function Members({
             <p>ค้นหาและกรองตามสถานะการใช้งานได้ทันที</p>
           </div>
           <div className="toolbar-actions">
+            <button type="button" className="primary-button" onClick={() => setRegistrationOpen(true)}>
+              <UsersRound size={16} /> เพิ่มสมาชิก
+            </button>
+            <SharedSearch label="สมาชิก · ชื่อ / เลขสมาชิก">
             <div className="search-field">
               <Search size={16} />
               <input
@@ -246,6 +252,7 @@ export function Members({
                 placeholder="ค้นหาชื่อ เลขสมาชิก หรือพิมพ์เลขบางส่วน/ท้ายเลข"
               />
             </div>
+            </SharedSearch>
             <div className="filter-pills">
               {["ทั้งหมด", "ใช้งาน", "ระงับ"].map(item => (
                 <button
@@ -424,6 +431,12 @@ export function Members({
           onClose={() => setBatchCardOpen(false)}
         />
       )}
+      {registrationOpen && <MemberRegistrationModal actor={actor} actorRole={actorRole} onClose={() => setRegistrationOpen(false)} onRegistered={member => {
+        setRegistrationOpen(false);
+        setQuery("");
+        setStatusFilter("ทั้งหมด");
+        setNotice(`เพิ่มสมาชิก ${member.firstName} ${member.lastName} · ${member.memberNumber} แล้ว`);
+      }} />}
     </>
   );
 }

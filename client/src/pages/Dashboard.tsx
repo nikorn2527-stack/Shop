@@ -1,12 +1,13 @@
 import { useMemo, useState } from "react";
 import {
-  Activity, BarChart3, CalendarClock, CalendarDays, Check, CircleAlert, Crown, MoreHorizontal, PackageSearch, Printer, ReceiptText, ShieldCheck, ShoppingBag, Terminal, Wallet, X, UsersRound,
+  Activity, BarChart3, CalendarClock, CalendarDays, Check, CircleAlert, Crown, FileText, MoreHorizontal, PackageSearch, Printer, ReceiptText, ShieldCheck, ShoppingBag, Terminal, Wallet, X, UsersRound,
 } from "@/lib/icons";
 import type { BusinessPeriodStatus, DashboardStats, DayClosureRow } from "../../../server/sqliteStore";
 import type { Role, View } from "./pageData";
 import { isAdminRole, money, roleThaiLabel } from "./pageData";
 import { ConfirmDialog, SectionHeader } from "./PagePrimitives";
 import { PrintPreviewModal } from "@/components/PrintPreviewModal";
+import { downloadReportPdf, printReportDoc, type ReportDocConfig } from "@/reportDoc";
 import { OnboardingBanner } from "@/components/OnboardingBanner";
 import { RecentBillsWidget } from "@/components/RecentBillsWidget";
 import { trpc } from "@/lib/trpc";
@@ -53,7 +54,7 @@ function TodaySnapshot({
       </div>
       <div className="today-snapshot-grid">
         <button
-          className="today-snapshot-stat highlight"
+          className="today-snapshot-stat"
           onClick={() => setView("reports")}
           title="ดูรายงานยอดขายเต็มรูปแบบ"
         >
@@ -200,6 +201,7 @@ function buildDepositsByDay(logs: { action: string; detail: string; createdAt: s
 function CutoffWidget({ role, userName }: { role: Role; userName: string }) {
   const utils = trpc.useUtils();
   const periodQuery = trpc.reports.businessPeriod.useQuery(undefined, { refetchInterval: 60_000 });
+  const settingsQuery = trpc.settings.get.useQuery(undefined);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [closed, setClosed] = useState<DayClosureRow | null>(null);
   // ROUND 51 — พิมพ์สรุปรอบผ่านพรีวิวก่อน (เหมือนจุดพิมพ์อื่นทั้งระบบ)
@@ -214,9 +216,31 @@ function CutoffWidget({ role, userName }: { role: Role; userName: string }) {
   });
   const period: BusinessPeriodStatus | undefined = periodQuery.data;
   const actorRole = roleThaiLabel(role);
-  const periodTotals = closed
-    ? { bills: closed.bills, pieces: closed.pieces, revenue: closed.revenue, cashTotal: closed.cashTotal, qrTotal: closed.qrTotal, walletTotal: closed.walletTotal, deposits: closed.deposits, withdrawals: closed.withdrawals }
-    : period?.totals;
+  const periodTotals = period?.totals;
+  const dailyCoverDoc = (closure: DayClosureRow): ReportDocConfig => {
+    const receiptCount = closure.depositCount + closure.activationCount;
+    const receiptAmount = closure.depositAmount + closure.activationAmount;
+    const paymentCount = closure.withdrawalCount + closure.refundCount;
+    const paymentAmount = closure.withdrawalAmount + closure.refundAmount;
+    return {
+      fileName: `daily-report-cover-${closure.closedAt.slice(0, 10)}.pdf`,
+      title: "สรุปรอบตัดยอด",
+      periodLabel: `รอบ ${formatThaiDate(closure.periodStart)} ${formatTimeShort(closure.periodStart)} – ${formatThaiDate(closure.closedAt)} ${formatTimeShort(closure.closedAt)}`,
+      meta: [["เจ้าหน้าที่", closure.closedBy ?? "ไม่ระบุ"], ["วันที่ตัดยอด", `${formatThaiDate(closure.closedAt)} ${formatTimeShort(closure.closedAt)}`]],
+      summaryBlocks: [["ยอดรวมรับ", `${receiptCount.toLocaleString("th-TH")} รายการ · ${money(receiptAmount)}`], ["ยอดรวมจ่าย", `${paymentCount.toLocaleString("th-TH")} รายการ · ${money(paymentAmount)}`]],
+      columns: ["รายการ", "จำนวนรายการ", "จำนวนเงิน (บาท)"],
+      numericCols: [1, 2],
+      rows: [
+        ["ยอดรวมรับ", receiptCount.toLocaleString("th-TH"), money(receiptAmount)],
+        ["เติมเงินบัตร", closure.depositCount.toLocaleString("th-TH"), closure.depositAmount.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })],
+        ["เปิดใช้บัตร", closure.activationCount.toLocaleString("th-TH"), closure.activationAmount.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })],
+        ["ยอดรวมจ่าย", paymentCount.toLocaleString("th-TH"), money(paymentAmount)],
+        ["ลดยอดเงินบัตร", closure.withdrawalCount.toLocaleString("th-TH"), closure.withdrawalAmount.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })],
+        ["คืนบัตรเงินสด", closure.refundCount.toLocaleString("th-TH"), closure.refundAmount.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })],
+      ],
+      brandName: (settingsQuery.data?.storeName ?? settingsQuery.data?.appName ?? "").trim() || "ร้านค้าสวัสดิการ",
+    };
+  };
   return <section className="panel cutoff-widget" aria-label="รอบตัดยอดประจำวัน">
     <div className="cutoff-widget-main">
       <div className="cutoff-widget-head">
@@ -241,14 +265,17 @@ function CutoffWidget({ role, userName }: { role: Role; userName: string }) {
       </div>
     </div>
     <div className="cutoff-widget-actions">
+      <button type="button" className="primary-button cutoff-trigger" onClick={() => { closeMutation.reset(); setConfirmOpen(true); }} disabled={closeMutation.isPending || !period}><CalendarClock size={15} /> ตัดยอดรอบนี้</button>
+      {period?.lastClosure && <><div className="cutoff-last-note"><CalendarDays size={13} /> ตัดล่าสุด {formatTimeShort(period.lastClosure.closedAt)} · {period.lastClosure.bills} บิล · {money(period.lastClosure.revenue)}</div><button type="button" className="outline-button" aria-expanded={!!closed} aria-controls="cutoff-summary-details" onClick={() => setClosed(closed ? null : period.lastClosure)}><ReceiptText size={15} /> {closed ? "ซ่อนสรุปรอบ" : "ดูสรุปรอบล่าสุด"}</button></>}
+    </div>
+    <div id="cutoff-summary-details" className="cutoff-summary-details">
       {closed ? <>
         <div className="cutoff-done-note"><Check size={14} /> ตัดยอดเรียบร้อย {formatTimeShort(closed.closedAt)} · โดย {closed.closedBy ?? "—"}</div>
+        <button type="button" className="outline-button" onClick={() => void downloadReportPdf(dailyCoverDoc(closed))}><FileText size={15} /> PDF สรุปรอบ</button>
+        <button type="button" className="outline-button" onClick={() => printReportDoc(dailyCoverDoc(closed))}><Printer size={15} /> พิมพ์ A4</button>
         <button type="button" className="outline-button" onClick={() => setPrintPreviewOpen(true)}><Printer size={15} /> พิมพ์สรุปรอบ</button>
-        <button type="button" className="primary-button" onClick={() => setClosed(null)}><CalendarClock size={15} /> เริ่มรอบใหม่</button>
-      </> : <>
-        <button type="button" className="primary-button cutoff-trigger" onClick={() => setConfirmOpen(true)} disabled={closeMutation.isPending}><CalendarClock size={15} /> ตัดยอดรอบนี้</button>
-        {period?.lastClosure && <div className="cutoff-last-note"><CalendarDays size={13} /> ตัดล่าสุด {formatTimeShort(period.lastClosure.closedAt)} · {period.lastClosure.bills} บิล · {money(period.lastClosure.revenue)}</div>}
-      </>}
+        <button type="button" className="outline-button" onClick={() => setClosed(null)}>ปิดสรุปรอบ</button>
+      </> : null}
     </div>
     {/* สรุปรอบ (Z-report) — แสดงเฉพาะหลังกดตัดยอด เพื่อพิมพ์เก็บ / ส่งผู้บริหาร */}
     {closed && periodTotals && <div className="receipt-paper cutoff-report" id="cutoff-report">
@@ -257,21 +284,20 @@ function CutoffWidget({ role, userName }: { role: Role; userName: string }) {
       <div className="receipt-meta"><span>ตัดยอดเมื่อ <b>{formatThaiDate(closed.closedAt)} · {formatTimeShort(closed.closedAt)}</b></span><span>โดย {closed.closedBy ?? "—"}</span></div>
       <div className="receipt-meta"><span>รอบตั้งแต่ <b>{formatThaiDate(closed.periodStart)} · {formatTimeShort(closed.periodStart)}</b></span><span>ถึงเวลาตัดยอด</span></div>
       <div className="receipt-divider" />
-      <div className="receipt-line"><span>จำนวนบิล</span><b>{closed.bills.toLocaleString("th-TH")} บิล</b></div>
-      <div className="receipt-line"><span>ชิ้นที่ขาย</span><b>{closed.pieces.toLocaleString("th-TH")} ชิ้น</b></div>
-      <div className="receipt-total"><span>ยอดขายรอบนี้</span><b>{money(closed.revenue)}</b></div>
-      <div className="receipt-line"><span>รับเงินสด</span><b>{money(closed.cashTotal)}</b></div>
-      <div className="receipt-line"><span>QR / สแกน</span><b>{money(closed.qrTotal)}</b></div>
-      <div className="receipt-line"><span>หักบัญชีสมาชิก</span><b>{money(closed.walletTotal)}</b></div>
+      <div className="receipt-total"><span>ยอดรวมรับ</span><b>{money(closed.depositAmount + closed.activationAmount)}</b></div>
+      <div className="receipt-line"><span>จำนวนรายการรับ</span><b>{closed.depositCount + closed.activationCount} รายการ</b></div>
+      <div className="receipt-line"><span>เติมเงินบัตร · {closed.depositCount} รายการ</span><b>{money(closed.depositAmount)}</b></div>
+      <div className="receipt-line"><span>เปิดใช้บัตร · {closed.activationCount} รายการ</span><b>{money(closed.activationAmount)}</b></div>
       <div className="receipt-divider" />
-      <div className="receipt-line"><span>เติมเงินสมาชิก</span><b>{money(closed.deposits)}</b></div>
-      <div className="receipt-line"><span>ถอนเงินสมาชิก</span><b>{money(closed.withdrawals)}</b></div>
+      <div className="receipt-total"><span>ยอดรวมจ่าย</span><b>{money(closed.withdrawalAmount + closed.refundAmount)}</b></div>
+      <div className="receipt-line"><span>จำนวนรายการจ่าย</span><b>{closed.withdrawalCount + closed.refundCount} รายการ</b></div>
+      <div className="receipt-line"><span>ลดยอดเงินบัตร · {closed.withdrawalCount} รายการ</span><b>{money(closed.withdrawalAmount)}</b></div>
+      <div className="receipt-line"><span>คืนบัตรเงินสด · {closed.refundCount} รายการ</span><b>{money(closed.refundAmount)}</b></div>
       {closed.note && <div className="receipt-line"><span>หมายเหตุ</span><b>{closed.note}</b></div>}
-      <div className="receipt-thanks">ตัดยอดโดย {closed.closedBy ?? "—"} · {actorRole} {userName ? `(${userName})` : ""}<br /><small>สรุปรอบนี้บันทึกลงระบบ Log แล้ว · รอบใหม่เริ่มทันทีหลังตัดยอด</small></div>
+      <div className="receipt-thanks">เจ้าหน้าที่ {closed.closedBy ?? "—"}</div>
     </div>}
-    <ConfirmDialog open={confirmOpen} title="ยืนยันตัดยอดรอบนี้?" description={`สรุปยอดตั้งแต่ ${period ? `${formatThaiDate(period.periodStart)} ${formatTimeShort(period.periodStart)}` : "ต้นรอบ"} จนถึงตอนนี้ แล้วเริ่มรอบใหม่ทันที · ยอดขายรอบนี้ ${period ? money(period.totals.revenue) : "—"} (${period?.totals.bills ?? 0} บิล) · ระบบจะสร้างสรุปรอบให้พิมพ์เก็บไว้ และบันทึกลง Log`} confirmLabel="ตัดยอดรอบนี้" onCancel={() => setConfirmOpen(false)} onConfirm={() => closeMutation.mutate({ actor: userName || "เจ้าหน้าที่ร้านค้า", actorRole: role })} />
+    <ConfirmDialog open={confirmOpen} title="ยืนยันตัดยอดรอบนี้?" description={`สรุปยอดตั้งแต่ ${period ? `${formatThaiDate(period.periodStart)} ${formatTimeShort(period.periodStart)}` : "ต้นรอบ"} จนถึงตอนนี้ แล้วเริ่มรอบใหม่ทันที · ยอดขายรอบนี้ ${period ? money(period.totals.revenue) : "—"} (${period?.totals.bills ?? 0} บิล) · ระบบจะสร้างสรุปรอบให้พิมพ์เก็บไว้ และบันทึกลง Log`} confirmLabel={closeMutation.isPending ? "กำลังตัดยอด…" : "ตัดยอดรอบนี้"} pending={closeMutation.isPending} error={closeMutation.isError ? closeMutation.error.message : undefined} onCancel={() => { if (closeMutation.isPending) return; setConfirmOpen(false); closeMutation.reset(); }} onConfirm={() => { if (!closeMutation.isPending) closeMutation.mutate({ actor: userName || "เจ้าหน้าที่ร้านค้า", actorRole: role }); }} />
     {printPreviewOpen && closed && <PrintPreviewModal targetId="cutoff-report" title="พรีวิวก่อนพิมพ์สรุปรอบตัดยอด" subtitle={`ตัดยอดเมื่อ ${formatThaiDate(closed.closedAt)} · ${formatTimeShort(closed.closedAt)} · โดย ${closed.closedBy ?? "—"}`} paper="thermal" chips={[`${closed.bills.toLocaleString("th-TH")} บิล`, `ยอดขาย ${money(closed.revenue)}`, `เงินสด ${money(closed.cashTotal)} · QR ${money(closed.qrTotal)}`]} onClose={() => setPrintPreviewOpen(false)} />}
-    {closeMutation.isError && <div className="notice-bar error" role="alert"><CircleAlert size={16} /> {closeMutation.error.message}<button onClick={() => closeMutation.reset()}><X size={14} /></button></div>}
   </section>;
 }
 
@@ -408,7 +434,7 @@ export function Dashboard({ setView, role, userName }: { setView: (view: View) =
   };
   return (
     <>
-      <SectionHeader eyebrow={`ภาพรวมการดำเนินงาน · ${role === "admin" ? "มุมมองผู้บริหาร" : role === "dev" ? "มุมมองผู้พัฒนา" : "มุมมองเจ้าหน้าที่"}`} title={`${greetingWord}, ${firstName}`} description="สรุปตัวเลขสำคัญอยู่บนสุด · เลือกมุมมองข้อมูลจากแถบด้านล่างเพื่อดูรายละเอียดแบบเต็มพื้นที่" action={<><div className={`permission-chip ${role}`}><span>{role === "admin" ? <Crown size={14} /> : role === "dev" ? <Terminal size={14} /> : <ShieldCheck size={14} />}</span>{role === "admin" ? "สิทธิ์ผู้บริหาร · วิเคราะห์เต็มรูปแบบ" : role === "dev" ? "สิทธิ์ผู้พัฒนา · เข้าถึงทุกส่วนของระบบ" : "สิทธิ์เจ้าหน้าที่ · ปฏิบัติงานหน้าร้าน"}</div><div className="permission-chip neutral" title="วันที่ปัจจุบัน"><span><CalendarDays size={14} /></span>วันนี้ · {formatThaiDate(new Date())}</div></>} />
+      <SectionHeader eyebrow={`ภาพรวมการดำเนินงาน · ${role === "admin" ? "มุมมองผู้บริหาร" : role === "dev" ? "มุมมองผู้พัฒนา" : "มุมมองเจ้าหน้าที่"}`} title={`${greetingWord}, ${firstName}`} description="" action={<><div className={`permission-chip ${role}`}><span>{role === "admin" ? <Crown size={14} /> : role === "dev" ? <Terminal size={14} /> : <ShieldCheck size={14} />}</span>{role === "admin" ? "สิทธิ์ผู้บริหาร · วิเคราะห์เต็มรูปแบบ" : role === "dev" ? "สิทธิ์ผู้พัฒนา · เข้าถึงทุกส่วนของระบบ" : "สิทธิ์เจ้าหน้าที่ · ปฏิบัติงานหน้าร้าน"}</div><div className="permission-chip neutral" title="วันที่ปัจจุบัน"><span><CalendarDays size={14} /></span>วันนี้ · {formatThaiDate(new Date())}</div></>} />
       <OnboardingBanner progress={onboardingProgress} setView={setView} />
       {/* STYLE-9 — Today's snapshot mini-stats row (always visible, quick glance at today) */}
       <TodaySnapshot stats={stats} deposits={deposits} loading={loading} rangeDays={rangeDays} setView={setView} />
@@ -449,7 +475,7 @@ export function Dashboard({ setView, role, userName }: { setView: (view: View) =
                     return weekday === 0 || weekday === 6 ? <div key={`weekend-${index}`} className="weekend-band" aria-hidden="true" style={{ left: `${(index / chartData.length) * 100}%`, width: `${100 / chartData.length}%` }} /> : null;
                   })}
                   <svg viewBox={`0 0 ${lineGeom.width} ${lineGeom.height}`} preserveAspectRatio="none" aria-hidden="true">
-                    <defs><linearGradient id="revenue-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="rgba(61,140,113,.32)" /><stop offset="100%" stopColor="rgba(61,140,113,0)" /></linearGradient></defs>
+                    <defs><linearGradient id="revenue-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--chart-revenue)" stopOpacity={0.2} /><stop offset="100%" stopColor="var(--chart-revenue)" stopOpacity={0} /></linearGradient></defs>
                     {[0.25, 0.5, 0.75, 1].map((ratio) => <line key={ratio} className="line-grid" x1="0" x2={lineGeom.width} y1={lineGeom.height * (1 - ratio)} y2={lineGeom.height * (1 - ratio)} />)}
                     <path className="line-area" d={lineGeom.areaPath} />
                     <path className="line-revenue" d={lineGeom.revenuePath} />

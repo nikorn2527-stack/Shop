@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Camera, PackageSearch, ScanLine, X } from "@/lib/icons";
 import { toast } from "sonner";
 import { blocker } from "@/components/BlockerAlert";
@@ -9,6 +10,7 @@ import { SCAN_LAYOUT_TOAST, useScanLayout } from "../scanLayout";
 import { MemberAvatar } from "./MemberAvatar";
 import { MemberCardModal } from "./MemberCardModal";
 import { BarcodeCameraModal } from "./BarcodeCameraModal";
+import { SharedSearch } from "./SharedSearch";
 
 /**
  * Round 37 (req 36) — ปิดประวัติการคีย์/ยิงของช่องกรอกข้อมูลทุกช่อง:
@@ -145,6 +147,7 @@ export function MemberScanPicker({
   };
 
   return (
+    <SharedSearch label="สมาชิก" priority={20} enabled={!selected && inputId !== "pos-member-input"}>
     <div className="member-scan-wrap" ref={wrapRef}>
       {selected ? (
         <div className="member-scan-chip">
@@ -167,7 +170,7 @@ export function MemberScanPicker({
             <X size={15} />
           </button>
         </div>
-      ) : (
+      ) : inputId === "pos-member-input" ? null : (
         <>
           <div className="member-scan-field">
             <ScanLine size={16} />
@@ -274,16 +277,16 @@ export function MemberScanPicker({
       )}
       {/* ROUND 37 (req 36) — ยิงบัตรสมาชิกเข้าช่องเลือกสมาชิก → บัตรเด้งขึ้นมา
           เต็มรูปแบบ (รูป + บาร์โค้ด + QR + ยอดคงเหลือ) ให้ยืนยันก่อนใช้จริง */}
-      {pending && (
+      {pending && createPortal(
         <MemberCardModal
           member={pending}
           confirmForBill
           confirmLabel={`ยืนยันใช้กับ${confirmContext}`}
           onClose={() => { setPending(null); inputRef.current?.focus(); }}
           onConfirm={confirmPending}
-        />
+        />, document.body
       )}
-      {cameraOpen && (
+      {cameraOpen && createPortal(
         <BarcodeCameraModal
           open
           title="สแกนบัตรสมาชิกด้วยกล้อง"
@@ -293,9 +296,10 @@ export function MemberScanPicker({
             setCameraOpen(false);
             commit(code);
           }}
-        />
+        />, document.body
       )}
     </div>
+    </SharedSearch>
   );
 }
 
@@ -309,12 +313,14 @@ export function ProductScanPicker({
   selectedId,
   onSelect,
   autoFocus,
+  compactSelected = false,
   placeholder = "ยิงบาร์โค้ดที่ตัวสินค้า หรือคีย์รหัส SKU / ชื่อสินค้า",
 }: {
   products: SqliteProduct[];
   selectedId: number | null;
   onSelect: (product: SqliteProduct | null) => void;
   autoFocus?: boolean;
+  compactSelected?: boolean;
   placeholder?: string;
 }) {
   const [term, setTerm] = useState("");
@@ -333,7 +339,7 @@ export function ProductScanPicker({
   // 3 ตัว (เช่น 017 → 8850000000017) + ชื่อ/คำ ก็จับได้
   const suggestions = useMemo(() => {
     const q = term.trim();
-    if (q === "") return products.slice(0, 6);
+    if (q === "") return [];
     return products
       .map((product) => ({
         product,
@@ -401,9 +407,10 @@ export function ProductScanPicker({
   };
 
   return (
+    <SharedSearch label="เลือกสินค้า · รับเข้า / นับสต็อก" priority={30} enabled={!selected}>
     <div className="product-scan-wrap" ref={wrapRef}>
       {selected ? (
-        <div className="product-scan-chip">
+        <div className={`product-scan-chip${compactSelected ? " product-scan-chip-compact" : ""}`}>
           <div className="product-thumb">
             {selected.imageUrl ? <img src={selected.imageUrl} alt="" /> : <PackageSearch size={17} />}
           </div>
@@ -423,6 +430,7 @@ export function ProductScanPicker({
             title="เปลี่ยนสินค้า"
           >
             <X size={15} />
+            {compactSelected && <span>เปลี่ยนสินค้า</span>}
           </button>
         </div>
       ) : (
@@ -479,7 +487,7 @@ export function ProductScanPicker({
           )}
         </div>
       )}
-      {open && !selected && (
+      {open && !selected && term.trim() !== "" && (
         <div className="member-scan-list product-scan-list" role="listbox" aria-label="สินค้าที่ตรงกับที่คีย์">
           {missed ? (
             <div className="member-option disabled">
@@ -524,7 +532,7 @@ export function ProductScanPicker({
           )}
         </div>
       )}
-      {cameraOpen && (
+      {cameraOpen && createPortal(
         <BarcodeCameraModal
           open
           title="สแกนสินค้าด้วยกล้อง"
@@ -534,8 +542,9 @@ export function ProductScanPicker({
             setCameraOpen(false);
             commit(code);
           }}
-        />
+        />, document.body
       )}
     </div>
+    </SharedSearch>
   );
 }

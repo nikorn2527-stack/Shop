@@ -8,6 +8,19 @@ import { createServer as createViteServer } from "vite";
 import viteConfig from "../../vite.config";
 
 export async function setupVite(app: Express, server: Server | HttpsServer) {
+  // Vite normally marks transformed modules as non-cacheable. Because this app
+  // runs Vite through Express middleware, set the policy explicitly as well:
+  // stale /src modules otherwise leave a Local browser rendering an older UI
+  // after a server restart or source edit.
+  app.use((req, res, next) => {
+    if (req.path === "/" || req.path.startsWith("/src/") || req.path.startsWith("/@vite") || req.path.startsWith("/@react-refresh")) {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+    }
+    next();
+  });
+
   const serverOptions = {
     middlewareMode: true,
     hmr: { server },

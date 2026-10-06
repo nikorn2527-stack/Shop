@@ -11,13 +11,13 @@
  * into the form state and saving via `settings.set` mutation.
  */
 import { useState } from "react";
+import "./PaymentSettings.css";
 import {
   Bank,
   Check,
   Copy,
   Pencil,
   Plus,
-  ShieldCheck,
   Trash2,
   X,
   CircleAlert,
@@ -174,17 +174,11 @@ export function BankAccountsPanel({
     }
   };
 
-  const activeCount = value.filter(a => a.active).length;
-
   return (
     <section className="panel settings-card">
       <div className="settings-heading">
         <div>
-          <h2>บัญชีธนาคารร้าน (รับเงินโอน)</h2>
-          <p>
-            ใส่บัญชีของร้านเพื่อให้ลูกค้าโอนผ่านแอปธนาคารได้ —
-            แสดงที่หน้ายืนยันการชำระ POS ควบคู่กับ QR พร้อมเพย์ และท้ายใบเสร็จ
-          </p>
+          <h2>บัญชีธนาคารรับโอน</h2>
         </div>
         <Bank size={20} className="muted-icon" />
       </div>
@@ -194,11 +188,7 @@ export function BankAccountsPanel({
           <div className="bank-empty">
             <Bank size={22} />
             <div>
-              <b>ยังไม่มีบัญชีธนาคารในระบบ</b>
-              <small>
-                เพิ่มบัญชีร้าน (1 หรือหลายบัญชี) — ลูกค้าจะเห็นตัวเลือกโอนผ่านแอป
-                ธนาคารที่หน้ายืนยันการชำระเงิน และท้ายใบเสร็จ
-              </small>
+              <b>ยังไม่มีบัญชีธนาคาร</b>
             </div>
           </div>
         )}
@@ -362,7 +352,6 @@ export function BankAccountsPanel({
             <label className="toggle-row">
               <div>
                 <b>เปิดใช้งานบัญชีนี้</b>
-                <small>ปิดได้ชั่วคราว — บัญชีที่ปิดจะไม่แสดงที่หน้า POS และใบเสร็จ</small>
               </div>
               <button
                 type="button"
@@ -417,14 +406,6 @@ export function BankAccountsPanel({
         </div>
       )}
 
-      <div className="settings-inline-note">
-        <ShieldCheck size={16} />
-        <span>
-          ตอนขายด้วยวิธี “QR / สแกน” — ระบบจะแสดงบัญชีธนาคารที่เปิดใช้งาน
-          ({activeCount} บัญชี) ควบคู่กับ QR พร้อมเพย์ให้ลูกค้าเลือกโอน
-          และพิมพ์ท้ายใบเสร็จด้วย · เจ้าหน้าที่ยังแนบสลิปหลักฐานการโอนได้ตามปกติ
-        </span>
-      </div>
     </section>
   );
 }

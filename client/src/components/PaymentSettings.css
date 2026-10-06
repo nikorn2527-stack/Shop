@@ -1,0 +1,73 @@
+.payment-settings-compact .settings-card {
+  padding: 16px 20px;
+}
+
+.payment-settings-compact .settings-heading {
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+}
+
+.payment-settings-compact .settings-card:first-child {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(280px, 2fr);
+  align-items: center;
+  gap: 8px 20px;
+}
+
+.payment-settings-compact .settings-card:first-child .settings-heading {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.payment-settings-compact .settings-card:first-child .form-grid {
+  margin: 0;
+}
+
+.payment-settings-compact .settings-card:first-child .settings-inline-note,
+.payment-settings-compact .settings-card:first-child .notice-bar {
+  grid-column: 2;
+  margin: 0;
+  padding: 4px 0;
+  background: transparent;
+  border: 0;
+}
+
+.payment-settings-compact .bank-row {
+  padding: 10px 12px;
+}
+
+.payment-settings-compact .bank-row-info {
+  min-width: 0;
+}
+
+.payment-settings-compact .bank-row-info small {
+  overflow-wrap: anywhere;
+}
+
+.payment-settings-compact .bank-add-row {
+  margin-top: 8px;
+}
+
+.payment-settings-compact .bank-draft .form-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.payment-settings-compact .bank-draft .form-grid .wide {
+  grid-column: auto;
+}
+
+@media (max-width: 720px) {
+  .payment-settings-compact .settings-card:first-child {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .payment-settings-compact .settings-card:first-child .settings-inline-note,
+  .payment-settings-compact .settings-card:first-child .notice-bar {
+    grid-column: 1;
+  }
+
+  .payment-settings-compact .bank-draft .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

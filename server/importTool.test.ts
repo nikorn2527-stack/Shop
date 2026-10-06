@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from "vitest";
 import * as XLSX from "xlsx";
-import { createSqliteStore, listMembers, listProducts, listStockRows, seedSqliteDemoData } from "./sqliteStore";
+import { createSqliteStore, listMembers, listProducts, listStockRows, registerMember, seedSqliteDemoData, setSettings } from "./sqliteStore";
 import { buildTemplateBase64, guessMemberMapping, guessProductMapping, importMembers, importProducts, parseSpreadsheetBase64, readSheetRows } from "./importTool";
 
 function sheetBase64(rows: (string | number | null)[][], sheetName = "Sheet1"): string {
@@ -87,6 +87,34 @@ describe("importTool — เดา mapping", () => {
 });
 
 describe("importTool — importMembers", () => {
+  it.each(["xlsx", "csv"] as const)("imports names and balances from %s using the shop numbering, then continues registration", (format) => {
+    const db = createSqliteStore(":memory:");
+    try {
+      setSettings(db, { memberNumberMode: "running", memberNumberPrefix: "TEST", memberNumberYearMode: "none", memberNumberSeparator: "-", memberNumberSequenceDigits: 5 });
+      const data = [["ชื่อ", "ยอดเงิน"], ["สมชาย ใจดี", "1500.50"], ["สมหญิง มั่นคง", "0"]];
+      const base64 = format === "xlsx" ? sheetBase64(data) : Buffer.from("\uFEFF" + data.map(row => row.join(",")).join("\n")).toString("base64");
+      const parsed = parseSpreadsheetBase64(base64, "members");
+      const sheet = parsed.sheets[0];
+      const { rows } = readSheetRows(base64, sheet.name, sheet.headerRowIndex);
+      const result = importMembers(db, { rows, mapping: { firstName: 0, balance: 1 }, duplicateMode: "skip" });
+      expect(result.errors).toEqual([]);
+      expect(result.inserted).toBe(2);
+      expect(listMembers(db).map(member => [member.memberNumber, member.balance])).toEqual([["TEST-00001", 1500.5], ["TEST-00002", 0]]);
+      registerMember(db, { firstName: "สมาชิก", lastName: "ถัดไป" });
+      expect(listMembers(db).find(member => member.firstName === "สมาชิก")?.memberNumber).toBe("TEST-00003");
+    } finally { db.close(); }
+  });
+
+  it("requires explicit numbers in manual mode rather than silently inventing an import format", () => {
+    const db = createSqliteStore(":memory:");
+    try {
+      setSettings(db, { memberNumberMode: "manual" });
+      const result = importMembers(db, { rows: [["สมาชิก", "100"]], mapping: { firstName: 0, balance: 1 }, duplicateMode: "skip" });
+      expect(result.inserted).toBe(0);
+      expect(result.errors[0].message).toContain("กรุณาระบุหมายเลขสมาชิก");
+      expect(listMembers(db)).toHaveLength(0);
+    } finally { db.close(); }
+  });
   it("เพิ่มสมาชิกใหม่พร้อมยอดยกมา และบันทึกธุรกรรม", () => {
     const db = createSqliteStore(":memory:");
     const summary = importMembers(db, {
@@ -148,6 +176,39 @@ describe("importTool — importMembers", () => {
 });
 
 describe("importTool — importProducts", () => {
+  it("rejects malformed numeric values without changing existing product data", () => {
+    const db = createSqliteStore(":memory:");
+    try {
+      const mapping = { name: 0, price: 1, cost: 2, stock: 3, reorderPoint: 4 };
+      importProducts(db, { rows: [["Audit product", "20", "10", "5", "2"]], mapping, duplicateMode: "skip" });
+      const before = listProducts(db);
+      for (const row of [
+        ["Audit product", "invalid", "10", "5", "2"],
+        ["Audit product", "20", "-10", "5", "2"],
+        ["Audit product", "20", "10", "1.5", "2"],
+        ["Audit product", "20", "10", "-5", "2"],
+        ["Audit product", "20", "10", "5", "NaN"],
+      ]) {
+        const result = importProducts(db, { rows: [row], mapping, duplicateMode: "replace" });
+        expect(result.errors).toHaveLength(1);
+        expect(result.updated).toBe(0);
+        expect(listProducts(db)).toEqual(before);
+      }
+    } finally { db.close(); }
+  });
+
+  it("rejects invalid member balances and limits without creating members", () => {
+    const db = createSqliteStore(":memory:");
+    try {
+      for (const row of [["Audit member", "invalid", "100"], ["Audit member", "10", "-1"]]) {
+        const result = importMembers(db, { rows: [row], mapping: { firstName: 0, balance: 1, creditLimit: 2 }, duplicateMode: "skip" });
+        expect(result.errors).toHaveLength(1);
+        expect(result.inserted).toBe(0);
+        expect(listMembers(db)).toHaveLength(0);
+      }
+    } finally { db.close(); }
+  });
+
   it("เพิ่มสินค้าใหม่: สร้าง SKU อัตโนมัติ + Lot นำเข้าข้อมูลเมื่อมีสต็อก", () => {
     const db = createSqliteStore(":memory:");
     const summary = importProducts(db, {
