@@ -64,7 +64,9 @@ ENV NODE_OPTIONS="--experimental-sqlite"
 # created on `docker run` when the operator forgets to bind-mount.
 # `docker-compose.yml` bind-mounts these to host paths for on-premise
 # installs (see docs/ON_PREMISE_STRUCTURE_TH.md).
-VOLUME ["/app/data", "/app/data/backups"]
+# Mount persistent storage through the deployment platform instead of Docker
+# VOLUME declarations (Railway rejects these). On-premise deployments retain
+# their explicit docker-compose bind mounts; Railway mounts its /data volume.
 
 # --- 5. Run ----------------------------------------------------------------
 # `dist/index.js` is the esbuild bundle produced by `pnpm run build`.
