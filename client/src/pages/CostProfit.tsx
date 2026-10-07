@@ -10,7 +10,7 @@ function localDate(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-/** Dedicated layout preview. Existing cost snapshots are provisional, not revalued. */
+/** Sales and cost reports use the snapshots recorded when each sale was made. */
 export default function CostProfit() {
   const [range, setRange] = useState<"today" | "month" | "custom">("today");
   const [from, setFrom] = useState(localDate);
@@ -61,10 +61,11 @@ export default function CostProfit() {
       <label>ตั้งแต่<ThaiDatePicker value={from} onChange={value => { setRange("custom"); setFrom(value); }} ariaLabel="วันที่เริ่มต้นต้นทุนและกำไร" /></label>
       <label>ถึง<ThaiDatePicker value={to} onChange={value => { setRange("custom"); setTo(value); }} ariaLabel="วันที่สิ้นสุดต้นทุนและกำไร" /></label>
     </div>
-    <p className="cost-profit-provisional">ตัวอย่างหน้าจอ · ใช้ต้นทุนที่บันทึกเดิม ยังไม่รวมวิธีจัดสรรเศษต้นทุนใหม่</p>
+    <p className="cost-profit-provisional">ต้นทุนขายใช้ต้นทุนที่บันทึกไว้ในแต่ละบิล</p>
     {!valid && <p role="alert">กรุณาเลือกวันที่เริ่มต้นไม่เกินวันที่สิ้นสุด</p>}
     {query.isError && <p role="alert">โหลดข้อมูลไม่สำเร็จ: {query.error.message} <button type="button" className="outline-button" onClick={() => void query.refetch()}>ลองอีกครั้ง</button></p>}
     <div className="cost-profit-cards">{cards.map(([label, value]) => <article key={label}><span>{label}</span><strong>{ready ? value : "—"}</strong></article>)}</div>
+    {ready && totals.orders === 0 && <p role="status" className="cost-profit-empty">ไม่มีบิลขายในช่วงวันที่เลือก {range === "today" && <button type="button" className="outline-button" onClick={() => choose("month")}>ดูเดือนนี้</button>}</p>}
     <article className="cost-profit-detail">
       <header><div><h2>รายละเอียดตามสินค้า</h2><span>{valid ? `${formatThaiDate(from)} – ${formatThaiDate(to)}` : "—"}</span></div><span>{productRows.length} รายการ</span></header>
       {productsQuery.isError && <p role="alert">โหลดรายละเอียดสินค้าไม่สำเร็จ: {productsQuery.error.message} <button type="button" className="outline-button" onClick={() => void productsQuery.refetch()}>ลองอีกครั้ง</button></p>}
