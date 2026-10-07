@@ -77,7 +77,7 @@ export function StockCountSheet({ products }: { products: SqliteProduct[] }) {
         <thead>
           <tr>
             <th className="scs-no">ลำดับ</th>
-            <th className="scs-code">รหัสสินค้า</th>
+            <th className="scs-code">บาร์โค้ด / รหัสสินค้า</th>
             <th className="scs-name">ชื่อสินค้า</th>
             <th className="scs-unit">หน่วย</th>
             <th className="scs-num num">ระบบมี</th>
@@ -96,7 +96,7 @@ export function StockCountSheet({ products }: { products: SqliteProduct[] }) {
               return (
                 <tr key={product.id}>
                   <td className="scs-no">{running}</td>
-                  <td className="scs-code">{product.sku}</td>
+                  <td className="scs-code">{product.barcode?.trim() || product.sku}</td>
                   <td className="scs-name">
                     {product.name}{product.size ? ` ${product.size}` : ""}
                   </td>

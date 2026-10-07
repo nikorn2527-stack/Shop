@@ -131,7 +131,7 @@ export function resolveThemeColor(theme: string | undefined | null): string {
 export function applyThemeColor(theme: string | undefined | null): string {
   // One application palette; legacy saved colors remain readable but no longer
   // override the shared design after removing the theme selector.
-  const base = "#c65d16";
+  const base = "#c94f08";
   const rgb = hexToRgb(base);
   if (!rgb) return base;
   const [r, g, b] = rgb;
@@ -146,10 +146,10 @@ export function applyThemeColor(theme: string | undefined | null): string {
   const vars: Record<string, string> = {
     "--teal": base,
     "--teal-dark": build(clamp(l - 0.07, 0.12, 0.82)),
-    "--teal-soft": "#fed7aa",
+    "--teal-soft": "#fdba74",
     "--teal-mist": "#fff7ed",
-    "--app-secondary": "#426b8c",
-    "--app-secondary-soft": "#eaf2f8",
+    "--app-secondary": "#1d4ed8",
+    "--app-secondary-soft": "#dbeafe",
     // เฉดเข้มของสีธีม — ยังใช้โดะ member-balance-card (การ์ดยอดเงินคงเหลือ)
     "--rail-a": build(0.2, sat * 0.92),
     // ROUND 48 — ราง POS ไม่ตามสีธีมแล้ว: ใช้สีเดียวกับแอปตามที่ผู้ใช้ขอ (ปุ่มเท่านั้นที่มีสีของใครของมัน)
@@ -214,6 +214,8 @@ export function readBrandCache(): BrandSettings | null {
 
 /** เรียกตอนบูตแอป — ใช้แบรนด์ที่จำไว้ทันที กันธีมกระพริบเป็นสีเดิม */
 export function applyCachedBrand(): void {
+  // Login must use the application palette even on a device with no brand cache.
+  applyThemeColor(undefined);
   applyBrand(readBrandCache());
 }
 

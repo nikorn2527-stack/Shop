@@ -26,6 +26,8 @@ export type ReportDocConfig = {
   rows: string[][];
   /** Index of subtotal/header rows that start a distinct financial group. */
   groupStartRows?: number[];
+  /** Financial summary: separate groups with whitespace instead of row rules. */
+  borderlessGroups?: boolean;
   /** แถวรวมท้ายตาราง (ตัวหนา เส้นคู่) */
   totalsRow?: string[];
   /** กล่องสรุปย่อยเหนือ/ใต้ตาราง */
@@ -79,6 +81,8 @@ export const REPORT_DOC_CSS = `
   .rd-table tbody.rd-row-group + tbody.rd-row-group::before { content: ""; display: table-row; height: 16px; }
   .rd-table tr.rd-group-total td { font-weight: 800; padding-top: 10px; padding-bottom: 10px; border-top: 1px solid #000; border-bottom: 1px solid #000; }
   .rd-table tbody.rd-row-group tr:not(.rd-group-total) td:first-child { padding-left: 20px; }
+  .report-doc.rd-borderless-groups .rd-table :is(th, td) { border: 0 !important; }
+  .report-doc.rd-borderless-groups .rd-table tbody.rd-row-group + tbody.rd-row-group::before { height: 24px; }
   .rd-table th, .rd-table td { overflow-wrap: anywhere; }
   .rd-table tbody tr:nth-child(even) td { background: #f7f7f5; }
   .rd-table tfoot td { font-weight: 800; background: #f0f0ee; border-top: 2px solid #111111; border-bottom: 2px solid #111111; color: #111111; padding: 8px; font-size: 13px; }
@@ -175,7 +179,7 @@ export function buildReportDocumentHtml(config: ReportDocConfig, opts: BuildRepo
   ${REPORT_DOC_CSS}
 </style></head>
 <body>
-  <div class="report-doc${config.compact ? " compact" : ""}">
+  <div class="report-doc${config.compact ? " compact" : ""}${config.borderlessGroups ? " rd-borderless-groups" : ""}">
     <div class="rd-head">
       <div class="rd-brand"><div><b>${escapeHtml(config.brandName)}</b><small>ระบบร้านค้าสวัสดิการ · Welfare Store</small></div></div>
       <div class="rd-stamp">${escapeHtml(opts.stampText)}</div>

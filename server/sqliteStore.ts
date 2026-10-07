@@ -1183,7 +1183,10 @@ function generateSku(db: SqliteDb, category: string) {
   const prefix = CATEGORY_SKU_PREFIXES[category] ?? "GEN";
   const rows = db.prepare(`SELECT sku FROM products WHERE sku LIKE ?`).all(`${prefix}-%`) as unknown as { sku: string }[];
   const used = new Set(rows.map((row) => row.sku));
-  let sequence = rows.length + 1;
+  let sequence = rows.reduce((max, row) => {
+    const suffix = row.sku.slice(prefix.length + 1);
+    return /^\d+$/.test(suffix) ? Math.max(max, Number(suffix)) : max;
+  }, 0) + 1;
   while (used.has(`${prefix}-${String(sequence).padStart(3, "0")}`)) sequence += 1;
   return `${prefix}-${String(sequence).padStart(3, "0")}`;
 }
@@ -1235,7 +1238,7 @@ export function createProduct(db: SqliteDb, input: CreateProductInput): SqlitePr
   const quickPick = toQuickPickFlag(input.quickPick);
   const priceTiers = input.priceTiers?.trim() || null;
   if (sellMode === "money") assertValidPriceTiers(priceTiers);
-  const sku = input.sku?.trim() || generateSku(db, input.category ?? "ของใช้");
+  const sku = input.sku?.trim() || generateSku(db, input.category?.trim() || "ของใช้");
   if (db.prepare(`SELECT id FROM products WHERE sku = ?`).get(sku)) {
     throw new StoreError(`รหัสสินค้า ${sku} ถูกใช้แล้ว กรุณาระบุรหัสอื่น`);
   }

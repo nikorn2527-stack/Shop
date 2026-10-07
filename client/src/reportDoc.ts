@@ -29,7 +29,7 @@ const REPORT_DOC_PDF_STAGE_CSS = `
 function buildPage(config: ReportDocConfig, rows: string[][], pageIndex: number, pageCount: number) {
   const numeric = new Set(config.numericCols ?? []);
   const page = document.createElement("div");
-  page.className = `report-doc${config.compact ? " compact" : ""}`;
+  page.className = `report-doc${config.compact ? " compact" : ""}${config.borderlessGroups ? " rd-borderless-groups" : ""}`;
   const head = document.createElement("div");
   head.className = "rd-head";
   head.innerHTML = `

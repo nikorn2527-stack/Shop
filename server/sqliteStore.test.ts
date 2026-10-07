@@ -34,6 +34,17 @@ afterEach(() => {
 });
 
 describe("SQLite local test store", () => {
+  it("generates category codes for products without barcodes after the highest existing sequence", () => {
+    db = createSqliteStore();
+    createProduct(db, { name: "Existing", sku: "DRK-099", category: "เครื่องดื่ม", price: 10 });
+    const first = createProduct(db, { name: "New drink", category: " เครื่องดื่ม ", price: 10 });
+    const second = createProduct(db, { name: "Next drink", category: "เครื่องดื่ม", price: 10 });
+    const snack = createProduct(db, { name: "Snack", category: "ขนม", price: 5 });
+    expect(first).toMatchObject({ sku: "DRK-100", barcode: null });
+    expect(second).toMatchObject({ sku: "DRK-101", barcode: null });
+    expect(snack).toMatchObject({ sku: "SNK-001", barcode: null });
+    expect(listProducts(db).find(product => product.name === "Existing")?.sku).toBe("DRK-099");
+  });
   it("returns the uploaded photo and gender immediately after registration and on reload", () => {
     db = createSqliteStore();
     const photoUrl = "data:image/png;base64,dGVzdA==";

@@ -1,3 +1,16 @@
+/* Stronger screen accents without tinting documents or changing task colors. */
+@media screen {
+  :root .app-shell :is(.sidebar nav, .admin-nav) button.active {
+    background: var(--app-secondary-soft); color: #1e40af;
+    border-color: #93c5fd;
+  }
+  :root .app-shell :is(.sidebar nav, .admin-nav) button.active svg {
+    color: #1d4ed8;
+  }
+  :root .app-shell :is(.section-header h1, .section-header h2, .page-heading h1) {
+    color: #0f172a;
+  }
+}
 /* Card inventory: scoped layout, independent from generic full-width buttons. */
 @media screen and (min-width: 901px) {
   :root .app-shell .pos-rail > * { flex-shrink: 0; }
