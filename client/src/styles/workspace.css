@@ -1,3 +1,55 @@
+/* Card inventory: scoped layout, independent from generic full-width buttons. */
+@media screen and (min-width: 901px) {
+  :root .app-shell .pos-rail > * { flex-shrink: 0; }
+  :root .app-shell .pos-rail > details { min-height: max-content; }
+  :root .app-shell .pos-rail-more[open] > .pos-rail-group {
+    position: static; box-shadow: none; width: 100%; box-sizing: border-box;
+  }
+  :root .app-shell .pos-rail { overflow-y: auto; }
+  :root .app-shell .pos-rail > .shell-account-footer { position: static; }
+}
+@media screen {
+  :root .app-shell .cost-profit-page .cost-profit-table {
+    display: block; min-width: 0; max-width: 100%; overflow: auto;
+    max-height: min(60vh, 640px); color: #0f172a;
+  }
+  :root .app-shell .cost-profit-page .cost-profit-table table {
+    display: table; width: 100%; border-collapse: collapse; color: #0f172a;
+  }
+  :root .app-shell .cost-profit-page .cost-profit-table thead { display: table-header-group; }
+  :root .app-shell .cost-profit-page .cost-profit-table tbody { display: table-row-group; }
+  :root .app-shell .cost-profit-page .cost-profit-table tfoot { display: table-footer-group; }
+  :root .app-shell .cost-profit-page .cost-profit-table tr { display: table-row; }
+  :root .app-shell .cost-profit-page .cost-profit-table :is(th, td) {
+    display: table-cell; color: #0f172a; opacity: 1;
+    padding: 10px 14px; border-bottom: 1px solid #e2e8f0;
+  }
+  :root .app-shell .cost-profit-page .cost-profit-table th { background: #f8fafc; color: #334155; }
+}
+.card-inventory h2 { color: #0f172a; margin-bottom: 16px; }
+.card-inventory-search { display: grid; gap: 6px; max-width: 440px; margin-bottom: 16px; }
+.card-inventory-search input, .card-inventory-codes textarea { width: 100%; box-sizing: border-box; background: #fff; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px 12px; }
+.card-inventory-create { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 12px; padding: 16px; margin-bottom: 20px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; }
+.card-inventory-codes { display: grid; gap: 6px; flex: 1 1 320px; }
+.card-inventory-create > button { flex: 0 0 auto; width: auto; margin: 0; }
+:root .app-shell .card-inventory .card-inventory-create { display: flex; flex-wrap: wrap; gap: 12px; }
+:root .app-shell .card-inventory .card-inventory-create > button { width: auto; flex: 0 0 auto; margin: 0; }
+:root .app-shell .card-inventory .card-inventory-codes { display: grid; gap: 6px; flex: 1 1 320px; }
+:root .app-shell .card-inventory .card-inventory-codes textarea { display: block; width: 100%; min-height: 80px; background: #fff; color: #0f172a; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 10px; }
+:root .app-shell .card-inventory table thead th { background: #f8fafc; color: #334155; }
+.card-inventory table thead th { background: #f8fafc; color: #334155; }
+.card-inventory table td { color: #0f172a; }
+.card-inventory .table-wrap { overflow-x: auto; }
+.card-inventory table { min-width: 760px; }
+.card-inventory table th, .card-inventory table td:first-child, .card-inventory table td:nth-child(3) { white-space: nowrap; }
+.card-inventory-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.card-inventory-actions button { width: auto; min-height: 34px; padding: 6px 12px; margin: 0; }
+.card-inventory-status { display: inline-flex; white-space: nowrap; border-radius: 999px; padding: 4px 10px; background: #f1f5f9; color: #475569; }
+.card-inventory-status.is-assigned { background: #eff6ff; color: #1d4ed8; }
+.card-inventory-status.is-blank, .card-inventory-status.is-returned_vacant { background: #ecfdf5; color: #047857; }
+.card-inventory-status.is-lost, .card-inventory-status.is-damaged { background: #fef2f2; color: #b91c1c; }
+@media (max-width: 640px) { .card-inventory-create { align-items: stretch; } .card-inventory-create > button { width: 100%; } .card-inventory-codes { flex-basis: 100%; } }
+@media (max-width: 640px) { :root .app-shell .card-inventory .card-inventory-create > button { width: 100%; } }
 /* Shared screen surfaces. Print/export documents deliberately keep their own styles. */
 /* Standard palette across login and workspace. Documents keep their own ink. */
 @media screen {
@@ -266,7 +318,7 @@
   :root .pos-premium-bill .pos-summary-count strong { color: #334155; }
   :root .pos-premium-bill .total-line { background: #f8fafc; border-radius: 16px; padding: 16px 12px; }
   :root .pos-premium-bill .total-line strong { font-size: 30px; color: #0f172a; }
-  :root .pos-premium-bill .payment-actions { display: flex; flex-direction: column; gap: 12px; }
+  :root .pos-premium-bill .payment-actions { display: flex; flex-direction: column; gap: 12px; width: min(100%, 240px); align-self: center; }
   :root .pos-premium-bill .pay-button { order: 2; }
   :root .pos-premium-bill .pay-split button { border: 1px solid var(--teal-soft); border-radius: 999px; background: var(--teal-mist); color: var(--teal-dark); box-shadow: none; }
   :root .pos-premium-bill .pay-button,
@@ -274,7 +326,7 @@
   :root .pos-premium-bill .pay-button:hover:not(:disabled),
   :root .pay-confirm-modal .pay-confirm-button:hover:not(:disabled) { background: var(--teal-dark); }
   :root .pos-premium-bill .pay-button:disabled { opacity: .5; box-shadow: none; }
-  :root .pos-premium-bill .cart-status-line { height: auto; min-height: 32px; white-space: normal; }
+  :root .pos-premium-bill .cart-status-line { height: auto; min-height: 32px; white-space: normal; width: 100%; margin-top: 6px; flex: 0 0 auto; }
   :root .app-shell .pos-premium-layout .quick-pick-panel {
     min-width: 0; background: #fff; background-image: none;
     border: 1px solid #e2e8f0; border-radius: 20px;

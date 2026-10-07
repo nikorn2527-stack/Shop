@@ -1,6 +1,6 @@
 import { memberNumberHead } from "../../../shared/memberNumber";
 import type { ReactNode } from "react";
-import { SquaresFour, ShoppingCart, Package, Users, ChartBar } from "@phosphor-icons/react";
+import { SquaresFour, ShoppingCart, Package, Users, FileText, Coins } from "@phosphor-icons/react";
 
 export type View = "dashboard" | "pos" | "stock" | "members" | "reports" | "profit" | "settings" | "logs" | "users";
 /** ROUND 36 (ข้อ 31) — เพิ่ม "dev": บัญชีผู้พัฒนา มีสิทธิ์ระดับผู้บริหารแต่แสดงตัวตนต่างกัน */
@@ -131,8 +131,8 @@ export const navItems: { id: View; label: string; caption: string; icon: React.C
   { id: "pos", label: "หน้าร้าน / POS", caption: "ขายสินค้าและรับชำระ", icon: ShoppingCart, tileColor: "#d97706" },
   { id: "stock", label: "สต็อกสินค้า", caption: "รับเข้าและนับสต็อก", icon: Package, tileColor: "#2563eb" },
   { id: "members", label: "สมาชิกและบัญชี", caption: "สมาชิกและเจ้าหน้าที่", icon: Users, tileColor: "#7c3aed" },
-  { id: "reports", label: "รายงาน", caption: "วิเคราะห์และส่งออก", icon: ChartBar, tileColor: "#0891b2" },
-  { id: "profit", label: "ต้นทุนและกำไร", caption: "ต้นทุนขายและกำไรขั้นต้น", icon: ChartBar, tileColor: "#537fa6" },
+  { id: "reports", label: "รายงาน", caption: "เอกสารสรุปและส่งออก", icon: FileText, tileColor: "#0891b2" },
+  { id: "profit", label: "ต้นทุนและกำไร", caption: "ต้นทุนขายและกำไรขั้นต้น", icon: Coins, tileColor: "#537fa6" },
 ];
 
 // NOTE (OLD-2-b): mock exports `products` + `stockRows` were DELETED — Pos.tsx and

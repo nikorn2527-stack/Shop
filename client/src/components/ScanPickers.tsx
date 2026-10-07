@@ -40,7 +40,7 @@ export function MemberScanPicker({
   selectedNumber,
   onSelect,
   inputId,
-  placeholder = "คีย์เลขสมาชิก หรือยิงบาร์โค้ด / คิวอาร์โค้ด",
+  placeholder = "ค้นหาชื่อ เลขสมาชิก เลขบัตร หรือสแกน",
   emptyHint = "ยังไม่มีสมาชิกในระบบ · ลงทะเบียนก่อนใช้งาน",
   requireConfirm = false,
   confirmContext = "บิลนี้",
@@ -77,6 +77,7 @@ export function MemberScanPicker({
         member,
         score: Math.max(
           smartMatchScore(member.memberNumber, q),
+          smartMatchScore(member.cardNumber, q),
           Math.max(
             smartMatchScore(memberFullName(member), q),
             smartMatchScore(member.firstName, q),
@@ -140,7 +141,7 @@ export function MemberScanPicker({
       }
     }
     const exact =
-      members.find((member) => scanMatches(member.memberNumber, value)) ??
+      members.find((member) => scanMatches(member.memberNumber, value) || scanMatches(member.cardNumber, value)) ??
       (codeArg === undefined && suggestions.length === 1 && suggestions[0].status === "active" ? suggestions[0] : null);
     if (exact) pick(exact);
     else { setTerm(value); setOpen(true); }
@@ -178,6 +179,8 @@ export function MemberScanPicker({
               ref={inputRef}
               id={inputId}
               name={inputName}
+              type="text"
+              inputMode="text"
               value={term}
               autoComplete="off"
               autoCorrect="off"
@@ -439,6 +442,8 @@ export function ProductScanPicker({
           <input
             ref={inputRef}
             name={inputName}
+            type="text"
+            inputMode="text"
             value={term}
             autoComplete="off"
             autoCorrect="off"

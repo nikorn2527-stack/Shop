@@ -42,14 +42,14 @@ export function CardInventory({ canManage }: { canManage: boolean }) {
   });
   const pending = create.isPending || release.isPending || mark.isPending;
   return (
-    <section className="panel" aria-label="จัดการบัตรเปล่า">
+    <section className="panel card-inventory" aria-label="จัดการบัตรเปล่า">
       <h2>บัตรเปล่า / บัตรหมุนเวียน</h2>
-      <label>
+      <label className="card-inventory-search">
         ค้นหารหัสบัตร / เลขสมาชิก
         <input value={search} onChange={e => setSearch(e.target.value)} />
       </label>
       {canManage && (
-        <div className="form-grid">
+        <div className="card-inventory-create">
           <button type="button" className="outline-button" disabled={pending} onClick={() => {
             const existing = new Set(cards.data?.map(card => card.cardNumber));
             const simulated: string[] = [];
@@ -59,9 +59,9 @@ export function CardInventory({ canManage }: { canManage: boolean }) {
             }
             setCodes(simulated.join("\n"));
           }}>เตรียมรหัสบัตรจำลอง 20 ใบ</button>
-          <label>
+          <label className="card-inventory-codes">
             เพิ่มบัตรเปล่า · หนึ่งรหัสต่อบรรทัด
-            <textarea value={codes} onChange={e => setCodes(e.target.value)} />
+            <textarea rows={3} placeholder="DEMO-CARD-00001" value={codes} onChange={e => setCodes(e.target.value)} />
           </label>
           <button
             className="primary-button"
@@ -103,10 +103,10 @@ export function CardInventory({ canManage }: { canManage: boolean }) {
               {cards.data?.map(card => (
                 <tr key={card.cardNumber}>
                   <td>{card.cardNumber}</td>
-                  <td>{labels[card.status]}</td>
+                  <td><span className={`card-inventory-status is-${card.status}`}>{labels[card.status]}</span></td>
                   <td>{card.assignedMemberNumber || "—"}</td>
                   <td>{card.updatedBy || "—"}</td>
-                  <td>
+                  <td><div className="card-inventory-actions">
                     {card.status === "assigned" && (
                       <button
                         className="outline-button"
@@ -163,7 +163,7 @@ export function CardInventory({ canManage }: { canManage: boolean }) {
                           </button>
                         </>
                       )}
-                  </td>
+                  </div></td>
                 </tr>
               ))}
             </tbody>

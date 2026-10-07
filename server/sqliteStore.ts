@@ -745,6 +745,40 @@ function assignPhysicalCardTx(db: SqliteDb, cardNumber: string, memberNumber: st
   db.prepare(`INSERT INTO card_assignments (card_number, member_number, action, actor, actor_role, created_at) VALUES (?, ?, 'assign', ?, ?, ?)`).run(code, memberNumber, actor?.trim() || null, actorRole ?? null, createdAt);
 }
 
+/** Explicit demo preparation, never executed automatically during startup. */
+export function bindExistingMembersToDemoCards(db: SqliteDb, actor: string) {
+  return runInTransaction(db, () => {
+    const members = db.prepare(`SELECT member_number AS memberNumber, card_number AS cardNumber FROM members ORDER BY member_number`).all() as unknown as { memberNumber: string; cardNumber: string | null }[];
+    const mappings: { memberNumber: string; cardNumber: string; previousCard: string | null }[] = [];
+    let sequence = 1;
+    for (const member of members) {
+      if (member.cardNumber?.startsWith("DEMO-CARD-")) continue;
+      let code: string;
+      while (true) {
+        code = `DEMO-CARD-${String(sequence++).padStart(5, "0")}`;
+        const card = listPhysicalCards(db, "all", code).find(entry => entry.cardNumber === code);
+        if (!card) {
+          const now = formatDateTime();
+          db.prepare(`INSERT INTO physical_cards (card_number, status, created_by, updated_by, created_at, updated_at) VALUES (?, 'blank', ?, ?, ?, ?)`).run(code, actor, actor, now, now);
+          break;
+        }
+        if (card.status === "blank" || card.status === "returned_vacant") break;
+      }
+      if (member.cardNumber) {
+        const now = formatDateTime();
+        const result = db.prepare(`UPDATE physical_cards SET status = 'returned_vacant', assigned_member_number = NULL, updated_by = ?, updated_at = ? WHERE card_number = ? AND assigned_member_number = ? AND status = 'assigned'`).run(actor, now, member.cardNumber, member.memberNumber);
+        if (Number(result.changes) !== 1) throw new StoreError(`ข้อมูลการผูกบัตรเดิมไม่ตรงกับสมาชิก ${member.memberNumber}`);
+        db.prepare(`INSERT INTO card_assignments (card_number, member_number, action, actor, note, created_at) VALUES (?, ?, 'release', ?, ?, ?)`).run(member.cardNumber, member.memberNumber, actor, "เปลี่ยนเป็นบัตรชุดเดโม", now);
+      }
+      assignPhysicalCardTx(db, code, member.memberNumber, actor);
+      db.prepare(`UPDATE members SET card_number = ? WHERE member_number = ?`).run(code, member.memberNumber);
+      logAction(db, "ผูกบัตรเดโม", actor, `${member.memberNumber} · ${code}`, "blue");
+      mappings.push({ memberNumber: member.memberNumber, cardNumber: code, previousCard: member.cardNumber });
+    }
+    return mappings;
+  });
+}
+
 export function releasePhysicalCard(db: SqliteDb, cardNumber: string, actor?: string, actorRole?: string, note?: string) {
   const code = cardNumber.trim();
   if (!code) throw new StoreError("กรุณาระบุรหัสบัตร");

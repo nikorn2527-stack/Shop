@@ -128,10 +128,6 @@ export function AppShell({
   // desktop; the toggle sits beside the brand mark. Tooltips (title attr) on
   // every nav button show the label so collapsed mode stays usable.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  // PT-2 — "จัดการระบบ" admin group (settings / users / logs) is collapsed
-  // by default; an admin taps the group header to expand it inline. Keeps the
-  // sidebar at ≤6 top-level items (5 primary + 1 group).
-  const [adminGroupOpen, setAdminGroupOpen] = useState(false);
   const [posShortcut, setPosShortcut] = useState("");
   // POS rail badge: parked-bill count, seeded from this device's storage and
   // kept in sync by the "pos-held" events Pos dispatches whenever they change.
@@ -733,26 +729,18 @@ export function AppShell({
         </nav>
         {isAdminRole(role) ? (
           <div
-            className={`nav-admin-section${sidebarCollapsed ? " collapsed" : ""}${adminGroupOpen ? " open" : ""}`}
+            className={`nav-admin-section open${sidebarCollapsed ? " collapsed" : ""}`}
+            aria-label="ตั้งค่าและระบบ"
           >
             {!sidebarCollapsed && (
-              <button
-                type="button"
-                className="nav-group-toggle"
-                onClick={() => setAdminGroupOpen((open) => !open)}
-                aria-expanded={adminGroupOpen}
-                title="จัดการระบบ — ตั้งค่า / ผู้ใช้ระบบ / ประวัติระบบ"
-              >
-                <Settings2 size={20} />
-                <b>จัดการระบบ</b>
-                <ChevronDown size={14} className="toggle-chevron" />
-              </button>
+              <div className="nav-group-label">ตั้งค่าและระบบ</div>
             )}
-            {(sidebarCollapsed || adminGroupOpen) && (
+            {(
               <nav className="nav-group-children">
                 <button
                   className={safeView === "settings" ? "active" : ""}
                   title="ตั้งค่า"
+                  data-nav-item="settings"
                   onClick={() => {
                     setActiveView("settings");
                     setMobileNav(false);
@@ -764,6 +752,7 @@ export function AppShell({
                 <button
                   className={safeView === "users" ? "active" : ""}
                   title="ผู้ใช้ระบบ"
+                  data-nav-item="users"
                   onClick={() => {
                     setActiveView("users");
                     setMobileNav(false);
@@ -775,6 +764,7 @@ export function AppShell({
                 <button
                   className={safeView === "logs" ? "active" : ""}
                   title="ประวัติระบบ"
+                  data-nav-item="logs"
                   onClick={() => {
                     setActiveView("logs");
                     setMobileNav(false);
