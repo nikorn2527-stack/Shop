@@ -9,6 +9,10 @@
 .cost-profit-page { display: grid; gap: 16px; min-width: 0; color: #0f172a; font-size: 14px; }
 .cost-profit-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; padding: 20px; background: white; border: 1px solid #e2e8f0; border-radius: 16px; }
 .cost-profit-ranges { display: flex; flex-wrap: wrap; gap: 8px; }
+.cost-profit-tabs { display: flex; gap: 6px; padding: 4px; background: #e2e8f0; border-radius: 12px; width: fit-content; max-width: 100%; }
+.cost-profit-tabs button { padding: 9px 14px; border: 0; border-radius: 9px; background: transparent; color: #475569; font: inherit; cursor: pointer; }
+.cost-profit-tabs button[aria-selected="true"] { background: #fff; color: #0f172a; font-weight: 700; box-shadow: 0 1px 3px #0f172a12; }
+.cost-profit-tabs button:focus-visible { outline: 2px solid #537fa6; outline-offset: 2px; }
 .cost-profit-filters label { display: grid; gap: 6px; min-width: 180px; font-size: 13px; }
 .cost-profit-provisional { margin: 0; color: #92400e; background: #fffbeb; padding: 10px 14px; border-radius: 10px; font-size: 13px; }
 .cost-profit-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }

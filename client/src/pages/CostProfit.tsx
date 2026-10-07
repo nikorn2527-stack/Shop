@@ -12,6 +12,7 @@ function localDate(date = new Date()) {
 
 /** Sales and cost reports use the snapshots recorded when each sale was made. */
 export default function CostProfit() {
+  const [view, setView] = useState<"products" | "daily">("products");
   const [range, setRange] = useState<"today" | "month" | "custom">("today");
   const [from, setFrom] = useState(localDate);
   const [to, setTo] = useState(localDate);
@@ -66,7 +67,11 @@ export default function CostProfit() {
     {query.isError && <p role="alert">โหลดข้อมูลไม่สำเร็จ: {query.error.message} <button type="button" className="outline-button" onClick={() => void query.refetch()}>ลองอีกครั้ง</button></p>}
     <div className="cost-profit-cards">{cards.map(([label, value]) => <article key={label}><span>{label}</span><strong>{ready ? value : "—"}</strong></article>)}</div>
     {ready && totals.orders === 0 && <p role="status" className="cost-profit-empty">ไม่มีบิลขายในช่วงวันที่เลือก {range === "today" && <button type="button" className="outline-button" onClick={() => choose("month")}>ดูเดือนนี้</button>}</p>}
-    <article className="cost-profit-detail">
+    <div className="cost-profit-tabs" role="tablist" aria-label="มุมมองต้นทุนและกำไร">
+      {([['products', 'รายละเอียดตามสินค้า'], ['daily', 'สรุปรายวัน']] as const).map(([value, label]) =>
+        <button key={value} type="button" role="tab" id={`cost-profit-tab-${value}`} aria-selected={view === value} aria-controls={`cost-profit-panel-${value}`} onClick={() => setView(value)}>{label}</button>)}
+    </div>
+    {view === "products" && <article className="cost-profit-detail" role="tabpanel" id="cost-profit-panel-products" aria-labelledby="cost-profit-tab-products">
       <header><div><h2>รายละเอียดตามสินค้า</h2><span>{valid ? `${formatThaiDate(from)} – ${formatThaiDate(to)}` : "—"}</span></div><span>{productRows.length} รายการ</span></header>
       {productsQuery.isError && <p role="alert">โหลดรายละเอียดสินค้าไม่สำเร็จ: {productsQuery.error.message} <button type="button" className="outline-button" onClick={() => void productsQuery.refetch()}>ลองอีกครั้ง</button></p>}
       <div className="cost-profit-table cost-profit-products" tabIndex={0} role="region" aria-label="ตารางต้นทุนและกำไรแยกสินค้า" aria-busy={productsQuery.isFetching}>
@@ -75,9 +80,9 @@ export default function CostProfit() {
           {valid && !productsQuery.isLoading && !productsQuery.isError && <tfoot><tr><th colSpan={5}>รวม {productRows.length} รายการสินค้า</th><td>{money(productTotals.revenue)}</td><td>{money(productTotals.cogs)}</td><td>{money(productTotals.revenue - productTotals.cogs)}</td><td>{productTotals.revenue > 0 ? ((productTotals.revenue - productTotals.cogs) / productTotals.revenue * 100).toFixed(2) : "0.00"}%</td></tr></tfoot>}
         </table>
       </div>
-      <p className="cost-profit-product-note">รายละเอียดสินค้าเป็นยอดก่อนส่วนลดระดับบิล ส่วนสรุปรายวันด้านล่างเป็นยอดสุทธิหลังส่วนลด</p>
-    </article>
-    <article className="cost-profit-detail">
+      <p className="cost-profit-product-note">รายละเอียดสินค้าเป็นยอดก่อนส่วนลดระดับบิล ส่วนแท็บสรุปรายวันเป็นยอดสุทธิหลังส่วนลด</p>
+    </article>}
+    {view === "daily" && <article className="cost-profit-detail" role="tabpanel" id="cost-profit-panel-daily" aria-labelledby="cost-profit-tab-daily">
       <header><div><h2>สรุปรายวัน</h2><span>{valid ? `${formatThaiDate(from)} – ${formatThaiDate(to)}` : "—"}</span></div><span>{ready ? `${totals.orders.toLocaleString("th-TH")} บิล` : "—"}</span></header>
       <div className="cost-profit-table" tabIndex={0} role="region" aria-label="ตารางต้นทุนและกำไรรายวัน" aria-busy={query.isFetching}><table><thead><tr>{([
         ["date", "วันที่"], ["orders", "จำนวนบิล"], ["revenue", "ยอดขายสุทธิ"], ["cogs", "ต้นทุนขาย"], ["profit", "กำไรขั้นต้น"], ["marginPct", "อัตรากำไร"],
@@ -86,7 +91,7 @@ export default function CostProfit() {
         {ready && !rows.length && <tr><td colSpan={6}>ไม่มีรายการในช่วงวันที่เลือก</td></tr>}</tbody>
         {ready && <tfoot><tr><th>รวม</th><td>{totals.orders}</td><td>{money(totals.revenue)}</td><td>{money(totals.cost)}</td><td>{money(profit)}</td><td>{cards[3][1]}</td></tr></tfoot>}
       </table></div>
-    </article>
+    </article>}
     <div className="cost-profit-next"><strong>ส่วนกระทบยอดต้นทุน</strong><span>มูลค่าต้นงวด + รับเข้า + ปรับปรุง − ต้นทุนขาย = มูลค่าปลายงวด</span><small>จะแสดงเมื่อเชื่อมระบบมูลค่าสินค้าแล้ว ไม่ใช้ยอดซื้อแทนต้นทุนขาย</small></div>
   </section>;
 }
