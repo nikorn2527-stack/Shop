@@ -23,21 +23,21 @@ export function StockReceiptHistory({ canExport, expanded = false }: { canExport
   const [error, setError] = useState("");
   const query = trpc.stock.receipts.useQuery({ from, to, search, actor }, { enabled: open });
   const entries = query.data ?? [];
-  const columns = ["วัน–เวลา", "รหัส / สินค้า", "Lot", "จำนวนรับ", "หน่วย", "ต้นทุน/หน่วย", "มูลค่าต้นทุน", "หมดอายุ", "เจ้าหน้าที่"];
+  const columns = ["วัน–เวลา", "รหัส / สินค้า", "Lot", "จำนวนรับ", "หน่วย", "ราคาขาย/หน่วย", "มูลค่าราคาขาย", "หมดอายุ", "เจ้าหน้าที่"];
   const rows = entries.map(row => [formatLogDateTime(row.receivedAt), `${row.sku} · ${row.name}`, row.lot,
-    row.value === null ? "ไม่ระบุ" : String(row.receivedQty), row.unit,
-    row.value === null ? "ไม่ระบุ" : exportNumber(row.cost), row.value === null ? "ไม่ระบุ" : exportNumber(row.value),
+    row.receivedQty === null ? "ไม่ระบุ" : String(row.receivedQty), row.unit,
+    exportNumber(row.sellingPrice), row.sellingValue === null ? "ไม่ระบุ" : exportNumber(row.sellingValue),
     row.expiry ?? "—", row.actor ?? "ไม่ระบุ"]);
-  const total = entries.reduce((sum, row) => sum + (row.value ?? 0), 0);
+  const total = entries.reduce((sum, row) => sum + (row.sellingValue ?? 0), 0);
   const showPreview = () => {
     const units = new Map<string, number>();
-    for (const row of entries) if (row.value !== null) units.set(row.unit, (units.get(row.unit) ?? 0) + row.receivedQty);
+    for (const row of entries) if (row.receivedQty !== null) units.set(row.unit, (units.get(row.unit) ?? 0) + row.receivedQty);
     const periodLabel = `${from || "ทั้งหมด"} ถึง ${to || "ปัจจุบัน"}${search ? ` · ค้นหา ${search}` : ""}${actor ? ` · เจ้าหน้าที่ ${actor}` : ""}`;
     setPreview({ kind: "stock", title: "ประวัติรับเข้าสินค้า", periodLabel, label: "ประวัติรับเข้า", fileName: "stock-receipts",
       sheetName: "ประวัติรับเข้า", rows: [columns, ...rows], numericCols: [3, 5, 6], preferred: "pdf", hasTotalsRow: false,
       downloadNoticeBase: "ประวัติรับเข้า", printNotice: "สั่งพิมพ์ประวัติรับเข้าแล้ว",
       doc: { fileName: "stock-receipts.pdf", title: "ประวัติรับเข้าสินค้า", periodLabel, columns, rows, numericCols: [3, 5, 6],
-        meta: [["จำนวนบรรทัดรับเข้า", String(entries.length)], ["จำนวนตามหน่วย", Array.from(units).map(([unit, qty]) => `${qty} ${unit}`).join(" · ") || "—"], ["มูลค่าต้นทุนที่ยืนยันได้", money(total)]],
+        meta: [["จำนวนบรรทัดรับเข้า", String(entries.length)], ["จำนวนตามหน่วย", Array.from(units).map(([unit, qty]) => `${qty} ${unit}`).join(" · ") || "—"], ["มูลค่าตามราคาขายปัจจุบัน", money(total)]],
         compact: true, brandName: "ร้านค้าสวัสดิการ" }
     });
   };
@@ -63,7 +63,7 @@ export function StockReceiptHistory({ canExport, expanded = false }: { canExport
         <label>เจ้าหน้าที่<input value={actor} onChange={e => setActor(e.target.value)} /></label>
         <button type="button" className="outline-button" disabled={!canExport || !entries.length || query.isFetching} onClick={showPreview}><Eye size={15} /> พรีวิว / ส่งออก</button>
       </div>
-      <p>{entries.length} บรรทัดรับเข้า · มูลค่าต้นทุนที่ยืนยันได้ {money(total)}</p>
+      <p>{entries.length} บรรทัดรับเข้า · มูลค่าตามราคาขายปัจจุบัน {money(total)}</p>
       {query.isLoading ? <p>กำลังโหลด…</p> : query.isError ? <p role="alert">{query.error.message}</p> : <div className="table-wrap"><table className="data-table"><thead><tr>{columns.map(c => <th key={c}>{c}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={entries[index].id}>{row.map((cell, i) => <td key={i}>{cell}</td>)}</tr>)}</tbody></table>{!entries.length && <p>ไม่มีรายการรับเข้าในช่วงที่เลือก</p>}</div>}
     </>}
     {error && <p role="alert">{error}</p>}

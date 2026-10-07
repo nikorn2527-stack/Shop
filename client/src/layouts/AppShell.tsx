@@ -11,8 +11,9 @@
  * be removed.
  */
 import type { ComponentType } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import CostProfit from "../pages/CostProfit";
 import {
   Activity,
   ArrowDownToLine,
@@ -84,6 +85,7 @@ export type AppShellViewComponents = {
     onFocusMemberConsumed: () => void;
   }>;
   Reports: ComponentType<{
+    financialOverview?: boolean;
     focusBill: string | null;
     onFocusBillConsumed: () => void;
     role: Role;
@@ -699,9 +701,11 @@ export function AppShell({
             {sidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
           </button>
         </div>
-        <div className="nav-group-label">เมนูหลัก</div>
+        <div className="nav-group-label">หน้าร้าน / งานขาย</div>
         <nav>
-          {navItems.map(({ id, label, caption, icon: Icon, tileColor }) => (
+          {[...navItems].sort((a, b) => Number(b.id === "pos") - Number(a.id === "pos")).map(({ id, label, caption, icon: Icon, tileColor }) => (
+            <Fragment key={id}>
+            {id === navItems.find(item => item.id !== "pos")?.id && <div className="nav-group-label">การบริหารจัดการ</div>}
             <button
               className={safeView === id ? "active" : ""}
               data-nav-item={id}
@@ -724,6 +728,7 @@ export function AppShell({
                 <i className="nav-badge">{posHeldCount}</i>
               )}
             </button>
+            </Fragment>
           ))}
         </nav>
         {isAdminRole(role) ? (
@@ -855,8 +860,10 @@ export function AppShell({
               onFocusMemberConsumed={() => setPendingMemberNumber(null)}
             />
           )}
+          {safeView === "profit" && <CostProfit />}
           {safeView === "reports" && (
             <Reports
+              key={safeView}
               focusBill={pendingBillNumber}
               onFocusBillConsumed={() => setPendingBillNumber(null)}
               role={role}

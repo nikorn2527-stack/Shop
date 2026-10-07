@@ -18,6 +18,10 @@ import { buildTemplateBase64, importMembers, importProducts, parseSpreadsheetBas
 import { closeWelfareDb, getBackupDir, getWelfareDb, getWelfareDbPath } from "./welfareStore";
 import {
   LOGIN_MAX_FAILURES,
+  listPhysicalCards,
+  createBlankCards,
+  releasePhysicalCard,
+  markPhysicalCard,
   StoreError,
   appRoleThai,
   openShift,
@@ -64,6 +68,7 @@ import {
   memberSpendingStats,
   stockBalanceReport,
   receiveStockLines,
+  receiveStockBatch,
   requestLimitReduction,
   decideLimitRequest,
   registerLoginFailure,
@@ -970,6 +975,17 @@ export const appRouter = router({
   }),
 
   stock: router({
+    receiveBatch: publicProcedure.input(z.object({ entries: z.array(z.object({
+      productId: z.number().int().positive().optional(),
+      newProduct: productCreateInput.optional(),
+      purchaseQty: z.number().int().positive(), freeQty: z.number().int().min(0).optional(),
+      paidAmount: z.number().min(0), lot: z.string().optional(), expiryDate: z.string().nullish(),
+    })).min(1).max(200) })).mutation(({ ctx, input }) => withStoreErrors(() => {
+      requireLogin(ctx);
+      if (input.entries.some(entry => entry.newProduct)) requireAdmin(ctx, "การสร้างสินค้าต้องใช้สิทธิ์ผู้บริหาร");
+      const { actor, actorRole } = resolveActor(ctx, {});
+      return receiveStockBatch(getWelfareDb(), input.entries, actor, actorRole);
+    })),
     receipts: publicProcedure
       .input(z.object({ from: z.string().optional(), to: z.string().optional(), search: z.string().optional(), actor: z.string().optional() }))
       .query(({ ctx, input }) => withStoreErrors(() => {
@@ -1001,6 +1017,7 @@ export const appRouter = router({
               productId: input.productId,
               lot: input.lot ?? "",
               expiryDate: input.expiryDate ?? null,
+              paidAmount: input.paidAmount,
               lines,
               actor,
               actorRole,
@@ -1099,6 +1116,27 @@ export const appRouter = router({
       }),
   }),
 
+  card: router({
+    list: publicProcedure.input(z.object({ search: z.string().optional() }).optional()).query(({ ctx, input }) => {
+      requireLogin(ctx);
+      return listPhysicalCards(getWelfareDb(), "all", input?.search);
+    }),
+    create: publicProcedure.input(z.object({ cardNumbers: z.array(z.string().trim().min(1).max(100)).min(1).max(500) })).mutation(({ ctx, input }) => withStoreErrors(() => {
+      requireAdmin(ctx);
+      const { actor, actorRole } = resolveActor(ctx, {});
+      return createBlankCards(getWelfareDb(), input.cardNumbers, actor, actorRole);
+    })),
+    release: publicProcedure.input(z.object({ cardNumber: z.string().trim().min(1), note: z.string().max(500).optional() })).mutation(({ ctx, input }) => withStoreErrors(() => {
+      requireLogin(ctx);
+      const { actor, actorRole } = resolveActor(ctx, {});
+      return releasePhysicalCard(getWelfareDb(), input.cardNumber, actor, actorRole, input.note);
+    })),
+    mark: publicProcedure.input(z.object({ cardNumber: z.string().trim().min(1), status: z.enum(["lost", "damaged"]), note: z.string().max(500).optional() })).mutation(({ ctx, input }) => withStoreErrors(() => {
+      requireAdmin(ctx);
+      const { actor, actorRole } = resolveActor(ctx, {});
+      return markPhysicalCard(getWelfareDb(), input.cardNumber, input.status, actor, actorRole, input.note);
+    })),
+  }),
   member: router({
     list: publicProcedure
       .input(memberListInput)
@@ -1130,6 +1168,7 @@ export const appRouter = router({
         const { actor, actorRole } = resolveActor(ctx, input);
         return withStoreErrors(() => {
           requireLogin(ctx); // P1-c — ลงทะเบียนสมาชิกต้องมีเซสชันเจ้าหน้าที่
+          if (!input.cardNumber?.trim()) throw new StoreError("กรุณายิงบัตรว่างก่อนลงทะเบียน");
           return registerMember(getWelfareDb(), { ...input, actor, actorRole });
         });
       }),

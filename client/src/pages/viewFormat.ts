@@ -1,3 +1,4 @@
+import { nextMemberNumberSequence } from "../../../shared/memberNumber";
 import { TRPCClientError } from "@trpc/client";
 
 /**
@@ -117,31 +118,5 @@ export function parseBahtFromDetail(detail: string | null | undefined) {
 
 /** Mirrors the backend numbering rules to preview the next member number client-side. */
 export function nextMemberSequence(members: readonly { memberNumber: string }[], mode: "running" | "year" | "manual", format: { prefix?: string; yearMode?: "none" | "buddhist" | "gregorian"; yearDigits?: 2 | 4; resetMonth?: number; separator?: "-" | "/" | "_" | "" } = {}) {
-  if (mode === "manual") return 0;
-  if (mode === "year" && format.yearMode === "none") {
-    const prefix = `${String(new Date().getFullYear() + 543).slice(-2)}-`;
-    let max = 0;
-    for (const member of members) {
-      if (!member.memberNumber.startsWith(prefix)) continue;
-      const suffix = member.memberNumber.slice(prefix.length);
-      if (/^\d+$/.test(suffix)) max = Math.max(max, Number(suffix));
-    }
-    return max + 1;
-  }
-  const prefixText = format.prefix ?? (mode === "year" ? "" : "M");
-  const yearMode = format.yearMode ?? (mode === "year" ? "buddhist" : "none");
-  const resetMonth = Math.min(12, Math.max(1, format.resetMonth ?? 1));
-  const now = new Date();
-  const cycleYear = now.getMonth() + 1 < resetMonth ? now.getFullYear() - 1 : now.getFullYear();
-  const yearValue = yearMode === "buddhist" ? cycleYear + 543 : cycleYear;
-  const yearText = yearMode === "none" ? "" : String(yearValue).slice(format.yearDigits === 4 ? -4 : -2);
-  const separator = format.separator ?? "-";
-  const prefix = `${[prefixText.trim(), yearText].filter(Boolean).join(separator)}${prefixText.trim() || yearText ? separator : ""}`;
-  let max = 0;
-  for (const member of members) {
-    if (!member.memberNumber.startsWith(prefix)) continue;
-    const suffix = member.memberNumber.slice(prefix.length);
-    if (/^\d+$/.test(suffix)) max = Math.max(max, Number(suffix));
-  }
-  return max + 1;
+  return nextMemberNumberSequence(members, mode, format);
 }

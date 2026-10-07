@@ -12,6 +12,8 @@ describe("stock receipt history", () => {
       expect(rows).toHaveLength(2);
       expect(rows.reduce((sum, row) => sum + row.receivedQty, 0)).toBe(12);
       expect(rows.reduce((sum, row) => sum + (row.value ?? 0), 0)).toBe(50);
+      expect(rows.reduce((sum, row) => sum + row.sellingValue, 0)).toBe(180);
+      expect(rows.every(row => row.sellingPrice === 15)).toBe(true);
       expect(rows.every(row => row.actor === "Receiver")).toBe(true);
       expect(stockReceiptHistory(db, { from: "2099-01-01" })).toHaveLength(0);
       expect(stockReceiptHistory(db, { search: "missing" })).toHaveLength(0);

@@ -34,6 +34,19 @@ afterEach(() => {
 });
 
 describe("SQLite local test store", () => {
+  it("returns the uploaded photo and gender immediately after registration and on reload", () => {
+    db = createSqliteStore();
+    const photoUrl = "data:image/png;base64,dGVzdA==";
+    const detail = registerMember(db, {
+      firstName: "Photo",
+      lastName: "Audit",
+      photoUrl,
+      gender: "หญิง",
+      initialDeposit: 25,
+    });
+    expect(detail.member).toMatchObject({ photoUrl, gender: "หญิง", balance: 25 });
+    expect(getMemberDetail(db, detail.member.memberNumber)?.member).toMatchObject({ photoUrl, gender: "หญิง", balance: 25 });
+  });
   it("records the activation operator alongside the registration audit log", () => {
     db = createSqliteStore();
     const detail = registerMember(db, {

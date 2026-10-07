@@ -208,7 +208,7 @@ const SETTINGS_FIELD_LABELS: [keyof SettingsForm, string][] = [
   ["memberNumberYearMode", "ระบบปีของเลขสมาชิก"],
   ["memberNumberYearDigits", "จำนวนหลักปีของเลขสมาชิก"],
   ["memberNumberSeparator", "ตัวคั่นเลขสมาชิก"],
-  ["memberNumberResetMonth", "เดือนเริ่มรอบเลขสมาชิก"],
+  ["memberNumberResetMonth", "เดือนสิ้นสุดรอบปีสมาชิก"],
   ["memberNumberSequenceDigits", "จำนวนหลักเลขรันสมาชิก"],
   ["storeName", "ชื่อร้าน"],
   ["storeCode", "รหัสร้าน"],
@@ -2282,7 +2282,7 @@ export function Settings({
                             </select>
                           </label>
                           <label>
-                            เดือนเริ่มรอบเลข
+                            เดือนสิ้นสุดรอบปี
                             <select
                               value={form?.memberNumberResetMonth ?? 1}
                               onChange={event =>
@@ -2332,8 +2332,7 @@ export function Settings({
                         ปี พ.ศ. 2 หลัก + เลข 5 หลัก · 6900001
                       </button>
                       <small>
-                        ปีจะเปลี่ยนอัตโนมัติตาม “เดือนเริ่มรอบเลข”
-                        ที่กำหนดไว้ด้านบน
+                        เปลี่ยนปีวันที่ 1 ของเดือนถัดจากเดือนที่เลือก
                       </small>
                     </div>
                   </div>

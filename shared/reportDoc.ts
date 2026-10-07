@@ -24,6 +24,8 @@ export type ReportDocConfig = {
   /** คอลัมน์ (index) ที่ชิดขวา + ตัวเลข */
   numericCols?: number[];
   rows: string[][];
+  /** Index of subtotal/header rows that start a distinct financial group. */
+  groupStartRows?: number[];
   /** แถวรวมท้ายตาราง (ตัวหนา เส้นคู่) */
   totalsRow?: string[];
   /** กล่องสรุปย่อยเหนือ/ใต้ตาราง */
@@ -74,6 +76,9 @@ export const REPORT_DOC_CSS = `
   .rd-table th { background: #f0f0ee; color: #111111; font-weight: 700; text-align: left; padding: 7px 8px; border-top: 2px solid #111111; border-bottom: 1.5px solid #555555; white-space: nowrap; font-size: 11px; text-transform: uppercase; letter-spacing: .3px; }
   .rd-table th.num, .rd-table td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .rd-table td { padding: 6px 8px; font-weight: 500; border-bottom: 1px solid #e0e0dc; vertical-align: middle; }
+  .rd-table tbody.rd-row-group + tbody.rd-row-group::before { content: ""; display: table-row; height: 16px; }
+  .rd-table tr.rd-group-total td { font-weight: 800; padding-top: 10px; padding-bottom: 10px; border-top: 1px solid #000; border-bottom: 1px solid #000; }
+  .rd-table tbody.rd-row-group tr:not(.rd-group-total) td:first-child { padding-left: 20px; }
   .rd-table th, .rd-table td { overflow-wrap: anywhere; }
   .rd-table tbody tr:nth-child(even) td { background: #f7f7f5; }
   .rd-table tfoot td { font-weight: 800; background: #f0f0ee; border-top: 2px solid #111111; border-bottom: 2px solid #111111; color: #111111; padding: 8px; font-size: 13px; }
@@ -136,9 +141,16 @@ export function buildReportDocumentHtml(config: ReportDocConfig, opts: BuildRepo
   const numeric = new Set(config.numericCols ?? []);
   const metaRows = (config.meta ?? []).map(([label, text]) => `<div><span>${escapeHtml(label)}</span><b>${escapeHtml(text)}</b></div>`).join("");
   const summaryRows = (config.summaryBlocks ?? []).map(([label, text]) => `<div><span>${escapeHtml(label)}</span><b>${escapeHtml(text)}</b></div>`).join("");
-  const bodyRows = config.rows
-    .map((row) => `<tr>${row.map((cell, index) => `<td${numeric.has(index) ? ' class="num"' : ""}>${escapeHtml(cell)}</td>`).join("")}</tr>`)
-    .join("");
+  const groupStarts = new Set(config.groupStartRows ?? []);
+  let bodyRows = "";
+  config.rows.forEach((row, rowIndex) => {
+    if (rowIndex === 0 || groupStarts.has(rowIndex)) {
+      if (rowIndex > 0) bodyRows += "</tbody>";
+      bodyRows += `<tbody${groupStarts.size ? ' class="rd-row-group"' : ""}>`;
+    }
+    bodyRows += `<tr${groupStarts.has(rowIndex) ? ' class="rd-group-total"' : ""}>${row.map((cell, index) => `<td${numeric.has(index) ? ' class="num"' : ""}>${escapeHtml(cell)}</td>`).join("")}</tr>`;
+  });
+  bodyRows += config.rows.length ? "</tbody>" : "<tbody></tbody>";
   const totalsRow = config.totalsRow
     ? `<tfoot><tr>${config.totalsRow.map((cell, index) => `<td${numeric.has(index) ? ' class="num"' : ""}>${escapeHtml(cell)}</td>`).join("")}</tr></tfoot>`
     : "";
@@ -171,7 +183,7 @@ export function buildReportDocumentHtml(config: ReportDocConfig, opts: BuildRepo
     <div class="rd-title"><h1>${escapeHtml(config.title)}</h1>${config.periodLabel ? `<p>${escapeHtml(config.periodLabel)}</p>` : ""}</div>
     ${metaRows ? `<div class="rd-meta">${metaRows}</div>` : ""}
     ${summaryRows ? `<div class="rd-summary-grid">${summaryRows}</div>` : ""}
-    <table class="rd-table"><thead><tr>${headCells}</tr></thead><tbody>${bodyRows}</tbody>${totalsRow}</table>
+    <table class="rd-table"><thead><tr>${headCells}</tr></thead>${bodyRows}${totalsRow}</table>
     ${config.footnote ? `<div class="rd-note">${escapeHtml(config.footnote)}</div>` : ""}
   </div>
 ${autoPrintScript}

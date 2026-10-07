@@ -1,3 +1,5 @@
+import { memberNumberHead, nextMemberNumberSequence, type MemberNumberFormat } from "../shared/memberNumber";
+import { allocateInventoryCost } from "./inventoryValuation";
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 import { mkdirSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -534,6 +536,28 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (member_number) REFERENCES members(member_number)
     );
+    CREATE TABLE IF NOT EXISTS physical_cards (
+      card_number TEXT PRIMARY KEY,
+      status TEXT NOT NULL DEFAULT 'blank' CHECK (status IN ('blank','assigned','returned_vacant','lost','damaged')),
+      assigned_member_number TEXT REFERENCES members(member_number),
+      note TEXT,
+      created_by TEXT,
+      updated_by TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS card_assignments (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      card_number TEXT NOT NULL REFERENCES physical_cards(card_number),
+      member_number TEXT NOT NULL REFERENCES members(member_number),
+      action TEXT NOT NULL CHECK (action IN ('assign','release','lost','damaged')),
+      actor TEXT,
+      actor_role TEXT,
+      note TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE INDEX IF NOT EXISTS idx_physical_cards_status ON physical_cards(status);
+    CREATE INDEX IF NOT EXISTS idx_card_assignments_card ON card_assignments(card_number);
     -- P4 (release/rollback) — every install/update/rollback/hotfix lands a row
     -- here so the on-premise deployment has an auditable release history. The
     -- scripts/update.sh and scripts/rollback.sh drivers append a row each
@@ -558,6 +582,29 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
   ensureColumn(db, "member_transactions", "balance_after", "REAL");
   ensureColumn(db, "audit_logs", "actor_role", "TEXT");
   ensureColumn(db, "sale_items", "unit", "TEXT");
+  // NULL marks legacy valuations: never invent historical purchase amounts.
+  ensureColumn(db, "stock_lots", "remaining_value_satang", "INTEGER");
+  ensureColumn(db, "stock_lots", "received_value_satang", "INTEGER");
+  ensureColumn(db, "sale_items", "cost_total_satang", "INTEGER");
+  db.exec(`CREATE TABLE IF NOT EXISTS sale_lot_allocations (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sale_item_id INTEGER NOT NULL REFERENCES sale_items(id),
+    lot_id INTEGER NOT NULL REFERENCES stock_lots(id),
+    qty INTEGER NOT NULL CHECK(qty > 0),
+    cost_satang INTEGER NOT NULL CHECK(cost_satang >= 0),
+    valuation_source TEXT NOT NULL CHECK(valuation_source IN ('receipt', 'legacy_estimate')),
+    UNIQUE(sale_item_id, lot_id)
+  );
+  CREATE INDEX IF NOT EXISTS idx_sale_lot_item ON sale_lot_allocations(sale_item_id);`);
+  db.exec(`CREATE TABLE IF NOT EXISTS lot_value_adjustments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    lot_id INTEGER NOT NULL REFERENCES stock_lots(id),
+    qty_delta INTEGER NOT NULL,
+    value_delta_satang INTEGER NOT NULL,
+    reason TEXT NOT NULL,
+    actor TEXT,
+    created_at TEXT NOT NULL
+  );`);
   ensureColumn(db, "app_users", "failed_attempts", "INTEGER NOT NULL DEFAULT 0");
   // ROUND 36 (ข้อ 31) — บังคับเปลี่ยนรหัสผ่านครั้งแรก: 1 = บัญชีใหม่/รหัสที่ผู้บริหารตั้งให้ ต้องเปลี่ยนก่อนใช้งาน
   ensureColumn(db, "app_users", "must_change_password", "INTEGER NOT NULL DEFAULT 0");
@@ -637,10 +684,98 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
   db.prepare("UPDATE stock_lots SET received_qty = qty WHERE received_qty IS NULL").run();
   // Backfill units for sale_items rows written before the column existed (idempotent).
   db.prepare("UPDATE sale_items SET unit = (SELECT p.unit FROM products p WHERE p.id = sale_items.product_id) WHERE unit IS NULL").run();
+  seedPhysicalCardsFromMembers(db);
   // RBAC — seed roles + permissions (idempotent)
   ensureRbacSeed(db);
   return db;
 }
+/** บัตรกายภาพหมุนเวียน — แยกสต็อกบัตรออกจากตัวตนสมาชิก (member_number ไม่ reuse). */
+export type PhysicalCardStatus = "blank" | "assigned" | "returned_vacant" | "lost" | "damaged";
+export type PhysicalCardRow = { cardNumber: string; status: PhysicalCardStatus; assignedMemberNumber: string | null; note: string | null; createdBy: string | null; updatedBy: string | null; createdAt: string; updatedAt: string };
+
+function seedPhysicalCardsFromMembers(db: SqliteDb) {
+  const rows = db.prepare(`SELECT DISTINCT card_number AS cardNumber, member_number AS memberNumber FROM members WHERE card_number IS NOT NULL AND TRIM(card_number) != ''`).all() as unknown as { cardNumber: string; memberNumber: string }[];
+  const insert = db.prepare(`INSERT OR IGNORE INTO physical_cards (card_number, status, assigned_member_number, created_at, updated_at) VALUES (?, 'assigned', ?, ?, ?)`);
+  for (const row of rows) {
+    const code = row.cardNumber.trim();
+    if (!code) continue;
+    const now = formatDateTime();
+    insert.run(code, row.memberNumber, now, now);
+  }
+}
+
+export function listPhysicalCards(db: SqliteDb, status?: PhysicalCardStatus | "all", search?: string): PhysicalCardRow[] {
+  const conditions: string[] = [];
+  const params: (string | number)[] = [];
+  if (status && status !== "all") { conditions.push(`status = ?`); params.push(status); }
+  const keyword = search?.trim();
+  if (keyword) { conditions.push(`(card_number LIKE ? OR COALESCE(assigned_member_number, '') LIKE ?)`); params.push(`%${keyword}%`, `%${keyword}%`); }
+  const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
+  return db.prepare(`SELECT card_number AS cardNumber, status, assigned_member_number AS assignedMemberNumber, note, created_by AS createdBy, updated_by AS updatedBy, created_at AS createdAt, updated_at AS updatedAt FROM physical_cards${where} ORDER BY card_number`).all(...params) as unknown as PhysicalCardRow[];
+}
+export function createBlankCards(db: SqliteDb, cardNumbers: string[], actor?: string, actorRole?: string) {
+  const cleaned = Array.from(new Set(cardNumbers.map((code) => code.trim()).filter(Boolean)));
+  if (cleaned.length === 0) throw new StoreError("กรุณาระบุรหัสบัตรอย่างน้อย 1 ใบ");
+  if (cleaned.length > 500) throw new StoreError("เพิ่มบัตรได้ครั้งละไม่เกิน 500 ใบ");
+  if (cleaned.some((code) => code.length > 30)) throw new StoreError("รหัสบัตรยาวเกินไป (สูงสุด 30 ตัวอักษร)");
+  const createdAt = formatDateTime();
+  runInTransaction(db, () => {
+    for (const code of cleaned) {
+      const exists = db.prepare(`SELECT status FROM physical_cards WHERE card_number = ?`).get(code);
+      if (exists) throw new StoreError(`รหัสบัตร ${code} มีอยู่ในระบบแล้ว`);
+      const clash = db.prepare(`SELECT member_number FROM members WHERE card_number = ?`).get(code) as { member_number: string } | undefined;
+      if (clash) throw new StoreError(`รหัสบัตร ${code} ถูกใช้กับสมาชิก ${clash.member_number} อยู่แล้ว`);
+      db.prepare(`INSERT INTO physical_cards (card_number, status, assigned_member_number, created_by, updated_by, created_at, updated_at) VALUES (?, 'blank', NULL, ?, ?, ?, ?)`).run(code, actor?.trim() || null, actor?.trim() || null, createdAt, createdAt);
+    }
+    logAction(db, "เพิ่มบัตรเปล่า", actor?.trim() || "ระบบ", `${cleaned.length} ใบ`, "blue", actorRole ?? null, createdAt);
+  });
+  return listPhysicalCards(db, "blank");
+}
+
+function assignPhysicalCardTx(db: SqliteDb, cardNumber: string, memberNumber: string, actor?: string, actorRole?: string, createdAt = formatDateTime()) {
+  const code = cardNumber.trim();
+  if (!code) throw new StoreError("กรุณายิงรหัสบัตร");
+  const card = db.prepare(`SELECT status AS status, assigned_member_number AS assignedMemberNumber FROM physical_cards WHERE card_number = ?`).get(code) as { status: PhysicalCardStatus; assignedMemberNumber: string | null } | undefined;
+  if (!card) throw new StoreError(`ไม่พบบัตร ${code} ในสต็อกบัตร · กรุณาเพิ่มบัตรเปล่าก่อน`);
+  if (card.status === "assigned") throw new StoreError(`บัตร ${code} ถูกใช้กับสมาชิก ${card.assignedMemberNumber ?? ""} อยู่แล้ว`);
+  if (card.status === "lost" || card.status === "damaged") throw new StoreError(`บัตร ${code} ใช้งานไม่ได้`);
+  const holder = db.prepare(`SELECT member_number FROM members WHERE card_number = ? AND member_number != ?`).get(code, memberNumber) as { member_number: string } | undefined;
+  if (holder) throw new StoreError(`รหัสบัตร ${code} ถูกใช้กับสมาชิก ${holder.member_number} อยู่แล้ว`);
+  db.prepare(`UPDATE physical_cards SET status = 'assigned', assigned_member_number = ?, updated_by = ?, updated_at = ? WHERE card_number = ?`).run(memberNumber, actor?.trim() || null, createdAt, code);
+  db.prepare(`INSERT INTO card_assignments (card_number, member_number, action, actor, actor_role, created_at) VALUES (?, ?, 'assign', ?, ?, ?)`).run(code, memberNumber, actor?.trim() || null, actorRole ?? null, createdAt);
+}
+
+export function releasePhysicalCard(db: SqliteDb, cardNumber: string, actor?: string, actorRole?: string, note?: string) {
+  const code = cardNumber.trim();
+  if (!code) throw new StoreError("กรุณาระบุรหัสบัตร");
+  const createdAt = formatDateTime();
+  return runInTransaction(db, () => {
+    const card = db.prepare(`SELECT status AS status, assigned_member_number AS assignedMemberNumber FROM physical_cards WHERE card_number = ?`).get(code) as { status: PhysicalCardStatus; assignedMemberNumber: string | null } | undefined;
+    if (!card) throw new StoreError(`ไม่พบบัตร ${code} ในสต็อกบัตร`);
+    if (card.status !== "assigned" || !card.assignedMemberNumber) throw new StoreError(`บัตร ${code} ไม่ได้ผูกกับสมาชิก`);
+    db.prepare(`UPDATE members SET card_number = NULL WHERE member_number = ?`).run(card.assignedMemberNumber);
+    db.prepare(`UPDATE physical_cards SET status = 'returned_vacant', assigned_member_number = NULL, note = ?, updated_by = ?, updated_at = ? WHERE card_number = ?`).run(note?.trim() || null, actor?.trim() || null, createdAt, code);
+    db.prepare(`INSERT INTO card_assignments (card_number, member_number, action, actor, actor_role, note, created_at) VALUES (?, ?, 'release', ?, ?, ?, ?)`).run(code, card.assignedMemberNumber, actor?.trim() || null, actorRole ?? null, note?.trim() || null, createdAt);
+    logAction(db, "คืนบัตรหมุนเวียน", actor?.trim() || "ระบบ", `${code} · จากสมาชิก ${card.assignedMemberNumber}`, "amber", actorRole ?? null, createdAt);
+    return getMemberDetail(db, card.assignedMemberNumber);
+  });
+}
+
+export function markPhysicalCard(db: SqliteDb, cardNumber: string, status: "lost" | "damaged", actor?: string, actorRole?: string, note?: string) {
+  const code = cardNumber.trim();
+  if (!code) throw new StoreError("กรุณาระบุรหัสบัตร");
+  const createdAt = formatDateTime();
+  return runInTransaction(db, () => {
+    const card = db.prepare(`SELECT assigned_member_number AS assignedMemberNumber FROM physical_cards WHERE card_number = ?`).get(code) as { assignedMemberNumber: string | null } | undefined;
+    if (!card) throw new StoreError(`ไม่พบบัตร ${code} ในสต็อกบัตร`);
+    if (card.assignedMemberNumber) db.prepare(`UPDATE members SET card_number = NULL WHERE member_number = ?`).run(card.assignedMemberNumber);
+    if (card.assignedMemberNumber) db.prepare(`INSERT INTO card_assignments (card_number, member_number, action, actor, actor_role, note, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)`).run(code, card.assignedMemberNumber, status, actor?.trim() || null, actorRole ?? null, note?.trim() || null, createdAt);
+    db.prepare(`UPDATE physical_cards SET status = ?, assigned_member_number = NULL, note = ?, updated_by = ?, updated_at = ? WHERE card_number = ?`).run(status, note?.trim() || null, actor?.trim() || null, createdAt, code);
+    logAction(db, status === "lost" ? "แจ้งบัตรหาย" : "ทำบัตรชำรุด", actor?.trim() || "ระบบ", code, "red", actorRole ?? null, createdAt);
+  });
+}
+
+
 
 /** Migration-safe column add for databases created before a column existed. */
 function ensureColumn(db: SqliteDb, table: string, column: string, definition: string) {
@@ -698,7 +833,7 @@ export function seedSqliteDemoData(db: SqliteDb) {
 }
 
 export function getMemberDetail(db: SqliteDb, memberNumber: string, transactionLimit = 50) {
-  const member = db.prepare(`SELECT id, member_number as memberNumber, prename, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, credit_limit as creditLimit, card_number as cardNumber, patient_code as patientCode FROM members WHERE member_number = ?`).get(memberNumber) as SqliteMember | undefined;
+  const member = db.prepare(`SELECT id, member_number as memberNumber, prename, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, photo_url as photoUrl, gender, credit_limit as creditLimit, card_number as cardNumber, patient_code as patientCode FROM members WHERE member_number = ?`).get(memberNumber) as SqliteMember | undefined;
   if (!member) return undefined;
   const transactions = db.prepare(`SELECT id, member_number as memberNumber, type, detail, amount, payment_method as paymentMethod, balance_after as balanceAfter, created_at as createdAt, slip_url IS NOT NULL AS hasSlip FROM member_transactions WHERE member_number = ? ORDER BY created_at DESC, id DESC LIMIT ?`).all(memberNumber, transactionLimit) as unknown as SqliteTransaction[];
   return { member, transactions };
@@ -720,7 +855,7 @@ export function getMemberNumberMode(db: SqliteDb) {
   return row?.value ?? "running";
 }
 
-function memberNumberSettings(db: SqliteDb) {
+function memberNumberSettings(db: SqliteDb): Required<MemberNumberFormat> {
   const settings = getSettings(db);
   return {
     // An empty prefix is intentional: it enables formats such as 69-00001
@@ -1117,7 +1252,8 @@ export type ReceiveStockResult = {
 
 export function receiveStockLines(
   db: SqliteDb,
-  input: { productId: number; lot?: string; expiryDate?: string | null; lines: (ReceiveStockLine | null | undefined)[] | null | undefined; actor?: string; actorRole?: string },
+  input: { productId: number; lot?: string; expiryDate?: string | null; lines: (ReceiveStockLine | null | undefined)[] | null | undefined; paidAmount?: number; actor?: string; actorRole?: string },
+  insideTransaction = false,
 ): ReceiveStockResult {
   const lines = (input.lines ?? []).filter((line): line is ReceiveStockLine => line != null);
   if (lines.length === 0) throw new StoreError("กรุณาระบุจำนวนที่รับเข้าอย่างน้อย 1 บรรทัด");
@@ -1129,17 +1265,27 @@ export function receiveStockLines(
   if (!product || !product.active) throw new StoreError(`ไม่พบสินค้ารหัส ${input.productId} ในระบบ`);
   const parsed = lines.map((line) => ({ qty: line.qty, cost: line.cost === undefined ? undefined : round2(line.cost) }));
   const totalQty = parsed.reduce((sum, line) => sum + line.qty, 0);
+  const receiptValue = input.paidAmount === undefined
+    ? Math.round(lines.reduce((sum, line) => sum + line.qty * (line.cost ?? product.cost), 0) * 100)
+    : Math.round(input.paidAmount * 100);
+  if (!Number.isSafeInteger(receiptValue) || receiptValue < 0) throw new StoreError("มูลค่ารับเข้าไม่ถูกต้อง");
   const previousCost = product.cost;
   // บรรทัดที่ไม่ใส่ต้นทุน = ใช้ต้นทุนเฉลี่ยปัจจุบันของสินค้า (พฤติกรรมเดิม)
-  const lineValue = parsed.reduce((sum, line) => sum + line.qty * (line.cost ?? previousCost), 0);
+  const lineValue = receiptValue / 100;
   const oldQty = Math.max(0, Math.trunc(product.stock));
   const averageCost = round2((oldQty * previousCost + lineValue) / (oldQty + totalQty));
   const lotLabel = input.lot?.trim() || `LOT-${formatDate()}`;
   const createdAt = formatDateTime();
-  return runInTransaction(db, () => {
-    const insert = db.prepare(`INSERT INTO stock_lots (product_id, lot, expiry_date, qty, cost, received_at, received_qty) VALUES (?, ?, ?, ?, ?, ?, ?)`);
+  const writeReceipt = () => {
+    const insert = db.prepare(`INSERT INTO stock_lots (product_id, lot, expiry_date, qty, cost, received_at, received_qty, received_value_satang, remaining_value_satang) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    let valueRemaining = BigInt(receiptValue);
+    let qtyRemaining = totalQty;
     const lots = parsed.map((line) => {
-      const result = insert.run(input.productId, lotLabel, input.expiryDate || null, line.qty, line.cost ?? previousCost, createdAt, line.qty);
+      const allocation = allocateInventoryCost(valueRemaining, qtyRemaining, line.qty);
+      const value = Number(allocation.issuedValueSatang);
+      valueRemaining = allocation.remainingValueSatang;
+      qtyRemaining = allocation.remainingQuantity;
+      const result = insert.run(input.productId, lotLabel, input.expiryDate || null, line.qty, line.cost ?? previousCost, createdAt, line.qty, value, value);
       return { id: Number(result.lastInsertRowid), productId: input.productId, lot: lotLabel, expiry: input.expiryDate || null, qty: line.qty, cost: line.cost ?? previousCost, receivedAt: createdAt };
     });
     db.prepare(`UPDATE products SET stock = stock + ?, cost = ? WHERE id = ?`).run(totalQty, averageCost, input.productId);
@@ -1152,7 +1298,31 @@ export function receiveStockLines(
     const avgSummary = anyCost ? ` · ต้นทุนเฉลี่ย ${money(averageCost)} (เดิม ${money(previousCost)})` : "";
     logAction(db, "รับเข้าสินค้า", input.actor?.trim() || "ระบบ", `${product.name} · Lot ${lotLabel} · +${totalQty} ${product.unit}${lineSummary}${avgSummary}`, "green", input.actorRole ?? null, createdAt);
     return { lots, lot: lots[0], product: getProductById(db, input.productId)!, averageCost, previousCost };
-  });
+  };
+  return insideTransaction ? writeReceipt() : runInTransaction(db, writeReceipt);
+}
+
+export type StockIntakeEntry = {
+  productId?: number;
+  newProduct?: CreateProductInput;
+  purchaseQty: number;
+  freeQty?: number;
+  paidAmount: number;
+  lot?: string;
+  expiryDate?: string | null;
+};
+
+/** Create catalog entries and their receipts together, or roll back the entire intake. */
+export function receiveStockBatch(db: SqliteDb, entries: StockIntakeEntry[], actor: string, actorRole?: string) {
+  if (entries.length === 0 || entries.length > 200) throw new StoreError("จำนวนรายการรับเข้าต้องอยู่ระหว่าง 1–200 รายการ");
+  return runInTransaction(db, () => entries.map((entry) => {
+    if (Boolean(entry.productId) === Boolean(entry.newProduct)) throw new StoreError("เลือกรายการสินค้าเดิมหรือสินค้าใหม่อย่างใดอย่างหนึ่ง");
+    if (!Number.isInteger(entry.purchaseQty) || entry.purchaseQty <= 0 || !Number.isInteger(entry.freeQty ?? 0) || (entry.freeQty ?? 0) < 0 || !Number.isFinite(entry.paidAmount) || entry.paidAmount < 0) throw new StoreError("จำนวนรับเข้าหรือยอดจ่ายไม่ถูกต้อง");
+    if (entry.newProduct?.stock) throw new StoreError("สินค้าใหม่ต้องไม่มีสต็อกตั้งต้นในรายการรับเข้า");
+    if (entry.newProduct?.barcode?.trim() && db.prepare("SELECT id FROM products WHERE barcode = ? OR sku = ?").get(entry.newProduct.barcode.trim(), entry.newProduct.barcode.trim())) throw new StoreError("บาร์โค้ดนี้มีสินค้าอยู่แล้ว กรุณาเลือกสินค้าเดิม");
+    const productId = entry.newProduct ? createProduct(db, { ...entry.newProduct, stock: 0, actor, actorRole }).id : entry.productId!;
+    return receiveStockLines(db, { productId, lot: entry.lot, expiryDate: entry.expiryDate, paidAmount: entry.paidAmount, actor, actorRole, lines: [{ qty: entry.purchaseQty, cost: entry.paidAmount / entry.purchaseQty }, ...((entry.freeQty ?? 0) > 0 ? [{ qty: entry.freeQty!, cost: 0 }] : [])] }, true);
+  }));
 }
 
 export function receiveStock(
@@ -1173,7 +1343,8 @@ export function receiveStock(
 export function stockReceiptHistory(db: SqliteDb, input: { from?: string; to?: string; search?: string; actor?: string } = {}) {
   return db.prepare(`SELECT l.id, p.sku, p.name, p.unit, l.lot,
     l.received_at AS receivedAt, l.received_qty AS receivedQty,
-    l.expiry_date AS expiry, l.cost, m.actor,
+    l.expiry_date AS expiry, l.cost, p.price AS sellingPrice,
+    ROUND(l.received_qty * p.price, 2) AS sellingValue, m.actor,
     CASE WHEN m.id IS NOT NULL THEN l.received_qty * m.unit_cost ELSE NULL END AS value
     FROM stock_lots l JOIN products p ON p.id = l.product_id
     LEFT JOIN stock_movements m ON m.ref_type = 'stock_lot' AND m.ref_id = l.id AND m.type = 'RECEIVE'
@@ -1184,7 +1355,7 @@ export function stockReceiptHistory(db: SqliteDb, input: { from?: string; to?: s
     ORDER BY l.received_at DESC, l.id DESC`).all(
       input.from ?? '', input.from ?? '', input.to ?? '', input.to ?? '',
       input.search?.trim() ?? '', input.search?.trim() ?? '', input.actor?.trim() ?? '', input.actor?.trim() ?? ''
-    ) as { id: number; sku: string; name: string; unit: string; lot: string; receivedAt: string; receivedQty: number; expiry: string | null; cost: number; actor: string | null; value: number | null }[];
+    ) as { id: number; sku: string; name: string; unit: string; lot: string; receivedAt: string; receivedQty: number; expiry: string | null; cost: number; sellingPrice: number; sellingValue: number; actor: string | null; value: number | null }[];
 }
 
 export function listStockRows(db: SqliteDb): SqliteStockRow[] {
@@ -1224,6 +1395,9 @@ export function stockCount(db: SqliteDb, input: StockCountInput) {
   const product = getProductById(db, input.productId);
   if (!product || !product.active) throw new StoreError(`ไม่พบสินค้ารหัส ${input.productId} ในระบบ`);
   const diff = input.countedQty - product.stock;
+  if (diff !== 0 && db.prepare(`SELECT 1 FROM stock_lots WHERE product_id = ? AND received_value_satang IS NOT NULL`).get(input.productId)) {
+    throw new StoreError("สินค้าที่มีมูลค่ารายล็อตต้องนับสต็อกแยกล็อต เพื่อรักษาจำนวนและต้นทุนให้ตรงกัน");
+  }
   const note = input.note?.trim();
   const detail =
     (diff === 0
@@ -1318,6 +1492,13 @@ export function stockCountLots(db: SqliteDb, input: StockCountLotsInput): StockC
   return runInTransaction(db, () => {
     const results: StockCountLotResult[] = [];
     for (const { lot, countedQty } of lots) {
+      const valuation = db.prepare(`SELECT remaining_value_satang AS value FROM stock_lots WHERE id = ?`).get(lot.id) as { value: number | null };
+      if (valuation.value !== null && countedQty !== lot.qty) {
+        if (countedQty > lot.qty) throw new StoreError("ล็อตที่นับเกินต้องตรวจสอบมูลค่าก่อนปรับเพิ่ม กรุณารับเข้าเป็นล็อตปรับปรุงพร้อมมูลค่าที่ตรวจสอบแล้ว");
+        const allocation = allocateInventoryCost(BigInt(valuation.value), lot.qty, lot.qty - countedQty);
+        db.prepare(`UPDATE stock_lots SET remaining_value_satang = ? WHERE id = ?`).run(Number(allocation.remainingValueSatang), lot.id);
+        db.prepare(`INSERT INTO lot_value_adjustments (lot_id, qty_delta, value_delta_satang, reason, actor, created_at) VALUES (?, ?, ?, ?, ?, ?)`).run(lot.id, countedQty - lot.qty, -Number(allocation.issuedValueSatang), input.note?.trim() || "นับสต็อกแยกล็อต", input.actor ?? null, formatDateTime());
+      }
       db.prepare(`UPDATE stock_lots SET qty = ? WHERE id = ?`).run(countedQty, lot.id);
       results.push({ lotId: lot.id, lot: lot.lot, expiry: lot.expiry, systemQty: lot.qty, countedQty, diff: countedQty - lot.qty });
     }
@@ -1736,27 +1917,33 @@ export type CheckoutItemInput =
 /**
  * Deducts sold qty from the product's lots FEFO-style (first-expiry-first-out:
  * earliest expiry first, undated lots last, then oldest received, then lot id).
- * Best-effort by design: when the lots cannot cover the whole qty — drift
- * between products.stock and the lot sums — they are zeroed instead and the
- * shortfall is returned so checkout can flag it in the audit trail.
- * products.stock stays the authoritative sellable figure at all times.
- * Returns the unmet qty (0 when the lots covered the sale).
+ * Records exact per-lot satang allocations. Checkout rejects shortfalls for
+ * valued receipts and rolls back the transaction. Legacy, unvalued inventory
+ * retains its estimated-cost fallback and audit warning.
  */
-function deductLotsFifo(db: SqliteDb, productId: number, qty: number): number {
+function deductLotsFifo(db: SqliteDb, productId: number, qty: number, saleItemId: number): { shortfall: number; costSatang: number } {
   const tracked = db.prepare(`SELECT COUNT(*) AS count FROM stock_lots WHERE product_id = ?`).get(productId) as { count: number };
-  if (tracked.count === 0) return 0; // product is not lot-tracked — nothing to deduct
+  if (tracked.count === 0) {
+    const product = getProductById(db, productId)!;
+    return { shortfall: 0, costSatang: Math.round(qty * product.cost * 100) };
+  }
   const lots = db.prepare(
-    `SELECT id, qty FROM stock_lots WHERE product_id = ? AND qty > 0 ORDER BY (expiry_date IS NULL), expiry_date, received_at, id`,
-  ).all(productId) as unknown as { id: number; qty: number }[];
+    `SELECT id, qty, cost, remaining_value_satang AS value, received_value_satang AS receivedValue FROM stock_lots WHERE product_id = ? AND qty > 0 ORDER BY (expiry_date IS NULL), expiry_date, received_at, id`,
+  ).all(productId) as unknown as { id: number; qty: number; cost: number; value: number | null; receivedValue: number | null }[];
   let remaining = qty;
-  const updateLot = db.prepare(`UPDATE stock_lots SET qty = qty - ? WHERE id = ?`);
+  let costSatang = 0;
+  const updateLot = db.prepare(`UPDATE stock_lots SET qty = qty - ?, remaining_value_satang = ? WHERE id = ?`);
   for (const lot of lots) {
     if (remaining <= 0) break;
     const take = Math.min(lot.qty, remaining);
-    updateLot.run(take, lot.id);
+    const allocation = allocateInventoryCost(BigInt(lot.value ?? Math.round(lot.qty * lot.cost * 100)), lot.qty, take);
+    const issued = Number(allocation.issuedValueSatang);
+    updateLot.run(take, Number(allocation.remainingValueSatang), lot.id);
+    db.prepare(`INSERT INTO sale_lot_allocations (sale_item_id, lot_id, qty, cost_satang, valuation_source) VALUES (?, ?, ?, ?, ?)`).run(saleItemId, lot.id, take, issued, lot.receivedValue === null ? 'legacy_estimate' : 'receipt');
+    costSatang += issued;
     remaining -= take;
   }
-  return remaining;
+  return { shortfall: remaining, costSatang };
 }
 
 export type CheckoutInput = {
@@ -1929,11 +2116,18 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
     const updateStock = db.prepare(`UPDATE products SET stock = stock - ? WHERE id = ?`);
     const lotShortfalls: { name: string; unit: string; qty: number }[] = [];
     for (const item of items) {
-      insertItem.run(saleId, item.productId, item.name, item.qty, item.price, item.cost, item.unit);
+      const itemResult = insertItem.run(saleId, item.productId, item.name, item.qty, item.price, item.cost, item.unit);
+      const saleItemId = Number(itemResult.lastInsertRowid);
       if (item.productId == null) continue; // รายการพิเศษ — no product/stock row behind it
       updateStock.run(item.qty, item.productId);
         recordMovement(db, { type: 'SALE', productId: item.productId, qtyDelta: -item.qty, unitCost: item.cost, refType: 'sale', refId: saleId, reason: `บิล ${orderNumber}`, actor: input.cashier?.trim() || undefined, actorRole: input.actorRole ?? undefined });
-      const shortfall = deductLotsFifo(db, item.productId, item.qty);
+      const allocation = deductLotsFifo(db, item.productId, item.qty, saleItemId);
+      const shortfall = allocation.shortfall;
+      if (shortfall > 0 && db.prepare(`SELECT 1 FROM stock_lots WHERE product_id = ? AND received_value_satang IS NOT NULL`).get(item.productId)) {
+        throw new StoreError("จำนวนในล็อตไม่ตรงกับสต็อก กรุณาตรวจสอบล็อตก่อนขาย");
+      }
+      const costSatang = allocation.costSatang + Math.round(shortfall * item.cost * 100);
+      db.prepare(`UPDATE sale_items SET cost_total_satang = ? WHERE id = ?`).run(costSatang, saleItemId);
       if (shortfall > 0) lotShortfalls.push({ name: item.name, unit: item.unit, qty: shortfall });
     }
 
@@ -2105,19 +2299,9 @@ export function generateMemberNumber(db: SqliteDb, mode: "running" | "year" | "m
     return manual;
   }
   const config = memberNumberSettings(db);
-  const legacyYearMode = mode === "year" && config.yearMode === "none";
-  if (legacyYearMode) {
-    const year = String(new Date().getFullYear() + 543).slice(-2);
-    const prefix = `${year}-`;
-    return `${prefix}${String(nextMemberSequence(db, prefix)).padStart(5, "0")}`;
-  }
-  const now = new Date();
-  const cycleYear = now.getMonth() + 1 < config.resetMonth ? now.getFullYear() - 1 : now.getFullYear();
-  const yearValue = config.yearMode === "buddhist" ? cycleYear + 543 : cycleYear;
-  const yearText = config.yearMode === "none" ? "" : String(yearValue).slice(config.yearDigits === 4 ? -4 : -2);
-  const head = [config.prefix, yearText].filter(Boolean).join(config.separator);
-  const separator = head ? `${head}${config.separator}` : "";
-  return `${separator}${String(nextMemberSequence(db, separator)).padStart(config.sequenceDigits, "0")}`;
+  const members = db.prepare(`SELECT member_number AS memberNumber FROM members`).all() as unknown as { memberNumber: string }[];
+  const digits = mode === "year" && config.yearMode === "none" ? 5 : config.sequenceDigits;
+  return `${memberNumberHead(mode, config)}${String(nextMemberNumberSequence(members, mode, config)).padStart(digits, "0")}`;
 }
 
 export type RegisterMemberInput = {
@@ -2175,6 +2359,7 @@ export function registerMember(db: SqliteDb, input: RegisterMemberInput) {
       cardNumber,
       patientCode,
     );
+    if (cardNumber) assignPhysicalCardTx(db, cardNumber, memberNumber, input.actor, input.actorRole, createdAt);
     if (initialDeposit > 0) {
       // ROUND 65 — เงินเริ่มต้นตอนลงทะเบียน = "เปิดใช้บัตร" (ตรงกับรายงานโรงพยาบาล)
       db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, created_at, actor) VALUES (?, 'activation', ?, ?, 'เงินสด', ?, ?, ?)`).run(
@@ -2349,6 +2534,9 @@ export type UpdateMemberInput = {
 export function updateMember(db: SqliteDb, input: UpdateMemberInput): SqliteMember {
   const member = getMemberByNumber(db, input.memberNumber?.trim() ?? "");
   if (!member) throw new StoreError(`ไม่พบสมาชิก ${input.memberNumber} ในระบบ`);
+  if (input.cardNumber !== undefined && (input.cardNumber?.trim() || null) !== (member.cardNumber ?? null)) {
+    throw new StoreError("เปลี่ยนบัตรผ่านหน้าจัดการบัตรเปล่าเท่านั้น");
+  }
   if (typeof input.firstName === "string" && !input.firstName.trim()) throw new StoreError("กรุณาระบุชื่อสมาชิก");
   if (typeof input.lastName === "string" && !input.lastName.trim()) throw new StoreError("กรุณาระบุนามสกุลสมาชิก");
   if (typeof input.type === "string" && !input.type.trim()) throw new StoreError("กรุณาระบุประเภทสมาชิก");
@@ -2457,6 +2645,9 @@ export function deleteMember(db: SqliteDb, input: DeleteMemberInput): { memberNu
   if (member.balance > 0) throw new StoreError(`ยอดเงินคงเหลือไม่เป็น 0 · ถอนเงิน ${money(member.balance)} ออกก่อนลบสมาชิก`);
   const history = db.prepare(`SELECT COUNT(*) AS count FROM member_transactions WHERE member_number = ?`).get(member.memberNumber) as { count: number };
   if (history.count > 0) throw new StoreError("สมาชิกมีประวัติธุรกรรมในระบบ · ใช้การระงับการใช้งานแทนการลบ");
+  if (db.prepare(`SELECT id FROM card_assignments WHERE member_number = ? LIMIT 1`).get(member.memberNumber) || member.cardNumber) {
+    throw new StoreError("สมาชิกมีประวัติบัตร · ใช้การระงับการใช้งานแทนการลบ");
+  }
 
   const displayName = [member.prename, member.firstName, member.lastName].filter(Boolean).join(" ");
   runInTransaction(db, () => {
@@ -2681,11 +2872,11 @@ export function dailySalesRows(db: SqliteDb, input: number | DailyRangeInput = 3
   const until = `${formatDate(toDate)} 23:59:59`;
   const filter = cashierWhere("s", options);
   const salesByDay = new Map<string, { orders: number; revenue: number }>();
-  for (const row of db.prepare(`SELECT substr(s.created_at, 1, 10) AS date, COUNT(*) AS orders, ROUND(SUM(s.total), 2) AS revenue FROM sales s WHERE s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY date`).all(since, until, ...filter.params) as unknown as { date: string; orders: number; revenue: number }[]) {
+  for (const row of db.prepare(`SELECT substr(s.created_at, 1, 10) AS date, COUNT(*) AS orders, ROUND(SUM(s.total), 2) AS revenue FROM sales s WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY date`).all(since, until, ...filter.params) as unknown as { date: string; orders: number; revenue: number }[]) {
     salesByDay.set(row.date, { orders: row.orders, revenue: round2(row.revenue) });
   }
   const itemsByDay = new Map<string, { items: number; cogs: number }>();
-  for (const row of db.prepare(`SELECT substr(s.created_at, 1, 10) AS date, COALESCE(SUM(si.qty), 0) AS items, ROUND(COALESCE(SUM(si.qty * si.cost), 0), 2) AS cogs FROM sales s JOIN sale_items si ON si.sale_id = s.id WHERE s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY date`).all(since, until, ...filter.params) as unknown as { date: string; items: number; cogs: number }[]) {
+  for (const row of db.prepare(`SELECT substr(s.created_at, 1, 10) AS date, COALESCE(SUM(si.qty), 0) AS items, ROUND(COALESCE(SUM(COALESCE(si.cost_total_satang / 100.0, si.qty * si.cost)), 0), 2) AS cogs FROM sales s JOIN sale_items si ON si.sale_id = s.id WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY date`).all(since, until, ...filter.params) as unknown as { date: string; items: number; cogs: number }[]) {
     itemsByDay.set(row.date, { items: row.items, cogs: round2(row.cogs) });
   }
   const rows: DailySalesRow[] = [];
@@ -2711,7 +2902,7 @@ export function salesByCategory(db: SqliteDb, input: DailyRangeInput = {}): Sale
   const since = `${formatDate(fromDate)} 00:00:00`;
   const until = `${formatDate(toDate)} 23:59:59`;
   const filter = cashierWhere("s", input);
-  const rows = db.prepare(`SELECT COALESCE(NULLIF(TRIM(p.category), ''), 'ไม่ระบุหมวด') AS category, COUNT(DISTINCT si.sale_id) AS orders, COALESCE(SUM(si.qty), 0) AS qty, ROUND(COALESCE(SUM(si.qty * si.price), 0), 2) AS revenue, ROUND(COALESCE(SUM(si.qty * si.cost), 0), 2) AS cogs FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id WHERE s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY category ORDER BY revenue DESC`).all(since, until, ...filter.params) as unknown as { category: string; orders: number; qty: number; revenue: number; cogs: number }[];
+  const rows = db.prepare(`SELECT COALESCE(NULLIF(TRIM(p.category), ''), 'ไม่ระบุหมวด') AS category, COUNT(DISTINCT si.sale_id) AS orders, COALESCE(SUM(si.qty), 0) AS qty, ROUND(COALESCE(SUM(si.qty * si.price), 0), 2) AS revenue, ROUND(COALESCE(SUM(COALESCE(si.cost_total_satang / 100.0, si.qty * si.cost)), 0), 2) AS cogs FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY category ORDER BY revenue DESC`).all(since, until, ...filter.params) as unknown as { category: string; orders: number; qty: number; revenue: number; cogs: number }[];
   return rows.map((row) => { const profit = round2(row.revenue - row.cogs); return { ...row, qty: Number(row.qty), cogs: round2(row.cogs), profit, marginPct: row.revenue > 0 ? round2((profit / row.revenue) * 100) : 0 }; });
 }
 
@@ -2740,7 +2931,7 @@ export function salesByProduct(db: SqliteDb, input: DailyRangeInput = {}): Sales
   const since = `${formatDate(fromDate)} 00:00:00`;
   const until = `${formatDate(toDate)} 23:59:59`;
   const filter = cashierWhere("s", input);
-  const rows = db.prepare(`SELECT si.product_id AS productId, CASE WHEN si.product_id IS NULL THEN 'รายการพิเศษ' ELSE COALESCE(p.name, si.name) END AS name, p.sku AS sku, p.barcode AS barcode, NULLIF(TRIM(p.category), '') AS category, COUNT(DISTINCT si.sale_id) AS bills, COALESCE(SUM(si.qty), 0) AS qty, ROUND(COALESCE(SUM(si.qty * si.price), 0), 2) AS revenue, ROUND(COALESCE(SUM(si.qty * si.cost), 0), 2) AS cogs FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id WHERE s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY si.product_id ORDER BY revenue DESC`).all(since, until, ...filter.params) as unknown as { productId: number | null; name: string; sku: string | null; barcode: string | null; category: string | null; bills: number; qty: number; revenue: number; cogs: number }[];
+  const rows = db.prepare(`SELECT si.product_id AS productId, CASE WHEN si.product_id IS NULL THEN 'รายการพิเศษ' ELSE COALESCE(p.name, si.name) END AS name, p.sku AS sku, p.barcode AS barcode, NULLIF(TRIM(p.category), '') AS category, COUNT(DISTINCT si.sale_id) AS bills, COALESCE(SUM(si.qty), 0) AS qty, ROUND(COALESCE(SUM(si.qty * si.price), 0), 2) AS revenue, ROUND(COALESCE(SUM(COALESCE(si.cost_total_satang / 100.0, si.qty * si.cost)), 0), 2) AS cogs FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY si.product_id ORDER BY revenue DESC`).all(since, until, ...filter.params) as unknown as { productId: number | null; name: string; sku: string | null; barcode: string | null; category: string | null; bills: number; qty: number; revenue: number; cogs: number }[];
   return rows.map((row) => { const profit = round2(row.revenue - row.cogs); return { ...row, bills: Number(row.bills), qty: Number(row.qty), cogs: round2(row.cogs), profit, marginPct: row.revenue > 0 ? round2((profit / row.revenue) * 100) : 0 }; });
 }
 
@@ -2771,7 +2962,7 @@ export function salesLineItems(db: SqliteDb, input: DailyRangeInput = {}): Sales
   const since = `${formatDate(fromDate)} 00:00:00`;
   const until = `${formatDate(toDate)} 23:59:59`;
   const filter = cashierWhere("s", input);
-  return db.prepare(`SELECT s.order_number AS orderNumber, s.created_at AS createdAt, COALESCE(NULLIF(TRIM(p.sku), ''), NULLIF(TRIM(p.barcode), '')) AS productCode, si.name AS productName, COALESCE(si.unit, p.unit, 'ชิ้น') AS unit, si.qty, si.price, ROUND(si.qty * si.price, 2) AS amount, s.payment_method AS paymentMethod, COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, s.member_number AS memberNumber, CASE WHEN m.member_number IS NULL THEN NULL WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id LEFT JOIN members m ON m.member_number = s.member_number WHERE s.created_at >= ? AND s.created_at <= ?${filter.sql} ORDER BY s.created_at DESC, s.id DESC, si.id ASC LIMIT 1000`).all(since, until, ...filter.params) as unknown as SalesLineItemRow[];
+  return db.prepare(`SELECT s.order_number AS orderNumber, s.created_at AS createdAt, COALESCE(NULLIF(TRIM(p.sku), ''), NULLIF(TRIM(p.barcode), '')) AS productCode, si.name AS productName, COALESCE(si.unit, p.unit, 'ชิ้น') AS unit, si.qty, si.price, ROUND(si.qty * si.price, 2) AS amount, s.payment_method AS paymentMethod, COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, s.member_number AS memberNumber, CASE WHEN m.member_number IS NULL THEN NULL WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id LEFT JOIN members m ON m.member_number = s.member_number WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql} ORDER BY s.created_at DESC, s.id DESC, si.id ASC LIMIT 1000`).all(since, until, ...filter.params) as unknown as SalesLineItemRow[];
 }
 
 export type SalesByCashierRow = { cashier: string; orders: number; items: number; memberBills: number; discount: number; total: number; cogs: number; profit: number };
@@ -2782,9 +2973,9 @@ export function salesByCashier(db: SqliteDb, input: DailyRangeInput = {}): Sales
   const since = `${formatDate(fromDate)} 00:00:00`;
   const until = `${formatDate(toDate)} 23:59:59`;
   const filter = cashierWhere("s", input);
-  const base = db.prepare(`SELECT COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, COUNT(*) AS orders, ROUND(COALESCE(SUM(s.discount), 0), 2) AS discount, ROUND(COALESCE(SUM(s.total), 0), 2) AS total, SUM(CASE WHEN s.member_number IS NOT NULL AND s.member_number != '' THEN 1 ELSE 0 END) AS memberBills, ROUND(COALESCE(SUM(si.qty * si.cost), 0), 2) AS cogs FROM sales s LEFT JOIN sale_items si ON si.sale_id = s.id WHERE s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY cashier ORDER BY total DESC`).all(since, until, ...filter.params) as unknown as { cashier: string; orders: number; discount: number; total: number; memberBills: number; cogs: number }[];
+  const base = db.prepare(`SELECT COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, COUNT(*) AS orders, ROUND(COALESCE(SUM(s.discount), 0), 2) AS discount, ROUND(COALESCE(SUM(s.total), 0), 2) AS total, SUM(CASE WHEN s.member_number IS NOT NULL AND s.member_number != '' THEN 1 ELSE 0 END) AS memberBills, ROUND(COALESCE(SUM(COALESCE(si.cost_total_satang / 100.0, si.qty * si.cost)), 0), 2) AS cogs FROM sales s LEFT JOIN sale_items si ON si.sale_id = s.id WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY cashier ORDER BY total DESC`).all(since, until, ...filter.params) as unknown as { cashier: string; orders: number; discount: number; total: number; memberBills: number; cogs: number }[];
   const itemsByCashier = new Map<string, number>();
-  for (const row of db.prepare(`SELECT COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, COALESCE(SUM(si.qty), 0) AS items FROM sales s JOIN sale_items si ON si.sale_id = s.id WHERE s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY cashier`).all(since, until, ...filter.params) as unknown as { cashier: string; items: number }[]) {
+  for (const row of db.prepare(`SELECT COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, COALESCE(SUM(si.qty), 0) AS items FROM sales s JOIN sale_items si ON si.sale_id = s.id WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY cashier`).all(since, until, ...filter.params) as unknown as { cashier: string; items: number }[]) {
     itemsByCashier.set(row.cashier, Number(row.items));
   }
   return base.map((row) => { const cogs = round2(row.cogs); const profit = round2(row.total - cogs); return { cashier: row.cashier, orders: row.orders, items: itemsByCashier.get(row.cashier) ?? 0, memberBills: Number(row.memberBills), discount: round2(row.discount), total: round2(row.total), cogs, profit }; });
@@ -3001,6 +3192,8 @@ export type StockBalanceRow = {
   received: number;
   /** จำนวนคงเหลือปัจจุบัน */
   remaining: number;
+  sellingPrice: number;
+  sellingValue: number;
 };
 
 export type StockBalanceInput = { from?: string; to?: string; search?: string };
@@ -3032,7 +3225,7 @@ export function stockBalanceReport(db: SqliteDb, input: StockBalanceInput = {}):
   const search = input.search?.trim();
   const where = search ? ` WHERE (name LIKE ? OR sku LIKE ? OR COALESCE(barcode, '') LIKE ?)` : "";
   const params = search ? [`%${search}%`, `%${search}%`, `%${search}%`] : [];
-  const products = db.prepare(`SELECT id, sku, barcode, name, unit, category, stock, active FROM products${where} ORDER BY id`).all(...params) as unknown as { id: number; sku: string; barcode: string | null; name: string; unit: string; category: string; stock: number; active: number }[];
+  const products = db.prepare(`SELECT id, sku, barcode, name, unit, category, stock, price, active FROM products${where} ORDER BY id`).all(...params) as unknown as { id: number; sku: string; barcode: string | null; name: string; unit: string; category: string; stock: number; price: number; active: number }[];
   return products.map((product) => {
     const sold = soldByProduct.get(product.id) ?? 0;
     const received = receivedByProduct.get(product.id) ?? 0;
@@ -3049,6 +3242,8 @@ export function stockBalanceReport(db: SqliteDb, input: StockBalanceInput = {}):
       sold,
       received,
       remaining: product.stock,
+      sellingPrice: product.price,
+      sellingValue: round2(product.stock * product.price),
     };
   });
 }
@@ -3757,6 +3952,11 @@ export function voidSale(db: SqliteDb, input: { saleId: number; reason: string; 
         actorRole: input.actorRole,
       });
       db.prepare(`UPDATE products SET stock = stock + ? WHERE id = ?`).run(item.qty, item.productId);
+    }
+    // Restore the exact original allocations, including their residual satang.
+    const allocations = db.prepare(`SELECT a.lot_id AS lotId, a.qty, a.cost_satang AS costSatang FROM sale_lot_allocations a JOIN sale_items si ON si.id = a.sale_item_id WHERE si.sale_id = ?`).all(sale.id) as { lotId: number; qty: number; costSatang: number }[];
+    for (const allocation of allocations) {
+      db.prepare(`UPDATE stock_lots SET qty = qty + ?, remaining_value_satang = COALESCE(remaining_value_satang, ROUND(qty * cost * 100)) + ? WHERE id = ?`).run(allocation.qty, allocation.costSatang, allocation.lotId);
     }
     // Reverse wallet if wallet payment
     if (sale.paymentMethod === "หักบัญชีสมาชิก" && sale.memberNumber) {

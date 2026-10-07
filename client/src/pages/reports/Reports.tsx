@@ -193,11 +193,13 @@ function todayIso() {
 }
 
 export function Reports({
+  financialOverview = false,
   focusBill,
   onFocusBillConsumed,
   role,
   userName,
 }: {
+  financialOverview?: boolean;
   focusBill: string | null;
   onFocusBillConsumed: () => void;
   role: Role;
@@ -542,6 +544,7 @@ export function Reports({
       opening: stockBalanceRows.reduce((sum, row) => sum + row.opening, 0),
       sold: stockBalanceRows.reduce((sum, row) => sum + row.sold, 0),
       remaining: stockBalanceRows.reduce((sum, row) => sum + row.remaining, 0),
+      sellingValue: stockBalanceRows.reduce((sum, row) => sum + row.sellingValue, 0),
     }),
     [stockBalanceRows]
   );
@@ -1520,17 +1523,18 @@ export function Reports({
       ["จำนวนรายการ", `${stockTotals.items.toLocaleString("th-TH")} รายการ`],
       ["ขายออกในช่วง", `${stockTotals.sold.toLocaleString("th-TH")} ชิ้น`],
       ["คงเหลือรวม", `${stockTotals.remaining.toLocaleString("th-TH")} ชิ้น`],
+      ["มูลค่าคงเหลือตามราคาขายปัจจุบัน", money(stockTotals.sellingValue)],
     ],
     columns: hospitalPreset === "stock"
       ? ["รหัสสินค้า", "ชื่อสินค้า", "ยอดยกมา", "ยอดขาย", "คงเหลือ"]
-      : ["ลำดับ", "รหัสสินค้า", "ชื่อสินค้า", "หน่วย", "ยอดยกมา", "ยอดขาย", "คงเหลือ"],
-    numericCols: hospitalPreset === "stock" ? [2, 3, 4] : [4, 5, 6],
+      : ["ลำดับ", "รหัสสินค้า", "ชื่อสินค้า", "หน่วย", "ยอดยกมา", "ยอดขาย", "คงเหลือ", "ราคาขาย", "มูลค่าคงเหลือ"],
+    numericCols: hospitalPreset === "stock" ? [2, 3, 4] : [4, 5, 6, 7, 8],
     rows: stockBalanceRows.map((row, index) => hospitalPreset === "stock"
       ? [row.code, row.name, exportCount(row.opening), exportCount(row.sold), exportCount(row.remaining)]
-      : [exportCount(index + 1), row.code, row.name, row.unit, exportCount(row.opening), exportCount(row.sold), exportCount(row.remaining)]),
+      : [exportCount(index + 1), row.code, row.name, row.unit, exportCount(row.opening), exportCount(row.sold), exportCount(row.remaining), exportNumber(row.sellingPrice), exportNumber(row.sellingValue)]),
     totalsRow: hospitalPreset === "stock"
       ? ["รวม", `${stockTotals.items} รายการ`, exportCount(stockTotals.opening), exportCount(stockTotals.sold), exportCount(stockTotals.remaining)]
-      : ["รวม", `${stockTotals.items} รายการ`, "", "", exportCount(stockTotals.opening), exportCount(stockTotals.sold), exportCount(stockTotals.remaining)],
+      : ["รวม", `${stockTotals.items} รายการ`, "", "", exportCount(stockTotals.opening), exportCount(stockTotals.sold), exportCount(stockTotals.remaining), "", exportNumber(stockTotals.sellingValue)],
     brandName: "ร้านค้าสวัสดิการ",
     footnote:
       "ยอดยกมา = จำนวนต้นช่วง · ยอดขาย = ขายออกในช่วงที่เลือก · คงเหลือ = สต็อกปัจจุบัน",
@@ -1673,7 +1677,7 @@ export function Reports({
     <PageTemplate>
       <SectionHeader
         eyebrow="สรุปผลและวิเคราะห์ข้อมูล"
-        title="รายงาน"
+        title={financialOverview ? "ต้นทุนและกำไร" : "รายงาน"}
         description=""
         action={
           <div className="page-template-action">
@@ -3023,7 +3027,7 @@ export function Reports({
                         <th>วันที่ · เวลา</th>
                         <th>สมาชิก / เลขสมาชิก</th>
                         <th>ประเภท</th>
-                        <th className="hide-sm">รายละเอียด</th>
+                        <th>รายละเอียด</th>
                         <th className="num">ยอดเคลื่อน</th>
                         <th className="num hide-sm">คงเหลือ(บาท)</th>
                         <th className="hide-sm">ผู้ทำรายการ</th>
@@ -3035,7 +3039,7 @@ export function Reports({
                         const isLimit = row.kind === "limit";
                         const limitStatus =
                           LIMIT_STATUS_META[row.status ?? "pending"];
-                        return [
+                        return (
                           <tr
                             key={row.id}
                             className={isLimit ? "tx-limit" : `tx-${row.type}`}
@@ -3072,6 +3076,9 @@ export function Reports({
                                   {TX_TYPE_LABEL[row.type]}
                                 </StatusPill>
                               )}
+                            </td>
+                            <td>
+                              <span className="tx-detail">{row.detail || "—"}</span>
                             </td>
                             <td className="num">
                               {isLimit ? (
@@ -3148,16 +3155,8 @@ export function Reports({
                                 )}
                               </td>
                             )}
-                          </tr>,
-                          <tr key={`${row.id}-d`} className="tx-detail-row">
-                            <td
-                              colSpan={isAdminRole(role) ? 8 : 7}
-                              className="hide-sm-restore"
-                            >
-                              <span className="tx-detail">{row.detail}</span>
-                            </td>
-                          </tr>,
-                        ];
+                          </tr>
+                        );
                       })}
                     </tbody>
                   </table>
@@ -3362,6 +3361,8 @@ export function Reports({
                         <th className="num">ยอดยกมา</th>
                         <th className="num">ยอดขาย</th>
                         <th className="num">คงเหลือ</th>
+                        <th className="num">ราคาขาย</th>
+                        <th className="num">มูลค่าคงเหลือ</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -3418,6 +3419,8 @@ export function Reports({
                               {exportCount(row.remaining)}
                             </strong>
                           </td>
+                          <td className="num cell-mono">{money(row.sellingPrice)}</td>
+                          <td className="num cell-mono">{money(row.sellingValue)}</td>
                         </tr>
                       ))}
                     </tbody>

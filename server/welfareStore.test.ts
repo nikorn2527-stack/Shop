@@ -12,6 +12,7 @@ import {
   createAppSession,
   createAppUser,
   createProduct,
+  createBlankCards,
   createSqliteStore,
   dailySalesRows,
   dashboardStats,
@@ -274,26 +275,20 @@ describe("FIFO lot deduction at checkout", () => {
     expect(productBySku(database, "ICE-004").stock).toBe(35 + 5 - 7);
   });
 
-  it("tolerates lot shortfall (drift), zeroes the lots and flags it in the audit log", () => {
+  it("rejects tracked-lot drift and rolls back all sale writes", () => {
     const database = freshDb();
     const water = productBySku(database, "DRK-001");
-    // Simulate drift: lots far below the authoritative product stock.
-    database.prepare(`UPDATE stock_lots SET qty = 0 WHERE product_id = ?`).run(water.id);
-    receiveStock(database, water.id, "SMALL-LOT", "2027-01-01", 2, 4, "นายวรพจน์ ด.");
-    const stockBefore = productBySku(database, "DRK-001").stock; // 124 + 2 = 126
-
-    const receipt = checkout(database, {
-      items: [{ productId: water.id, qty: 5 }],
-      paymentMethod: "เงินสด",
-    });
-
-    expect(receipt.total).toBe(35); // 5 × ฿7 — the sale is NOT blocked by the drift.
-    expect(lotRows(database, water.id).every((row) => row.qty === 0)).toBe(true);
-    expect(productBySku(database, "DRK-001").stock).toBe(stockBefore - 5);
-    const latest = listAuditLogs(database, 1)[0];
-    expect(latest.action).toBe("ขายสินค้า");
-    expect(latest.detail).toContain("ตัดยอด Lot ไม่ครบ");
-    expect(latest.detail).toContain(`น้ำดื่มคริสตัล 600 มล. 3 ขวด`);
+    database.prepare('UPDATE stock_lots SET qty = 0 WHERE product_id = ?').run(water.id);
+    receiveStock(database, water.id, "SMALL-LOT", "2027-01-01", 2, 4, "Audit");
+    const stockBefore = productBySku(database, "DRK-001").stock;
+    const lotsBefore = lotRows(database, water.id);
+    const salesBefore = database.prepare('SELECT COUNT(*) AS count FROM sales').get();
+    expect(() => checkout(database, {
+      items: [{ productId: water.id, qty: 5 }], paymentMethod: "เงินสด",
+    })).toThrow("จำนวนในล็อตไม่ตรงกับสต็อก");
+    expect(productBySku(database, "DRK-001").stock).toBe(stockBefore);
+    expect(lotRows(database, water.id)).toEqual(lotsBefore);
+    expect(database.prepare('SELECT COUNT(*) AS count FROM sales').get()).toEqual(salesBefore);
   });
 
   it("sells lot-less products unchanged (no crash, no audit note)", () => {
@@ -464,7 +459,7 @@ describe("stock counting", () => {
     const result = stockCountLots(database, {
       counts: [
         { lotId: lots[0]!.id, countedQty: lots[0]!.qty - 6 },
-        { lotId: lots[1]!.id, countedQty: lots[1]!.qty + 1 },
+        { lotId: lots[1]!.id, countedQty: lots[1]!.qty - 1 },
       ],
       note: "ตรวจนับก่อนปิดร้าน",
       actor: "นายวรพจน์ ด.",
@@ -473,13 +468,13 @@ describe("stock counting", () => {
 
     expect(result.lots).toHaveLength(2);
     expect(result.lots[0]).toMatchObject({ lotId: lots[0]!.id, systemQty: lots[0]!.qty, countedQty: lots[0]!.qty - 6, diff: -6 });
-    expect(result.lots[1]).toMatchObject({ systemQty: lots[1]!.qty, countedQty: lots[1]!.qty + 1, diff: 1 });
-    const newSum = (lots[0]!.qty - 6) + (lots[1]!.qty + 1);
+    expect(result.lots[1]).toMatchObject({ systemQty: lots[1]!.qty, countedQty: lots[1]!.qty - 1, diff: -1 });
+    const newSum = (lots[0]!.qty - 6) + (lots[1]!.qty - 1);
     expect(result.countedQty).toBe(newSum);
     expect(result.diff).toBe(newSum - lotSum);
     expect(productBySku(database, "DRK-001").stock).toBe(newSum);
     const storedLots = database.prepare(`SELECT qty FROM stock_lots WHERE product_id = ? ORDER BY id`).all(water.id) as { qty: number }[];
-    expect(storedLots.map((row) => row.qty)).toEqual([lots[0]!.qty - 6, lots[1]!.qty + 1]);
+    expect(storedLots.map((row) => row.qty)).toEqual([lots[0]!.qty - 6, lots[1]!.qty - 1]);
 
     const latest = listAuditLogs(database, 1)[0];
     expect(latest).toMatchObject({ action: "นับสต็อก (แยกล็อต)", actor: "นายวรพจน์ ด.", actorRole: "ผู้บริหาร", tone: "red" });
@@ -535,7 +530,11 @@ describe("member registration numbering", () => {
     const database = freshDb();
     setMemberNumberMode(database, "year");
     const detail = registerMember(database, { firstName: "ทดสอบ", lastName: "ปี" });
-    expect(detail.member.memberNumber).toBe("69-00001");
+    const settings = getSettings(database);
+    const endMonth = Number(settings.memberNumberResetMonth ?? 12);
+    const now = new Date();
+    const cycleYear = now.getFullYear() + (now.getMonth() + 1 > endMonth ? 1 : 0) + 543;
+    expect(detail.member.memberNumber).toBe(`${String(cycleYear).slice(-2)}-00001`);
   });
 
   it("requires a staff-provided number in manual mode", () => {
@@ -557,6 +556,7 @@ describe("member registration numbering", () => {
 
   it("ROUND 65 — ลงทะเบียนพร้อมรหัสบัตร/รหัสผู้ป่วย และห้ามใช้รหัสบัตรซ้ำ", () => {
     const database = freshDb();
+    createBlankCards(database, ["2395100201"]);
     const detail = registerMember(database, { firstName: "สมชาย", lastName: "ใจดี", prename: "นาย", cardNumber: "2395100201", patientCode: "70001", initialDeposit: 500 });
     expect(detail.member.cardNumber).toBe("2395100201");
     expect(detail.member.patientCode).toBe("70001");

@@ -230,6 +230,7 @@ function CutoffWidget({ role, userName }: { role: Role; userName: string }) {
       summaryBlocks: [["ยอดรวมรับ", `${receiptCount.toLocaleString("th-TH")} รายการ · ${money(receiptAmount)}`], ["ยอดรวมจ่าย", `${paymentCount.toLocaleString("th-TH")} รายการ · ${money(paymentAmount)}`]],
       columns: ["รายการ", "จำนวนรายการ", "จำนวนเงิน (บาท)"],
       numericCols: [1, 2],
+      groupStartRows: [0, 3],
       rows: [
         ["ยอดรวมรับ", receiptCount.toLocaleString("th-TH"), money(receiptAmount)],
         ["เติมเงินบัตร", closure.depositCount.toLocaleString("th-TH"), closure.depositAmount.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })],
@@ -284,15 +285,19 @@ function CutoffWidget({ role, userName }: { role: Role; userName: string }) {
       <div className="receipt-meta"><span>ตัดยอดเมื่อ <b>{formatThaiDate(closed.closedAt)} · {formatTimeShort(closed.closedAt)}</b></span><span>โดย {closed.closedBy ?? "—"}</span></div>
       <div className="receipt-meta"><span>รอบตั้งแต่ <b>{formatThaiDate(closed.periodStart)} · {formatTimeShort(closed.periodStart)}</b></span><span>ถึงเวลาตัดยอด</span></div>
       <div className="receipt-divider" />
+      <section aria-label="ยอดรวมรับ" style={{ display: "block", gridColumn: "1 / -1", padding: "10px 0", breakInside: "avoid" }}>
       <div className="receipt-total"><span>ยอดรวมรับ</span><b>{money(closed.depositAmount + closed.activationAmount)}</b></div>
       <div className="receipt-line"><span>จำนวนรายการรับ</span><b>{closed.depositCount + closed.activationCount} รายการ</b></div>
       <div className="receipt-line"><span>เติมเงินบัตร · {closed.depositCount} รายการ</span><b>{money(closed.depositAmount)}</b></div>
       <div className="receipt-line"><span>เปิดใช้บัตร · {closed.activationCount} รายการ</span><b>{money(closed.activationAmount)}</b></div>
+      </section>
       <div className="receipt-divider" />
+      <section aria-label="ยอดรวมจ่าย" style={{ display: "block", gridColumn: "1 / -1", marginTop: "12px", padding: "10px 0", breakInside: "avoid" }}>
       <div className="receipt-total"><span>ยอดรวมจ่าย</span><b>{money(closed.withdrawalAmount + closed.refundAmount)}</b></div>
       <div className="receipt-line"><span>จำนวนรายการจ่าย</span><b>{closed.withdrawalCount + closed.refundCount} รายการ</b></div>
       <div className="receipt-line"><span>ลดยอดเงินบัตร · {closed.withdrawalCount} รายการ</span><b>{money(closed.withdrawalAmount)}</b></div>
       <div className="receipt-line"><span>คืนบัตรเงินสด · {closed.refundCount} รายการ</span><b>{money(closed.refundAmount)}</b></div>
+      </section>
       {closed.note && <div className="receipt-line"><span>หมายเหตุ</span><b>{closed.note}</b></div>}
       <div className="receipt-thanks">เจ้าหน้าที่ {closed.closedBy ?? "—"}</div>
     </div>}

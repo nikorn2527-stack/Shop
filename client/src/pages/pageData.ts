@@ -1,7 +1,8 @@
+import { memberNumberHead } from "../../../shared/memberNumber";
 import type { ReactNode } from "react";
 import { SquaresFour, ShoppingCart, Package, Users, ChartBar } from "@phosphor-icons/react";
 
-export type View = "dashboard" | "pos" | "stock" | "members" | "reports" | "settings" | "logs" | "users";
+export type View = "dashboard" | "pos" | "stock" | "members" | "reports" | "profit" | "settings" | "logs" | "users";
 /** ROUND 36 (ข้อ 31) — เพิ่ม "dev": บัญชีผู้พัฒนา มีสิทธิ์ระดับผู้บริหารแต่แสดงตัวตนต่างกัน */
 export type Role = "staff" | "admin" | "dev";
 export type CartItem = { id: number; name: string; price: number; qty: number; unit: string; special?: boolean; variant?: string; step?: number };
@@ -121,20 +122,8 @@ export type MemberNumberFormat = {
 
 export function formatMemberNumber(mode: "running" | "year" | "manual", sequence: number, format: MemberNumberFormat = {}) {
   if (mode === "manual") return "กรอกเอง";
-  const legacyYearMode = mode === "year" && format.yearMode === "none";
-  if (legacyYearMode) return `69-${String(sequence).padStart(5, "0")}`;
-  const prefix = format.prefix ?? (mode === "year" ? "" : "M");
-  const yearMode = format.yearMode ?? (mode === "year" ? "buddhist" : "none");
-  const yearDigits = format.yearDigits === 4 ? 4 : 2;
-  const resetMonth = Math.min(12, Math.max(1, format.resetMonth ?? 1));
-  const now = new Date();
-  const cycleYear = now.getMonth() + 1 < resetMonth ? now.getFullYear() - 1 : now.getFullYear();
-  const yearValue = yearMode === "buddhist" ? cycleYear + 543 : cycleYear;
-  const yearText = yearMode === "none" ? "" : String(yearValue).slice(yearDigits === 4 ? -4 : -2);
-  const separator = format.separator ?? "-";
-  const head = [prefix.trim(), yearText].filter(Boolean).join(separator);
-  const digits = Math.min(10, Math.max(1, format.sequenceDigits ?? (mode === "year" ? 5 : 6)));
-  return `${head ? `${head}${separator}` : ""}${String(sequence).padStart(digits, "0")}`;
+  const digits = mode === "year" && format.yearMode === "none" ? 5 : Math.min(10, Math.max(1, format.sequenceDigits ?? (mode === "year" ? 5 : 6)));
+  return `${memberNumberHead(mode, format)}${String(sequence).padStart(digits, "0")}`;
 }
 
 export const navItems: { id: View; label: string; caption: string; icon: React.ComponentType<any>; tileColor: string }[] = [
@@ -143,6 +132,7 @@ export const navItems: { id: View; label: string; caption: string; icon: React.C
   { id: "stock", label: "สต็อกสินค้า", caption: "รับเข้าและนับสต็อก", icon: Package, tileColor: "#2563eb" },
   { id: "members", label: "สมาชิกและบัญชี", caption: "สมาชิกและเจ้าหน้าที่", icon: Users, tileColor: "#7c3aed" },
   { id: "reports", label: "รายงาน", caption: "วิเคราะห์และส่งออก", icon: ChartBar, tileColor: "#0891b2" },
+  { id: "profit", label: "ต้นทุนและกำไร", caption: "ต้นทุนขายและกำไรขั้นต้น", icon: ChartBar, tileColor: "#537fa6" },
 ];
 
 // NOTE (OLD-2-b): mock exports `products` + `stockRows` were DELETED — Pos.tsx and
