@@ -1,6 +1,7 @@
 import { LimitReductionModal } from "@/components/LimitReductionModal";
 import { ActionButton } from "@/components/ActionButton";
 import { useState } from "react";
+import { MemberCardActionsModal } from "@/components/MemberCardActionsModal";
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -148,6 +149,7 @@ export function MemberDetail({
   const [walletConfirm, setWalletConfirm] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [cardOpen, setCardOpen] = useState(false);
+  const [cardActionsOpen, setCardActionsOpen] = useState(false);
   const [statementOpen, setStatementOpen] = useState(false);
   // ROUND 34 (req 23.2) — ขอลดวงเงินซื้อสินค้าต่อวัน: 2 ขั้นเหมือนเติม/ถอน (กรอก → ยืนยัน → ส่ง)
   const [limitOpen, setLimitOpen] = useState(false);
@@ -256,6 +258,16 @@ export function MemberDetail({
       void utils.member.detail.invalidate();
     },
     onError: mutationError => setError(getErrorMessage(mutationError)),
+  });
+  const releaseCardMutation = trpc.card.release.useMutation({
+    onSuccess: () => {
+      setNotice("รับคืนบัตรแล้ว · บัตรพร้อมใช้กับสมาชิกใหม่");
+      void utils.member.list.invalidate();
+      void utils.member.detail.invalidate();
+      void utils.card.list.invalidate();
+      void utils.card.history.invalidate();
+    },
+    onError: e => setError(getErrorMessage(e)),
   });
   const updateMutation = trpc.member.update.useMutation({
     onSuccess: result => {
@@ -453,6 +465,8 @@ export function MemberDetail({
           </div>
         </div>
         <div className="member-detail-actions">
+          <button type="button" className="outline-button" onClick={() => setCardActionsOpen(true)}><IdCard size={15} /> คืน / จ่ายบัตร</button>
+          {cardActionsOpen && <MemberCardActionsModal memberNumber={member.memberNumber} onClose={() => setCardActionsOpen(false)} onSuccess={() => { void detailQuery.refetch(); setNotice("จัดการบัตรเรียบร้อยแล้ว"); }} />}
           <button
             className="primary-button"
             disabled={profile.status !== "active"}
@@ -478,27 +492,11 @@ export function MemberDetail({
             <ArrowUpFromLine size={15} /> ถอนเงิน
           </button>
           <button
-            className="outline-button refund-card-button"
-            disabled={profile.status !== "active" || profile.balance <= 0}
-            onClick={() => {
-              setWalletOpen("refund");
-              setWalletAmount(
-                profile.balance > 0 ? String(profile.balance) : ""
-              );
-              setWalletConfirm(false);
-              setWalletResult(null);
-              setError("");
-            }}
-            title="ผู้ป่วยคืนบัตรเมื่อออกจากโรงพยาบาล — จ่ายเงินสดคืนตามยอดคงเหลือ แล้วยอดเหลือเป็น 0"
-          >
-            <IdCard size={15} /> คืนบัตรเงินสด
-          </button>
-          <button
             className="outline-button"
             onClick={openLimitDialog}
-            title="ยื่นคำขอลดวงเงินซื้อสินค้าต่อวัน — รอผู้บริหารพิจารณา"
+            title="คืนเงินทั้งหมดและคืนบัตร"
           >
-            <TrendingDown size={15} /> ขอลดวงเงิน
+            <TrendingDown size={15} /> ขอลดวงเงิน / คืนบัตร
           </button>
           {profile.status === "active" ? (
             <button

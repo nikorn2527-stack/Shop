@@ -23,6 +23,7 @@ import {
   ChevronLeft,
   ChevronRight,
   CircleHelp,
+  CreditCard,
   LayoutDashboard,
   LockKeyhole,
   LogOut,
@@ -531,7 +532,8 @@ export function AppShell({
             </button>
           )}
           </div> : null}
-          {!railHidden.has("deposit") || !railHidden.has("withdraw") || !railHidden.has("register") || !railHidden.has("limit") ? <div className="pos-rail-group"><span className="pos-rail-group-label">งานสมาชิก</span>
+          {!railHidden.has("card") || !railHidden.has("deposit") || !railHidden.has("withdraw") || !railHidden.has("register") || !railHidden.has("limit") ? <div className="pos-rail-group"><span className="pos-rail-group-label">งานสมาชิก</span>
+          {!railHidden.has("card") && <button type="button" className="rail-btn rail-member" onClick={() => window.dispatchEvent(new CustomEvent("pos-rail", { detail: "card" }))}><CreditCard size={20} /><b>คืน / จ่ายบัตร</b></button>}
           {!railHidden.has("deposit") && (
             <button
               type="button"
@@ -576,7 +578,7 @@ export function AppShell({
               <kbd>F6</kbd>
             </button>
           )}
-          {!railHidden.has("limit") && <button type="button" className="rail-btn rail-limit" title="ขอลดวงเงินซื้อสินค้าต่อวัน — รอผู้บริหารอนุมัติ" onClick={() => window.dispatchEvent(new CustomEvent("pos-rail", { detail: "limit" }))}><TrendingDown size={20} /><b>ขอลดวงเงิน</b></button>}
+          {!railHidden.has("limit") && <button type="button" className="rail-btn rail-limit" title="คืนเงินทั้งหมดและคืนบัตร" onClick={() => window.dispatchEvent(new CustomEvent("pos-rail", { detail: "limit" }))}><TrendingDown size={20} /><b>ขอลดวงเงิน / คืนบัตร</b></button>}
           </div> : null}
           {!railHidden.has("special") || !railHidden.has("receive") || !railHidden.has("add") ? <details className="pos-rail-more"><summary>งานอื่น</summary><div className="pos-rail-group">
           {!railHidden.has("special") && (

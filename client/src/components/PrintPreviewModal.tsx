@@ -130,7 +130,7 @@ export function PrintPreviewModal({
         ? `@media print { @page { margin: 0; size: ${widthMm}mm ${heightMm}mm; } .receipt-paper, .receipt-line, .receipt-total, .receipt-meta, .receipt-customer, .receipt-payment, .receipt-balance, .receipt-thanks, .receipt-brand, .receipt-divider { break-inside: avoid; page-break-inside: avoid; } body { margin: 0; padding: 0; } }`
         : `@media print { @page { margin: 0; } .receipt-paper, .receipt-line, .receipt-total, .receipt-meta, .receipt-customer, .receipt-payment, .receipt-balance, .receipt-thanks, .receipt-brand, .receipt-divider { break-inside: avoid; page-break-inside: avoid; } body { margin: 0; padding: 0; } }`;
     } else {
-      const marginMm = targetId === "stock-count-sheet" ? 14 : 8;
+      const marginMm = targetId === "stock-count-sheet" ? 6 : 8;
       styleEl.textContent = `@media print { @page { margin: ${marginMm}mm; ${paper === "a4" ? "size: A4;" : ""} } }`;
     }
     const printClass = targetId === "stock-count-sheet" ? "printing-stock-count" : "printing-receipt";

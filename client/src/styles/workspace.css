@@ -1,3 +1,63 @@
+/* Keep member search results in the dialog flow instead of clipping a popup. */
+@media screen {
+  :root .member-card-modal.confirm-mode .modal-actions .primary-button,
+  :root .member-card-modal.confirm-mode .modal-actions .primary-button svg {
+    color: #fff !important; opacity: 1;
+  }
+  :root .member-card-modal.confirm-mode .modal-actions .primary-button {
+    background: #c65300 !important; border: 1px solid #c65300;
+    min-height: 42px; font-weight: 700;
+  }
+  :root .member-card-modal.confirm-mode .modal-actions .primary-button:disabled {
+    background: #475569 !important; border-color: #475569; color: #fff !important;
+  }
+  [data-sonner-toaster] { z-index: 1400 !important; pointer-events: none; }
+  [data-sonner-toast] { pointer-events: auto; }
+  :root .app-shell .settings-save-bar { z-index: 40; }
+}
+@media screen {
+  :root .card-inventory-toolbar { align-items: end; }
+  :root .card-inventory-toolbar > button { align-self: end; height: 40px; margin: 0; flex-shrink: 0; }
+  :root .card-inventory-search { margin: 0; }
+  :root .card-inventory-search input { box-sizing: border-box; height: 40px; }
+  :root .card-history-dialog { position: fixed; inset: 0; margin: auto; box-sizing: border-box; width: min(1200px, calc(100vw - 32px)); max-width: calc(100vw - 32px); max-height: calc(100dvh - 32px); padding: 0; border: 1px solid #e2e8f0; border-radius: 16px; background: #fff; color: #0f172a; box-shadow: 0 20px 60px #0f172a33; }
+  .card-history-dialog::backdrop { background: #0f172a66; }
+  .card-history-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-bottom: 1px solid #e2e8f0; }
+  .card-history-heading h3 { margin: 0; overflow-wrap: anywhere; }
+  .card-history-heading button { flex-shrink: 0; }
+  .card-history-content { padding: 20px; overflow: auto; max-height: calc(100dvh - 130px); }
+  .card-history-content .table-wrap { overflow: auto; }
+  .card-history-content table { min-width: 950px; width: 100%; }
+  .card-history-content th, .card-history-content td { color: #0f172a; padding: 12px; vertical-align: top; }
+  .card-history-content th { white-space: nowrap; }
+}
+@media screen {
+  .modal-backdrop .member-selection-modal {
+    max-height: calc(100dvh - 32px);
+    overflow-y: auto;
+  }
+  .member-selection-modal .member-scan-list {
+    position: relative;
+    inset: auto;
+    margin-top: 8px;
+    max-height: min(330px, 45dvh);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    box-shadow: none;
+  }
+}
+.card-inventory-builder { margin: 8px 0 12px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; }
+.card-inventory-builder [role="tablist"] { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.card-inventory-builder [role="tab"] { padding: 10px 16px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; color: #334155; font-weight: 600; }
+.card-inventory-builder [role="tab"][aria-selected="true"] { background: #eaf2f8; color: #1e466c; border-color: #537fa6; }
+.card-number-fields { display: grid; grid-template-columns: minmax(160px, 2fr) minmax(100px, 1fr) minmax(100px, 1fr) auto; align-items: end; gap: 10px; max-width: 900px; }
+.card-inventory-builder label { display: flex; flex-direction: column; gap: 6px; color: #0f172a; }
+.card-inventory-builder input, .card-inventory-builder select, .card-inventory-builder textarea { width: 100%; min-height: 42px; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 10px; background: #fff; color: #0f172a; }
+.card-inventory-builder small { display: block; margin-top: 10px; color: #475569; }
+.card-scan-entry { display: flex; align-items: end; gap: 12px; margin-bottom: 16px; max-width: 760px; }
+.card-scan-entry label { flex: 1; min-width: 0; }
+.card-inventory-builder .card-inventory-codes { margin-bottom: 12px; max-width: 760px; }
+@media (max-width: 600px) { .card-number-fields { grid-template-columns: 1fr; } .card-scan-entry { flex-direction: column; align-items: stretch; } .card-inventory-builder { padding: 14px; } }
 /* Stronger screen accents without tinting documents or changing task colors. */
 @media screen {
   :root .app-shell :is(.sidebar nav, .admin-nav) button.active {
@@ -41,6 +101,13 @@
 }
 .card-inventory h2 { color: #0f172a; margin-bottom: 16px; }
 .card-inventory-search { display: grid; gap: 6px; max-width: 440px; margin-bottom: 16px; }
+.card-inventory-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-bottom: 10px; }
+.card-inventory .card-inventory-toolbar h2 { margin: 0; font-size: 16px; }
+.card-inventory .card-inventory-toolbar .card-inventory-search { margin: 0 0 0 auto; flex: 1 1 240px; max-width: 360px; font-size: 12px; gap: 3px; }
+.card-inventory .card-inventory-toolbar > button { width: auto; margin: 0; white-space: nowrap; }
+.card-inventory-builder [role="tabpanel"] > p { margin: 6px 0 0; font-size: 12px; color: #475569; }
+@media (max-width: 800px) { .card-number-fields { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 600px) { .card-number-fields { grid-template-columns: 1fr; } .card-inventory .card-inventory-toolbar .card-inventory-search { order: 3; max-width: none; flex-basis: 100%; margin: 0; } }
 .card-inventory-search input, .card-inventory-codes textarea { width: 100%; box-sizing: border-box; background: #fff; color: #0f172a; border: 1px solid #cbd5e1; border-radius: 10px; padding: 10px 12px; }
 .card-inventory-create { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 12px; padding: 16px; margin-bottom: 20px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; }
 .card-inventory-codes { display: grid; gap: 6px; flex: 1 1 320px; }
@@ -291,7 +358,7 @@
     pointer-events: auto;
   }
   :root .app-shell .pos-premium-layout {
-    display: grid; grid-template-columns: minmax(0, 1fr) 224px;
+    display: grid; grid-template-columns: minmax(0, 1fr) clamp(340px, 30vw, 420px);
     gap: 16px; align-items: start;
   }
   :root .app-shell .pos-premium-bill {
@@ -353,7 +420,7 @@
     height: 48px; font-size: 24px;
   }
   :root .app-shell .pos-premium-layout .product-grid {
-    grid-template-columns: minmax(0, 1fr); gap: 10px;
+    grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;
   }
   :root .app-shell .pos-premium-layout .product-card {
     background: #fff; border-color: #e2e8f0; border-radius: 14px; box-shadow: none;

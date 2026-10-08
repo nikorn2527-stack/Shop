@@ -684,13 +684,72 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
   db.prepare("UPDATE stock_lots SET received_qty = qty WHERE received_qty IS NULL").run();
   // Backfill units for sale_items rows written before the column existed (idempotent).
   db.prepare("UPDATE sale_items SET unit = (SELECT p.unit FROM products p WHERE p.id = sale_items.product_id) WHERE unit IS NULL").run();
+  ensureColumn(db, "physical_cards", "archived_at", "TEXT");
   seedPhysicalCardsFromMembers(db);
+  initializeCardUsageSessions(db);
   // RBAC — seed roles + permissions (idempotent)
   ensureRbacSeed(db);
   return db;
 }
 /** บัตรกายภาพหมุนเวียน — แยกสต็อกบัตรออกจากตัวตนสมาชิก (member_number ไม่ reuse). */
 export type PhysicalCardStatus = "blank" | "assigned" | "returned_vacant" | "lost" | "damaged";
+export type CardUsageSession = { id: number; cardNumber: string; memberNumber: string; memberName: string; startedAt: string; endedAt: string | null; openedBy: string | null; closedBy: string | null; openingBalance: number; closingBalance: number | null; legacy: number; transactionCount: number; incoming: number; outgoing: number };
+export type CardSessionTransaction = { id: number; type: string; amount: number; balanceAfter: number | null; createdAt: string; actor: string | null; detail: string };
+
+function initializeCardUsageSessions(db: SqliteDb) {
+  db.exec(`CREATE TABLE IF NOT EXISTS card_usage_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    card_number TEXT NOT NULL REFERENCES physical_cards(card_number),
+    member_number TEXT NOT NULL REFERENCES members(member_number),
+    started_at TEXT NOT NULL, ended_at TEXT, opened_by TEXT, closed_by TEXT,
+    opening_balance REAL NOT NULL, closing_balance REAL, end_reason TEXT,
+    legacy INTEGER NOT NULL DEFAULT 0
+  );
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_card_session_open_card ON card_usage_sessions(card_number) WHERE ended_at IS NULL;
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_card_session_open_member ON card_usage_sessions(member_number) WHERE ended_at IS NULL;`);
+  ensureColumn(db, "member_transactions", "card_usage_session_id", "INTEGER REFERENCES card_usage_sessions(id)");
+  ensureColumn(db, "sales", "card_usage_session_id", "INTEGER REFERENCES card_usage_sessions(id)");
+  db.prepare(`INSERT INTO card_usage_sessions (card_number, member_number, started_at, opening_balance, legacy)
+    SELECT c.card_number, c.assigned_member_number, ?, m.balance, 1
+    FROM physical_cards c JOIN members m ON m.member_number = c.assigned_member_number
+    WHERE c.status = 'assigned' AND NOT EXISTS (SELECT 1 FROM card_usage_sessions s WHERE s.card_number = c.card_number AND s.ended_at IS NULL)`).run(formatDateTime());
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_member_tx_card_session ON member_transactions(card_usage_session_id);
+    CREATE INDEX IF NOT EXISTS idx_sales_card_session ON sales(card_usage_session_id);
+    CREATE TRIGGER IF NOT EXISTS card_session_assignment AFTER INSERT ON card_assignments BEGIN
+      INSERT INTO card_usage_sessions (card_number, member_number, started_at, opened_by, opening_balance)
+      SELECT NEW.card_number, NEW.member_number, NEW.created_at, NEW.actor,
+        CASE WHEN EXISTS (SELECT 1 FROM member_transactions WHERE member_number = NEW.member_number)
+        THEN balance ELSE 0 END FROM members WHERE member_number = NEW.member_number AND NEW.action = 'assign';
+      UPDATE card_usage_sessions SET ended_at = NEW.created_at, closed_by = NEW.actor, end_reason = NEW.action,
+        closing_balance = (SELECT balance FROM members WHERE member_number = NEW.member_number)
+      WHERE card_number = NEW.card_number AND member_number = NEW.member_number AND ended_at IS NULL AND NEW.action != 'assign';
+    END;
+    CREATE TRIGGER IF NOT EXISTS member_tx_card_session AFTER INSERT ON member_transactions BEGIN
+      UPDATE member_transactions SET card_usage_session_id = (SELECT id FROM card_usage_sessions WHERE member_number = NEW.member_number AND ended_at IS NULL)
+      WHERE id = NEW.id AND NEW.card_usage_session_id IS NULL;
+    END;
+    CREATE TRIGGER IF NOT EXISTS sale_card_session AFTER INSERT ON sales BEGIN
+      UPDATE sales SET card_usage_session_id = (SELECT id FROM card_usage_sessions WHERE member_number = NEW.member_number AND ended_at IS NULL)
+      WHERE id = NEW.id AND NEW.card_usage_session_id IS NULL;
+    END;`);
+}
+
+export function cardUsageHistory(db: SqliteDb, cardNumber: string) {
+  const sessions = db.prepare(`SELECT s.id, s.card_number AS cardNumber, s.member_number AS memberNumber,
+    TRIM(m.first_name || ' ' || m.last_name) AS memberName, s.started_at AS startedAt, s.ended_at AS endedAt, s.opened_by AS openedBy,
+    s.closed_by AS closedBy, s.opening_balance AS openingBalance, s.closing_balance AS closingBalance, s.legacy,
+    COUNT(t.id) AS transactionCount,
+    COALESCE(SUM(CASE WHEN t.type IN ('deposit','activation') THEN ABS(t.amount) ELSE 0 END),0) AS incoming,
+    COALESCE(SUM(CASE WHEN t.type IN ('purchase','withdrawal','refund') THEN ABS(t.amount) ELSE 0 END),0) AS outgoing
+    FROM card_usage_sessions s JOIN members m ON m.member_number = s.member_number
+    LEFT JOIN member_transactions t ON t.card_usage_session_id = s.id
+    WHERE s.card_number = ? GROUP BY s.id ORDER BY s.id DESC`).all(cardNumber) as unknown as CardUsageSession[];
+  const transactions = db.prepare(`SELECT t.id, t.type, t.amount, t.balance_after AS balanceAfter,
+    t.created_at AS createdAt, t.actor, t.detail, t.card_usage_session_id AS sessionId
+    FROM member_transactions t JOIN card_usage_sessions s ON s.id = t.card_usage_session_id
+    WHERE s.card_number = ? ORDER BY t.id DESC`).all(cardNumber) as unknown as (CardSessionTransaction & { sessionId: number })[];
+  return { sessions, transactions };
+}
 export type PhysicalCardRow = { cardNumber: string; status: PhysicalCardStatus; assignedMemberNumber: string | null; note: string | null; createdBy: string | null; updatedBy: string | null; createdAt: string; updatedAt: string };
 
 function seedPhysicalCardsFromMembers(db: SqliteDb) {
@@ -705,7 +764,7 @@ function seedPhysicalCardsFromMembers(db: SqliteDb) {
 }
 
 export function listPhysicalCards(db: SqliteDb, status?: PhysicalCardStatus | "all", search?: string): PhysicalCardRow[] {
-  const conditions: string[] = [];
+  const conditions: string[] = ["archived_at IS NULL"];
   const params: (string | number)[] = [];
   if (status && status !== "all") { conditions.push(`status = ?`); params.push(status); }
   const keyword = search?.trim();
@@ -713,6 +772,40 @@ export function listPhysicalCards(db: SqliteDb, status?: PhysicalCardStatus | "a
   const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
   return db.prepare(`SELECT card_number AS cardNumber, status, assigned_member_number AS assignedMemberNumber, note, created_by AS createdBy, updated_by AS updatedBy, created_at AS createdAt, updated_at AS updatedAt FROM physical_cards${where} ORDER BY card_number`).all(...params) as unknown as PhysicalCardRow[];
 }
+export function previewGeneratedCards(db: SqliteDb, prefix: string, digits: number, count: number) {
+  prefix = prefix.trim();
+  if (!/^[A-Za-z0-9-]{0,16}$/.test(prefix) || !Number.isInteger(digits) || digits < 3 || digits > 10 || !Number.isInteger(count) || count < 1 || count > 500) {
+    throw new StoreError("รูปแบบรหัสไม่ถูกต้อง: จำนวนหลัก 3–10 และจำนวนบัตร 1–500 ใบ");
+  }
+  let last = 0;
+  const rows = db.prepare(`SELECT card_number AS code FROM physical_cards UNION SELECT card_number AS code FROM members WHERE card_number IS NOT NULL`).all() as { code: string }[];
+  for (const { code } of rows) {
+    if (!code.startsWith(prefix)) continue;
+    const suffix = code.slice(prefix.length);
+    if (/^\d+$/.test(suffix) && suffix.length === digits) last = Math.max(last, Number(suffix));
+  }
+  if (last + count >= 10 ** digits) throw new StoreError("เลขรันเต็มจำนวนหลักที่กำหนด กรุณาเพิ่มจำนวนหลักหรือเปลี่ยนคำนำหน้า");
+  const codes = Array.from({ length: count }, (_, index) => `${prefix}${String(last + index + 1).padStart(digits, "0")}`);
+  return { first: codes[0], last: codes[codes.length - 1], count, codes };
+}
+
+export function generateBlankCards(db: SqliteDb, prefix: string, digits: number, count: number, actor?: string, actorRole?: string) {
+  // Allocate and insert under one write lock; previews never reserve numbers.
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const result = previewGeneratedCards(db, prefix, digits, count);
+    const now = formatDateTime();
+    const insert = db.prepare(`INSERT INTO physical_cards (card_number, status, created_by, updated_by, created_at, updated_at) VALUES (?, 'blank', ?, ?, ?, ?)`);
+    for (const code of result.codes) insert.run(code, actor?.trim() || null, actor?.trim() || null, now, now);
+    logAction(db, "เพิ่มบัตรเปล่า", actor?.trim() || "ระบบ", `${count} ใบ · ${result.first} ถึง ${result.last}`, "blue", actorRole ?? null, now);
+    db.exec("COMMIT");
+    return result;
+  } catch (error) {
+    db.exec("ROLLBACK");
+    throw error;
+  }
+}
+
 export function createBlankCards(db: SqliteDb, cardNumbers: string[], actor?: string, actorRole?: string) {
   const cleaned = Array.from(new Set(cardNumbers.map((code) => code.trim()).filter(Boolean)));
   if (cleaned.length === 0) throw new StoreError("กรุณาระบุรหัสบัตรอย่างน้อย 1 ใบ");
@@ -735,7 +828,7 @@ export function createBlankCards(db: SqliteDb, cardNumbers: string[], actor?: st
 function assignPhysicalCardTx(db: SqliteDb, cardNumber: string, memberNumber: string, actor?: string, actorRole?: string, createdAt = formatDateTime()) {
   const code = cardNumber.trim();
   if (!code) throw new StoreError("กรุณายิงรหัสบัตร");
-  const card = db.prepare(`SELECT status AS status, assigned_member_number AS assignedMemberNumber FROM physical_cards WHERE card_number = ?`).get(code) as { status: PhysicalCardStatus; assignedMemberNumber: string | null } | undefined;
+  const card = db.prepare(`SELECT status AS status, assigned_member_number AS assignedMemberNumber FROM physical_cards WHERE card_number = ? AND archived_at IS NULL`).get(code) as { status: PhysicalCardStatus; assignedMemberNumber: string | null } | undefined;
   if (!card) throw new StoreError(`ไม่พบบัตร ${code} ในสต็อกบัตร · กรุณาเพิ่มบัตรเปล่าก่อน`);
   if (card.status === "assigned") throw new StoreError(`บัตร ${code} ถูกใช้กับสมาชิก ${card.assignedMemberNumber ?? ""} อยู่แล้ว`);
   if (card.status === "lost" || card.status === "damaged") throw new StoreError(`บัตร ${code} ใช้งานไม่ได้`);
@@ -779,11 +872,53 @@ export function bindExistingMembersToDemoCards(db: SqliteDb, actor: string) {
   });
 }
 
-export function releasePhysicalCard(db: SqliteDb, cardNumber: string, actor?: string, actorRole?: string, note?: string) {
+export function releasePhysicalCard(db: SqliteDb, cardNumber: string, actor?: string, actorRole?: string, note?: string, expectedSessionId?: number) {
+  return runInTransaction(db, () => {
+    if (expectedSessionId !== undefined) {
+      const session = db.prepare(`SELECT id FROM card_usage_sessions WHERE card_number = ? AND ended_at IS NULL`).get(cardNumber.trim()) as { id: number } | undefined;
+      if (session?.id !== expectedSessionId) throw new StoreError("บัตรมีการเปลี่ยนผู้ถือแล้ว กรุณาสแกนใหม่");
+    }
+    const holder = db.prepare(`SELECT balance FROM members WHERE card_number = ?`).get(cardNumber.trim()) as { balance: number } | undefined;
+    if (holder && holder.balance !== 0) throw new StoreError("กรุณาคืนเงินทั้งหมดหรือจัดการยอดค้างก่อนคืนบัตร");
+    return releasePhysicalCardTx(db, cardNumber, actor, actorRole, note);
+  });
+}
+
+/** Assign or replace a physical card without changing the member identity or money. */
+export function assignMemberCard(db: SqliteDb, input: {
+  memberNumber: string; cardNumber: string; expectedCardNumber: string | null;
+  expectedSessionId?: number; previousCardStatus?: "returned_vacant" | "lost" | "damaged";
+  actor?: string; actorRole?: string;
+}) {
+  return runInTransaction(db, () => {
+    const member = getMemberDetail(db, input.memberNumber)?.member;
+    if (!member) throw new StoreError("ไม่พบสมาชิก");
+    if (member.status !== "active") throw new StoreError("สมาชิกถูกระงับการใช้งาน");
+    if ((member.cardNumber || null) !== input.expectedCardNumber) throw new StoreError("บัตรสมาชิกมีการเปลี่ยนแปลง กรุณาโหลดข้อมูลใหม่");
+    if (member.cardNumber) throw new StoreError("กรุณาคืนเงินและคืนบัตรเดิมก่อนจ่ายบัตรใหม่");
+    if (member.cardNumber === input.cardNumber.trim()) throw new StoreError("กรุณาเลือกบัตรใบใหม่");
+    if (member.cardNumber) {
+      const session = db.prepare(`SELECT id FROM card_usage_sessions WHERE card_number = ? AND member_number = ? AND ended_at IS NULL`).get(member.cardNumber, input.memberNumber) as { id: number } | undefined;
+      if (input.expectedSessionId === undefined || session?.id !== input.expectedSessionId) throw new StoreError("รอบบัตรมีการเปลี่ยนแปลง กรุณาโหลดข้อมูลใหม่");
+      const oldStatus = input.previousCardStatus ?? "returned_vacant";
+      releasePhysicalCardTx(db, member.cardNumber, input.actor, input.actorRole, "เปลี่ยนบัตร · คงยอดเงินในบัญชีสมาชิก");
+      if (oldStatus !== "returned_vacant") {
+        db.prepare(`UPDATE physical_cards SET status = ? WHERE card_number = ?`).run(oldStatus, member.cardNumber);
+        db.prepare(`INSERT INTO card_assignments (card_number, member_number, action, actor, actor_role, created_at) VALUES (?, ?, ?, ?, ?, ?)`).run(member.cardNumber, input.memberNumber, oldStatus, input.actor ?? null, input.actorRole ?? null, formatDateTime());
+      }
+    }
+    assignPhysicalCardTx(db, input.cardNumber, input.memberNumber, input.actor, input.actorRole);
+    db.prepare(`UPDATE members SET card_number = ? WHERE member_number = ?`).run(input.cardNumber.trim(), input.memberNumber);
+    logAction(db, "จ่ายบัตรสมาชิก", input.actor || "ระบบ", `${input.memberNumber} · ${input.cardNumber.trim()}`, "blue", input.actorRole ?? null);
+    return getMemberDetail(db, input.memberNumber);
+  });
+}
+
+function releasePhysicalCardTx(db: SqliteDb, cardNumber: string, actor?: string, actorRole?: string, note?: string) {
   const code = cardNumber.trim();
   if (!code) throw new StoreError("กรุณาระบุรหัสบัตร");
   const createdAt = formatDateTime();
-  return runInTransaction(db, () => {
+  {
     const card = db.prepare(`SELECT status AS status, assigned_member_number AS assignedMemberNumber FROM physical_cards WHERE card_number = ?`).get(code) as { status: PhysicalCardStatus; assignedMemberNumber: string | null } | undefined;
     if (!card) throw new StoreError(`ไม่พบบัตร ${code} ในสต็อกบัตร`);
     if (card.status !== "assigned" || !card.assignedMemberNumber) throw new StoreError(`บัตร ${code} ไม่ได้ผูกกับสมาชิก`);
@@ -792,7 +927,7 @@ export function releasePhysicalCard(db: SqliteDb, cardNumber: string, actor?: st
     db.prepare(`INSERT INTO card_assignments (card_number, member_number, action, actor, actor_role, note, created_at) VALUES (?, ?, 'release', ?, ?, ?, ?)`).run(code, card.assignedMemberNumber, actor?.trim() || null, actorRole ?? null, note?.trim() || null, createdAt);
     logAction(db, "คืนบัตรหมุนเวียน", actor?.trim() || "ระบบ", `${code} · จากสมาชิก ${card.assignedMemberNumber}`, "amber", actorRole ?? null, createdAt);
     return getMemberDetail(db, card.assignedMemberNumber);
-  });
+  }
 }
 
 export function markPhysicalCard(db: SqliteDb, cardNumber: string, status: "lost" | "damaged", actor?: string, actorRole?: string, note?: string) {
@@ -807,6 +942,20 @@ export function markPhysicalCard(db: SqliteDb, cardNumber: string, status: "lost
     db.prepare(`UPDATE physical_cards SET status = ?, assigned_member_number = NULL, note = ?, updated_by = ?, updated_at = ? WHERE card_number = ?`).run(status, note?.trim() || null, actor?.trim() || null, createdAt, code);
     logAction(db, status === "lost" ? "แจ้งบัตรหาย" : "ทำบัตรชำรุด", actor?.trim() || "ระบบ", code, "red", actorRole ?? null, createdAt);
   });
+}
+
+export function returnMemberCard(db: SqliteDb, input: { memberNumber: string; cardNumber: string; expectedSessionId: number; mode: "refund"; actor?: string; actorRole?: string; clientRequestId?: string }) {
+  if (input.mode !== "refund") throw new StoreError("คืนบัตรต้องคืนเงินทั้งหมดก่อน");
+  const member = getMemberDetail(db, input.memberNumber)?.member;
+  const session = db.prepare(`SELECT id FROM card_usage_sessions WHERE card_number = ? AND member_number = ? AND ended_at IS NULL`).get(input.cardNumber, input.memberNumber) as { id: number } | undefined;
+  if (!member || member.cardNumber !== input.cardNumber || session?.id !== input.expectedSessionId) throw new StoreError("บัตรมีการเปลี่ยนผู้ถือแล้ว กรุณาสแกนใหม่");
+  if (member.status !== "active") throw new StoreError("สมาชิกถูกระงับการใช้งาน");
+  if (member.balance < 0) throw new StoreError("สมาชิกมียอดค้าง กรุณาจัดการยอดก่อนคืนบัตร");
+  if (input.mode === "refund" && member.balance > 0) {
+    walletTx(db, { memberNumber: input.memberNumber, type: "refund", amount: member.balance, actor: input.actor, actorRole: input.actorRole, clientRequestId: input.clientRequestId, note: "คืนเงินทั้งหมดและคืนบัตร" });
+    return getMemberDetail(db, input.memberNumber);
+  }
+  return releasePhysicalCard(db, input.cardNumber, input.actor, input.actorRole, "รับคืนบัตรยอดศูนย์", input.expectedSessionId);
 }
 
 
@@ -2526,6 +2675,10 @@ export function walletTx(db: SqliteDb, input: WalletTxInput) {
       slipImage,
       input.clientRequestId ?? null,
     );
+    // Record the refund in the holding round before closing and releasing the card.
+    if (input.type === "refund" && balanceAfter === 0 && member.cardNumber) {
+      releasePhysicalCardTx(db, member.cardNumber, actor, input.actorRole, "คืนเงินครบยอดและรับคืนบัตร");
+    }
     logAction(
       db,
       input.type === "deposit" ? "เติมเงินสมาชิก" : input.type === "refund" ? "คืนบัตรเงินสด" : "ถอนเงินสมาชิก",

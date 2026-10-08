@@ -281,10 +281,17 @@ const POS_RAIL_BUTTONS: {
     icon: ArrowUpFromLine,
   },
   {
-    key: "limit",
-    label: "ขอลดวงเงิน",
+    key: "card",
+    label: "คืน / จ่ายบัตร",
     kbd: "",
-    detail: "ขอลดวงเงินซื้อสินค้าต่อวันของสมาชิก — รอผู้บริหารพิจารณา",
+    detail: "คืนบัตร หรือจ่ายบัตรว่างให้สมาชิกเดิม",
+    icon: UsersRound,
+  },
+  {
+    key: "limit",
+    label: "ขอลดวงเงิน / คืนบัตร",
+    kbd: "",
+    detail: "คืนเงินทั้งหมดและคืนบัตร",
     icon: TrendingDown,
   },
   {
@@ -1180,11 +1187,16 @@ export function Settings({
   };
   const saveMutation = trpc.settings.set.useMutation({
     onSuccess: () => {
-      setSaved(true);
+      setSaved(false);
       setError("");
+      toast.success("บันทึกการตั้งค่าแล้ว");
       void utils.settings.get.invalidate();
     },
-    onError: mutationError => setError(getErrorMessage(mutationError)),
+    onError: mutationError => {
+      const message = getErrorMessage(mutationError);
+      setError(message);
+      toast.error("บันทึกไม่สำเร็จ", { description: message, duration: Infinity });
+    },
   });
   const updateForm = (patch: Partial<SettingsForm>) =>
     setForm(current => (current ? { ...current, ...patch } : current));

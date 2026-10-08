@@ -219,6 +219,24 @@ export function MemberRegistrationModal({
             className="form-grid compact-form"
             onKeyDownCapture={event => formEnterNav(event, submitRegister)}
           >
+            <label className="wide">
+              สแกนหรือกรอกรหัสบัตร *
+              <input
+                autoFocus
+                type="text"
+                value={registerForm.cardNumber}
+                onChange={event =>
+                  setRegisterForm({
+                    ...registerForm,
+                    cardNumber: event.target.value,
+                  })
+                }
+                placeholder="เช่น 2395100201"
+                name="cardNumber"
+                maxLength={100}
+                title="ใช้บัตรที่พร้อมใช้งานจากทะเบียนบัตร"
+              />
+            </label>
             <label>
               คำนำหน้า
               <input
@@ -378,22 +396,6 @@ export function MemberRegistrationModal({
                   })
                 }
                 placeholder="เช่น 08x-xxx-xxxx"
-              />
-            </label>
-            <label>
-              ยิงรหัสบัตรว่าง *
-              <input
-                value={registerForm.cardNumber}
-                onChange={event =>
-                  setRegisterForm({
-                    ...registerForm,
-                    cardNumber: event.target.value,
-                  })
-                }
-                placeholder="เช่น 2395100201"
-                name="cardNumber"
-                maxLength={100}
-                title="ใช้บัตรว่างจากหน้าจัดการบัตรเปล่า"
               />
             </label>
             <label>

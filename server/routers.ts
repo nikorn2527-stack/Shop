@@ -1,3 +1,4 @@
+import { previewGeneratedCards, generateBlankCards } from "./sqliteStore";
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
@@ -19,8 +20,11 @@ import { closeWelfareDb, getBackupDir, getWelfareDb, getWelfareDbPath } from "./
 import {
   LOGIN_MAX_FAILURES,
   listPhysicalCards,
+  cardUsageHistory,
   createBlankCards,
   releasePhysicalCard,
+  assignMemberCard,
+  returnMemberCard,
   markPhysicalCard,
   StoreError,
   appRoleThai,
@@ -1117,6 +1121,30 @@ export const appRouter = router({
   }),
 
   card: router({
+    previewNumbers: publicProcedure.input(z.object({ prefix: z.string().max(16), digits: z.number().int().min(3).max(10), count: z.number().int().min(1).max(500) })).query(({ ctx, input }) => withStoreErrors(() => {
+      requireAdmin(ctx);
+      return previewGeneratedCards(getWelfareDb(), input.prefix, input.digits, input.count);
+    })),
+    generate: publicProcedure.input(z.object({ prefix: z.string().max(16), digits: z.number().int().min(3).max(10), count: z.number().int().min(1).max(500) })).mutation(({ ctx, input }) => withStoreErrors(() => {
+      requireAdmin(ctx);
+      const { actor, actorRole } = resolveActor(ctx, {});
+      return generateBlankCards(getWelfareDb(), input.prefix, input.digits, input.count, actor, actorRole);
+    })),
+    return: publicProcedure.input(z.object({ memberNumber: z.string().trim().min(1), cardNumber: z.string().trim().min(1), expectedSessionId: z.number().int().positive(), mode: z.literal("refund"), clientRequestId: z.string().max(100).optional() })).mutation(({ ctx, input }) => withStoreErrors(() => {
+      requireLogin(ctx);
+      const { actor, actorRole } = resolveActor(ctx, {});
+      return returnMemberCard(getWelfareDb(), { ...input, actor, actorRole });
+    })),
+    assign: publicProcedure.input(z.object({ memberNumber: z.string().trim().min(1), cardNumber: z.string().trim().min(1).max(30), expectedCardNumber: z.string().nullable(), expectedSessionId: z.number().int().positive().optional(), previousCardStatus: z.enum(["returned_vacant", "lost", "damaged"]).optional() })).mutation(({ ctx, input }) => withStoreErrors(() => {
+      requireLogin(ctx);
+      if (input.previousCardStatus === "lost" || input.previousCardStatus === "damaged") requireAdmin(ctx);
+      const { actor, actorRole } = resolveActor(ctx, {});
+      return assignMemberCard(getWelfareDb(), { ...input, actor, actorRole });
+    })),
+    history: publicProcedure.input(z.object({ cardNumber: z.string().trim().min(1) })).query(({ ctx, input }) => {
+      requireLogin(ctx);
+      return cardUsageHistory(getWelfareDb(), input.cardNumber);
+    }),
     list: publicProcedure.input(z.object({ search: z.string().optional() }).optional()).query(({ ctx, input }) => {
       requireLogin(ctx);
       return listPhysicalCards(getWelfareDb(), "all", input?.search);

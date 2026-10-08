@@ -34,9 +34,13 @@ export function StockCountSheet({ products }: { products: SqliteProduct[] }) {
     <div className="stock-count-sheet report-doc" id="stock-count-sheet">
       <style>{REPORT_DOC_CSS}</style>
       <style>{`
+        .stock-count-sheet.report-doc { padding: 0; margin: 0; max-width: none; }
         .stock-count-sheet .scs-table { width: 100%; min-width: 0; table-layout: fixed; font-size: 12px; line-height: 1.5; }
         .stock-count-sheet .scs-table th, .stock-count-sheet .scs-table td { padding: 6px 4px; letter-spacing: 0; width: auto; }
         .stock-count-sheet .scs-table th { font-size: 11px; white-space: nowrap; overflow-wrap: normal; }
+        .stock-count-sheet .scs-table .scs-code { padding-right: 10px; }
+        .stock-count-sheet .scs-table .scs-name { padding-left: 10px; }
+        .stock-count-sheet .scs-table .scs-name b { overflow-wrap: break-word; word-break: normal; }
         .stock-count-sheet .scs-table :is(.scs-no, .scs-code, .scs-unit, .scs-num) { white-space: nowrap; overflow-wrap: normal; word-break: normal; }
         .stock-count-sheet .scs-table :is(.scs-name, .scs-note) { white-space: normal; overflow-wrap: break-word; word-break: normal; }
         .stock-count-sheet .scs-table td { height: 34px; }
@@ -66,13 +70,13 @@ export function StockCountSheet({ products }: { products: SqliteProduct[] }) {
       <table className="rd-table scs-table">
         <colgroup>
           <col style={{ width: "5%" }} />
-          <col style={{ width: "14%" }} />
-          <col style={{ width: "32%" }} />
+          <col style={{ width: "20%" }} />
+          <col style={{ width: "31%" }} />
           <col style={{ width: "8%" }} />
           <col style={{ width: "9%" }} />
           <col style={{ width: "9%" }} />
           <col style={{ width: "9%" }} />
-          <col style={{ width: "14%" }} />
+          <col style={{ width: "9%" }} />
         </colgroup>
         <thead>
           <tr>

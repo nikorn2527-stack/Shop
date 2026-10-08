@@ -4709,7 +4709,7 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 /* Use the report viewport's fixed A4 geometry; scale the whole document, not its table. */
 .a4-preview-content { width: 794px; min-height: 1123px; box-sizing: border-box; background: #fff; transform-origin: top left; }
 .print-preview-a4 .print-preview-paper { width: 794px; min-height: 1123px; box-sizing: border-box; padding: 30px; background: #fff; }
-.print-preview-a4 .print-preview-paper:has(.stock-count-sheet) { padding: 14mm; }
+.print-preview-a4 .print-preview-paper:has(.stock-count-sheet) { padding: 6mm; }
 .print-preview-a4 .export-doc-preview { min-height: 0; flex: 1 1 auto; }
 .print-preview-a4 > .modal-heading,
 .print-preview-a4 > .export-preview-summary,

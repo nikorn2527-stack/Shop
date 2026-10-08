@@ -40,7 +40,7 @@ try {
     return { width: table.getBoundingClientRect().width, fits: headers.every(n => n.scrollWidth <= n.clientWidth + 1) };
   });
   assert.ok(printed.width > 0 && printed.fits, JSON.stringify(printed));
-  await page.pdf({ path: path.join(cfg.dir, 'stock-count-columns-after.pdf'), format: 'A4', margin: { top: '14mm', bottom: '14mm', left: '14mm', right: '14mm' } });
+  await page.pdf({ path: path.join(cfg.dir, 'stock-count-columns-after.pdf'), format: 'A4', margin: { top: '6mm', bottom: '6mm', left: '6mm', right: '6mm' } });
   console.log('PASS stock count preview headers fit', JSON.stringify(result));
 } finally {
   await browser.close();

@@ -34,7 +34,7 @@ function App() {
         <TooltipProvider>
           {/* ROUND 37 (req 35) — ส่วนแจ้งเตือน: toast เด้งมุมขวาล่าง เหนือแผงสินค้า
               ไม่บังปุ่มชำระเงิน (อยู่ซ้าย) และเลื่อนพ้นแถบช่วยเหลือด้านล่าง */}
-          <Toaster position="bottom-right" offset={{ bottom: 84, right: 18 }} gap={9} visibleToasts={4} closeButton duration={3200} />
+          <Toaster position="top-right" offset={18} gap={9} visibleToasts={3} closeButton duration={4000} />
           {/* ROUND 78 (user) — กล่องแจ้งเตือนกลางจอสำหรับเหตุที่ทำงานต่อไม่ได้
               (สต็อกไม่พอ · เงินไม่พอ · บัตรถูกระงับ · ชำระเงินไม่สำเร็จ)
               toast มุมขวาล่างผู้ใช้มองไม่เห็น — ต้องขึ้นกลางจอให้ชัด */}
