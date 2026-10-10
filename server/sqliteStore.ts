@@ -740,8 +740,8 @@ export function cardUsageHistory(db: SqliteDb, cardNumber: string) {
     TRIM(m.first_name || ' ' || m.last_name) AS memberName, s.started_at AS startedAt, s.ended_at AS endedAt, s.opened_by AS openedBy,
     s.closed_by AS closedBy, s.opening_balance AS openingBalance, s.closing_balance AS closingBalance, s.legacy,
     COUNT(t.id) AS transactionCount,
-    COALESCE(SUM(CASE WHEN t.type IN ('deposit','activation') THEN ABS(t.amount) ELSE 0 END),0) AS incoming,
-    COALESCE(SUM(CASE WHEN t.type IN ('purchase','withdrawal','refund') THEN ABS(t.amount) ELSE 0 END),0) AS outgoing
+    COALESCE(SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END),0) AS incoming,
+    COALESCE(SUM(CASE WHEN t.amount < 0 THEN -t.amount ELSE 0 END),0) AS outgoing
     FROM card_usage_sessions s JOIN members m ON m.member_number = s.member_number
     LEFT JOIN member_transactions t ON t.card_usage_session_id = s.id
     WHERE s.card_number = ? GROUP BY s.id ORDER BY s.id DESC`).all(cardNumber) as unknown as CardUsageSession[];
@@ -4149,7 +4149,7 @@ export function listShifts(db: SqliteDb, status?: string): CashierShift[] {
 // ============================================================================
 
 export function voidSale(db: SqliteDb, input: { saleId: number; reason: string; actor?: string; actorRole?: string }): { reversed: boolean } {
-  const sale = db.prepare(`SELECT id, order_number AS orderNumber, total, payment_method AS paymentMethod, member_number AS memberNumber FROM sales WHERE id = ?`).get(input.saleId) as { id: number; orderNumber: string; total: number; paymentMethod: string; memberNumber: string | null } | undefined;
+  const sale = db.prepare(`SELECT id, order_number AS orderNumber, total, payment_method AS paymentMethod, member_number AS memberNumber, card_usage_session_id AS cardUsageSessionId FROM sales WHERE id = ?`).get(input.saleId) as { id: number; orderNumber: string; total: number; paymentMethod: string; memberNumber: string | null; cardUsageSessionId: number | null } | undefined;
   if (!sale) throw new StoreError("ไม่พบบิลนี้ในระบบ");
   if (!input.reason.trim()) throw new StoreError("ต้องระบุเหตุผลในการยกเลิก");
   const items = db.prepare(`SELECT product_id AS productId, qty, cost FROM sale_items WHERE sale_id = ?`).all(input.saleId) as { productId: number; qty: number; cost: number }[];
@@ -4187,7 +4187,7 @@ export function voidSale(db: SqliteDb, input: { saleId: number; reason: string; 
       if (member) {
         const newBalance = round2(member.balance + sale.total);
         db.prepare(`UPDATE members SET balance = ? WHERE member_number = ?`).run(newBalance, sale.memberNumber);
-        db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, balance_after, payment_method, actor, created_at) VALUES (?, 'refund', ?, ?, ?, ?, ?, ?)`).run(
+        const reversal = db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, balance_after, payment_method, actor, created_at, card_usage_session_id) VALUES (?, 'refund', ?, ?, ?, ?, ?, ?, ?)`).run(
           sale.memberNumber,
           `ยกเลิกบิล ${sale.orderNumber} · คืนเงิน ฿${sale.total.toFixed(2)} · ${input.reason}`,
           sale.total,
@@ -4195,7 +4195,11 @@ export function voidSale(db: SqliteDb, input: { saleId: number; reason: string; 
           sale.paymentMethod,
           input.actor ?? null,
           formatDateTime(),
+          sale.cardUsageSessionId,
         );
+        // The legacy insert trigger links NULL to the currently open round.
+        // A reversal belongs to the sale's round, including an unknown legacy round.
+        db.prepare(`UPDATE member_transactions SET card_usage_session_id = ? WHERE id = ?`).run(sale.cardUsageSessionId, Number(reversal.lastInsertRowid));
       }
     }
     // Mark sale as voided

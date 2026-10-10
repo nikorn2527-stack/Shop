@@ -1,10 +1,36 @@
 import { describe, expect, it } from "vitest";
-import { assignMemberCard } from "./sqliteStore";
+import { assignMemberCard, checkout, createProduct, receiveStockLines, voidSale } from "./sqliteStore";
 import { generateBlankCards, previewGeneratedCards } from "./sqliteStore";
 import { returnMemberCard } from "./sqliteStore";
 import { createSqliteStore, createBlankCards, registerMember, releasePhysicalCard, listPhysicalCards, markPhysicalCard, getMemberDetail, setSettings, setMemberNumberMode, bindExistingMembersToDemoCards, cardUsageHistory, walletTx, setMemberStatus } from "./sqliteStore";
 
 describe("reusable physical cards", () => {
+  it("attributes a cancelled wallet sale to its original card round after the card is reused", () => {
+    const db = createSqliteStore();
+    try {
+      createBlankCards(db, ["VOID-ROUND", "RETURNING-HOLDER"]);
+      const first = registerMember(db, { firstName: "Original", lastName: "Holder", cardNumber: "VOID-ROUND", initialDeposit: 100 }).member;
+      const product = createProduct(db, { name: "Reversal fixture", price: 20, stock: 0, cost: 5 });
+      receiveStockLines(db, { productId: product.id, paidAmount: 10, lines: [{ qty: 2, cost: 5 }] });
+      const sale = checkout(db, { items: [{ productId: product.id, qty: 1 }], paymentMethod: "หักบัญชีสมาชิก", memberNumber: first.memberNumber });
+      const saleId = (db.prepare("SELECT id FROM sales WHERE order_number = ?").get(sale.orderNumber) as { id: number }).id;
+      const originalRound = cardUsageHistory(db, "VOID-ROUND").sessions[0];
+      returnMemberCard(db, { memberNumber: first.memberNumber, cardNumber: "VOID-ROUND", expectedSessionId: originalRound.id, mode: "refund" });
+      const second = registerMember(db, { firstName: "Next", lastName: "Holder", cardNumber: "VOID-ROUND", initialDeposit: 50 }).member;
+      assignMemberCard(db, { memberNumber: first.memberNumber, cardNumber: "RETURNING-HOLDER", expectedCardNumber: null });
+      const otherRound = cardUsageHistory(db, "RETURNING-HOLDER");
+      voidSale(db, { saleId, reason: "Wrong item", actor: "Supervisor" });
+      expect(getMemberDetail(db, first.memberNumber)?.member.balance).toBe(20);
+      expect(getMemberDetail(db, second.memberNumber)?.member.balance).toBe(50);
+      const history = cardUsageHistory(db, "VOID-ROUND");
+      expect(history.sessions.find(round => round.id === originalRound.id)).toMatchObject({ closingBalance: 0, incoming: 120, outgoing: 100, transactionCount: 4 });
+      expect(history.transactions.find(tx => tx.detail.includes("ยกเลิกบิล"))).toMatchObject({ sessionId: originalRound.id, amount: 20 });
+      expect(cardUsageHistory(db, "RETURNING-HOLDER")).toEqual(otherRound);
+      expect(() => voidSale(db, { saleId, reason: "Retry" })).toThrow();
+      expect(getMemberDetail(db, first.memberNumber)?.member.balance).toBe(20);
+      expect(db.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+    } finally { db.close(); }
+  });
   it("hides archived cards and blocks assignment without deleting history", () => {
     const db = createSqliteStore();
     try {
