@@ -38,5 +38,17 @@ To prevent breaking other parts of the system when fixing a specific module:
 2. **Backward Compatibility:** Ensure your modifications do not change the expected inputs/outputs of shared functions in a way that breaks existing dependents. 
 3. **Cross-Module Verification:** If a global/shared file was modified, briefly navigate to at least one other major menu/module that uses it to verify it hasn't been negatively affected. If a side effect is detected, revert the change and find a localized solution instead.
 
+### 3.6. Natural Human-Centric UI Copy
+Whenever you add or modify text in the UI (labels, buttons, placeholders, tooltips, error messages, or success alerts):
+- **Avoid AI-Speak & Robotic Tone:** Do not use overly formal, rigid, or mechanical phrasing (e.g., avoid "Please be informed that", "System error occurred", "Successfully executed").
+- **Be Conversational & Concise:** Use natural, everyday language that a real human would use to guide another human. (e.g., use "Save changes" instead of "Execute update", or "We couldn't find that device" instead of "Device data not found in database").
+- **Contextual Tone:** Keep error messages friendly and helpful. If working on a Thai language UI, use natural, modern Thai phrasing without sounding like a textbook translation.
+
+### 3.7. UI Consistency & Design System Adherence
+To maintain a unified and professional look across the entire application:
+- **Use Global Components:** Before building a new Modal, Dialog, Popup, Table, or Form, you MUST search the codebase for existing shared/base components (e.g., `BaseModal`, `GlobalDialog`, `AppTable`) and reuse them. Do NOT create custom, isolated UI components if a global one already exists.
+- **Consistent Layout Structure:** Ensure the layout structure matches the rest of the application. For example, if search bars and filter buttons are globally placed on the top-right corner above tables, the menu you are working on must follow this exact same placement and spacing.
+- **Visual Uniformity:** Padding, margins, border-radius, shadows, and button placements (e.g., Confirm/Cancel positioning in dialogs) must be identical to the rest of the app.
+
 4. Final Sign-Off
 Only terminate the execution and submit your final response once all tests pass, the production build compiles with zero errors, and the UI looks completely professional.
