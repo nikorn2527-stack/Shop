@@ -32,5 +32,11 @@ Safety Limit: Limit this self-healing loop to a maximum of 5 iterations per spec
 
 Loop Until Flawless: Repeat this cycle continuously on your own until the project achieves a 100% perfect, production-ready state (within the limit).
 
+### 3.5. Impact Radius & Regression Prevention
+To prevent breaking other parts of the system when fixing a specific module:
+1. **Dependency Check:** Before modifying any shared component, utility function, state management file, or API endpoint, perform a global search (e.g., `grep` or VS Code search) to find all other files that import or depend on it.
+2. **Backward Compatibility:** Ensure your modifications do not change the expected inputs/outputs of shared functions in a way that breaks existing dependents. 
+3. **Cross-Module Verification:** If a global/shared file was modified, briefly navigate to at least one other major menu/module that uses it to verify it hasn't been negatively affected. If a side effect is detected, revert the change and find a localized solution instead.
+
 4. Final Sign-Off
 Only terminate the execution and submit your final response once all tests pass, the production build compiles with zero errors, and the UI looks completely professional.

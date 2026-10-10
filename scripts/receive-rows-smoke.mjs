@@ -7,7 +7,7 @@ import { spawn } from 'node:child_process';
 import { DatabaseSync, backup } from 'node:sqlite';
 import puppeteer from 'puppeteer';
 import XLSX from 'xlsx';
-import { createAppSession, createBlankCards, assignMemberCard, stockReceiptHistory } from '../server/sqliteStore.ts';
+import { createAppSession, createBlankCards, assignMemberCard, stockReceiptHistory, setSettings } from '../server/sqliteStore.ts';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stock-intake-audit-'));
 const dbPath = path.join(dir, 'test.sqlite');
@@ -15,6 +15,9 @@ const source = new DatabaseSync(path.resolve('data/welfare-store.sqlite'), { rea
 await backup(source, dbPath);
 source.close();
 const db = new DatabaseSync(dbPath);
+// Keep inventory actions enabled in the isolated fixture regardless of local
+// shortcut preferences. Never change the source database's menu settings.
+setSettings(db, { posRailHidden: '[]' }, 'Inventory audit fixture');
 const user = db.prepare("SELECT id FROM app_users WHERE active=1 AND role IN ('dev','admin','administrator','manager') LIMIT 1").get();
 assert.ok(user, 'Test requires an existing administrator');
 const session = createAppSession(db, user.id);
@@ -61,6 +64,7 @@ try {
   assert.ok(pos.asElement());
   await pos.asElement().click();
   await page.waitForSelector('.pos-head');
+  await page.waitForFunction(() => document.querySelectorAll('.pos-rail-more .rail-btn').length >= 2);
   const inventoryLabels = await page.$$eval('.pos-rail-more .rail-btn', nodes => nodes.map(n => n.querySelector('b')?.textContent));
   assert.ok(inventoryLabels.includes('เพิ่มสินค้าใหม่'));
   assert.ok(inventoryLabels.includes('รับเข้าสินค้า'));
@@ -172,11 +176,32 @@ try {
   const sourceUnchanged = new DatabaseSync(dbPath, {readOnly:true});
   try { assert.equal(sourceUnchanged.prepare("SELECT id FROM products WHERE barcode='INLINE-AUDIT'").get(), undefined); } finally { sourceUnchanged.close(); }
   const createButton = await page.evaluateHandle(() => [...document.querySelectorAll('.receive-unknown-product button')].find(n => n.textContent.trim() === 'เพิ่มสินค้าใหม่'));
-  await createButton.asElement().click(); await page.waitForSelector('.receive-inline-new .receive-new-required input');
-  const fields = await page.$$('.receive-inline-new .receive-new-required input');
+  await createButton.asElement().click(); await page.waitForSelector('.form-modal:not(.stock-receive-modal) .form-grid');
+  const addScope = '.form-modal:not(.stock-receive-modal)';
+  assert.ok(await page.$eval(addScope, n => n.textContent.includes('จะสร้างสินค้าและเพิ่มสต็อกเมื่อกดบันทึกรับเข้าทั้งหมด')));
+  for (const viewport of [{ width: 1366, height: 768 }, { width: 390, height: 844 }]) {
+    await page.setViewport(viewport);
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), 'Shared add popup does not overflow');
+    await page.$eval(addScope, n => { n.scrollTop = n.scrollHeight; });
+    await page.screenshot({ path: path.join(dir, `shared-add-receive-${viewport.width}.png`) });
+  }
+  await page.setViewport({ width: 1366, height: 768 });
+  const fields = await page.$$(`${addScope} .form-grid > label.wide input`);
   assert.equal(await fields[0].evaluate(n => n.value), 'INLINE-AUDIT');
-  await fields[1].type('Inline audit product'); await fields[2].type('25');
-  const useButton = await page.evaluateHandle(() => [...document.querySelectorAll('.receive-inline-new button')].find(n => n.textContent.includes('ใช้สินค้านี้')));
+  await fields[1].type('Cancelled draft');
+  const cancelAdd = await page.evaluateHandle(scope => [...document.querySelectorAll(`${scope} .modal-actions button`)].find(n => n.textContent.trim() === 'ยกเลิก'), addScope);
+  await cancelAdd.asElement().click();
+  await page.waitForFunction(scope => !document.querySelector(scope), {}, addScope);
+  assert.equal(await page.$$eval('.receive-main-row', ns => ns.length), 1, 'Cancel add keeps the existing receipt row');
+  const reopenAdd = await page.evaluateHandle(() => [...document.querySelectorAll('.receive-scan-toolbar button')].find(n => n.textContent.trim() === 'เพิ่มสินค้าใหม่'));
+  assert.ok(reopenAdd.asElement()); await reopenAdd.asElement().click();
+  await page.waitForSelector(`${addScope} .form-grid`);
+  const reopened = await page.$$(`${addScope} .form-grid > label.wide input`);
+  assert.equal(await reopened[1].evaluate(n => n.value), '', 'New attempt does not reuse cancelled fields');
+  await reopened[0].type('INLINE-AUDIT'); await reopened[1].type('Inline audit product');
+  const priceInput = await page.evaluateHandle(scope => [...document.querySelectorAll(`${scope} label`)].find(n => n.textContent.startsWith('ราคาขาย'))?.querySelector('input'), addScope);
+  await priceInput.asElement().click({ clickCount: 3 }); await priceInput.asElement().type('25');
+  const useButton = await page.evaluateHandle(scope => [...document.querySelectorAll(`${scope} button`)].find(n => n.textContent.includes('ใช้สินค้านี้ในรายการรับเข้า')), addScope);
   await useButton.asElement().click();
   await page.waitForFunction(() => document.querySelector('.receive-item-editor h3')?.textContent.includes('Inline audit product'));
   await draftFill('#receive-editor-qty','4'); await draftFill('#receive-editor-paid','40');
