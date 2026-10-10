@@ -172,11 +172,9 @@ try {
   await page.screenshot({path:path.join(dir,'receipt-editable-rows.png')});
   await fill(productInput, 'INLINE-AUDIT');
   await page.keyboard.press('Enter');
-  await page.waitForSelector('.receive-unknown-product');
+  await page.waitForSelector('.form-modal:not(.stock-receive-modal) .form-grid');
   const sourceUnchanged = new DatabaseSync(dbPath, {readOnly:true});
   try { assert.equal(sourceUnchanged.prepare("SELECT id FROM products WHERE barcode='INLINE-AUDIT'").get(), undefined); } finally { sourceUnchanged.close(); }
-  const createButton = await page.evaluateHandle(() => [...document.querySelectorAll('.receive-unknown-product button')].find(n => n.textContent.trim() === 'เพิ่มสินค้าใหม่'));
-  await createButton.asElement().click(); await page.waitForSelector('.form-modal:not(.stock-receive-modal) .form-grid');
   const addScope = '.form-modal:not(.stock-receive-modal)';
   assert.ok(await page.$eval(addScope, n => n.textContent.includes('จะสร้างสินค้าและเพิ่มสต็อกเมื่อกดบันทึกรับเข้าทั้งหมด')));
   for (const viewport of [{ width: 1366, height: 768 }, { width: 390, height: 844 }]) {
@@ -193,6 +191,18 @@ try {
   await cancelAdd.asElement().click();
   await page.waitForFunction(scope => !document.querySelector(scope), {}, addScope);
   assert.equal(await page.$$eval('.receive-main-row', ns => ns.length), 1, 'Cancel add keeps the existing receipt row');
+  // The same entry flow also resolves an existing barcode without creating a duplicate.
+  const resolveExisting = await page.evaluateHandle(() => [...document.querySelectorAll('.receive-scan-toolbar button')].find(n => n.textContent.trim() === 'เพิ่มสินค้าใหม่'));
+  await resolveExisting.asElement().click();
+  await page.waitForSelector(`${addScope} .form-grid`);
+  await fill(`${addScope} .form-grid > label.wide input`, product.barcode);
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(scope => !document.querySelector(scope), {}, addScope);
+  await page.waitForFunction(name => document.querySelector('.receive-item-editor h3')?.textContent.includes(name), {}, product.name);
+  assert.equal(await page.$eval('#receive-editor-qty', n => n.value), '', 'Existing barcode loads its product with no prefixed quantity');
+  const clearExisting = await page.evaluateHandle(() => [...document.querySelectorAll('.receive-item-editor button')].find(n => n.textContent.includes('ล้าง')));
+  await clearExisting.asElement().click();
+  console.log('EXISTING_BARCODE_REUSES_RECEIPT_FLOW_PASS');
   const reopenAdd = await page.evaluateHandle(() => [...document.querySelectorAll('.receive-scan-toolbar button')].find(n => n.textContent.trim() === 'เพิ่มสินค้าใหม่'));
   assert.ok(reopenAdd.asElement()); await reopenAdd.asElement().click();
   await page.waitForSelector(`${addScope} .form-grid`);

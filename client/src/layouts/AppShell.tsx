@@ -609,7 +609,7 @@ export function AppShell({
             <button
               type="button"
               className="rail-btn rail-inventory"
-              title="รับเข้าสินค้าจากหน้า POS โดยตรง (F9)"
+              title={`${INVENTORY_ACTION_LABELS.receive}จากหน้า POS โดยตรง (${shortcutLabel("receive", "F9")})`}
               onClick={() =>
                 window.dispatchEvent(
                   new CustomEvent("pos-rail", { detail: "receive" })
@@ -625,7 +625,7 @@ export function AppShell({
             <button
               type="button"
               className="rail-btn rail-add"
-              title="เพิ่มสินค้าใหม่จากหน้า POS โดยตรง (F10)"
+              title={`${INVENTORY_ACTION_LABELS.add}จากหน้า POS โดยตรง (${shortcutLabel("add", "F10")})`}
               onClick={() =>
                 window.dispatchEvent(
                   new CustomEvent("pos-rail", { detail: "add" })

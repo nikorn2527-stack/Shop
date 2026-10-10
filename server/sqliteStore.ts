@@ -1,5 +1,6 @@
 import { memberNumberHead, nextMemberNumberSequence, type MemberNumberFormat } from "../shared/memberNumber";
 import { allocateInventoryCost } from "./inventoryValuation";
+import { INVENTORY_ACTION_LABELS } from "../shared/inventoryActions";
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
 import { mkdirSync, statSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -3937,7 +3938,7 @@ export const PERMISSION_CATALOG: { key: PermissionKey; group: string; descriptio
   { key: "POS.DISCOUNT", group: "POS", description: "ให้ส่วนลดบิล" },
   { key: "POS.SPECIAL", group: "POS", description: "เปิดรายการพิเศษ" },
   { key: "STOCK.VIEW", group: "STOCK", description: "ดูสต็อก" },
-  { key: "STOCK.RECEIVE", group: "STOCK", description: "รับสินค้าเข้า" },
+  { key: "STOCK.RECEIVE", group: "STOCK", description: INVENTORY_ACTION_LABELS.receive },
   { key: "STOCK.ADJUST", group: "STOCK", description: "ปรับยอดสต็อก" },
   { key: "STOCK.COUNT", group: "STOCK", description: "นับสต็อก" },
   { key: "STOCK.TRANSFER", group: "STOCK", description: "โอนสินค้าระหว่างคลัง" },

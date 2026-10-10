@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Keyboard, X } from "@/lib/icons";
+import { INVENTORY_ACTION_LABELS } from "@/lib/inventoryActions";
 
 /**
  * KeyboardShortcutsOverlay — discoverable in-app help overlay listing all
@@ -40,8 +41,8 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: "F6", desc: "ลงทะเบียนสมาชิกใหม่ + พิมพ์บัตร", tag: "POS" },
       { keys: "F7", desc: "จัดแผงลัดหน้าร้าน (เลือกสินค้าที่หยิบบ่อย)", tag: "POS" },
       { keys: "F8", desc: "โฟกัสช่องสแกนบาร์โค้ด", tag: "POS" },
-      { keys: "F9", desc: "รับเข้าสินค้าจาก POS โดยตรง", tag: "POS" },
-      { keys: "F10", desc: "เพิ่มสินค้าใหม่จาก POS โดยตรง", tag: "POS" },
+      { keys: "F9", desc: `${INVENTORY_ACTION_LABELS.receive}จาก POS โดยตรง`, tag: "POS" },
+      { keys: "F10", desc: `${INVENTORY_ACTION_LABELS.add}จาก POS โดยตรง`, tag: "POS" },
       { keys: "F9", desc: "ที่หน้าภาพรวม — เปิดเมนูหลัก", tag: "Global" },
     ],
   },
