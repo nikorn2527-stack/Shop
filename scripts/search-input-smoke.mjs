@@ -97,10 +97,14 @@ try {
   }
   assert.equal(await page.$eval(productInput, n => n.inputMode), 'text');
   await page.keyboard.press('Enter');
-  await page.waitForSelector('.receive-confirm-card');
-  const close = await page.evaluateHandle(() => [...document.querySelectorAll('.stock-receive-modal button')].find(n => n.textContent.includes('ยกเลิก')));
+  await page.waitForSelector('.receive-item-editor');
+  // Closing a selected draft first asks whether it should be discarded.
+  const close = await page.evaluateHandle(() => document.querySelector('.stock-receive-modal .modal-heading button'));
   assert.ok(close.asElement());
   await close.asElement().click();
+  const discard = await page.evaluateHandle(() => [...document.querySelectorAll('button')].find(n => n.getClientRects().length && n.textContent.trim() === 'ทิ้งรายการและปิดหน้าต่าง') ?? null);
+  if (discard.asElement()) await discard.asElement().click();
+  await discard.dispose();
   await page.waitForFunction(() => !document.querySelector('.stock-receive-modal'));
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('pos-rail', { detail: 'limit' })));
   const memberInput = '#pos-limit-member';

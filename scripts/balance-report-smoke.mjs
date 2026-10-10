@@ -128,7 +128,9 @@ try {
   await page.waitForFunction(() => !document.querySelector('.export-preview-modal'));
   await page.waitForSelector('[data-testid=include-zero-balances]', { visible: true });
   await page.click('[data-testid=include-zero-balances]');
-  const search = '#member-balances-report input[aria-label="ค้นหารายงานยอดเงินในบัตร"]';
+  // SharedSearch renders the active report input in the page header via a portal.
+  // Locate the accessible input rather than assuming it remains inside the table panel.
+  const search = 'input[aria-label="ค้นหารายงานยอดเงินในบัตร"]';
   await page.waitForSelector(search);
   await page.type(search, 'ZZZ-NOT-A-MEMBER-9999');
   await page.waitForFunction(() => document.body.innerText.includes('ไม่พบสมาชิกตามเงื่อนไข'));

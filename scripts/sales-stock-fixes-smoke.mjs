@@ -6,7 +6,7 @@ import { spawn } from 'node:child_process';
 import net from 'node:net';
 import { DatabaseSync, backup } from 'node:sqlite';
 import puppeteer from 'puppeteer';
-import { createAppSession, checkout, createSqliteStore, receiveStockLines } from '../server/sqliteStore.ts';
+import { createAppSession, checkout, createSqliteStore, receiveStockLines, setSettings } from '../server/sqliteStore.ts';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sales-stock-fixes-'));
 const dbPath = path.join(dir, 'test.sqlite');
@@ -14,6 +14,9 @@ const source = new DatabaseSync(path.resolve('data/welfare-store.sqlite'), { rea
 await backup(source, dbPath);
 source.close();
 const db = new DatabaseSync(dbPath);
+// Exercise inventory shortcuts even when the source user's preferences hide them.
+// This setting applies only to the isolated copy.
+setSettings(db, { posRailHidden: '[]' }, 'Isolated shortcut audit');
 const user = db.prepare("SELECT id FROM app_users WHERE active=1 AND role IN ('dev','admin','administrator','manager') ORDER BY id LIMIT 1").get();
 assert.ok(user);
 const session = createAppSession(db, user.id);
