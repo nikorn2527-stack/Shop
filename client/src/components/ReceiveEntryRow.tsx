@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ExpiryDateInput } from "./ExpiryDateInput";
 import { normalizeExpiryDate } from "@shared/expiryDate";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "./ui/dialog";
 
 type Entry = { lot: string; expiry: string; purchaseQty: string; freeQty: string; paidAmount: string };
 export function ReceiveEntryRow({ entry, index, name, code, unit, busy, onUpdate, onRemove }: {
@@ -24,21 +25,26 @@ export function ReceiveEntryRow({ entry, index, name, code, unit, busy, onUpdate
   };
   return <>
     <tr className="receive-main-row">
-      <td><b>{name}</b><small>{code}</small></td>
-      <td>{entry.purchaseQty}<small>{unit || "หน่วย"}{Number(entry.freeQty) > 0 ? ` · รับรวม ${total}` : ""}</small></td>
-      <td>฿{Number(entry.paidAmount).toFixed(2)}<small>ต้นทุน {total > 0 ? (Number(entry.paidAmount) / total).toFixed(2) : "0.00"} / {unit || "หน่วย"}</small></td>
-      <td>{entry.freeQty || "0"}</td><td>{entry.lot || "อัตโนมัติ"}</td><td>{entry.expiry || "ไม่ระบุ"}</td>
+      <td><b title={name}>{name}</b>{code && <small> · {code}</small>}</td>
+      <td>{entry.purchaseQty} {unit || "หน่วย"}</td>
+      <td>{entry.freeQty || "0"} {unit || "หน่วย"}</td>
+      <td>฿{Number(entry.paidAmount).toFixed(2)} <small>· ต้นทุน {total > 0 ? (Number(entry.paidAmount) / total).toFixed(2) : "0.00"}/{unit || "หน่วย"}</small></td>
+      <td>{entry.lot || "อัตโนมัติ"}</td><td>{entry.expiry || "ไม่ระบุ"}</td>
       <td><div className="receive-row-actions"><button type="button" className="outline-button" disabled={busy} aria-label={`แก้ไขรายการ ${row}`} onClick={() => { setDraft({ ...entry }); setError(""); }}>แก้ไข</button><button type="button" className="icon-button" disabled={busy} aria-label={`นำรายการ ${row} ออก`} onClick={onRemove}>×</button></div></td>
     </tr>
-    {draft && <tr className="receive-edit-row"><td colSpan={7}>
+    <Dialog open={draft !== null} onOpenChange={open => { if (!open && !busy) { setDraft(null); setError(""); } }}>
+      {draft && <DialogContent className="receive-entry-edit-modal" showCloseButton={!busy} onPointerDownOutside={event => event.preventDefault()} onEscapeKeyDown={event => { if (busy) event.preventDefault(); }}>
+      <DialogTitle>แก้ไขรายการรับเข้า</DialogTitle>
+      <DialogDescription>{name} · แก้จำนวนและต้นทุนของรายการรับเข้ารอบนี้ ไม่ใช่ข้อมูลหลักสินค้า</DialogDescription>
       <div className="receive-row-edit-form">
         <label>จำนวนซื้อ *<input autoFocus type="number" min="1" step="1" aria-label={`จำนวนซื้อรายการ ${row}`} value={draft.purchaseQty} disabled={busy} onFocus={e => e.currentTarget.select()} onChange={e => update("purchaseQty", e.target.value)} /></label>
-        <label>ยอดจ่ายทั้งหมด *<input type="number" min="0" step="0.01" aria-label={`ยอดจ่ายรายการ ${row}`} value={draft.paidAmount} disabled={busy} onFocus={e => e.currentTarget.select()} onChange={e => update("paidAmount", e.target.value)} /></label>
         <label>จำนวนแถม<input type="number" min="0" step="1" aria-label={`จำนวนแถมรายการ ${row}`} value={draft.freeQty} disabled={busy} onFocus={e => e.currentTarget.select()} onChange={e => update("freeQty", e.target.value)} /></label>
+        <label>ยอดจ่ายทั้งหมด *<input type="number" min="0" step="0.01" aria-label={`ยอดจ่ายรายการ ${row}`} value={draft.paidAmount} disabled={busy} onFocus={e => e.currentTarget.select()} onChange={e => update("paidAmount", e.target.value)} /></label>
         <label>Lot<input aria-label={`Lot รายการ ${row}`} value={draft.lot} disabled={busy} onChange={e => update("lot", e.target.value)} /></label>
         <label>วันหมดอายุ<ExpiryDateInput value={draft.expiry} disabled={busy} onChange={value => update("expiry", value)} label={`วันหมดอายุรายการ ${row}`} /></label>
         <div className="receive-editor-actions"><button type="button" className="primary-button" disabled={busy} aria-label={`บันทึกแก้ไขรายการ ${row}`} onClick={save}>บันทึกแก้ไข</button><button type="button" className="outline-button" disabled={busy} onClick={() => { setDraft(null); setError(""); }}>ยกเลิกแก้ไข</button></div>
       </div>{error && <p role="alert">{error}</p>}
-    </td></tr>}
+      </DialogContent>}
+    </Dialog>
   </>;
 }

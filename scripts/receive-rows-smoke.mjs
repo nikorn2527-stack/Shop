@@ -138,24 +138,33 @@ try {
   await page.click('[data-add-receipt]');
   await page.waitForSelector('.receive-entry-table tbody tr');
   assert.equal(await page.$$eval('.receive-entry-table thead th', nodes => nodes.length), 7);
+  assert.deepEqual(await page.$$eval('.receive-entry-table thead th', nodes => nodes.slice(1, 4).map(n => n.textContent)), ['จำนวนซื้อ', 'จำนวนแถม', 'ยอดจ่าย (บาท)']);
+  assert.ok(await page.$eval('.receive-main-row', n => [...n.querySelectorAll('td')].every(td => getComputedStyle(td).whiteSpace === 'nowrap')), 'Summary values stay on one line');
   assert.equal(await page.$('[aria-label="รายละเอียดรายการ 1"]'), null);
 
   const fill = async (selector, value) => { await page.$eval(selector, n => n.select()); await page.keyboard.press('Backspace'); await page.type(selector, value); };
   assert.equal(await page.$('.receive-main-row input'), null, 'Completed rows are read-only');
   await page.click('[aria-label="แก้ไขรายการ 1"]');
-  await fill('.receive-entry-table input[aria-label="จำนวนซื้อรายการ 1"]', '9');
-  const cancelEdit = await page.evaluateHandle(() => [...document.querySelectorAll('.receive-edit-row button')].find(n => n.textContent.includes('ยกเลิกแก้ไข')));
+  await page.waitForSelector('.receive-entry-edit-modal[role="dialog"]');
+  assert.equal(await page.$('.receive-edit-row'), null, 'Editing must not expand the table');
+  await page.screenshot({ path: path.join(dir, 'receive-edit-popup-desktop.png') });
+  await page.setViewport({ width: 390, height: 844 });
+  assert.ok(await page.$eval('.receive-entry-edit-modal', n => n.scrollWidth <= n.clientWidth + 1), 'Edit popup does not overflow horizontally');
+  await page.screenshot({ path: path.join(dir, 'receive-edit-popup-mobile.png') });
+  await page.setViewport({ width: 1440, height: 1000 });
+  await fill('.receive-entry-edit-modal input[aria-label="จำนวนซื้อรายการ 1"]', '9');
+  const cancelEdit = await page.evaluateHandle(() => [...document.querySelectorAll('.receive-entry-edit-modal button')].find(n => n.textContent.includes('ยกเลิกแก้ไข')));
   await cancelEdit.asElement().click();
   assert.ok(await page.$eval('.receive-main-row td:nth-child(2)', n => n.textContent.startsWith('3')), 'Cancel preserves original quantity');
   await page.click('[aria-label="แก้ไขรายการ 1"]');
-  await fill('.receive-entry-table input[aria-label="Lot รายการ 1"]', 'ROW-LOT-001');
-  await fill('.receive-entry-table input[aria-label="จำนวนซื้อรายการ 1"]', '3');
-  await fill('.receive-entry-table input[aria-label="ยอดจ่ายรายการ 1"]', '15');
-  assert.equal(await page.$eval('.receive-entry-table input[aria-label="Lot รายการ 1"]', n => n.value), 'ROW-LOT-001');
+  await fill('.receive-entry-edit-modal input[aria-label="Lot รายการ 1"]', 'ROW-LOT-001');
+  await fill('.receive-entry-edit-modal input[aria-label="จำนวนซื้อรายการ 1"]', '3');
+  await fill('.receive-entry-edit-modal input[aria-label="ยอดจ่ายรายการ 1"]', '15');
+  assert.equal(await page.$eval('.receive-entry-edit-modal input[aria-label="Lot รายการ 1"]', n => n.value), 'ROW-LOT-001');
   assert.ok(await page.$eval('.receive-entry-table tfoot', n => n.textContent.includes('15.00')));
-  await fill('.receive-entry-table input[aria-label="วันหมดอายุรายการ 1"]', '31/12/2570');
+  await fill('.receive-entry-edit-modal input[aria-label="วันหมดอายุรายการ 1"]', '31/12/2570');
   await page.click('[aria-label="บันทึกแก้ไขรายการ 1"]');
-  await page.waitForFunction(() => !document.querySelector('.receive-edit-row'));
+  await page.waitForFunction(() => !document.querySelector('.receive-entry-edit-modal'));
   await page.screenshot({path:path.join(dir,'receipt-editable-rows.png')});
   await fill(productInput, 'INLINE-AUDIT');
   await page.keyboard.press('Enter');
@@ -205,18 +214,20 @@ try {
   const save = await page.evaluateHandle(() => [...document.querySelectorAll('.stock-receive-modal button')].find(node => node.textContent.includes('บันทึกทั้งหมด')));
   assert.ok(save.asElement(), 'Save all receipts button exists');
   await page.click('[aria-label="แก้ไขรายการ 2"]');
-  await fill('.receive-entry-table input[aria-label="จำนวนซื้อรายการ 2"]', '0');
+  await fill('.receive-entry-edit-modal input[aria-label="จำนวนซื้อรายการ 2"]', '0');
   await page.$eval('[aria-label="บันทึกแก้ไขรายการ 2"]', n => n.scrollIntoView({ block: 'center' }));
   await page.click('[aria-label="บันทึกแก้ไขรายการ 2"]');
-  await page.waitForFunction(() => document.querySelector('.receive-edit-row [role=alert]')?.textContent.includes('กรุณาตรวจจำนวน'));
-  await save.asElement().click();
+  await page.waitForFunction(() => document.querySelector('.receive-entry-edit-modal [role=alert]')?.textContent.includes('กรุณาตรวจจำนวน'));
+  // A real click is blocked by the popup; invoke the handler to verify its
+  // additional guard also prevents submitting stale drafts programmatically.
+  await save.asElement().evaluate(n => n.click());
   await page.waitForFunction(() => document.querySelector('.stock-receive-modal')?.textContent.includes('กรุณาบันทึกหรือยกเลิกการแก้ไข'));
   const unchanged = new DatabaseSync(dbPath, { readOnly: true });
   try {
     assert.equal(unchanged.prepare('SELECT stock FROM products WHERE id=?').get(product.id).stock, product.stock);
     assert.equal(unchanged.prepare("SELECT id FROM products WHERE barcode='INLINE-AUDIT'").get(), undefined);
   } finally { unchanged.close(); }
-  await fill('.receive-entry-table input[aria-label="จำนวนซื้อรายการ 2"]', '4');
+  await fill('.receive-entry-edit-modal input[aria-label="จำนวนซื้อรายการ 2"]', '4');
   await page.click('[aria-label="บันทึกแก้ไขรายการ 2"]');
   await save.asElement().click();
   await page.waitForFunction(() => !document.querySelector('.stock-receive-modal'));
