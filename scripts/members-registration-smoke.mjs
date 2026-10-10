@@ -64,13 +64,16 @@ try {
   await page.waitForFunction(() => !document.querySelector('.pos-register-modal .modal-actions .primary-button')?.disabled);
   await page.click('.pos-register-modal .modal-actions .primary-button');
   await page.waitForFunction(() => !document.querySelector('[name=firstName]'));
+  await page.waitForFunction(name => [...document.querySelectorAll('.table-wrap tbody tr')].some(row => row.innerText.includes(name) && row.innerText.includes('25.00')), {}, name);
+  await page.evaluate(name => [...document.querySelectorAll('.table-wrap tbody tr')].find(row => row.innerText.includes(name)).click(), name);
+  await page.waitForFunction(() => [...document.querySelectorAll('button')].some(button => button.getClientRects().length && button.innerText.includes('พิมพ์บัตรสมาชิก')));
+  await page.evaluate(() => [...document.querySelectorAll('button')].find(button => button.getClientRects().length && button.innerText.includes('พิมพ์บัตรสมาชิก')).click());
   await page.waitForSelector('#member-card');
   await page.waitForFunction(() => [...document.querySelectorAll('#member-card img')].some(img => img.src.startsWith('data:image/jpeg')));
   await download('ดาวน์โหลด PNG', '.png');
   await download('ดาวน์โหลด PDF', '.pdf');
   await page.screenshot({ path: path.join(artifacts, 'member-card.png') });
   await page.click('.member-card-modal button[aria-label="ปิดหน้าต่าง"]');
-  await page.waitForFunction(name => [...document.querySelectorAll('.table-wrap tr')].some(row => row.innerText.includes(name) && row.innerText.includes('25.00')), {}, name);
   await page.reload({ waitUntil: 'networkidle2' });
   if (!await page.$('.member-top-grid')) {
     await page.evaluate(() => [...document.querySelectorAll('button')].find(button => button.getClientRects().length && button.innerText.includes('สมาชิกและบัญชี')).click());
@@ -81,7 +84,8 @@ try {
   await posButton.asElement().click();
   await posButton.dispose();
   await page.waitForSelector('.pos-layout');
-  await page.keyboard.press('F6');
+  await page.waitForSelector('.rail-register', { visible: true });
+  await page.click('.rail-register');
   await page.waitForSelector('.pos-register-modal');
   await page.type('[name=cardNumber]', 'REVIEW-REGISTER-002');
   const posName = `PosMemberUI${Date.now()}`;
@@ -90,8 +94,7 @@ try {
   await page.type('[name=initialDeposit]', '10');
   assert.ok(await page.$('#pos-register-photo'), 'Shared form must include photo upload');
   await page.click('.pos-register-modal .modal-actions .primary-button');
-  await page.waitForSelector('#member-card');
-  await page.click('.member-card-modal button[aria-label="ปิดหน้าต่าง"]');
+  await page.waitForFunction(() => !document.querySelector('.pos-register-modal'));
   await page.waitForFunction(name => document.querySelector('.pos-layout')?.innerText.includes(name), {}, posName);
   await page.reload({ waitUntil: 'networkidle2' });
   await page.evaluate(() => [...document.querySelectorAll('button')].find(button => button.getClientRects().length && button.innerText.includes('สมาชิกและบัญชี')).click());
