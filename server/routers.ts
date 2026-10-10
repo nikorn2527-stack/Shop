@@ -14,7 +14,7 @@ import { ensureEditionFeature, generateLicenseKey, parseLicenseKey, resolveEditi
 import { getSessionCookieOptions } from "./_core/cookies";
 import { readAppSessionCookie, type TrpcContext } from "./_core/context";
 import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, router } from "./_core/trpc";
+import { permissionProcedure, publicProcedure, router } from "./_core/trpc";
 import { backupSqliteDatabase, listSqliteBackups, pruneSqliteBackupsByCount, restoreSqliteBackup, testRestore, verifySqliteBackup } from "./sqliteBackup";
 import { buildTemplateBase64, importMembers, importProducts, parseSpreadsheetBase64, readSheetRows, type MemberFieldMapping, type ProductFieldMapping } from "./importTool";
 import { closeWelfareDb, getBackupDir, getWelfareDb, getWelfareDbPath } from "./welfareStore";
@@ -997,7 +997,7 @@ export const appRouter = router({
       requireLogin(ctx);
       return nextStockLotNumber(getWelfareDb());
     })),
-    receiveBatch: publicProcedure.input(z.object({ entries: z.array(z.object({
+    receiveBatch: permissionProcedure("STOCK.RECEIVE").input(z.object({ entries: z.array(z.object({
       productId: z.number().int().positive().optional(),
       newProduct: productCreateInput.optional(),
       purchaseQty: z.number().int().positive(), freeQty: z.number().int().min(0).optional(),
@@ -1014,13 +1014,13 @@ export const appRouter = router({
         requireLogin(ctx);
         return stockReceiptHistory(getWelfareDb(), input);
       })),
-    rows: publicProcedure
+    rows: permissionProcedure("STOCK.VIEW")
       .input(z.unknown().optional())
       .query(({ ctx }) => withStoreErrors(() => {
         requireLogin(ctx);
         return listStockRows(getWelfareDb());
       })),
-    receive: publicProcedure
+    receive: permissionProcedure("STOCK.RECEIVE")
       .input(stockReceiveInput)
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input);
@@ -1047,7 +1047,7 @@ export const appRouter = router({
           );
         });
       }),
-    count: publicProcedure
+    count: permissionProcedure("STOCK.COUNT")
       .input(stockCountInput)
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input);
@@ -1057,7 +1057,7 @@ export const appRouter = router({
           return stockCount(getWelfareDb(), { ...input, actor, actorRole });
         });
       }),
-    countLots: publicProcedure
+    countLots: permissionProcedure("STOCK.COUNT")
       .input(stockCountLotsInput)
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input);
@@ -1074,7 +1074,7 @@ export const appRouter = router({
         requireLogin(ctx);
         return listOrderItems(getWelfareDb());
       })),
-    orderAdd: publicProcedure
+    orderAdd: permissionProcedure("STOCK.RECEIVE")
       .input(orderAddInput)
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input);
@@ -1083,7 +1083,7 @@ export const appRouter = router({
           return addOrderItem(getWelfareDb(), { ...input, actor, actorRole });
         });
       }),
-    orderUpdate: publicProcedure
+    orderUpdate: permissionProcedure("STOCK.RECEIVE")
       .input(orderUpdateInput)
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input);
@@ -1092,7 +1092,7 @@ export const appRouter = router({
           return updateOrderItem(getWelfareDb(), { ...input, actor, actorRole });
         });
       }),
-    orderRemove: publicProcedure
+    orderRemove: permissionProcedure("STOCK.RECEIVE")
       .input(z.object({ id: z.number().int().min(1), actor: z.string().optional(), actorRole: z.string().optional() }))
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input);
@@ -1101,7 +1101,7 @@ export const appRouter = router({
           return removeOrderItem(getWelfareDb(), { ...input, actor, actorRole });
         });
       }),
-    orderClear: publicProcedure
+    orderClear: permissionProcedure("STOCK.RECEIVE")
       .input(z.object({ actor: z.string().optional(), actorRole: z.string().optional() }).optional())
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input ?? {});
@@ -1110,7 +1110,7 @@ export const appRouter = router({
           return clearOrderList(getWelfareDb(), { actor, actorRole });
         });
       }),
-    card: publicProcedure.input(z.object({ productId: z.number().int(), from: z.string().optional(), to: z.string().optional() })).query(({ input }) => {
+    card: permissionProcedure("STOCK.VIEW").input(z.object({ productId: z.number().int(), from: z.string().optional(), to: z.string().optional() })).query(({ input }) => {
       return stockCard(getWelfareDb(), input.productId, input.from, input.to);
     }),
   }),
@@ -1228,7 +1228,7 @@ export const appRouter = router({
           return registerMember(getWelfareDb(), { ...input, actor, actorRole });
         });
       }),
-    setStatus: publicProcedure
+    setStatus: permissionProcedure("MEMBER.EDIT")
       .input(memberSetStatusInput)
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input);
@@ -1237,7 +1237,7 @@ export const appRouter = router({
           return setMemberStatus(getWelfareDb(), input.memberNumber, input.suspended, actor, actorRole);
         });
       }),
-    wallet: publicProcedure
+    wallet: permissionProcedure("MEMBER.WALLET")
       .input(memberWalletInput)
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input);
@@ -1253,7 +1253,7 @@ export const appRouter = router({
         requireLogin(ctx);
         return getTransactionSlip(getWelfareDb(), input.id);
       })),
-    update: publicProcedure
+    update: permissionProcedure("MEMBER.EDIT")
       .input(memberUpdateInput)
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input);

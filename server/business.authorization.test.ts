@@ -44,12 +44,12 @@ describe("business API permissions", () => {
   });
 
   it("allows stock officers to read inventory using their actual app role", async () => {
-    await expect(caller("stock_officer").stock.list()).resolves.toEqual([]);
+    await expect(caller("stock_officer").stock.rows()).resolves.toEqual([]);
   });
 
   it("blocks an auditor from changing member money and identity", async () => {
     await expect(caller("auditor").member.wallet({
-      memberNumber: "700001", type: "topup", amount: 10,
+      memberNumber: "700001", type: "deposit", amount: 10,
     })).rejects.toMatchObject({ code: "FORBIDDEN" });
     await expect(caller("auditor").member.setStatus({
       memberNumber: "700001", suspended: true,

@@ -57,8 +57,9 @@ export function requirePermission(permission: PermissionKey) {
       throw new TRPCError({ code: "UNAUTHORIZED", message: UNAUTHED_ERR_MSG });
     }
     const db = getWelfareDb();
-    if (!hasPermission(db, ctx.user.role, permission)) {
-      throw new TRPCError({ code: "FORBIDDEN", message: `คุณไม่มีสิทธิ์ "${permission}" (10002)` });
+    const role = ctx.user.appRole ?? (ctx.user.role === "admin" ? "administrator" : "cashier");
+    if (!hasPermission(db, role, permission)) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "บัญชีนี้ไม่มีสิทธิ์ทำรายการนี้" });
     }
     return next({ ctx: { ...ctx, user: ctx.user } });
   });
