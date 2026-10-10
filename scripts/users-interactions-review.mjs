@@ -55,11 +55,46 @@ try {
   await page.waitForSelector('[data-nav-item=users]'); await page.click('[data-nav-item=users]');
   await page.waitForFunction(username => [...document.querySelectorAll('tr')]
     .some(row => row.textContent.includes(username) && row.textContent.includes('เจ้าหน้าที่ตรวจสอบล่าสุด')), {}, username);
+  async function clickUserAction(label) {
+    const button = await page.waitForFunction((username, label) => {
+      const row = [...document.querySelectorAll('tr')].find(node => node.textContent.includes(username));
+      return [...(row?.querySelectorAll('button') ?? [])].find(node => node.textContent.trim() === label && !node.disabled);
+    }, {}, username, label);
+    await button.asElement().click(); await button.dispose();
+  }
+  async function waitForStoredUser(predicate) {
+    for (let attempt = 0; attempt < 50; attempt++) {
+      const connection = new DatabaseSync(cfg.target, { readOnly: true });
+      let user;
+      try { user = connection.prepare('SELECT * FROM app_users WHERE username=?').get(username); }
+      finally { connection.close(); }
+      if (predicate(user)) return user;
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+    assert.fail('User mutation did not persist');
+  }
+  await clickUserAction('ระงับ');
+  await clickText('ยืนยันระงับการใช้งาน');
+  await waitForStoredUser(user => user.active === 0);
+  await page.waitForFunction(() => !document.querySelector('.confirm-modal'));
+  await page.waitForFunction(username => [...document.querySelectorAll('tr')].find(row => row.textContent.includes(username))?.textContent.includes('เปิดใช้งาน'), {}, username);
+  await clickUserAction('เปิดใช้งาน');
+  await clickText('ยืนยันเปิดใช้งาน');
+  await waitForStoredUser(user => user.active === 1);
+  await page.waitForFunction(() => !document.querySelector('.confirm-modal'));
+  await page.waitForFunction(username => [...document.querySelectorAll('tr')].find(row => row.textContent.includes(username))?.textContent.includes('ระงับ'), {}, username);
+  await clickUserAction('รหัสผ่าน');
+  await page.waitForSelector('.form-modal input[type=password]');
+  await replace('.form-modal input[type=password]', 'ChangedSecure456!');
+  await replace('.form-modal input[placeholder="พิมพ์รหัสผ่านใหม่ซ้ำ"]', 'ChangedSecure456!');
+  await clickText('ตั้งรหัสผ่านใหม่', '.form-modal');
+  await page.waitForFunction(() => !document.querySelector('.form-modal'));
+  await waitForStoredUser(user => user.must_change_password === 1);
   for (const width of [1366, 390]) {
     await page.setViewport({ width, height: 844 });
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2), false);
     await page.screenshot({ path: `${cfg.dir}/users-persisted-${width}.png`, fullPage: true });
   }
   assert.deepEqual(errors, []);
-  console.log('PASS user validation, creation, edit, reload persistence and desktop/mobile layout');
+  console.log('PASS user validation, creation, edit, suspend/reactivate, password reset, persistence and desktop/mobile layout');
 } finally { await browser.close(); }

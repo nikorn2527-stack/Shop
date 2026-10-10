@@ -40,3 +40,14 @@ This does not verify every button or every possible data state.
 - Logs and dashboard: opening/layout verified; all filters/actions not independently verified.
 - Empty/error/large-data states for every screen.
 - Physical scanner/camera/printers, production proxy and post-deployment verification.
+
+## Continuation — 11 October 2026
+- Git was clean before inspection; rollback commit: `d396194`.
+- Rebuilt production output: exit 0. TypeScript passed. Bundle-size warning remains.
+- Full regression rerun: 261 tests / 33 files passed, exit 0.
+- Reran all-menu navigation on isolated database: `isolated-review-WqmLGq`.
+- Reran anonymous shift authorization and wallet concurrency on separate copies: passed.
+- Extended user browser review with suspend/reactivate and password reset. Verified persisted active state and mandatory password-change flag, plus desktop/mobile layout.
+- Extended scenario passed: `C:/Users/Korn/AppData/Local/Temp/isolated-review-X3YI2q`.
+- Initial extended run exposed a test synchronization race: database commit preceded query refresh/dialog teardown. Corrected the test to wait for both UI and database state; no application defect was established from this failure.
+- No production database change, push or deployment. Session revocation/unlock UI, backup/restore UI, all multi-page reports and full role/action matrix remain unverified.
