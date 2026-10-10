@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
-const cfg = JSON.parse(fs.readFileSync(path.join(os.tmpdir(), 'shop-ui-test-config.json'), 'utf8'));
+const cfg = JSON.parse(fs.readFileSync(process.env.AUDIT_CONFIG_PATH ?? path.join(os.tmpdir(), 'shop-ui-test-config.json'), 'utf8'));
 const artifacts = fs.mkdtempSync(path.join(os.tmpdir(), 'shop-member-photo-export-'));
 const photo = path.join(artifacts, 'member-photo.png');
 const browser = await puppeteer.launch({ headless: true, pipe: true, args: ['--no-sandbox'] });
@@ -40,16 +40,21 @@ try {
   };
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
-  await page.goto(process.env.AUDIT_BASE_URL ?? 'http://localhost:4173', { waitUntil: 'networkidle2' });
+  const url = process.env.AUDIT_BASE_URL ?? cfg.baseUrl ?? 'http://localhost:4173';
+  if (cfg.sessionId) await page.setCookie({ name: 'app_session_id', value: cfg.sessionId, url });
+  await page.goto(url, { waitUntil: 'networkidle2' });
+  if (!cfg.sessionId) {
   await page.type('[name=username]', cfg.username);
   await page.type('[name=password]', cfg.password);
   await page.click('.login-submit');
+  }
   await page.waitForSelector('.app-shell');
   await page.evaluate(() => [...document.querySelectorAll('button')].find(button => button.getClientRects().length && button.innerText.includes('สมาชิกและบัญชี')).click());
   await page.waitForSelector('.member-top-grid');
   assert.ok(!(await page.$eval('.page-content', node => node.innerText)).includes('ลงทะเบียนที่ POS (F6) · ดูยอดรวมได้ในรายงาน'));
   await page.evaluate(() => [...document.querySelectorAll('.toolbar-actions button')].find(button => button.innerText.includes('เพิ่มสมาชิก')).click());
   await page.waitForSelector('[name=firstName]');
+  await page.type('[name=cardNumber]', 'REVIEW-REGISTER-001');
   const name = `MemberUI${Date.now()}`;
   await page.type('[name=firstName]', name);
   await page.type('[name=lastName]', 'Audit');
@@ -78,6 +83,7 @@ try {
   await page.waitForSelector('.pos-layout');
   await page.keyboard.press('F6');
   await page.waitForSelector('.pos-register-modal');
+  await page.type('[name=cardNumber]', 'REVIEW-REGISTER-002');
   const posName = `PosMemberUI${Date.now()}`;
   await page.type('[name=firstName]', posName);
   await page.type('[name=lastName]', 'Audit');

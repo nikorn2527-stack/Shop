@@ -10,7 +10,7 @@ assert.ok(process.env.AUDIT_CONFIG_PATH, 'Requires an isolated audit configurati
 const cfg = JSON.parse(fs.readFileSync(process.env.AUDIT_CONFIG_PATH, 'utf8'));
 assert.ok(path.resolve(cfg.target).startsWith(path.resolve(os.tmpdir()) + path.sep));
 const browser = await puppeteer.launch({ headless: true, pipe: true, args: ['--no-sandbox'] });
-const memberNumber = 'M-000218';
+const memberNumber = cfg.memberNumber ?? 'M-000218';
 function readState() {
   const db = new DatabaseSync(cfg.target, { readOnly: true });
   try {
@@ -26,6 +26,7 @@ try {
   const sessions = [];
   for (const page of pages) {
     await page.bringToFront();
+    if (cfg.sessionId) await page.setCookie({ name: 'app_session_id', value: cfg.sessionId, url: cfg.baseUrl });
     await page.goto(cfg.baseUrl, { waitUntil: 'networkidle2' });
     if (await page.$('[name=username]')) {
       await page.type('[name=username]', cfg.username);

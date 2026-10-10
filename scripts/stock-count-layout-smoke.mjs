@@ -3,15 +3,19 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
-const cfg = JSON.parse(fs.readFileSync(path.join(os.tmpdir(), 'shop-ui-test-config.json'), 'utf8'));
+const cfg = JSON.parse(fs.readFileSync(process.env.AUDIT_CONFIG_PATH ?? path.join(os.tmpdir(), 'shop-ui-test-config.json'), 'utf8'));
 const browser = await puppeteer.launch({ headless: true, pipe: true, args: ['--no-sandbox'] });
 try {
   const page = await browser.newPage();
   await page.setViewport({ width: 1440, height: 1000 });
-  await page.goto(process.env.AUDIT_BASE_URL ?? 'http://localhost:4173', { waitUntil: 'networkidle2' });
+  const url = process.env.AUDIT_BASE_URL ?? cfg.baseUrl ?? 'http://localhost:4173';
+  if (cfg.sessionId) await page.setCookie({ name: 'app_session_id', value: cfg.sessionId, url });
+  await page.goto(url, { waitUntil: 'networkidle2' });
+  if (!cfg.sessionId) {
   await page.type('[name=username]', cfg.username);
   await page.type('[name=password]', cfg.password);
   await page.click('.login-submit');
+  }
   await page.waitForSelector('.app-shell');
   await new Promise(r => setTimeout(r, 2000));
   await page.evaluate(() => {

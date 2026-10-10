@@ -102,6 +102,7 @@ try {
   const close = await page.evaluateHandle(() => document.querySelector('.stock-receive-modal .modal-heading button'));
   assert.ok(close.asElement());
   await close.asElement().click();
+  await page.waitForSelector('.confirm-modal .danger-button', { visible: true });
   const discard = await page.evaluateHandle(() => [...document.querySelectorAll('button')].find(n => n.getClientRects().length && n.textContent.trim() === 'ทิ้งรายการและปิดหน้าต่าง') ?? null);
   if (discard.asElement()) await discard.asElement().click();
   await discard.dispose();

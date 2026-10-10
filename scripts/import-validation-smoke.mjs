@@ -11,10 +11,13 @@ assert.ok(path.resolve(cfg.target).startsWith(path.resolve(os.tmpdir()) + path.s
 const browser = await puppeteer.launch({ headless: true, pipe: true, args: ['--no-sandbox'] });
 try {
   const page = await browser.newPage();
+  if (cfg.sessionId) await page.setCookie({ name: 'app_session_id', value: cfg.sessionId, url: cfg.baseUrl });
   await page.goto(cfg.baseUrl, { waitUntil: 'networkidle2' });
+  if (!cfg.sessionId) {
   await page.type('[name=username]', cfg.username);
   await page.type('[name=password]', cfg.password);
   await page.click('.login-submit');
+  }
   await page.waitForSelector('.app-shell', { timeout: 30000 });
   const name = `Invalid-import-${Date.now()}`;
   const base64 = Buffer.from('\uFEFFName,Price,Cost,Stock,Reorder\n' + name + ',invalid,10,5,2\n').toString('base64');
