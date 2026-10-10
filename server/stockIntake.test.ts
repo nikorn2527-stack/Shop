@@ -1,7 +1,27 @@
 import { describe, expect, it } from "vitest";
-import { createSqliteStore, createProduct, receiveStockBatch, stockReceiptHistory } from "./sqliteStore";
+import { createSqliteStore, createProduct, receiveStockBatch, stockReceiptHistory, updateProduct } from "./sqliteStore";
 
 describe("unified stock intake", () => {
+  it("rejects non-finite prices/costs and invalid reorder points before writing", () => {
+    const db = createSqliteStore();
+    try {
+      const existing = createProduct(db, { name: "Validation", sku: "VALIDATION", price: 10 });
+      for (const fields of [{ price: Infinity }, { cost: Infinity }, { cost: NaN }, { cost: -1 }, { reorderPoint: 1.5 }, { reorderPoint: -1 }]) {
+        expect(() => createProduct(db, { name: "Invalid", sku: "INVALID", price: 10, ...fields })).toThrow();
+        expect(() => updateProduct(db, { productId: existing.id, ...fields })).toThrow();
+      }
+      expect(db.prepare("SELECT id FROM products WHERE sku='INVALID'").get()).toBeUndefined();
+      expect(db.prepare("SELECT price, cost FROM products WHERE id=?").get(existing.id)).toMatchObject({ price: 10, cost: 0 });
+    } finally { db.close(); }
+  });
+
+  it("rejects duplicate tier names that would merge different POS prices", () => {
+    const db = createSqliteStore();
+    try {
+      const priceTiers = JSON.stringify([{ label: "small", price: 5, qty: 100 }, { label: " small ", price: 10, qty: 200 }]);
+      expect(() => createProduct(db, { name: "Duplicate tiers", price: 5, sellMode: "money", priceTiers })).toThrow(/ซ้ำ/);
+    } finally { db.close(); }
+  });
   it("creates new products and receives existing products in one transaction", () => {
     const db = createSqliteStore();
     try {

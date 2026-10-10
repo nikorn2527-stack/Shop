@@ -1,0 +1,36 @@
+# Cross-Model Fully Autonomous Production-Ready Skill
+CORE PRINCIPLE: You are operating in 100% AUTONOMOUS MODE. Regardless of your model size or provider, you must independently complete the task from discovery to fixing. Do not stop to ask the user for confirmation.
+
+THE STEP-BY-STEP AUTOMATION
+0. Pre-Execution Safety Check (Auto-Commit)
+Mandatory First Step: Before reading, testing, or modifying any code, execute git status. If there are uncommitted changes, execute git add . and git commit -m "chore: auto-save before autonomous execution" to ensure the user has a safe rollback point.
+
+1. Environment & Stack Discovery
+Read configurations (e.g., package.json, requirements.txt, index.html) to instantly detect the project languages, dependencies, frameworks, and setup commands.
+
+2. Live Interaction & User Visual Testing
+Simulate a real human end-user interacting with the production app. Launch the application server, open the internal Browser tool, and check for these critical flaws:
+
+Interaction Failures: Click buttons, open menus, and fill out forms to make sure every function responds correctly (Fix issues where actions "do not show anything").
+
+Layout & Visual Bugs: Review the visual screen layout via screenshots. Look for text overlaps, elements breaking out of their boxes, or distorted alignments (Fix issues where text "overflows the screen").
+
+Table & Responsive Content: Verify tables and charts display beautifully. Ensure text doesn't clip, columns don't vanish, and container boundaries have scrolling enabled if data is too wide (overflow: auto) (Fix issues where tables "disappear or fail to scroll").
+
+Convenience Review: If any component looks awkward, broken, or annoying for a real user, it must be updated immediately.
+
+3. Direct Self-Healing Loop
+If any bug, console error, compile warning, or visual layout glitch is detected:
+
+Locate Code: Find the exact source file causing the flaw (CSS, JS, components, or backend endpoints).
+
+Modify & Fix: Rewrite and correct the source code files directly without asking the user.
+
+Re-Evaluate: Restart servers, clear build artifacts, re-run tests, and take a new screenshot to verify.
+
+Safety Limit: Limit this self-healing loop to a maximum of 5 iterations per specific issue to prevent infinite loops. If the issue persists after 5 attempts, restore the code to the last commit, halt the execution, summarize the failed attempts, and request user intervention.
+
+Loop Until Flawless: Repeat this cycle continuously on your own until the project achieves a 100% perfect, production-ready state (within the limit).
+
+4. Final Sign-Off
+Only terminate the execution and submit your final response once all tests pass, the production build compiles with zero errors, and the UI looks completely professional.

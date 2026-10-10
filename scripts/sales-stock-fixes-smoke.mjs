@@ -6,7 +6,7 @@ import { spawn } from 'node:child_process';
 import net from 'node:net';
 import { DatabaseSync, backup } from 'node:sqlite';
 import puppeteer from 'puppeteer';
-import { createAppSession } from '../server/sqliteStore.ts';
+import { createAppSession, checkout, createSqliteStore, receiveStockLines } from '../server/sqliteStore.ts';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sales-stock-fixes-'));
 const dbPath = path.join(dir, 'test.sqlite');
@@ -18,6 +18,15 @@ const user = db.prepare("SELECT id FROM app_users WHERE active=1 AND role IN ('d
 assert.ok(user);
 const session = createAppSession(db, user.id);
 db.close();
+// The current customer dataset has no sales. Create a real isolated receipt/sale
+// instead of assuming historical test bills exist or altering report expectations.
+const fixture = createSqliteStore(dbPath);
+try {
+  const item = fixture.prepare("SELECT id, price FROM products WHERE active=1 AND price>0 LIMIT 1").get();
+  assert.ok(item);
+  receiveStockLines(fixture, { productId: item.id, lot: 'COST-AUDIT-FIXTURE', lines: [{ qty: 3, cost: 5 }], actor: 'Isolated report audit' });
+  checkout(fixture, { items: [{ productId: item.id, qty: 1 }], paymentMethod: 'เงินสด', cashier: 'Isolated report audit', receivedCash: item.price, changeDue: 0 });
+} finally { fixture.close(); }
 const log = fs.openSync(path.join(dir, 'server.log'), 'a');
 const port = await new Promise((resolve, reject) => {
   const probe = net.createServer();

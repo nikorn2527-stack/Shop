@@ -11,6 +11,7 @@
  * be removed.
  */
 import type { ComponentType } from "react";
+import { INVENTORY_ACTION_LABELS } from "@/lib/inventoryActions";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import CostProfit from "../pages/CostProfit";
@@ -266,6 +267,9 @@ export function AppShell({
       return new Set<string>();
     }
   }, [settingsQuery.data?.posRailHidden]);
+  const shortcutLabel = (action: string, fallback = "") => {
+    try { const keys = JSON.parse(settingsQuery.data?.posShortcutKeys || "{}"); return String(keys[action] ?? (action === "card" ? keys.limit : undefined) ?? fallback).trim().toUpperCase(); } catch { return fallback; }
+  };
   const safeView = canAccessView(role, activeView) ? activeView : "dashboard";
   const pageTitle =
     navItems.find(item => item.id === safeView)?.label ??
@@ -493,7 +497,7 @@ export function AppShell({
             >
               <ScanLine size={20} />
               <b>สแกน</b>
-              <kbd>F8</kbd>
+              <kbd>{shortcutLabel("scan", "F8")}</kbd>
             </button>
           )}
           {!railHidden.has("customer") && (
@@ -509,7 +513,7 @@ export function AppShell({
             >
               <UsersRound size={20} />
               <b>ลูกค้า</b>
-              <kbd>F1</kbd>
+              <kbd>{shortcutLabel("customer", "F1")}</kbd>
             </button>
           )}
           {!railHidden.has("hold") && (
@@ -525,7 +529,7 @@ export function AppShell({
             >
               <Pause size={20} />
               <b>พักบิล</b>
-              <kbd>F5</kbd>
+              <kbd>{shortcutLabel("hold", "F5")}</kbd>
               {posHeldCount > 0 && (
                 <span className="rail-badge">{posHeldCount}</span>
               )}
@@ -533,7 +537,7 @@ export function AppShell({
           )}
           </div> : null}
           {!railHidden.has("card") || !railHidden.has("deposit") || !railHidden.has("withdraw") || !railHidden.has("register") || !railHidden.has("limit") ? <div className="pos-rail-group"><span className="pos-rail-group-label">งานสมาชิก</span>
-          {!railHidden.has("card") && <button type="button" className="rail-btn rail-member" onClick={() => window.dispatchEvent(new CustomEvent("pos-rail", { detail: "card" }))}><CreditCard size={20} /><b>คืน / จ่ายบัตร</b></button>}
+          {!railHidden.has("card") && <button type="button" className="rail-btn rail-member" title="คืนเงิน / คืนบัตร / จ่ายบัตร" onClick={() => window.dispatchEvent(new CustomEvent("pos-rail", { detail: "card" }))}><CreditCard size={20} /><b>คืน / จ่ายบัตร</b><kbd>{shortcutLabel("card")}</kbd></button>}
           {!railHidden.has("deposit") && (
             <button
               type="button"
@@ -545,7 +549,7 @@ export function AppShell({
             >
               <ArrowDownToLine size={20} />
               <b>เติมเงิน</b>
-              <kbd>F2</kbd>
+              <kbd>{shortcutLabel("deposit", "F2")}</kbd>
             </button>
           )}
           {!railHidden.has("withdraw") && (
@@ -559,7 +563,7 @@ export function AppShell({
             >
               <ArrowUpFromLine size={20} />
               <b>ถอนเงิน</b>
-              <kbd>F3</kbd>
+              <kbd>{shortcutLabel("withdraw", "F3")}</kbd>
             </button>
           )}
           {!railHidden.has("register") && (
@@ -575,10 +579,10 @@ export function AppShell({
             >
               <UserPlus size={20} />
               <b>สมาชิกใหม่</b>
-              <kbd>F6</kbd>
+              <kbd>{shortcutLabel("register", "F6")}</kbd>
             </button>
           )}
-          {!railHidden.has("limit") && <button type="button" className="rail-btn rail-limit" title="คืนเงินทั้งหมดและคืนบัตร" onClick={() => window.dispatchEvent(new CustomEvent("pos-rail", { detail: "limit" }))}><TrendingDown size={20} /><b>ขอลดวงเงิน / คืนบัตร</b></button>}
+          
           </div> : null}
           {!railHidden.has("special") || !railHidden.has("receive") || !railHidden.has("add") ? <details className="pos-rail-more"><summary>งานอื่น</summary><div className="pos-rail-group">
           {!railHidden.has("special") && (
@@ -598,7 +602,7 @@ export function AppShell({
             >
               <Sparkles size={20} />
               <b>รายการพิเศษ</b>
-              <kbd>F4</kbd>
+              <kbd>{shortcutLabel("special", "F4")}</kbd>
             </button>
           )}
           {!railHidden.has("receive") && (
@@ -613,8 +617,8 @@ export function AppShell({
               }
             >
               <StockReceive size={20} weight="bold" />
-              <b>รับเข้าสินค้า</b>
-              <kbd>F9</kbd>
+              <b>{INVENTORY_ACTION_LABELS.receive}</b>
+              <kbd>{shortcutLabel("receive", "F9")}</kbd>
             </button>
           )}
           {!railHidden.has("add") && (
@@ -629,8 +633,8 @@ export function AppShell({
               }
             >
               <Plus size={20} />
-              <b>เพิ่มสินค้าใหม่</b>
-              <kbd>F10</kbd>
+              <b>{INVENTORY_ACTION_LABELS.add}</b>
+              <kbd>{shortcutLabel("add", "F10")}</kbd>
             </button>
           )}
           </div></details> : null}

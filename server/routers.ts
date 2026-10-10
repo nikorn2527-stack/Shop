@@ -1,5 +1,6 @@
 import { previewGeneratedCards, generateBlankCards } from "./sqliteStore";
 import { z } from "zod";
+import { loginRateLimiter, loginRequestSource } from "./loginRateLimit";
 import { TRPCError } from "@trpc/server";
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -18,6 +19,10 @@ import { backupSqliteDatabase, listSqliteBackups, pruneSqliteBackupsByCount, res
 import { buildTemplateBase64, importMembers, importProducts, parseSpreadsheetBase64, readSheetRows, type MemberFieldMapping, type ProductFieldMapping } from "./importTool";
 import { closeWelfareDb, getBackupDir, getWelfareDb, getWelfareDbPath } from "./welfareStore";
 import {
+  generateMemberNumber,
+  nextStockLotNumber,
+  findExistingMembers,
+  getMemberNumberMode,
   LOGIN_MAX_FAILURES,
   listPhysicalCards,
   cardUsageHistory,
@@ -596,8 +601,9 @@ const backupFileInput = z.object({
 });
 
 const authLoginInput = z.object({
-  username: z.string().min(1, "กรุณาระบุชื่อผู้ใช้"),
-  password: z.string().min(1, "กรุณากรอกรหัสผ่าน"),
+  username: z.string().min(1, "กรุณาระบุชื่อผู้ใช้").max(128),
+  password: z.string().min(1, "กรุณากรอกรหัสผ่าน").max(4096),
+  replaceSession: z.boolean().optional(),
 });
 
 // ROUND 36 (ข้อ 31) — ลงทะเบียนครั้งแรก: ใช้ได้เฉพาะระบบที่ยังไม่มีบัญชีผู้ใช้เลย
@@ -710,6 +716,7 @@ export const appRouter = router({
       .input(authLoginInput)
       .mutation(({ ctx, input }) =>
         withStoreErrors(() => {
+          loginRateLimiter.check(loginRequestSource(ctx.req), input.username);
           const db = getWelfareDb();
           const username = input.username.trim();
           const user = findAppUserByUsername(db, username);
@@ -744,6 +751,13 @@ export const appRouter = router({
           }
           clearLoginFailures(db, user.id);
           const roleThai = appRoleThai(user.role);
+          if (user.active !== 1) throw new TRPCError({ code: "FORBIDDEN", message: "บัญชีนี้ถูกปิดใช้งาน กรุณาติดต่อผู้ดูแล" });
+          const currentSession = readAppSessionCookie(ctx.req);
+          const sessions = listAppSessions(db).filter(session => session.username === user.username && session.sessionId !== currentSession);
+          if (sessions.length && !input.replaceSession) {
+            return { requiresTransfer: true as const, createdAt: sessions[0].createdAt, lastSeenAt: sessions[0].lastSeenAt };
+          }
+          if (sessions.length) logAction(db, "ย้ายเครื่องเข้าใช้งาน", user.displayName, `${user.username} · ยุติการเข้าใช้งานเดิม`, "amber", roleThai);
           const session = createAppSession(db, user.id);
           ctx.res.cookie(COOKIE_NAME, session.sessionId, {
             httpOnly: true,
@@ -979,6 +993,10 @@ export const appRouter = router({
   }),
 
   stock: router({
+    nextLot: publicProcedure.query(({ ctx }) => withStoreErrors(() => {
+      requireLogin(ctx);
+      return nextStockLotNumber(getWelfareDb());
+    })),
     receiveBatch: publicProcedure.input(z.object({ entries: z.array(z.object({
       productId: z.number().int().positive().optional(),
       newProduct: productCreateInput.optional(),
@@ -1166,6 +1184,16 @@ export const appRouter = router({
     })),
   }),
   member: router({
+    checkExisting: publicProcedure.input(z.object({ firstName: z.string(), lastName: z.string(), citizenId: z.string().optional(), phone: z.string().optional() })).query(({ ctx, input }) => withStoreErrors(() => {
+      requireLogin(ctx);
+      return findExistingMembers(getWelfareDb(), input);
+    })),
+    nextNumber: publicProcedure.query(({ ctx }) => withStoreErrors(() => {
+      requireLogin(ctx);
+      const db = getWelfareDb();
+      const mode = getMemberNumberMode(db);
+      return { mode, memberNumber: mode === "manual" ? null : generateMemberNumber(db, mode) };
+    })),
     list: publicProcedure
       .input(memberListInput)
       .query(({ ctx, input }) => withStoreErrors(() => {

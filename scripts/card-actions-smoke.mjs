@@ -41,6 +41,11 @@ try {
   await page.type('[name=username]', source.username);
   await page.type('[name=password]', source.password);
   await page.click('.login-submit');
+  await page.waitForFunction(() => document.querySelector('.app-shell') || document.body.textContent.includes('บัญชีนี้เข้าใช้งานอยู่แล้ว'));
+  if (!await page.$('.app-shell')) {
+    const transfer = await page.evaluateHandle(() => [...document.querySelectorAll('button')].find(button => button.textContent.includes('ยืนยันย้ายมาเครื่องนี้')));
+    await transfer.asElement().click();
+  }
   await page.waitForSelector('.app-shell');
   const click = async (text, scope = 'body') => {
     const handle = await page.evaluateHandle((text, scope) => [...document.querySelector(scope).querySelectorAll('button')].find(b => b.getClientRects().length && b.textContent.trim() === text), text, scope);

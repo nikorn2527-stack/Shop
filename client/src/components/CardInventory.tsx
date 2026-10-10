@@ -11,7 +11,7 @@ const labels = {
 };
 
 function staffName(value: string | null | undefined) {
-  return !value || value === "เตรียมชุดเดโมตามคำสั่งเจ้าของระบบ" ? "ไม่ระบุ" : value;
+  return !value?.trim() || value === "เตรียมชุดเดโมตามคำสั่งเจ้าของระบบ" ? "Auto System" : value;
 }
 
 export function CardInventory({ canManage }: { canManage: boolean }) {
@@ -141,18 +141,17 @@ export function CardInventory({ canManage }: { canManage: boolean }) {
             <thead>
               <tr>
                 <th>รหัสบัตร</th>
-                <th>สถานะ</th>
                 <th>สมาชิก</th>
                 <th>เจ้าหน้าที่ลงทะเบียน / วันที่</th>
                 <th>เจ้าหน้าที่ดำเนินการล่าสุด</th>
                 <th>จัดการ</th>
+                <th>สถานะ</th>
               </tr>
             </thead>
             <tbody>
               {cards.data?.map(card => (
                 <tr key={card.cardNumber}>
                   <td>{card.cardNumber}</td>
-                  <td><span className={`card-inventory-status is-${card.status}`}>{labels[card.status]}</span></td>
                   <td>{card.assignedMemberNumber || "—"}</td>
                   <td>{staffName(card.createdBy)}<br />{card.createdAt}</td>
                   <td>{staffName(card.updatedBy)}</td>
@@ -215,6 +214,7 @@ export function CardInventory({ canManage }: { canManage: boolean }) {
                         </>
                       )}
                   </div></td>
+                  <td><span className={`card-inventory-status is-${card.status}`}>{labels[card.status]}</span></td>
                 </tr>
               ))}
             </tbody>
@@ -234,14 +234,14 @@ export function CardInventory({ canManage }: { canManage: boolean }) {
           <th>รอบ / สมาชิก</th><th>เริ่ม / เจ้าหน้าที่</th><th>สิ้นสุด / เจ้าหน้าที่</th><th>ยอดเริ่ม</th><th>รับเข้า</th><th>หักออก</th><th>ยอดปิด</th><th>รายการ</th>
         </tr></thead><tbody>{history.data?.sessions.map(s => <tr key={s.id}>
           <td>#{s.id} · {s.memberNumber}<br />{s.memberName}{s.legacy ? " · ยกมาจากข้อมูลเดิม" : ""}</td>
-          <td>{s.startedAt}<br />{s.openedBy || "ไม่ระบุ"}</td>
-          <td>{s.endedAt || "กำลังใช้งาน"}<br />{s.closedBy || "—"}</td>
+          <td>{s.startedAt}<br />{staffName(s.openedBy)}</td>
+          <td>{s.endedAt || "กำลังใช้งาน"}<br />{s.endedAt ? staffName(s.closedBy) : "—"}</td>
           <td>{s.openingBalance.toFixed(2)}</td><td>{s.incoming.toFixed(2)}</td><td>{s.outgoing.toFixed(2)}</td><td>{s.closingBalance == null ? "ยังไม่ปิดรอบ" : s.closingBalance.toFixed(2)}</td>
           <td><button type="button" className="outline-button" onClick={() => setSessionId(s.id)}>ดู {s.transactionCount} รายการ</button></td>
         </tr>)}</tbody></table></div>
         {history.data?.sessions.length === 0 && <p>ยังไม่มีประวัติการใช้บัตร</p>}
         {sessionId != null && <div className="table-wrap"><h4>ธุรกรรมรอบ #{sessionId}</h4><table><thead><tr><th>วันที่</th><th>รายละเอียด</th><th>จำนวนเงิน</th><th>ยอดหลังรายการ</th><th>เจ้าหน้าที่</th></tr></thead><tbody>
-          {history.data?.transactions.filter(t => t.sessionId === sessionId).map(t => <tr key={t.id}><td>{t.createdAt}</td><td>{t.detail}</td><td>{t.amount.toFixed(2)}</td><td>{t.balanceAfter == null ? "—" : t.balanceAfter.toFixed(2)}</td><td>{t.actor || "ไม่ระบุ"}</td></tr>)}
+          {history.data?.transactions.filter(t => t.sessionId === sessionId).map(t => <tr key={t.id}><td>{t.createdAt}</td><td>{t.detail}</td><td>{t.amount.toFixed(2)}</td><td>{t.balanceAfter == null ? "—" : t.balanceAfter.toFixed(2)}</td><td>{staffName(t.actor)}</td></tr>)}
         </tbody></table></div>}
         </div>
       </dialog>}

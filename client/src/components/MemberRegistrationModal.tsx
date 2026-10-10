@@ -13,9 +13,8 @@ import { toast } from "sonner";
 import {
   PRENAME_OPTIONS,
   compressImageToDataUrl,
-  formatMemberNumber,
 } from "@/pages/pageData";
-import { nextMemberSequence, getErrorMessage } from "@/pages/viewFormat";
+import { getErrorMessage } from "@/pages/viewFormat";
 import { formEnterNav } from "@/pages/PagePrimitives";
 import { CameraCaptureModal } from "./CameraCaptureModal";
 import { type MemberCardData } from "./MemberCardModal";
@@ -32,9 +31,10 @@ export function MemberRegistrationModal({
 }) {
   const utils = trpc.useUtils();
   const settingsQuery = trpc.settings.get.useQuery(undefined);
-  const membersQuery = trpc.member.list.useQuery(undefined);
-  const members = membersQuery.data ?? [];
+  const nextNumberQuery = trpc.member.nextNumber.useQuery(undefined, { staleTime: 0, refetchOnMount: "always", refetchOnWindowFocus: true });
   const [error, setError] = useState("");
+  const [checkingExisting, setCheckingExisting] = useState(false);
+  const [existingMembers, setExistingMembers] = useState<{ memberNumber: string; name: string; status: string; reason: string }[]>([]);
   const [registerForm, setRegisterForm] = useState({
     prename: "",
     firstName: "",
@@ -56,27 +56,14 @@ export function MemberRegistrationModal({
       onRegistered(result.member);
       void utils.card.list.invalidate();
       void utils.member.list.invalidate();
+      void utils.member.nextNumber.invalidate();
       void utils.reports.memberBalances.invalidate();
       void utils.logs.list.invalidate();
     },
     onError: cause => setError(getErrorMessage(cause)),
   });
   const numberMode = settingsQuery.data?.memberNumberMode ?? "running";
-  const numberFormat = settingsQuery.data
-    ? {
-        prefix: settingsQuery.data.memberNumberPrefix,
-        yearMode: settingsQuery.data.memberNumberYearMode,
-        yearDigits: settingsQuery.data.memberNumberYearDigits,
-        resetMonth: settingsQuery.data.memberNumberResetMonth,
-        sequenceDigits: settingsQuery.data.memberNumberSequenceDigits,
-        separator: settingsQuery.data.memberNumberSeparator,
-      }
-    : undefined;
-  const nextNumber = formatMemberNumber(
-    numberMode,
-    nextMemberSequence(members, numberMode, numberFormat),
-    numberFormat
-  );
+  const nextNumber = nextNumberQuery.data?.memberNumber;
   const onRegisterPhotoPick = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -107,8 +94,8 @@ export function MemberRegistrationModal({
         });
       });
   };
-  const submitRegister = () => {
-    if (registerMutation.isPending || !settingsQuery.data) return;
+  const submitRegister = async (confirmedDifferentPerson = false) => {
+    if (registerMutation.isPending || checkingExisting || !settingsQuery.data) return;
     if (!registerForm.firstName.trim() || !registerForm.lastName.trim()) {
       setError("กรุณาระบุชื่อและนามสกุลสมาชิก");
       toast.error("กรุณาระบุชื่อและนามสกุลสมาชิก", {
@@ -145,12 +132,27 @@ export function MemberRegistrationModal({
       return;
     }
     setError("");
+    setCheckingExisting(true);
+    try {
+      const matches = await utils.member.checkExisting.fetch({ firstName: registerForm.firstName.trim(), lastName: registerForm.lastName.trim(), citizenId: registerForm.idCard.trim() || undefined, phone: registerForm.phone.trim() || undefined });
+      if (matches.length && (!confirmedDifferentPerson || matches.some(member => member.reason === "citizenId"))) {
+        setExistingMembers(matches);
+        setError("พบข้อมูลสมาชิกเดิม กรุณาตรวจสอบก่อนสมัครใหม่");
+        return;
+      }
+      setExistingMembers([]);
+    } catch (cause) {
+      setError(getErrorMessage(cause));
+      return;
+    } finally {
+      setCheckingExisting(false);
+    }
     registerMutation.mutate({
+      citizenId: registerForm.idCard.trim() || undefined,
+      phone: registerForm.phone.trim() || undefined,
       prename: registerForm.prename.trim() || undefined,
       firstName: registerForm.firstName.trim(),
       lastName: registerForm.lastName.trim(),
-      citizenId: registerForm.idCard.trim() || undefined,
-      phone: registerForm.phone.trim() || undefined,
       type: registerForm.type,
       gender:
         registerForm.gender === "ไม่ระบุ" ? undefined : registerForm.gender,
@@ -159,7 +161,6 @@ export function MemberRegistrationModal({
         numberMode === "manual" ? registerForm.memberNumber.trim() : undefined,
       initialDeposit: initialBalance,
       cardNumber: registerForm.cardNumber.trim() || undefined,
-      patientCode: registerForm.patientCode.trim() || undefined,
       actor: cashier,
       actorRole,
     });
@@ -213,7 +214,7 @@ export function MemberRegistrationModal({
                 ? "โหมดกำหนดหมายเลขสมาชิกด้วยตนเอง"
                 : `หมายเลขสมาชิกถัดไป (${numberMode === "year" ? "ขึ้นต้นด้วยปี" : "รันเลขต่อเนื่อง"})`}
             </span>
-            <b>{nextNumber}</b>
+            <b>{numberMode === "manual" ? "\u0e01\u0e33\u0e2b\u0e19\u0e14\u0e40\u0e2d\u0e07" : nextNumberQuery.isError ? "\u0e42\u0e2b\u0e25\u0e14\u0e44\u0e21\u0e48\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08" : nextNumber ?? "\u0e01\u0e33\u0e25\u0e31\u0e07\u0e42\u0e2b\u0e25\u0e14..."}</b>
           </div>
           <div
             className="form-grid compact-form"
@@ -299,6 +300,8 @@ export function MemberRegistrationModal({
                 <option>เจ้าหน้าที่</option>
               </select>
             </label>
+            <label>เบอร์โทรศัพท์ (ถ้ามี)<input type="tel" value={registerForm.phone} onChange={event => setRegisterForm({ ...registerForm, phone: event.target.value })} /></label>
+            <label>เลขที่บัตรประชาชน (ถ้ามี)<input type="text" inputMode="numeric" value={registerForm.idCard} onChange={event => setRegisterForm({ ...registerForm, idCard: event.target.value })} /></label>
             <label>
               เพศ
               <select
@@ -385,47 +388,9 @@ export function MemberRegistrationModal({
                 )}
               </div>
             </label>
-            <label>
-              เบอร์โทรศัพท์
-              <input
-                value={registerForm.phone}
-                onChange={event =>
-                  setRegisterForm({
-                    ...registerForm,
-                    phone: event.target.value,
-                  })
-                }
-                placeholder="เช่น 08x-xxx-xxxx"
-              />
-            </label>
-            <label>
-              รหัสผู้ป่วย (HN)
-              <input
-                value={registerForm.patientCode}
-                onChange={event =>
-                  setRegisterForm({
-                    ...registerForm,
-                    patientCode: event.target.value,
-                  })
-                }
-                placeholder="เช่น 70001"
-                maxLength={30}
-                title="รหัสผู้ป่วยที่ผูกกับบัตร — แสดงในรายงานยอดเงินในบัตร"
-              />
-            </label>
-            <label className="wide">
-              เลขที่บัตรประชาชน
-              <input
-                value={registerForm.idCard}
-                onChange={event =>
-                  setRegisterForm({
-                    ...registerForm,
-                    idCard: event.target.value,
-                  })
-                }
-                placeholder="-"
-              />
-            </label>
+
+
+
             {numberMode === "manual" && (
               <label className="wide">
                 หมายเลขสมาชิก *
@@ -458,6 +423,16 @@ export function MemberRegistrationModal({
               />
             </label>
           </div>
+          {existingMembers.length > 0 && (
+            <div className="notice-bar" role="alert" style={{ display: "block" }}>
+              <strong>พบข้อมูลสมาชิกเดิม</strong>
+              {existingMembers.map(member => <div key={member.memberNumber}>
+                <p>{member.memberNumber} · {member.name} · {member.status === "active" ? "ใช้งาน" : "ระงับการใช้งาน"}</p><small>ข้อมูลตรงกัน: {member.reason === "citizenId" ? "เลขบัตรประชาชน" : member.reason === "phone" ? "เบอร์โทรศัพท์" : "ชื่อและนามสกุล"}</small>
+                <span>ใช้เลขสมาชิกนี้ค้นหาในหน้าจัดการสมาชิก แล้วจ่ายบัตรให้สมาชิกเดิม</span>
+              </div>)}
+              {!existingMembers.some(member => member.reason === "citizenId") && <button type="button" className="outline-button" onClick={() => void submitRegister(true)}>ตรวจแล้วว่าเป็นคนละคน — สมัครใหม่</button>}
+            </div>
+          )}
           {error && (
             <div className="notice-bar error">
               <CircleAlert size={16} /> {error}
@@ -477,8 +452,8 @@ export function MemberRegistrationModal({
             </button>
             <button
               className="primary-button"
-              disabled={registerMutation.isPending || !settingsQuery.data}
-              onClick={submitRegister}
+              disabled={registerMutation.isPending || checkingExisting || !settingsQuery.data}
+              onClick={() => void submitRegister()}
             >
               <IdCard size={16} />{" "}
               {registerMutation.isPending

@@ -1,4 +1,145 @@
+@media screen {
+  .stock-receive-modal .receive-unknown-product { padding: 12px; margin: 10px 0; border: 1px solid #fbbf24; border-radius: 10px; background: #fffbeb; color: #78350f; }
+  .stock-receive-modal .receive-unknown-product p { margin: 6px 0 10px; }
+  .stock-receive-modal .receive-unknown-product > div { display: flex; flex-wrap: wrap; gap: 8px; }
+}
+@media screen {
+  .stock-receive-modal .receive-split-workspace { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); gap: 16px; align-items: start; }
+  .stock-receive-modal .receive-split-workspace > div { min-width: 0; }
+  .stock-receive-modal .receive-entry-side .receive-unified-form { display: block !important; }
+  .stock-receive-modal .receive-entry-side .receive-scan-toolbar { display: block; }
+  .stock-receive-modal .receive-item-editor { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 16px; margin-top: 8px; }
+  .stock-receive-modal .receive-item-editor input { min-height: 34px; padding: 6px 8px; }
+  .stock-receive-modal .receive-entry-side { padding-bottom: 16px; }
+  .stock-receive-modal .receive-item-editor label { display: grid; gap: 4px; min-width: 0; }
+  .stock-receive-modal .receive-item-editor :is(input, .expiry-date-input), .stock-receive-modal .receive-row-edit-form input { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
+  .stock-receive-modal .receive-item-editor h3 { grid-column: 1 / -1; margin: 0; font-size: 14px; }
+  .stock-receive-modal .receive-editor-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+  .stock-receive-modal .receive-row-actions { display: flex; gap: 6px; align-items: center; }
+  .stock-receive-modal .receive-row-edit-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 12px; background: #f8fafc; }
+  .stock-receive-modal .receive-row-edit-form label { display: grid; gap: 4px; min-width: 0; }
+  .stock-receive-modal .receive-entry-side .receive-inline-new .receive-new-required { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  :root .stock-receive-modal .receive-review-side .receive-entry-table-wrap { max-height: calc(100dvh - 250px); }
+  :root .modal-backdrop .stock-receive-modal .receive-review-side .receive-simple-table { min-width: 850px; }
+  .stock-receive-modal .receive-entry-side .receive-new-required { grid-template-columns: 1fr; }
+  @media (max-width: 999px) { .stock-receive-modal .receive-split-workspace { grid-template-columns: 1fr; } }
+}
+@media screen {
+  :root .modal-backdrop .stock-receive-modal .receive-simple-table { min-width: 0; table-layout: fixed; }
+  :root .modal-backdrop .stock-receive-modal .receive-simple-table th:nth-child(1) { width: 25%; }
+  :root .modal-backdrop .stock-receive-modal .receive-simple-table th:nth-child(2) { width: 10%; }
+  :root .modal-backdrop .stock-receive-modal .receive-simple-table th:nth-child(3) { width: 13%; }
+  :root .modal-backdrop .stock-receive-modal .receive-simple-table th:nth-child(4) { width: 8%; }
+  :root .modal-backdrop .stock-receive-modal .receive-simple-table th:nth-child(5) { width: 16%; }
+  :root .modal-backdrop .stock-receive-modal .receive-simple-table th:nth-child(6) { width: 17%; }
+  :root .modal-backdrop .stock-receive-modal .receive-simple-table th:nth-child(7) { width: 11%; }
+  :root .modal-backdrop .stock-receive-modal .receive-simple-table td { min-width: 0; }
+  .stock-receive-modal .receive-simple-table .receive-main-row td:last-child { white-space: nowrap; }
+  :root .modal-backdrop .stock-receive-modal .receive-simple-table input { min-width: 0; }
+  .stock-receive-modal .receive-row-details { display: grid; grid-template-columns: 1fr 2fr 2fr; gap: 16px; padding: 8px; background: #f8fafc; }
+  .stock-receive-modal .receive-scan-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; align-items: end; }
+  .stock-receive-modal .receive-scan-toolbar > .field-label { grid-column: 1 / -1; }
+  @media (max-width: 600px) {
+    .stock-receive-modal .receive-item-editor, .stock-receive-modal .receive-row-edit-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .stock-receive-modal .receive-editor-actions { grid-column: 1 / -1; }
+    .stock-receive-modal .receive-item-editor > label:last-of-type { grid-column: 1 / -1; }
+    .stock-receive-modal .receive-entry-side .receive-inline-new .receive-new-required { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    :root .modal-backdrop .stock-receive-modal .receive-simple-table { min-width: 980px; }
+    .stock-receive-modal .receive-row-details { grid-template-columns: 1fr; }
+    .stock-receive-modal .receive-scan-toolbar { grid-template-columns: minmax(0, 1fr); }
+    .stock-receive-modal .receive-scan-toolbar > button { justify-self: end; }
+  }
+}
+/* Receiving is a workspace, not a narrow confirmation dialog. */
+@media screen and (min-width: 1000px) {
+  :root .pos-inventory-modal:has(.stock-receive-modal) { width: calc(100vw - 16px); max-width: none; padding: 0; box-sizing: border-box; overflow: visible; }
+  :root .pos-inventory-modal-body:has(.stock-receive-modal) { overflow: visible; padding: 0; min-width: 0; }
+  :root .modal-backdrop .form-modal:has(.stock-receive-modal) {
+    width: calc(100vw - 16px); max-width: none; padding: 0; overflow: visible; background: transparent; border: 0; box-shadow: none;
+  }
+  :root .modal-backdrop .form-modal.stock-receive-modal {
+    width: calc(100vw - 16px); max-width: none; max-height: calc(100dvh - 16px); box-sizing: border-box;
+    position: fixed; left: 8px; right: 8px; top: 8px; margin: 0;
+  }
+  :root .modal-backdrop .stock-receive-modal > * { min-width: 0; max-width: 100%; box-sizing: border-box; }
+  :root .modal-backdrop .stock-receive-modal .receive-unified-form > * { min-width: 0; max-width: 100%; box-sizing: border-box; }
+  :root .modal-backdrop .stock-receive-modal .receive-entry-table { table-layout: fixed; }
+  :root .modal-backdrop .stock-receive-modal .receive-entry-table input { min-width: 0; }
+  :root .modal-backdrop .stock-receive-modal .receive-entry-table th:first-child { width: 20%; }
+  :root .modal-backdrop .stock-receive-modal .receive-entry-table th:nth-child(3) { width: 14%; }
+  :root .modal-backdrop .stock-receive-modal .receive-purchase-grid :is(label, input) { min-width: 0; box-sizing: border-box; }
+  :root .modal-backdrop .stock-receive-modal .form-grid.receive-unified-form {
+    grid-template-columns: minmax(320px, 1.5fr) minmax(420px, 1fr); align-items: start;
+  }
+  :root .modal-backdrop .stock-receive-modal .receive-unified-form > .form-scan-picker {
+    grid-column: 1 / -1; grid-row: 1;
+  }
+  :root .modal-backdrop .stock-receive-modal .receive-unified-form > .receive-core-row {
+    grid-column: 2; grid-row: 1 / span 2; margin: 0; padding: 10px;
+  }
+  :root .modal-backdrop .stock-receive-modal .receive-unified-form > .receive-confirm-card {
+    grid-column: 1; grid-row: 2; padding: 8px;
+  }
+  :root .modal-backdrop .stock-receive-modal .receive-unified-form > .receive-extra-fields {
+    grid-column: 1 / -1; grid-row: 3;
+  }
+  :root .modal-backdrop .stock-receive-modal .receive-unified-form > .receive-inline-new {
+    grid-column: 1 / -1; grid-row: 4;
+  }
+  :root .modal-backdrop .stock-receive-modal .receive-core-row .receive-purchase-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px;
+  }
+  :root .modal-backdrop .stock-receive-modal .receive-entry-table-wrap { max-height: 42vh; }
+}
+@media screen {
+  .stock-receive-modal .receive-new-required { display: grid; grid-template-columns: 1fr 2fr 1fr 1fr auto; align-items: end; gap: 10px; }
+  .stock-receive-modal .receive-inline-new { border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; background: #f8fafc; }
+  .stock-receive-modal :is(.receive-inline-new, .receive-extra-fields) summary { cursor: pointer; color: #334155; padding: 8px 0; }
+  .stock-receive-modal .receive-core-row .receive-lines-head { display: none; }
+  .stock-receive-modal .receive-core-row .receive-cost-summary { margin-top: 8px; }
+  .stock-receive-modal .receive-unified-form { gap: 10px; }
+  @media (max-width: 900px) { .stock-receive-modal .receive-new-required { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 560px) { .stock-receive-modal .receive-new-required { grid-template-columns: 1fr; } }
+  .stock-receive-modal .receive-entry-table-wrap { overflow: auto; max-height: 340px; }
+  .stock-receive-modal .receive-entry-table { width: 100%; min-width: 1050px; border-collapse: collapse; background: #fff; }
+  .stock-receive-modal .receive-entry-table :is(th, td) { padding: 8px; border-bottom: 1px solid #e2e8f0; vertical-align: middle; }
+  .stock-receive-modal .receive-entry-table th { background: #f8fafc; color: #334155; white-space: nowrap; position: sticky; top: 0; }
+  .stock-receive-modal .receive-entry-table td:first-child { min-width: 180px; }
+  .stock-receive-modal .receive-entry-table td small { display: block; color: #64748b; }
+  .stock-receive-modal .receive-entry-table input { width: 100%; min-width: 70px; box-sizing: border-box; background: #fff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px; color: #0f172a; }
+  .stock-receive-modal .receive-entry-table td:nth-child(2) { min-width: 130px; }
+  .stock-receive-modal .receive-entry-table td:nth-child(3) { min-width: 150px; }
+  .stock-receive-modal .receive-entry-table tfoot td { font-weight: 700; background: #f8fafc; }
+}
 /* Keep member search results in the dialog flow instead of clipping a popup. */
+@media screen {
+  :root .app-shell .pos-premium-layout .quick-pick-panel .product-art {
+    height: 112px; background: #fff;
+  }
+  :root .app-shell .pos-premium-layout .quick-pick-panel .product-art-img {
+    width: 100%; height: 100%; object-fit: contain; padding: 6px; box-sizing: border-box;
+  }
+  :root .app-shell .pos-premium-layout .quick-pick-panel .product-card-info b {
+    font-size: 12px; line-height: 1.45;
+  }
+}
+/* Screen-only semantic red: keep print documents monochrome. */
+@media screen {
+  :root { --app-danger: #dc2626; --app-danger-ink: #b91c1c; --app-danger-soft: #fef2f2; }
+  :root .app-shell .red-text,
+  :root .modal-backdrop .red-text { color: var(--app-danger) !important; }
+  :root :is(.notice-bar.error, .inline-message.error, .login-error) {
+    color: var(--app-danger-ink); background: var(--app-danger-soft); border-color: #fca5a5;
+  }
+  :root :is(.notice-bar.error, .inline-message.error, .login-error) :is(button, svg) { color: var(--app-danger-ink); }
+  :root .app-shell .notif-badge { background: var(--app-danger); color: #fff; box-shadow: none; }
+  :root .blocker-icon.error { color: var(--app-danger); background: var(--app-danger-soft); box-shadow: none; }
+  :root .blocker-button.error { background: var(--app-danger); color: #fff; }
+  :root .blocker-button.error:hover { background: var(--app-danger-ink); }
+  :root .app-shell .status-badge.red { color: var(--app-danger-ink); background: var(--app-danger-soft); border-color: #fca5a5; }
+  :root [data-sonner-toast][data-type="error"] { color: var(--app-danger-ink); background: var(--app-danger-soft); border-color: #fca5a5; }
+  :root [data-sonner-toast][data-type="error"] [data-icon] { color: var(--app-danger); }
+}
 @media screen {
   :root .member-card-modal.confirm-mode .modal-actions .primary-button,
   :root .member-card-modal.confirm-mode .modal-actions .primary-button svg {
@@ -47,6 +188,30 @@
   }
 }
 .card-inventory-builder { margin: 8px 0 12px; padding: 12px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; }
+/* Keep the product name readable and all quantity controls on one row on phones. */
+@media screen and (max-width: 560px) {
+  :root .app-shell .cart-item,
+  :root .app-shell .cart-items-head {
+    grid-template-columns: 136px 60px minmax(0, 1fr);
+    gap: 8px;
+  }
+  :root .app-shell .cart-item-name,
+  :root .app-shell .cart-items-head > span:first-child {
+    grid-column: 1 / -1;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  :root .app-shell .cart-item .qty-control {
+    flex-wrap: nowrap;
+    overflow: visible;
+  }
+  :root .app-shell .pos-mobile-bar {
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+  :root .app-shell .page-content {
+    scroll-padding-bottom: calc(100px + env(safe-area-inset-bottom, 0px));
+  }
+}
 .card-inventory-builder [role="tablist"] { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
 .card-inventory-builder [role="tab"] { padding: 10px 16px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; color: #334155; font-weight: 600; }
 .card-inventory-builder [role="tab"][aria-selected="true"] { background: #eaf2f8; color: #1e466c; border-color: #537fa6; }
@@ -330,11 +495,19 @@
 }
 @media screen {
   :root .app-shell .shell-account-footer .notif-bell {
+    display: flex;
+    width: 100%;
+    min-width: 0;
     height: 36px; min-height: 36px; padding: 0 10px;
+    align-items: center; justify-content: flex-start; gap: 8px;
     border: 1px solid #e2e8f0; border-radius: 10px;
     background: #fff; background-image: none; color: #475569;
     box-shadow: none; font-size: 12px;
+    position: relative; overflow: visible;
   }
+  /* ปุ่มแจ้งเตือนท้ายเมนู POS: จำกัดกรอบเฉพาะปุ่มของตัวเอง — ห้ามแผ่ทับปุ่มทางลัดข้างเคียง (ตรวจสอบด้วยสคริปต์ pos-layout-audit) */
+  :root .app-shell .pos-rail .shell-account-footer .notif-bell::after,
+  :root .app-shell .pos-rail .shell-account-footer .notif-bell::before { content: none; }
   :root .app-shell .shell-account-footer .notif-bell:hover {
     background: #f8fafc; color: #0f172a;
   }
@@ -417,7 +590,7 @@
     flex: none; min-height: 0; max-height: 560px; overflow: auto;
   }
   :root .app-shell .pos-premium-layout .quick-pick-panel .product-art {
-    height: 48px; font-size: 24px;
+    height: 112px; font-size: 32px;
   }
   :root .app-shell .pos-premium-layout .product-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;

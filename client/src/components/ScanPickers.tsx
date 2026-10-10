@@ -317,6 +317,7 @@ export function ProductScanPicker({
   onSelect,
   autoFocus,
   compactSelected = false,
+  onNotFound,
   placeholder = "ยิงบาร์โค้ดที่ตัวสินค้า หรือคีย์รหัส SKU / ชื่อสินค้า",
 }: {
   products: SqliteProduct[];
@@ -324,6 +325,7 @@ export function ProductScanPicker({
   onSelect: (product: SqliteProduct | null) => void;
   autoFocus?: boolean;
   compactSelected?: boolean;
+  onNotFound?: (code: string) => void;
   placeholder?: string;
 }) {
   const [term, setTerm] = useState("");
@@ -406,6 +408,10 @@ export function ProductScanPicker({
       setTerm(value);
       setMissed(value);
       setOpen(true);
+      if (onNotFound && !suggestions.length) {
+        setOpen(false);
+        onNotFound(value);
+      }
     }
   };
 

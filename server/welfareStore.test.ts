@@ -1594,6 +1594,8 @@ describe("change own password (forced first change)", () => {
 
     const mine = createAppSession(database, user.id);
     const otherDevice = createAppSession(database, user.id);
+    // Simulate a legacy database containing parallel sessions before the new policy.
+    database.prepare("INSERT INTO app_sessions (id,user_id,expires_at,created_at,last_seen_at) VALUES (?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)").run(mine.sessionId, user.id, mine.expiresAt);
     const staffSession = createAppSession(database, findAppUserByUsername(database, "kanyanat")!.id);
 
     const result = changeOwnPassword(database, { userId: user.id, currentPassword, newPassword, keepSessionId: mine.sessionId });
@@ -1754,6 +1756,9 @@ describe("active session administration", () => {
     const staffOne = createAppSession(database, staff.id);
     const staffTwo = createAppSession(database, staff.id);
     const adminOld = createAppSession(database, admin.id);
+    // Legacy parallel sessions must still be removable by the administration tools.
+    database.prepare("INSERT INTO app_sessions (id,user_id,expires_at,created_at,last_seen_at) VALUES (?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)").run(mine.sessionId, admin.id, mine.expiresAt);
+    database.prepare("INSERT INTO app_sessions (id,user_id,expires_at,created_at,last_seen_at) VALUES (?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)").run(staffOne.sessionId, staff.id, staffOne.expiresAt);
     expect(tableCount(database, "app_sessions")).toBe(4);
 
     const revoked = revokeOtherAppSessions(database, mine.sessionId, "วรพจน์ ด.", "ผู้บริหาร");

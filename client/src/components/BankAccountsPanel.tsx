@@ -175,12 +175,12 @@ export function BankAccountsPanel({
   };
 
   return (
-    <section className="panel settings-card">
+    <section className="panel settings-card bank-accounts-compact">
       <div className="settings-heading">
         <div>
           <h2>บัญชีธนาคารรับโอน</h2>
         </div>
-        <Bank size={20} className="muted-icon" />
+        {!draft && <button type="button" className="outline-button" onClick={startAdd} disabled={disabled}><Plus size={15} /> เพิ่มบัญชี</button>}
       </div>
 
       <div className="bank-list">
@@ -266,11 +266,6 @@ export function BankAccountsPanel({
           <div className="bank-draft-head">
             <div>
               <b>{editingId ? "แก้ไขบัญชีธนาคาร" : "เพิ่มบัญชีธนาคาร"}</b>
-              <small>
-                {editingId
-                  ? "แก้ไขข้อมูลแล้วกด “บันทึก” — จะใช้เมื่อกดบันทึกการตั้งค่าท้ายหน้า"
-                  : "กรอกข้อมูลให้ครบแล้วกด “เพิ่มบัญชี” — สามารถเพิ่มได้หลายบัญชี"}
-              </small>
             </div>
             <button
               type="button"
@@ -281,28 +276,20 @@ export function BankAccountsPanel({
               <X size={17} />
             </button>
           </div>
-          <div className="bank-preset-row">
-            <small>เลือกธนาคารทั่วไป:</small>
-            <div className="bank-preset-chips">
-              {THAI_BANK_PRESETS.map(preset => (
-                <button
-                  type="button"
-                  key={preset.code}
-                  className={`bank-preset-chip${draft.bankCode === preset.code ? " active" : ""}`}
-                  onClick={() => pickPreset(preset)}
-                >
-                  {preset.name}
-                </button>
-              ))}
-            </div>
-          </div>
           <div className="form-grid">
+            <label>เลือกธนาคาร
+              <select value={THAI_BANK_PRESETS.some(p => p.code === draft.bankCode) ? draft.bankCode : ""} disabled={disabled}
+                onChange={e => { const preset = THAI_BANK_PRESETS.find(p => p.code === e.target.value); if (preset) pickPreset(preset); else setDraft({ ...draft, bankCode: "" }); }}>
+                <option value="">ระบุเอง</option>
+                {THAI_BANK_PRESETS.map(p => <option key={p.code} value={p.code}>{p.name}</option>)}
+              </select>
+            </label>
             <label className="wide">
               ชื่อธนาคาร *
               <input
                 value={draft.bankName}
                 onChange={e => setDraft({ ...draft, bankName: e.target.value })}
-                placeholder="เช่น ธนาคารกสิกรไทย (หรือเลือกจากชิปด้านบน)"
+                placeholder="ชื่อธนาคาร"
                 disabled={disabled}
               />
             </label>
@@ -349,20 +336,6 @@ export function BankAccountsPanel({
                 disabled={disabled}
               />
             </label>
-            <label className="toggle-row">
-              <div>
-                <b>เปิดใช้งานบัญชีนี้</b>
-              </div>
-              <button
-                type="button"
-                className={`toggle ${draft.active ? "on" : ""}`}
-                onClick={() => setDraft({ ...draft, active: !draft.active })}
-                aria-pressed={draft.active}
-                aria-label="เปิดหรือปิดใช้งานบัญชีนี้"
-              >
-                <span />
-              </button>
-            </label>
           </div>
           {!isComplete(draft) && draft.accountNumber.length > 0 && (
             <div className="settings-inline-note amber">
@@ -393,18 +366,6 @@ export function BankAccountsPanel({
         </div>
       )}
 
-      {!draft && (
-        <div className="bank-add-row">
-          <button
-            type="button"
-            className="outline-button"
-            onClick={startAdd}
-            disabled={disabled}
-          >
-            <Plus size={15} /> เพิ่มบัญชีธนาคาร
-          </button>
-        </div>
-      )}
 
     </section>
   );

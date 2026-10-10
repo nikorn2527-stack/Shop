@@ -1358,6 +1358,7 @@ function assertValidPriceTiers(raw: string | null): void {
     throw new StoreError(PRICE_TIERS_ERROR);
   }
   if (!Array.isArray(parsed) || parsed.length === 0) throw new StoreError(PRICE_TIERS_ERROR);
+  const labels = new Set<string>();
   for (const tier of parsed) {
     if (typeof tier !== "object" || tier === null || Array.isArray(tier)) throw new StoreError(PRICE_TIERS_ERROR);
     const { label, price, qty } = tier as { label?: unknown; price?: unknown; qty?: unknown };
@@ -1373,6 +1374,8 @@ function assertValidPriceTiers(raw: string | null): void {
     ) {
       throw new StoreError(PRICE_TIERS_ERROR);
     }
+    if (labels.has(label.trim())) throw new StoreError("ชื่อช่องราคาซ้ำกัน กรุณาใช้ชื่อไม่ซ้ำ");
+    labels.add(label.trim());
   }
 }
 
@@ -1381,7 +1384,9 @@ export function createProduct(db: SqliteDb, input: CreateProductInput): SqlitePr
   if (!name) throw new StoreError("กรุณาระบุชื่อสินค้า");
   // ROUND 54 (user) — อนุญาตราคา ฿0 = "ยังไม่ได้ตั้งราคา" (สินค้านำเข้า 120 รายการยังไม่มีราคา
   // ต้องแก้ชื่อ/ขนาด/หน่วยได้ก่อน โดยยังไม่ต้องใส่ราคา) — ห้ามติดลบเท่านั้น
-  if (!(input.price >= 0)) throw new StoreError("ราคาขายต้องเป็นตัวเลข 0 ขึ้นไป");
+  if (!Number.isFinite(input.price) || input.price < 0) throw new StoreError("ราคาขายต้องเป็นตัวเลข 0 ขึ้นไป");
+  if (input.cost !== undefined && (!Number.isFinite(input.cost) || input.cost < 0)) throw new StoreError("ต้นทุนต้องเป็นตัวเลข 0 ขึ้นไป");
+  if (input.reorderPoint !== undefined && (!Number.isInteger(input.reorderPoint) || input.reorderPoint < 0)) throw new StoreError("จุดสั่งซื้อต้องเป็นจำนวนเต็ม 0 ขึ้นไป");
   if (input.stock !== undefined && (!Number.isInteger(input.stock) || input.stock < 0)) throw new StoreError("จำนวนสต็อกเริ่มต้นไม่ถูกต้อง");
   const sellMode = input.sellMode ?? "unit";
   const quickPick = toQuickPickFlag(input.quickPick);
@@ -1436,6 +1441,16 @@ export type ReceiveStockResult = {
   previousCost: number;
 };
 
+export function nextStockLotNumber(db: SqliteDb) {
+  const prefix = `LOT-${formatDate()}-`;
+  const labels = db.prepare("SELECT lot FROM stock_lots WHERE lot LIKE ?").all(`${prefix}%`) as unknown as { lot: string }[];
+  const sequence = labels.reduce((max, row) => {
+    const suffix = row.lot.slice(prefix.length);
+    return /^\d+$/.test(suffix) ? Math.max(max, Number(suffix)) : max;
+  }, 0) + 1;
+  return { prefix, sequence, lot: prefix + String(sequence).padStart(4, "0") };
+}
+
 export function receiveStockLines(
   db: SqliteDb,
   input: { productId: number; lot?: string; expiryDate?: string | null; lines: (ReceiveStockLine | null | undefined)[] | null | undefined; paidAmount?: number; actor?: string; actorRole?: string },
@@ -1460,9 +1475,12 @@ export function receiveStockLines(
   const lineValue = receiptValue / 100;
   const oldQty = Math.max(0, Math.trunc(product.stock));
   const averageCost = round2((oldQty * previousCost + lineValue) / (oldQty + totalQty));
-  const lotLabel = input.lot?.trim() || `LOT-${formatDate()}`;
+  let lotLabel = input.lot?.trim() || "";
   const createdAt = formatDateTime();
   const writeReceipt = () => {
+    if (!lotLabel) {
+      lotLabel = nextStockLotNumber(db).lot;
+    }
     const insert = db.prepare(`INSERT INTO stock_lots (product_id, lot, expiry_date, qty, cost, received_at, received_qty, received_value_satang, remaining_value_satang) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     let valueRemaining = BigInt(receiptValue);
     let qtyRemaining = totalQty;
@@ -1839,8 +1857,8 @@ export function updateProduct(db: SqliteDb, input: UpdateProductInput): SqlitePr
   if (!product) throw new StoreError(`ไม่พบสินค้ารหัส ${input.productId} ในระบบ`);
   if (input.name !== undefined && !input.name.trim()) throw new StoreError("กรุณาระบุชื่อสินค้า");
   if (input.unit !== undefined && !input.unit.trim()) throw new StoreError("กรุณาระบุหน่วยสินค้า");
-  if (input.price !== undefined && !(input.price >= 0)) throw new StoreError("ราคาขายต้องเป็นตัวเลข 0 ขึ้นไป");
-  if (input.cost !== undefined && input.cost < 0) throw new StoreError("ต้นทุนต้องเป็น 0 ขึ้นไป");
+  if (input.price !== undefined && (!Number.isFinite(input.price) || input.price < 0)) throw new StoreError("ราคาขายต้องเป็นตัวเลข 0 ขึ้นไป");
+  if (input.cost !== undefined && (!Number.isFinite(input.cost) || input.cost < 0)) throw new StoreError("ต้นทุนต้องเป็น 0 ขึ้นไป");
   if (input.reorderPoint !== undefined && (!Number.isInteger(input.reorderPoint) || input.reorderPoint < 0)) throw new StoreError("จุดสั่งซื้อต้องเป็นจำนวนเต็ม 0 ขึ้นไป");
 
   // Resolved values for the new round-31-12 fields: undefined keeps the stored
@@ -2509,10 +2527,24 @@ export type RegisterMemberInput = {
   actorRole?: string;
 };
 
+export function findExistingMembers(db: SqliteDb, input: { firstName: string; lastName: string; citizenId?: string; phone?: string }) {
+  const normalize = (value: string) => value.normalize("NFKC").replace(/\s+/g, "").toLowerCase();
+  const digits = (value: string) => value.replace(/\D/g, "");
+  const id = digits(input.citizenId ?? "");
+  const phone = digits(input.phone ?? "");
+  const rows = db.prepare("SELECT member_number, first_name, last_name, status, id_card, phone FROM members").all() as unknown as { member_number: string; first_name: string; last_name: string; status: string; id_card: string | null; phone: string | null }[];
+  return rows.flatMap(row => {
+    const reason = id && digits(row.id_card ?? "") === id ? "citizenId" : phone && digits(row.phone ?? "") === phone ? "phone" : normalize(input.firstName) && normalize(input.lastName) && normalize(row.first_name) === normalize(input.firstName) && normalize(row.last_name) === normalize(input.lastName) ? "name" : null;
+    return reason ? [{ memberNumber: row.member_number, name: row.first_name + " " + row.last_name, status: row.status, reason }] : [];
+  });
+}
+
 export function registerMember(db: SqliteDb, input: RegisterMemberInput) {
   const firstName = input.firstName?.trim();
   const lastName = input.lastName?.trim();
   if (!firstName || !lastName) throw new StoreError("กรุณาระบุชื่อและนามสกุลสมาชิก");
+  const existingIdentity = findExistingMembers(db, input).find(member => member.reason === "citizenId");
+  if (existingIdentity) throw new StoreError(`เลขประจำตัวนี้เคยลงทะเบียนแล้ว สมาชิก ${existingIdentity.memberNumber} กรุณาใช้บัญชีเดิม`);
   if (input.initialDeposit !== undefined && !(input.initialDeposit > 0)) throw new StoreError("จำนวนเงินต้องมากกว่า 0");
   const memberNumber = generateMemberNumber(db, getMemberNumberMode(db), input.memberNumber);
   if (db.prepare(`SELECT id FROM members WHERE member_number = ?`).get(memberNumber)) {
@@ -4350,18 +4382,22 @@ export function createAppSession(db: SqliteDb, userId: number): { sessionId: str
   const now = new Date();
   const sessionId = randomUUID();
   const expiresAt = formatDateTime(addDays(now, APP_SESSION_TTL_DAYS));
-  db.prepare(`DELETE FROM app_sessions WHERE expires_at < ?`).run(formatDateTime(now));
-  db.prepare(`INSERT INTO app_sessions (id, user_id, expires_at, created_at, last_seen_at) VALUES (?, ?, ?, ?, ?)`).run(sessionId, userId, expiresAt, formatDateTime(now), formatDateTime(now));
+  runInTransaction(db, () => {
+    db.prepare(`DELETE FROM app_sessions WHERE expires_at < ? OR user_id = ?`).run(formatDateTime(now), userId);
+    db.prepare(`INSERT INTO app_sessions (id, user_id, expires_at, created_at, last_seen_at) VALUES (?, ?, ?, ?, ?)`).run(sessionId, userId, expiresAt, formatDateTime(now), formatDateTime(now));
+  });
   return { sessionId, expiresAt };
 }
 
 /** Resolves an active, unexpired session to its (active) app user. */
 export function authenticateAppSession(db: SqliteDb, sessionId: string): AppUser | undefined {
-  return db.prepare(
+  const user = db.prepare(
     `SELECT u.id, u.username, u.password_hash AS passwordHash, u.display_name AS displayName, u.role, u.active, u.created_at AS createdAt, u.failed_attempts AS failedAttempts, u.locked_until AS lockedUntil, u.must_change_password AS mustChangePassword
      FROM app_sessions s JOIN app_users u ON u.id = s.user_id
      WHERE s.id = ? AND s.expires_at > ? AND u.active = 1`,
   ).get(sessionId, formatDateTime()) as AppUser | undefined;
+  if (user) db.prepare("UPDATE app_sessions SET last_seen_at = ? WHERE id = ?").run(formatDateTime(), sessionId);
+  return user;
 }
 
 /** Deletes a session row (logout). Unknown ids are a no-op. */
@@ -4380,6 +4416,7 @@ export type AppSessionSummary = {
   active: number;
   createdAt: string;
   expiresAt: string;
+  lastSeenAt: string;
 };
 
 /** Purges expired session rows (housekeeping shared by list/revoke helpers). */
@@ -4399,7 +4436,7 @@ function withAppRole<T extends { role: string }>(row: T | undefined): (T & { rol
 export function listAppSessions(db: SqliteDb): AppSessionSummary[] {
   purgeExpiredAppSessions(db);
   const rows = db.prepare(
-    `SELECT s.id AS sessionId, u.username, u.display_name AS displayName, u.role, u.active, s.created_at AS createdAt, s.expires_at AS expiresAt
+    `SELECT s.id AS sessionId, u.username, u.display_name AS displayName, u.role, u.active, s.created_at AS createdAt, s.expires_at AS expiresAt, s.last_seen_at AS lastSeenAt
      FROM app_sessions s JOIN app_users u ON u.id = s.user_id
      WHERE s.expires_at > ?
      ORDER BY s.created_at DESC, s.id DESC`,
@@ -4410,7 +4447,7 @@ export function listAppSessions(db: SqliteDb): AppSessionSummary[] {
 /** Finds one unexpired session (with user info) by id. */
 function findAppSessionById(db: SqliteDb, sessionId: string): AppSessionSummary | undefined {
   const row = db.prepare(
-    `SELECT s.id AS sessionId, u.username, u.display_name AS displayName, u.role, u.active, s.created_at AS createdAt, s.expires_at AS expiresAt
+    `SELECT s.id AS sessionId, u.username, u.display_name AS displayName, u.role, u.active, s.created_at AS createdAt, s.expires_at AS expiresAt, s.last_seen_at AS lastSeenAt
      FROM app_sessions s JOIN app_users u ON u.id = s.user_id
      WHERE s.id = ? AND s.expires_at > ?`,
   ).get(sessionId, formatDateTime()) as AppSessionSummary | undefined;
@@ -4774,7 +4811,7 @@ const SEED_PRODUCTS: { sku: string; barcode: string; name: string; category: str
   { sku: "FD-015", barcode: "8850000000055", name: "ขนมปังแซนด์วิช", category: "อาหาร", emoji: "🥪", color: "rose", unit: "ชิ้น", price: 25, cost: 18, stock: 9, reorderPoint: 12 },
   { sku: "HYG-032", barcode: "8850000000062", name: "สบู่เหลวล้างมือ", category: "ของใช้", emoji: "🧴", color: "mint", unit: "ขวด", price: 32, cost: 24, stock: 28, reorderPoint: 10 },
   { sku: "HYG-033", barcode: "8850000000079", name: "หน้ากากอนามัย 3 ชิ้น", category: "ของใช้", emoji: "😷", color: "violet", unit: "แพ็ก", price: 20, cost: 14, stock: 86, reorderPoint: 20 },
-  { sku: "ICE-004", barcode: "8850000000086", name: "น้ำแข็งถุงเล็ก", category: "ของใช้", emoji: "🧊", color: "cyan", unit: "ถุง", price: 10, cost: 6, stock: 35, reorderPoint: 40 },
+  { sku: "ICE-004", barcode: "8850000000086", name: "น้ำแข็งถุงเล็ก", category: "อาหาร", emoji: "🧊", color: "cyan", unit: "ถุง", price: 10, cost: 6, stock: 35, reorderPoint: 40 },
 ];
 
 /**

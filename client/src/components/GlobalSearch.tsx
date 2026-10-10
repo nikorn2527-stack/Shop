@@ -72,7 +72,7 @@ export function GlobalSearch({ role, open, onClose, onNavigate, onOpenMember, on
   const quickActions = useMemo(() => {
     const actions: { key: string; label: string; icon: ComponentType<any>; view: View }[] = [
       { key: "quick-pos", label: "เปิดหน้าร้าน POS", icon: ShoppingCart, view: "pos" },
-      { key: "quick-receive", label: "รับเข้าสินค้า", icon: PackageSearch, view: "stock" },
+      { key: "quick-receive", label: "เปิดหน้าสต็อกสินค้า", icon: PackageSearch, view: "stock" },
       { key: "quick-register", label: "ลงทะเบียนสมาชิก", icon: UserPlus, view: "members" },
       { key: "quick-reports", label: "ดูรายงานยอดขาย", icon: BarChart3, view: "reports" },
     ];

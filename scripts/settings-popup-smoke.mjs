@@ -37,6 +37,31 @@ try {
   };
   await page.waitForSelector('[data-nav-item=settings]');
   await page.click('[data-nav-item=settings]');
+  await click('การชำระเงิน');
+  await page.waitForSelector('.bank-accounts-compact');
+  await click('เพิ่มบัญชี');
+  await page.waitForSelector('.bank-draft-panel select');
+  await page.select('.bank-draft-panel select', 'KTB');
+  assert.equal(await page.$eval('.bank-draft-panel input', n => n.value), 'ธนาคารกรุงไทย');
+  assert.equal(await page.$('.bank-preset-chips'), null);
+  assert.equal(await page.$('.bank-draft-panel .toggle'), null, 'Bank activation must only be controlled in the account list');
+  for (const width of [1366, 390]) {
+    await page.setViewport({ width, height: 768 });
+    const overflow = await page.$eval('.bank-accounts-compact', n => n.scrollWidth > n.clientWidth + 1);
+    assert.equal(overflow, false, 'Bank panel must fit available width');
+    const surfaces = await page.$eval('.bank-draft-panel', n => ({
+      panel: getComputedStyle(n).backgroundColor,
+      fields: [...n.querySelectorAll('input, select')].map(field => getComputedStyle(field).backgroundColor),
+    }));
+    assert.equal(surfaces.panel, 'rgb(241, 245, 249)');
+    assert.ok(surfaces.fields.length > 0);
+    assert.ok(surfaces.fields.every(color => color === 'rgb(255, 255, 255)'), 'Fields must remain white against the slate panel');
+    await page.$eval('.bank-draft-panel', n => n.scrollIntoView({ block: 'start' }));
+    await page.screenshot({ path: path.join(dir, `bank-compact-${width}.png`) });
+  }
+  await click('ยกเลิก');
+  await page.waitForFunction(() => !document.querySelector('.bank-draft-panel'));
+  await page.setViewport({ width: 1366, height: 768 });
   await click('ร้านค้าและหน้าจอ'); await click('แบรนด์');
   const input='input[placeholder="เช่น ร้านค้าสวัสดิการ"]';
   await page.waitForSelector(input);

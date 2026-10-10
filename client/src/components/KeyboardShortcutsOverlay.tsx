@@ -41,6 +41,7 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
       { keys: "F7", desc: "จัดแผงลัดหน้าร้าน (เลือกสินค้าที่หยิบบ่อย)", tag: "POS" },
       { keys: "F8", desc: "โฟกัสช่องสแกนบาร์โค้ด", tag: "POS" },
       { keys: "F9", desc: "รับเข้าสินค้าจาก POS โดยตรง", tag: "POS" },
+      { keys: "F10", desc: "เพิ่มสินค้าใหม่จาก POS โดยตรง", tag: "POS" },
       { keys: "F9", desc: "ที่หน้าภาพรวม — เปิดเมนูหลัก", tag: "Global" },
     ],
   },

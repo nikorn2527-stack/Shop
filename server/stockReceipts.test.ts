@@ -2,6 +2,20 @@ import { describe, expect, it } from "vitest";
 import { createSqliteStore, createProduct, receiveStockLines, stockReceiptHistory } from "./sqliteStore";
 
 describe("stock receipt history", () => {
+  it("allocates separate automatic lots to different receipt entries and retains supplier lots", () => {
+    const db = createSqliteStore();
+    try {
+      const a = createProduct(db, { name: "Lot A", sku: "LOT-A", price: 20 });
+      const b = createProduct(db, { name: "Lot B", sku: "LOT-B", price: 30 });
+      receiveStockLines(db, { productId: a.id, lines: [{ qty: 2, cost: 5 }] });
+      receiveStockLines(db, { productId: b.id, lines: [{ qty: 3, cost: 8 }] });
+      receiveStockLines(db, { productId: a.id, lot: "SUPPLIER-42", lines: [{ qty: 1, cost: 6 }] });
+      const lots = db.prepare("SELECT lot FROM stock_lots ORDER BY id").all() as unknown as { lot: string }[];
+      expect(lots[0].lot).toMatch(/^LOT-\d{4}-\d{2}-\d{2}-\d{4}$/);
+      expect(lots[1].lot).not.toBe(lots[0].lot);
+      expect(lots[2].lot).toBe("SUPPLIER-42");
+    } finally { db.close(); }
+  });
   it("links paid and free lines to their lots and preserves history after stock changes", () => {
     const db = createSqliteStore();
     try {

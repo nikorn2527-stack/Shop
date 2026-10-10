@@ -373,7 +373,6 @@ export function MemberDetail({
       photoUrl: editForm.photoUrl || null,
       creditLimit: creditLimitValue,
       cardNumber: editForm.cardNumber.trim() || null,
-      patientCode: editForm.patientCode.trim() || null,
       actor,
       actorRole,
     });
@@ -828,7 +827,7 @@ export function MemberDetail({
                       </span>
                       <b>
                         {walletDoneAt
-                          ? `${walletDoneAt.toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" })} · ${walletDoneAt.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })} น.`
+                          ? `${walletDoneAt.toLocaleDateString("th-TH", { timeZone: "Asia/Bangkok", day: "numeric", month: "short", year: "numeric" })} · ${walletDoneAt.toLocaleTimeString("th-TH", { timeZone: "Asia/Bangkok", hourCycle: "h23", hour: "2-digit", minute: "2-digit" })} น.`
                           : ""}
                       </b>
                     </div>
@@ -1243,21 +1242,7 @@ export function MemberDetail({
                   title="รหัสบัตรเงินสดของสมาชิก — ใช้ค้นหาและขึ้นรายงานยอดเงินในบัตร"
                 />
               </label>
-              <label>
-                รหัสผู้ป่วย (HN)
-                <input
-                  value={editForm.patientCode}
-                  onChange={event =>
-                    setEditForm({
-                      ...editForm,
-                      patientCode: event.target.value,
-                    })
-                  }
-                  placeholder="เช่น 70001"
-                  maxLength={30}
-                  title="รหัสผู้ป่วยที่ผูกกับบัตร — แสดงในรายงานยอดเงินในบัตร"
-                />
-              </label>
+
               <label className="wide">
                 เลขที่บัตรประชาชน
                 <input

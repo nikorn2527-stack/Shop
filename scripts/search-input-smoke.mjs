@@ -59,6 +59,24 @@ try {
   assert.ok(pos.asElement());
   await pos.asElement().click();
   await page.waitForSelector('.pos-head');
+  assert.equal(await page.$('.quick-pick-panel .pick-stepper'), null, 'Quantity controls belong in the cart');
+  let quickCard = await page.$('.quick-pick-panel .product-card[role="button"]');
+  assert.ok(quickCard);
+  const snackTab = await page.evaluateHandle(() => [...document.querySelectorAll('.category-tabs button')].find(n => n.textContent.trim() === '\u0e02\u0e19\u0e21'));
+  await snackTab.asElement().click();
+  await new Promise(resolve => setTimeout(resolve, 300));
+  const shown = await page.$$eval('.quick-pick-panel .product-card', nodes => nodes.map(n => n.textContent));
+  const nonSnackNames = new DatabaseSync(dbPath, {readOnly:true});
+  try { for (const row of nonSnackNames.prepare("SELECT name FROM products WHERE category<>?").all('\u0e02\u0e19\u0e21')) assert.ok(!shown.some(text => text.includes(row.name)), 'Other categories must not appear under snacks'); } finally {nonSnackNames.close();}
+  const allTab = await page.evaluateHandle(() => [...document.querySelectorAll('.category-tabs button')].find(n => n.textContent.trim() === '\u0e17\u0e31\u0e49\u0e07\u0e2b\u0e21\u0e14'));
+  await allTab.asElement().click();
+  console.log('PASS category filtering');
+  quickCard = await page.$('.quick-pick-panel .product-card[role="button"]');
+  await quickCard.click();
+  await page.waitForFunction(() => document.querySelector('.quick-pick-panel .pick-qty-badge')?.textContent === '1');
+  await quickCard.click();
+  await page.waitForFunction(() => document.querySelector('.quick-pick-panel .pick-qty-badge')?.textContent === '2');
+  assert.ok(Math.abs(await page.$eval('.quick-pick-panel .product-art', n => n.getBoundingClientRect().height) - 112) < 1);
   for (const width of [1440, 1366]) {
     await page.setViewport({ width, height: 900 });
     await page.waitForSelector('.product-grid');

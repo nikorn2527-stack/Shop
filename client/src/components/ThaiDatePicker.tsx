@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { CalendarDays, ChevronLeft, ChevronRight } from "@/lib/icons";
+import { bangkokParts } from "@shared/storeTime";
 
 /**
  * Round 31-8 — เลือกวันที่เป็นภาษาไทยล้วน (เดือนไทย · ปี พ.ศ. · สัปดาห์ อา–ส)
@@ -39,7 +40,8 @@ export function ThaiDatePicker({ value, onChange, min, max, ariaLabel = "เล�
   const popRef = useRef<HTMLDivElement | null>(null);
   const [position, setPosition] = useState({ top: 0, left: 0 });
   const selected = fromIso(value);
-  const today = new Date();
+  const current = bangkokParts(new Date());
+  const today = new Date(current.year, current.month - 1, current.day);
   const [viewYear, setViewYear] = useState(selected?.getFullYear() ?? today.getFullYear());
   const [viewMonth, setViewMonth] = useState(selected?.getMonth() ?? today.getMonth());
   useEffect(() => {
@@ -115,7 +117,7 @@ export function ThaiDatePicker({ value, onChange, min, max, ariaLabel = "เล�
               : <button type="button" key={toIso(date)} className={value === toIso(date) ? "picked" : toIso(date) === toIso(today) ? "today" : ""} disabled={Boolean(outOfRange(date))} onClick={() => pick(date)} aria-label={`${date.getDate()} ${THAI_MONTHS_FULL[date.getMonth()]} ${date.getFullYear() + 543}`}>{date.getDate()}</button>)}
           </div>
           <div className="thai-date-foot">
-            <button type="button" className="mini-button" onClick={() => pick(today)}>วันนี้ · {today.getDate()} {THAI_MONTHS_SHORT[today.getMonth()]} {today.getFullYear() + 543}</button>
+            <button type="button" className="mini-button" disabled={Boolean(outOfRange(today))} onClick={() => pick(today)}>วันนี้ · {today.getDate()} {THAI_MONTHS_SHORT[today.getMonth()]} {today.getFullYear() + 543}</button>
             {value && <button type="button" className="mini-button" onClick={() => { onChange(""); setOpen(false); }}>ล้างวันที่</button>}
           </div>
         </div>

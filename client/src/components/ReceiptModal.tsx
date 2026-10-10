@@ -6,12 +6,13 @@ import type { CheckoutReceipt } from "../../../server/sqliteStore";
 import { money } from "../pages/pageData";
 import { trpc } from "@/lib/trpc";
 import { PrintPreviewModal } from "./PrintPreviewModal";
+import { parseBangkokDate, STORE_TIME_ZONE } from "../../../shared/storeTime";
 
 /** "2026-09-18 14:42:33" → "18 ก.ย. 2569 · 14:42 น." */
 function formatReceiptDateTime(value: string) {
-  const date = new Date(value.includes("T") ? value : value.replace(" ", "T"));
-  if (Number.isNaN(date.getTime())) return value;
-  return `${date.toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" })} · ${date.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" })} น.`;
+  const date = parseBangkokDate(value);
+  if (!date) return value;
+  return `${date.toLocaleDateString("th-TH", { timeZone: STORE_TIME_ZONE, day: "numeric", month: "short", year: "numeric" })} · ${date.toLocaleTimeString("th-TH", { timeZone: STORE_TIME_ZONE, hourCycle: "h23", hour: "2-digit", minute: "2-digit" })} น.`;
 }
 
 /**

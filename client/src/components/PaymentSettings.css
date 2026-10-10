@@ -49,11 +49,11 @@
   margin-top: 8px;
 }
 
-.payment-settings-compact .bank-draft .form-grid {
+.payment-settings-compact .bank-draft-panel .form-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.payment-settings-compact .bank-draft .form-grid .wide {
+.payment-settings-compact .bank-draft-panel .form-grid .wide {
   grid-column: auto;
 }
 
@@ -67,7 +67,32 @@
     grid-column: 1;
   }
 
-  .payment-settings-compact .bank-draft .form-grid {
+  .payment-settings-compact .bank-draft-panel .form-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+.bank-accounts-compact .settings-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.bank-accounts-compact .settings-heading > button { width: auto; margin: 0; white-space: nowrap; }
+.bank-accounts-compact .bank-empty { padding: 10px 12px; }
+.bank-accounts-compact .bank-draft-panel { padding: 12px; margin-top: 10px; }
+.bank-accounts-compact .bank-draft-head { margin-bottom: 10px; }
+.bank-accounts-compact .bank-draft-panel .form-grid { gap: 10px 12px; }
+:root .app-shell .bank-accounts-compact .bank-draft-panel {
+  background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 12px;
+}
+:root .app-shell .bank-accounts-compact .bank-draft-panel .form-grid label {
+  display: flex; flex-direction: column; gap: 4px; margin: 0; min-width: 0;
+}
+:root .app-shell .bank-accounts-compact .bank-draft-panel :is(input, select) {
+  box-sizing: border-box; width: 100%; min-height: 38px; padding: 8px 10px;
+  border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: #0f172a;
+}
+.bank-accounts-compact .bank-draft-actions { margin-top: 10px; }
+.bank-accounts-compact .bank-row { display: flex; align-items: center; gap: 10px; }
+.bank-accounts-compact .bank-row-info { flex: 1; }
+.bank-accounts-compact .bank-row-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+@media (max-width: 720px) {
+  .bank-accounts-compact .bank-row { flex-wrap: wrap; }
+  .bank-accounts-compact .bank-row-actions { margin-left: auto; }
 }

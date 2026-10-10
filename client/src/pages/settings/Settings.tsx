@@ -1,4 +1,5 @@
 import { ActionButton } from "@/components/ActionButton";
+import { INVENTORY_ACTION_LABELS } from "@/lib/inventoryActions";
 import { SharedSearch } from "@/components/SharedSearch";
 /**
  * V2-C4 — Settings view extracted from `client/src/pages/Home.tsx` (pure move).
@@ -208,7 +209,7 @@ const SETTINGS_FIELD_LABELS: [keyof SettingsForm, string][] = [
   ["memberNumberYearMode", "ระบบปีของเลขสมาชิก"],
   ["memberNumberYearDigits", "จำนวนหลักปีของเลขสมาชิก"],
   ["memberNumberSeparator", "ตัวคั่นเลขสมาชิก"],
-  ["memberNumberResetMonth", "เดือนสิ้นสุดรอบปีสมาชิก"],
+  ["memberNumberResetMonth", "เดือนเริ่มรอบปีสมาชิก"],
   ["memberNumberSequenceDigits", "จำนวนหลักเลขรันสมาชิก"],
   ["storeName", "ชื่อร้าน"],
   ["storeCode", "รหัสร้าน"],
@@ -282,18 +283,12 @@ const POS_RAIL_BUTTONS: {
   },
   {
     key: "card",
-    label: "คืน / จ่ายบัตร",
+    label: "คืนเงิน / คืนบัตร / จ่ายบัตร",
     kbd: "",
     detail: "คืนบัตร หรือจ่ายบัตรว่างให้สมาชิกเดิม",
     icon: UsersRound,
   },
-  {
-    key: "limit",
-    label: "ขอลดวงเงิน / คืนบัตร",
-    kbd: "",
-    detail: "คืนเงินทั้งหมดและคืนบัตร",
-    icon: TrendingDown,
-  },
+
   {
     key: "special",
     label: "รายการพิเศษ",
@@ -324,16 +319,16 @@ const POS_RAIL_BUTTONS: {
   },
   {
     key: "receive",
-    label: "รับเข้าสินค้า",
+    label: INVENTORY_ACTION_LABELS.receive,
     kbd: "F9",
-    detail: "เปิดหน้ารับสินค้าเข้าโดยตรงจากหน้า POS",
+    detail: "เปิดฟอร์มรับเข้าสินค้าชุดเดียวกับเมนูสต็อกสินค้า โดยตรงจากหน้า POS",
     icon: PackageSearch,
   },
   {
     key: "add",
-    label: "เพิ่มไอเทมใหม่",
+    label: INVENTORY_ACTION_LABELS.add,
     kbd: "F10",
-    detail: "เปิดหน้าเพิ่มสินค้าใหม่โดยตรงจากหน้า POS",
+    detail: "เปิดฟอร์มเพิ่มสินค้าใหม่ชุดเดียวกับเมนูสต็อกสินค้า โดยตรงจากหน้า POS",
     icon: Plus,
   },
 ];
@@ -713,7 +708,7 @@ export function Settings({
         setLatencyMs(Math.round(performance.now() - started));
         setLatencyError(false);
         setLatencyAt(
-          new Date().toLocaleTimeString("th-TH", {
+          new Date().toLocaleTimeString("th-TH", { timeZone: "Asia/Bangkok", hourCycle: "h23",
             hour: "2-digit",
             minute: "2-digit",
             second: "2-digit",
@@ -2294,14 +2289,13 @@ export function Settings({
                             </select>
                           </label>
                           <label>
-                            เดือนสิ้นสุดรอบปี
+                            เดือนเริ่มรอบปี
                             <select
-                              value={form?.memberNumberResetMonth ?? 1}
+                              value={((form?.memberNumberResetMonth ?? 12) % 12) + 1}
                               onChange={event =>
                                 updateForm({
-                                  memberNumberResetMonth: Number(
-                                    event.target.value
-                                  ),
+                                  memberNumberResetMonth: Number(event.target.value) === 1
+                                    ? 12 : Number(event.target.value) - 1,
                                 })
                               }
                               disabled={!form}
@@ -2432,7 +2426,7 @@ export function Settings({
                         </span>
                         <div>
                           <b>
-                            {button.label} <kbd>{button.kbd}</kbd>
+                            {button.label} <kbd>{shortcutKeyMap[button.key] ?? button.kbd}</kbd>
                           </b>
                           <small>{button.detail}</small>
                         </div>

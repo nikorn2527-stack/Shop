@@ -17,8 +17,11 @@ export function LoginView({ brand, onAuthed }: { brand?: BrandSettings | null | 
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
+  const [transfer, setTransfer] = useState<{ createdAt: string; lastSeenAt: string } | null>(null);
   const loginMutation = trpc.auth.login.useMutation({
-    onSuccess: () => {
+    onSuccess: result => {
+      if (result.requiresTransfer === true) { setTransfer({ createdAt: result.createdAt, lastSeenAt: result.lastSeenAt }); return; }
+      setTransfer(null);
       setError("");
       onAuthed();
     },
@@ -52,7 +55,7 @@ export function LoginView({ brand, onAuthed }: { brand?: BrandSettings | null | 
             <input
               name="username"
               value={username}
-              onChange={(event) => setUsername(event.target.value)}
+              onChange={(event) => { setUsername(event.target.value); setTransfer(null); }}
               autoComplete="username"
               autoFocus
               placeholder="กรอกชื่อผู้ใช้ของบัญชีเจ้าหน้าที่/ผู้บริหาร"
@@ -65,7 +68,7 @@ export function LoginView({ brand, onAuthed }: { brand?: BrandSettings | null | 
                 name="password"
                 type={showPassword ? "text" : "password"}
                 value={password}
-                onChange={(event) => setPassword(event.target.value)}
+                onChange={(event) => { setPassword(event.target.value); setTransfer(null); }}
                 autoComplete="current-password"
                 placeholder="กรอกรหัสผ่าน"
               />
@@ -79,6 +82,13 @@ export function LoginView({ brand, onAuthed }: { brand?: BrandSettings | null | 
               <ShieldCheck size={15} /> {error}
             </div>
           )}
+          {transfer && <div className="login-error" role="alert">
+            <strong>บัญชีนี้เข้าใช้งานอยู่แล้ว</strong>
+            <p>เข้าสู่ระบบเมื่อ {transfer.createdAt} · ติดต่อระบบล่าสุด {transfer.lastSeenAt}</p>
+            <p>ย้ายมาเครื่องนี้จะยุติการเข้าใช้งานเดิม กรุณาตรวจว่างานที่เครื่องเดิมเสร็จแล้ว</p>
+            <button type="button" className="outline-button" disabled={loginMutation.isPending} onClick={() => setTransfer(null)}>ยกเลิก</button>
+            <button type="button" className="primary-button" disabled={loginMutation.isPending} onClick={() => loginMutation.mutate({ username: username.trim(), password, replaceSession: true })}>ยืนยันย้ายมาเครื่องนี้</button>
+          </div>}
           <button type="submit" className="primary-button login-submit" disabled={loginMutation.isPending || !username.trim() || !password}>
             <LogIn size={16} /> {loginMutation.isPending ? "กำลังตรวจสอบ…" : "เข้าสู่ระบบ"}
           </button>

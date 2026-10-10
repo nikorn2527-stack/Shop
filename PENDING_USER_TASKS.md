@@ -5,6 +5,15 @@ Before closing a later request, review this file and update only items supported
 
 ## Implemented; verification still incomplete
 
+### Latest verified repairs (9 October 2026)
+- Receiving draft protection, selected-product search, editable Lot text, keyboard intake and mixed existing/new-product batch have browser/database reconciliation evidence in `docs/USABILITY_AUDIT_LATEST.md` and `scripts/receive-rows-smoke.mjs`.
+- Receiving history now separates recorded acquisition cost/value from current selling price/value. CSV/Excel checks validate exact column values, filtered Lot and exclusion of another Lot; PDF download and preview checked. Unknown legacy acquisition values remain "ไม่ระบุ" rather than zero.
+- The receiving-history day defaults use Bangkok dates. Existing notes below are historical and do not override these verified updates.
+- Remaining acceptance includes physical devices, all report pages, permissions and the rest of the application. No full production approval.
+- Card lifecycle/browser inventory and desktop/mobile history popup checked again using explicit login transfer. Automatic/external codes, full refund/release, assigning an existing member and zero-balance return reconcile with database; CSV card intake, complete role matrix and concurrency are still outstanding.
+- Actual POS cash/QR/member-wallet checkout, receipt PDF/PNG, held bill reload/restore and database reconciliation verified after fixing main-scanner recognition of physical card numbers. Full multi-row cart, all roles and reversal-after-card-reassignment remain outstanding.
+- Settings save/reload persistence, simulated save failure retaining values, discard and mobile/desktop save-panel checks passed on an isolated production server.
+
 - Reusable physical cards (local changes): inventory tables and legacy backfill, registration assignment, separate return, lost/damaged blocking, shared registration without automatic card printing, and inventory panel in Members. HTTP on isolated production server 4197 verified login/create/register/duplicate rejection/return/reuse/anonymous rejection; database reconciliation preserved first member balance 25 and new member balance 0 with three assignment records. Regression 193/193 passed. Browser smoke script exists but Chrome launch failed before page access; UI acceptance is NOT complete. Remaining: CSV intake, history UI, replacement card assignment for existing members, role matrix/concurrency, import integration and full browser regression of changed registration requirements. Sidebar grouped into front-office/back-office without changing existing permissions. No production approval or push.
 
 - Member-card balances: default excludes zero balances; option includes all members. Reconcile filtered counts/totals in preview, PDF, print and spreadsheets through the browser, including negative balances and an empty result.
