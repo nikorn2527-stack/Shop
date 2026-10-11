@@ -50,5 +50,11 @@ To maintain a unified and professional look across the entire application:
 - **Consistent Layout Structure:** Ensure the layout structure matches the rest of the application. For example, if search bars and filter buttons are globally placed on the top-right corner above tables, the menu you are working on must follow this exact same placement and spacing.
 - **Visual Uniformity:** Padding, margins, border-radius, shadows, and button placements (e.g., Confirm/Cancel positioning in dialogs) must be identical to the rest of the app.
 
+### 3.8. Virtual Team Workflow (Role-Based Execution)
+Do not execute the task as a single monolithic entity. You must divide the workload and simulate a 3-role team process internally. Explicitly state which "Role" is currently acting in your output:
+1. **[Role: The End-User / QA Tester]:** Your first phase. Act strictly as a user. Open the browser, interact with the UI, click buttons, and look for bugs, layout issues, or bad UX. Do NOT fix code here. Generate a "Bug Report".
+2. **[Role: The Developer]:** Take the Bug Report. Locate the code, write the fix, and apply it. Ensure you follow all consistency and regression rules.
+3. **[Role: The Code Reviewer]:** After the Developer fixes the issue, review the code changes and the new UI state. If it fails consistency, performance, or introduces a regression, reject it and send it back to the Developer. Only proceed to "Final Sign-Off" when the Reviewer approves.
+
 4. Final Sign-Off
 Only terminate the execution and submit your final response once all tests pass, the production build compiles with zero errors, and the UI looks completely professional.

@@ -321,6 +321,9 @@ body, button, input, select, textarea { font-family: var(--font-body); }
 .inline-message.error, .notice-bar.error { color: #b05457; background: #fdf3f3; border-color: #f3dcdc; }
 .inline-message.error { color: #ad5053; }
 .inline-message.error button, .notice-bar.error button { color: #bd7a7c; }
+/* 语义色:黄色 = ต้องแก้ข้อมูลก่อนบันทึกได้ · แดง = ระบบไม่ให้ทำต่อจริง */
+.inline-message.warning, .notice-bar.warning { color: #946719; background: #fdf6e6; border-color: #f0e0b2; }
+.inline-message.warning button, .notice-bar.warning button { color: #b08a3e; }
 .pos-loading { grid-column: 1 / -1; min-height: 200px; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #959988; gap: 6px; border: 1px dashed #e3ede8; border-radius: 10px; margin-top: 15px; }
 .pos-loading b { color: #7e8270; font-size: 11px; }
 .pos-loading span { font-size: 11px; }

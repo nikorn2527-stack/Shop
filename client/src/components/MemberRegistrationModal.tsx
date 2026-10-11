@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { blocker } from "./BlockerAlert";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "./ui/dialog";
 import { trpc } from "@/lib/trpc";
@@ -11,7 +11,6 @@ import {
   CircleAlert,
   X,
 } from "@/lib/icons";
-import { toast } from "sonner";
 import {
   PRENAME_OPTIONS,
   compressImageToDataUrl,
@@ -35,12 +34,18 @@ export function MemberRegistrationModal({
   const settingsQuery = trpc.settings.get.useQuery(undefined);
   const nextNumberQuery = trpc.member.nextNumber.useQuery(undefined, { staleTime: 0, refetchOnMount: "always", refetchOnWindowFocus: true });
   const [error, setError] = useState("");
+  // แจ้งเตือนจุดเดียวกลางจอ: เหลือง = ข้อมูลแก้ได้ · แดง = บันทึกไม่ผ่านจริง
+  // เรียก fail() ทุกครั้งที่มีข้อผิดพลาด — ข้อความเดิมซ้ำก็เด้งซ้ำได้ (useEffect เดิมแปะ state เดิมแล้วไม่ขึ้นซ้ำ)
+  const fail = (message: string, fix: string) => {
+    setError(message);
+    blocker.warning("ข้อมูลยังไม่พร้อมบันทึก", `${message}\n${fix}`, {
+      confirmLabel: "กลับไปแก้ไข",
+      hint: "ยังไม่มีข้อมูลใดถูกบันทึก — แก้ในฟอร์มแล้วกดบันทึกสมาชิกใหม่ได้เลย",
+    });
+  };
   const [checkingExisting, setCheckingExisting] = useState(false);
   const [existingMembers, setExistingMembers] = useState<{ memberNumber: string; name: string; status: string; reason: string }[]>([]);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
-  useEffect(() => {
-    if (error && !duplicateOpen) blocker.warning("ตรวจสอบข้อมูลก่อนบันทึก", error);
-  }, [error, duplicateOpen]);
   const [registerForm, setRegisterForm] = useState({
     prename: "",
     firstName: "",
@@ -64,8 +69,8 @@ export function MemberRegistrationModal({
         setExistingMembers(matches);
         setDuplicateOpen(true);
       }
-    } catch (cause) {
-      setError(getErrorMessage(cause));
+    } catch {
+      fail("ตรวจรายชื่อสมาชิกเดิมไม่ได้", "อินเทอร์เน็ตขัดข้องชั่วคราว — รอสักครู่แล้วพิมพ์ชื่อใหม่อีกครั้ง ระบบจะตรวจให้เอง");
     }
   };
   const cardsQuery = trpc.card.list.useQuery(undefined);
@@ -78,7 +83,7 @@ export function MemberRegistrationModal({
       void utils.reports.memberBalances.invalidate();
       void utils.logs.list.invalidate();
     },
-    onError: cause => blocker.error("???????????????????????", getErrorMessage(cause), { confirmLabel: "???????" }),
+    onError: cause => blocker.error("บันทึกสมาชิกไม่สำเร็จ", getErrorMessage(cause), { confirmLabel: "ปิดหน้าต่างนี้", hint: "ข้อมูลที่กรอกยังอยู่ครบ — แก้จุดที่ขัดข้อง แล้วกดบันทึกใหม่อีกครั้งได้เลย" }),
   });
   const numberMode = settingsQuery.data?.memberNumberMode ?? "running";
   const nextNumber = nextNumberQuery.data?.memberNumber;
@@ -87,11 +92,11 @@ export function MemberRegistrationModal({
     event.target.value = "";
     if (!file) return;
     if (!/^image\/(png|jpe?g|webp)$/.test(file.type)) {
-      setError("รองรับเฉพาะไฟล์รูป PNG JPG WEBP");
+      fail("รองรับเฉพาะไฟล์รูป PNG JPG WEBP", "เปลี่ยนไฟล์เป็น .png .jpg หรือ .webp แล้วเลือกใหม่");
       return;
     }
     if (file.size > 8_000_000) {
-      setError("ไฟล์รูปใหญ่เกิน 8MB — เลือกไฟล์เล็กลง");
+      fail("ไฟล์รูปใหญ่เกิน 8MB", "ย่อรูปก่อน หรือเลือกไฟล์เล็กลง แล้วลองใหม่");
       return;
     }
     compressImageToDataUrl(file, 480, 0.72)
@@ -100,17 +105,17 @@ export function MemberRegistrationModal({
         setError("");
       })
       .catch(() => {
-        setError("อ่านไฟล์รูปไม่สำเร็จ");
+        fail("อ่านไฟล์รูปไม่สำเร็จ", "ไฟล์อาจเสีย — เลือกไฟล์ใหม่ หรือถ่ายรูปจากกล้องแทน");
       });
   };
   const submitRegister = async (confirmedDifferentPerson = false) => {
     if (registerMutation.isPending || checkingExisting || !settingsQuery.data) return;
     if (!registerForm.firstName.trim() || !registerForm.lastName.trim()) {
-      setError("กรุณาระบุชื่อและนามสกุลสมาชิก");
+      fail("ยังกรอกชื่อหรือนามสกุลไม่ครบ", "พิมพ์ชื่อและนามสกุลให้ครบทั้งสองช่อง แล้วกดบันทึกอีกครั้ง");
       return;
     }
     if (numberMode === "manual" && !registerForm.memberNumber.trim()) {
-      setError("โหมดกำหนดหมายเลขเอง: กรุณาระบุหมายเลขสมาชิก");
+      fail("โหมดกำหนดหมายเลขเอง — ยังไม่ได้ใส่หมายเลขสมาชิก", "พิมพ์หมายเลขที่ต้องการใช้ เช่น VIP-001 แล้วบันทึกใหม่");
       return;
     }
     const initialBalance =
@@ -121,14 +126,14 @@ export function MemberRegistrationModal({
       initialBalance !== undefined &&
       (!Number.isFinite(initialBalance) || !(initialBalance > 0))
     ) {
-      setError("เงินเริ่มต้นต้องมากกว่า 0");
+      fail("เงินเริ่มต้นต้องมากกว่า 0", "ใส่ตัวเลข เช่น 100 หรือเว้นว่างไว้ก่อน แล้วบันทึกใหม่");
       return;
     }
     const card = cardsQuery.data?.find(
       card => card.cardNumber === registerForm.cardNumber.trim()
     );
     if (!card || !["blank", "returned_vacant"].includes(card.status)) {
-      setError("กรุณาสแกนหรือกรอกรหัสบัตรที่พร้อมใช้งานในทะเบียนบัตร");
+      fail("ยังไม่มีบัตรพร้อมใช้สำหรับสมาชิกใหม่", "สแกนหรือกรอกรหัสบัตรที่ขึ้นทะเบียนแล้ว (สถานะว่าง/คืนแล้ว) — ดูรายการบัตรว่างได้ที่ทะเบียนบัตร แล้วบันทึกใหม่");
       return;
     }
     setError("");
@@ -144,7 +149,7 @@ export function MemberRegistrationModal({
       setExistingMembers([]);
       setDuplicateOpen(false);
     } catch (cause) {
-      setError(getErrorMessage(cause));
+      fail("ตรวจรายชื่อสมาชิกเดิมไม่สำเร็จ", "ระบบยังเชื่อมต่อฐานข้อมูลไม่ได้ — รอสักครู่แล้วบันทึกใหม่อีกครั้ง");
       return;
     } finally {
       setCheckingExisting(false);
@@ -448,7 +453,7 @@ export function MemberRegistrationModal({
             </label>
           </div>
           {error && (
-            <div className="notice-bar error">
+            <div className="notice-bar warning">
               <CircleAlert size={16} /> {error}
               <button onClick={() => setError("")}>
                 <X size={14} />

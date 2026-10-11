@@ -33,12 +33,26 @@ try {
     });
     assert.ok(visible, `Footer must stay visible at ${width}x${height}`);
   }
+  // Validation error must show ONE center blocker with reason + fix steps, and NO top-right toast.
+  await page.setViewport({ width: 1366, height: 768 });
+  await page.evaluate(() => [...document.querySelectorAll('.pos-register-modal .modal-actions button')].find(b => b.innerText.includes('บันทึกสมาชิก')).click());
+  await page.waitForSelector('.blocker-backdrop');
+  const blockerText = await page.$eval('.blocker-backdrop', el => el.innerText);
+  assert.ok(blockerText.includes('ยังกรอกชื่อหรือนามสกุลไม่ครบ'), 'Center alert must state the reason');
+  assert.ok(blockerText.includes('พิมพ์ชื่อและนามสกุลให้ครบ'), 'Center alert must state how to fix it');
+  assert.ok(await page.$eval('.blocker-icon.warning', el => el.getClientRects().length > 0), 'Fixable validation must use the yellow warning variant');
+  assert.ok(await page.$eval('.notice-bar.warning', el => el.getClientRects().length > 0), 'Inline hint under the form must be yellow (fixable), not red');
+  assert.equal(await page.$$eval('[data-sonner-toast]', els => els.filter(el => el.getClientRects().length > 0).length), 0, 'No top-right toast may appear for a validation event');
+  await page.screenshot({ path: path.join(cfg.dir, 'validation-center-alert.png'), fullPage: true });
+  await page.evaluate(() => [...document.querySelectorAll('.blocker-backdrop .blocker-button')].find(b => b.getClientRects().length).click());
+  await page.waitForSelector('.blocker-backdrop', { hidden: true });
   await page.type('[name=cardNumber]', 'REVIEW-REGISTER-001');
   await page.type('[name=firstName]', 'สมาชิก');
   await page.type('[name=lastName]', 'ตัวอย่าง');
   await page.keyboard.press('Tab');
   await page.waitForSelector('.member-duplicate-dialog');
   assert.ok((await page.$eval('.member-duplicate-dialog', el => el.innerText)).includes(cfg.memberNumber));
+  assert.equal(await page.$$eval('[data-sonner-toast]', els => els.filter(el => el.getClientRects().length > 0).length), 0, 'Duplicate warning must appear only as the center dialog, never as a toast');
   for (const [width, height] of [[1366, 768], [1139, 334], [390, 844]]) {
     await page.setViewport({ width, height });
     await new Promise(resolve => setTimeout(resolve, 250));
