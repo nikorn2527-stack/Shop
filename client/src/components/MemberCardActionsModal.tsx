@@ -25,12 +25,13 @@ export function MemberCardActionsModal({ memberNumber, onClose, onSuccess }: {
   const busy = release.isPending || assign.isPending;
   const ready = Boolean(member && member.status === "active" && (action === "assign" ? code.trim() && (!member.cardNumber || session) : member.cardNumber && session && member.balance >= 0));
   return <div className="modal-backdrop"><section className="form-modal" role="dialog" aria-modal="true" aria-label="จัดการบัตรสมาชิก">
-    <div className="modal-heading"><h2>จัดการบัตรสมาชิก</h2><button type="button" className="icon-button" aria-label="ปิดหน้าต่าง" disabled={busy} onClick={onClose}>×</button></div>
+    <div className="modal-heading"><h2>{action === "return" ? "คืนเงินและคืนบัตร" : "จ่ายบัตรให้สมาชิกเดิม"}</h2><button type="button" className="icon-button" aria-label="ปิดหน้าต่าง" disabled={busy} onClick={onClose}>×</button></div>
     {detail.isLoading ? <p role="status">กำลังโหลด…</p> : member && <>
       <p>{member.firstName} {member.lastName} · {memberNumber}</p>
       <p>บัตร {member.cardNumber || "ยังไม่มีบัตร"} · ยอดคงเหลือ {member.balance.toFixed(2)} บาท</p>
       {!confirm ? <>
-        <h3>{action === "return" ? "ขอลดวงเงิน / คืนบัตร" : "จ่ายบัตร"}</h3>
+        <h3>{action === "return" ? "รับบัตรคืนและคืนเงินทั้งหมด" : "สมาชิกยังไม่มีบัตร"}</h3>
+        {action === "assign" && <p>จ่ายบัตรว่างให้สมาชิกก่อนเติมเงิน โดยใช้เลขสมาชิกเดิม</p>}
         {action === "assign" ? <label>สแกนหรือกรอกรหัสบัตร<input type="text" autoComplete="off" maxLength={30} value={code} onChange={e => setCode(e.target.value)} /></label> : <p>{member.balance > 0 ? `คืนเงินทั้งหมด ${member.balance.toFixed(2)} บาท พร้อมคืนบัตร` : "รับคืนบัตรและปิดรอบการใช้บัตร"}</p>}
         {!member.cardNumber && action === "return" && <p>สมาชิกไม่มีบัตรที่ต้องคืน</p>}
         {member.balance < 0 && action === "return" && <p role="alert">มียอดค้าง ต้องจัดการยอดก่อนคืนบัตร</p>}

@@ -468,7 +468,8 @@ export function MemberDetail({
           {cardActionsOpen && <MemberCardActionsModal memberNumber={member.memberNumber} onClose={() => setCardActionsOpen(false)} onSuccess={() => { void detailQuery.refetch(); setNotice("จัดการบัตรเรียบร้อยแล้ว"); }} />}
           <button
             className="primary-button"
-            disabled={profile.status !== "active"}
+            disabled={profile.status !== "active" || !member.cardNumber}
+            title={!member.cardNumber ? "กรุณาจ่ายบัตรก่อนเติมเงิน" : undefined}
             onClick={() => {
               setWalletOpen("deposit");
               setWalletConfirm(false);

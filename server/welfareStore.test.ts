@@ -13,6 +13,7 @@ import {
   createAppUser,
   createProduct,
   createBlankCards,
+  assignMemberCard,
   createSqliteStore,
   dailySalesRows,
   dashboardStats,
@@ -644,6 +645,8 @@ describe("member list and status", () => {
 describe("wallet transactions", () => {
   it("deposits and withdraws with balance_after bookkeeping", () => {
     const database = freshDb();
+    createBlankCards(database, ["WALLET-BOOKKEEPING"]);
+    assignMemberCard(database, { memberNumber: "M-000241", cardNumber: "WALLET-BOOKKEEPING", expectedCardNumber: null });
     const deposit = walletTx(database, { memberNumber: "M-000241", type: "deposit", amount: 100, note: "เติมเงินทดสอบ" });
     expect(deposit.balanceAfter).toBe(440);
     const withdrawal = walletTx(database, { memberNumber: "M-000241", type: "withdrawal", amount: 40 });

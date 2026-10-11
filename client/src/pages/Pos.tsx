@@ -74,7 +74,7 @@ const SPECIAL_SHORTCUT = "สินค้าไม่ระบุตายตั
 
 function getErrorMessage(error: unknown) {
   if (error instanceof TRPCClientError) return error.message;
-  return "เกิดข้อผิดพลาดในการเชื่อมต่อระบบ กรุณาลองอีกครั้ง";
+  return "เชื่อมต่อระบบไม่ได้ ลองอีกครั้ง";
 }
 
 function holdTimeLabel(savedAt: number) {
@@ -686,7 +686,7 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
   const requestPayment = (method: PaymentMethod) => {
     if (cart.length === 0) return;
     if (method === "หักบัญชีสมาชิก" && !selectedMember) {
-      setError("กรุณาเลือกสมาชิกก่อนชำระแบบหักบัญชี");
+      setError("เลือกสมาชิกก่อนชำระแบบหักบัญชี");
       blocker.warning("ยังไม่ได้เลือกสมาชิก", "ชำระแบบหักบัญชีสมาชิก ต้องมีสมาชิกในบิลก่อน\nยิงบัตรสมาชิกที่ช่องสแกน หรือกด F1 เพื่อเลือกสมาชิก");
       return;
     }
@@ -752,9 +752,15 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
   };
   const submitWallet = () => {
     const memberNumber = walletMemberNumber || selectedMemberNumber;
-    if (!memberNumber) { setError("กรุณาเลือกสมาชิกก่อนบันทึกรายการ"); blocker.warning("ยังไม่ได้เลือกสมาชิก", "ยิงบัตรสมาชิกที่ช่องด้านบน หรือเลือกจากรายการก่อนบันทึกรายการ"); return; }
+    if (!memberNumber) { setError("เลือกสมาชิกก่อนบันทึกรายการ"); blocker.warning("ยังไม่ได้เลือกสมาชิก", "ยิงบัตรสมาชิกที่ช่องด้านบน หรือเลือกจากรายการก่อนบันทึกรายการ"); return; }
+    const target = members.find(member => member.memberNumber === memberNumber);
+    if (shortcut === "เติมเงิน" && !target?.cardNumber) {
+      setError("สมาชิกยังไม่มีบัตร กรุณาจ่ายบัตรก่อนเติมเงิน");
+      blocker.warning("กรุณาจ่ายบัตรก่อนเติมเงิน", "สมาชิกคืนบัตรแล้ว ให้จ่ายบัตรว่างแก่สมาชิกเดิมก่อนทำรายการเติมเงิน");
+      return;
+    }
     const amount = Number(walletAmount);
-    if (!(amount > 0)) { setError("กรุณาระบุจำนวนเงินมากกว่า 0"); blocker.warning("กรุณาระบุจำนวนเงินให้ถูกต้อง", "ใส่ยอดเงินที่จะเติมหรือถอนเป็นตัวเลขมากกว่า 0"); return; }
+    if (!(amount > 0)) { setError("ใส่จำนวนเงินมากกว่า 0"); blocker.warning("ระบุจำนวนเงินให้ถูกต้อง", "ใส่ยอดเงินที่จะเติมหรือถอนเป็นตัวเลขมากกว่า 0"); return; }
     clearNotices();
     setWalletStep("confirm");
   };
@@ -805,7 +811,7 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
     const price = Number(specialPrice);
     const qty = Math.max(1, Math.floor(Number(specialQty) || 1));
     const unit = specialUnit.trim() || "รายการ";
-    if (!name) { setError("กรุณาระบุชื่อรายการพิเศษ"); blocker.warning("กรุณาระบุชื่อรายการพิเศษ", "เช่น ข้าวราดแกงนอกรายการ / ค่าฝากของ"); return; }
+    if (!name) { setError("ระบุชื่อรายการพิเศษ"); blocker.warning("ระบุชื่อรายการพิเศษ", "เช่น ข้าวราดแกงนอกรายการ / ค่าฝากของ"); return; }
     if (!(price > 0)) { setError("ราคาต่อหน่วยต้องมากกว่า 0"); blocker.warning("ราคาต่อหน่วยต้องมากกว่า 0", "ใส่ราคาของรายการพิเศษนี้ให้ถูกต้องก่อนเพิ่มเข้าบิล"); return; }
     const specialId = -(Date.now() + ++specialSeq.current);
     setCart((items) => [...items, { id: specialId, name, price, qty, unit, special: true }]);

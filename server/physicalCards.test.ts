@@ -5,6 +5,25 @@ import { returnMemberCard } from "./sqliteStore";
 import { createSqliteStore, createBlankCards, registerMember, releasePhysicalCard, listPhysicalCards, markPhysicalCard, getMemberDetail, setSettings, setMemberNumberMode, bindExistingMembersToDemoCards, cardUsageHistory, walletTx, setMemberStatus } from "./sqliteStore";
 
 describe("reusable physical cards", () => {
+  it("requires an assigned card before topping up a returning member", () => {
+    const db = createSqliteStore();
+    try {
+      createBlankCards(db, ["TOPUP-FIRST", "TOPUP-NEXT"]);
+      const member = registerMember(db, { firstName: "Returning", lastName: "Topup", cardNumber: "TOPUP-FIRST", initialDeposit: 45 }).member;
+      const session = cardUsageHistory(db, "TOPUP-FIRST").sessions[0];
+      returnMemberCard(db, { memberNumber: member.memberNumber, cardNumber: "TOPUP-FIRST", expectedSessionId: session.id, mode: "refund" });
+      const count = db.prepare("SELECT COUNT(*) AS n FROM member_transactions").get();
+      expect(() => walletTx(db, { memberNumber: member.memberNumber, type: "deposit", amount: 100 })).toThrow("จ่ายบัตรก่อนเติมเงิน");
+      expect(db.prepare("SELECT COUNT(*) AS n FROM member_transactions").get()).toEqual(count);
+      expect(getMemberDetail(db, member.memberNumber)?.member.balance).toBe(0);
+      assignMemberCard(db, { memberNumber: member.memberNumber, cardNumber: "TOPUP-NEXT", expectedCardNumber: null });
+      walletTx(db, { memberNumber: member.memberNumber, type: "deposit", amount: 100 });
+      expect(getMemberDetail(db, member.memberNumber)?.member).toMatchObject({ balance: 100, cardNumber: "TOPUP-NEXT" });
+      expect(cardUsageHistory(db, "TOPUP-NEXT").sessions[0].incoming).toBe(100);
+      db.prepare("UPDATE physical_cards SET status = 'lost' WHERE card_number = 'TOPUP-NEXT'").run();
+      expect(() => walletTx(db, { memberNumber: member.memberNumber, type: "deposit", amount: 5 })).toThrow("บัตรไม่พร้อมใช้งาน");
+    } finally { db.close(); }
+  });
   it("attributes a cancelled wallet sale to its original card round after the card is reused", () => {
     const db = createSqliteStore();
     try {
