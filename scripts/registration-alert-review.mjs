@@ -36,7 +36,7 @@ try {
   await page.type('[name=cardNumber]', 'REVIEW-REGISTER-001');
   await page.type('[name=firstName]', 'สมาชิก');
   await page.type('[name=lastName]', 'ตัวอย่าง');
-  await page.click('.pos-register-modal > .modal-actions .primary-button');
+  await page.keyboard.press('Tab');
   await page.waitForSelector('.member-duplicate-dialog');
   assert.ok((await page.$eval('.member-duplicate-dialog', el => el.innerText)).includes(cfg.memberNumber));
   for (const [width, height] of [[1366, 768], [1139, 334], [390, 844]]) {
@@ -53,7 +53,8 @@ try {
     await page.screenshot({ path: path.join(cfg.dir, `duplicate-warning-${width}.png`), fullPage: true });
   }
   await page.screenshot({ path: path.join(cfg.dir, 'duplicate-warning.png'), fullPage: true });
-  await page.evaluate(() => [...document.querySelectorAll('.member-duplicate-dialog button')].find(b => b.innerText.includes('กลับไปตรวจสอบ')).click());
+  assert.ok((await page.$eval('.member-duplicate-dialog', el => el.innerText)).includes('ชื่อและนามสกุลที่กรอกตรงกับสมาชิกนี้'));
+  await page.evaluate(() => [...document.querySelectorAll('.member-duplicate-dialog button')].find(b => b.innerText.includes('ปิดคำเตือน')).click());
   await page.waitForSelector('.member-duplicate-dialog', { hidden: true });
   assert.equal(await page.$eval('[name=firstName]', el => el.value), 'สมาชิก');
   assert.deepEqual(errors, []);

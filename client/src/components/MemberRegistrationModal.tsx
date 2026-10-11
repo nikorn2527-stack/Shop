@@ -56,6 +56,18 @@ export function MemberRegistrationModal({
     patientCode: "",
   });
   const [registerCameraOpen, setRegisterCameraOpen] = useState(false);
+  const checkMemberOnBlur = async () => {
+    if (!registerForm.firstName.trim() || !registerForm.lastName.trim() || duplicateOpen || registerMutation.isPending) return;
+    try {
+      const matches = await utils.member.checkExisting.fetch({ firstName: registerForm.firstName.trim(), lastName: registerForm.lastName.trim(), citizenId: registerForm.idCard.trim() || undefined, phone: registerForm.phone.trim() || undefined });
+      if (matches.length) {
+        setExistingMembers(matches);
+        setDuplicateOpen(true);
+      }
+    } catch (cause) {
+      setError(getErrorMessage(cause));
+    }
+  };
   const cardsQuery = trpc.card.list.useQuery(undefined);
   const registerMutation = trpc.member.register.useMutation({
     onSuccess: result => {
@@ -180,18 +192,18 @@ export function MemberRegistrationModal({
         <DialogContent className="member-duplicate-dialog" showCloseButton={false}>
           <DialogHeader>
             <DialogTitle>พบข้อมูลสมาชิกเดิม</DialogTitle>
-            <DialogDescription>ตรวจสอบว่าเป็นสมาชิกคนเดิมหรือไม่ ก่อนสมัครใหม่ หากเป็นคนเดิมให้ใช้เลขสมาชิกเดิมเพื่อจ่ายบัตร</DialogDescription>
+            <DialogDescription>ข้อมูลที่กรอกตรงกับสมาชิกด้านล่าง ยังไม่ได้บันทึกสมาชิกใหม่ หากเป็นคนเดิม ไม่ต้องสมัครซ้ำ ให้ใช้เลขสมาชิกนี้เพื่อจ่ายบัตร</DialogDescription>
           </DialogHeader>
           <div className="member-duplicate-list">
             {existingMembers.map(member => <div className="notice-bar" key={member.memberNumber} style={{ display: "block" }}>
               <strong>{member.name}</strong>
               <p>เลขสมาชิก {member.memberNumber} · {member.status === "active" ? "ใช้งาน" : "ระงับการใช้งาน"}</p>
-              <small>ข้อมูลตรงกัน: {member.reason === "citizenId" ? "เลขบัตรประชาชน" : member.reason === "phone" ? "เบอร์โทรศัพท์" : "ชื่อและนามสกุล"}</small>
+              <small>{member.reason === "citizenId" ? "เลขบัตรประชาชนตรงกับสมาชิกนี้ จึงไม่สามารถสมัครซ้ำได้" : member.reason === "phone" ? "เบอร์โทรศัพท์ที่กรอกตรงกับสมาชิกนี้ หากใช้เบอร์ร่วมกันและเป็นคนละคน สามารถยืนยันสมัครใหม่ได้" : "ชื่อและนามสกุลที่กรอกตรงกับสมาชิกนี้ หากเป็นคนละคนที่ชื่อเหมือนกัน สามารถยืนยันสมัครใหม่ได้"}</small>
             </div>)}
           </div>
           <DialogFooter>
-            <button type="button" className="outline-button" disabled={checkingExisting || registerMutation.isPending} onClick={() => setDuplicateOpen(false)}>กลับไปตรวจสอบ</button>
-            {!existingMembers.some(member => member.reason === "citizenId") && <button type="button" className="primary-button" disabled={checkingExisting || registerMutation.isPending} onClick={() => void submitRegister(true)}>ยืนยันว่าเป็นคนละคน</button>}
+            <button type="button" className="outline-button" disabled={checkingExisting || registerMutation.isPending} onClick={() => setDuplicateOpen(false)}>ปิดคำเตือน — ยังไม่สมัครใหม่</button>
+            {!existingMembers.some(member => member.reason === "citizenId") && <button type="button" className="primary-button" disabled={checkingExisting || registerMutation.isPending} onClick={() => void submitRegister(true)}>เป็นคนละคน — สมัครใหม่</button>}
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -292,6 +304,7 @@ export function MemberRegistrationModal({
               <input
                 id="pos-register-first-name"
                 name="firstName"
+                onBlur={() => void checkMemberOnBlur()}
                 value={registerForm.firstName}
                 onChange={event =>
                   setRegisterForm({
@@ -306,6 +319,7 @@ export function MemberRegistrationModal({
               นามสกุล *
               <input
                 name="lastName"
+                onBlur={() => void checkMemberOnBlur()}
                 value={registerForm.lastName}
                 onChange={event =>
                   setRegisterForm({
@@ -328,8 +342,8 @@ export function MemberRegistrationModal({
                 <option>เจ้าหน้าที่</option>
               </select>
             </label>
-            <label>เบอร์โทรศัพท์ (ถ้ามี)<input type="tel" value={registerForm.phone} onChange={event => setRegisterForm({ ...registerForm, phone: event.target.value })} /></label>
-            <label>เลขที่บัตรประชาชน (ถ้ามี)<input type="text" inputMode="numeric" value={registerForm.idCard} onChange={event => setRegisterForm({ ...registerForm, idCard: event.target.value })} /></label>
+            <label>เบอร์โทรศัพท์ (ถ้ามี)<input type="tel" value={registerForm.phone} onBlur={() => void checkMemberOnBlur()} onChange={event => setRegisterForm({ ...registerForm, phone: event.target.value })} /></label>
+            <label>เลขที่บัตรประชาชน (ถ้ามี)<input type="text" inputMode="numeric" value={registerForm.idCard} onBlur={() => void checkMemberOnBlur()} onChange={event => setRegisterForm({ ...registerForm, idCard: event.target.value })} /></label>
             <label>
               เพศ
               <select
