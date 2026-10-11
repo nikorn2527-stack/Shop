@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, CircleHelp } from "lucide-react";
+import { ChevronDown, CircleHelp } from "@/lib/icons";
 
 /**
  * ROUND 80 (user) — ลดข้อแนะนำที่รกหน้าจอ

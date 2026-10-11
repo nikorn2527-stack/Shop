@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Camera, CircleAlert, ScanLine, X, Zap, ZapOff } from "lucide-react";
+import { Camera, CircleAlert, ScanLine, X, Zap, ZapOff } from "@/lib/icons";
 
 /**
  * ROUND 55 (user) — สแกนบาร์โค้ดด้วยกล้อง (มือถือ/เว็บแคม)

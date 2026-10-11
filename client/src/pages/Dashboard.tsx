@@ -1,18 +1,112 @@
 import { useMemo, useState } from "react";
 import {
-  Activity, BarChart3, CalendarClock, CalendarDays, Check, CircleAlert, Crown, MoreHorizontal, PackageSearch, Printer, ReceiptText, ShieldCheck, ShoppingBag, Terminal, Wallet, X,
-} from "lucide-react";
-import type { BusinessPeriodStatus, DayClosureRow } from "../../../server/sqliteStore";
+  Activity, BarChart3, CalendarClock, CalendarDays, Check, CircleAlert, Crown, MoreHorizontal, PackageSearch, Printer, ReceiptText, ShieldCheck, ShoppingBag, Terminal, Wallet, X, UsersRound,
+} from "@/lib/icons";
+import type { BusinessPeriodStatus, DashboardStats, DayClosureRow } from "../../../server/sqliteStore";
 import type { Role, View } from "./pageData";
 import { isAdminRole, money, roleThaiLabel } from "./pageData";
 import { ConfirmDialog, SectionHeader } from "./PagePrimitives";
 import { PrintPreviewModal } from "@/components/PrintPreviewModal";
+import { OnboardingBanner } from "@/components/OnboardingBanner";
+import { RecentBillsWidget } from "@/components/RecentBillsWidget";
 import { trpc } from "@/lib/trpc";
 import { formatAxisLabel, formatThaiDate, formatTimeShort, parseBahtFromDetail } from "./viewFormat";
 
 const THAI_WEEKDAYS = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."];
 const THAI_SHORT_MONTHS = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
 const RANGE_DAYS: Record<string, number> = { "7 วัน": 7, "30 วัน": 30, "12 เดือน": 365 };
+
+/**
+ * STYLE-9 — TodaySnapshot: a compact always-visible strip above the metric
+ * grid that shows today's sales / bills / deposits at a glance. The last
+ * entry of `stats.revenueByDay` IS today (the dashboardStats loop fills
+ * from `range-1` days ago through today). Clicking any stat jumps to the
+ * relevant view for deeper drill-down.
+ */
+function TodaySnapshot({
+  stats,
+  deposits,
+  loading,
+  rangeDays,
+  setView,
+}: {
+  stats: DashboardStats | undefined;
+  deposits: Map<string, number>;
+  loading: boolean;
+  rangeDays: number;
+  setView: (view: View) => void;
+}) {
+  const todayKey = (() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  })();
+  const todayRevenue = stats?.revenueByDay?.find((d) => d.date === todayKey)?.total ?? 0;
+  const todayDeposits = deposits.get(todayKey) ?? 0;
+  // Avg daily from range gives a "today vs avg" comparison
+  const avgDaily = stats?.avgDailySales ?? 0;
+  const vsAvgPct = avgDaily > 0 ? Math.round((todayRevenue / avgDaily) * 100) : 0;
+  return (
+    <section className="today-snapshot" aria-label="สรุปยอดวันนี้">
+      <div className="today-snapshot-head">
+        <span className="today-snapshot-label"><CalendarDays size={13} /> สรุปวันนี้</span>
+        <span className="today-snapshot-date">{formatThaiDate(new Date())}</span>
+      </div>
+      <div className="today-snapshot-grid">
+        <button
+          className="today-snapshot-stat highlight"
+          onClick={() => setView("reports")}
+          title="ดูรายงานยอดขายเต็มรูปแบบ"
+        >
+          <span className="ts-icon green"><ShoppingBag size={15} /></span>
+          <span className="ts-body">
+            <small>ยอดขายวันนี้</small>
+            <b>{loading ? "…" : money(todayRevenue)}</b>
+          </span>
+          {todayRevenue > 0 && avgDaily > 0 && (
+            <span className={`ts-delta ${vsAvgPct >= 100 ? "up" : "down"}`} title={`เทียบค่าเฉลี่ย ${money(avgDaily)}/วัน ในช่วง ${rangeDays} วัน`}>
+              {vsAvgPct >= 100 ? "▲" : "▼"} {vsAvgPct}%
+            </span>
+          )}
+        </button>
+        <button
+          className="today-snapshot-stat"
+          onClick={() => setView("members")}
+          title="ไปที่สมาชิกและบัญชี — ดูสมาชิกทั้งหมด"
+        >
+          <span className="ts-icon blue"><UsersRound size={15} /></span>
+          <span className="ts-body">
+            <small>สมาชิกทั้งหมด</small>
+            <b>{loading ? "…" : (stats?.memberCount?.total ?? 0)} <small>คน</small></b>
+          </span>
+        </button>
+        <button
+          className="today-snapshot-stat"
+          onClick={() => setView("members")}
+          title="ไปที่สมาชิกและบัญชี"
+        >
+          <span className="ts-icon purple"><Wallet size={15} /></span>
+          <span className="ts-body">
+            <small>เติมเงินวันนี้</small>
+            <b>{loading ? "…" : money(todayDeposits)}</b>
+          </span>
+        </button>
+        <button
+          className="today-snapshot-stat"
+          onClick={() => setView("stock")}
+          title="ไปที่สต็อกสินค้า"
+        >
+          <span className="ts-icon amber"><PackageSearch size={15} /></span>
+          <span className="ts-body">
+            <small>สินค้าใกล้หมดสต็อก</small>
+            <b>{loading ? "…" : (stats?.lowStock?.length ?? 0)} <small>รายการ</small></b>
+          </span>
+        </button>
+      </div>
+    </section>
+  );
+}
+
+
 
 /** Round 34 — compact baht for on-chart chips: 14900 → "฿14.9k", 1200000 → "฿1.2M", 0 → "฿0". */
 function compactBaht(value: number) {
@@ -71,10 +165,11 @@ const deltaChip = (delta: number | null, fallback: string) => (delta === null
   : <em className={delta >= 0 ? "up" : "down"}>{delta >= 0 ? "↑" : "↓"} {Math.abs(delta).toFixed(1)}%</em>);
 
 type ChartPoint = { label: string; date: string; revenue: number; deposit: number };
-type DashTab = "sales" | "best" | "watch" | "activity" | "cutoff";
+type DashTab = "sales" | "bills" | "best" | "watch" | "activity" | "cutoff";
 
 const DASH_TABS: { id: DashTab; label: string }[] = [
   { id: "sales", label: "ยอดขาย" },
+  { id: "bills", label: "บิลล่าสุด" },
   { id: "best", label: "สินค้าขายดี" },
   { id: "watch", label: "ต้องติดตาม" },
   { id: "activity", label: "กิจกรรมล่าสุด" },
@@ -190,6 +285,8 @@ export function Dashboard({ setView, role, userName }: { setView: (view: View) =
   const statsQuery = trpc.dashboard.stats.useQuery({ rangeDays });
   const logsQuery = trpc.logs.list.useQuery({ limit: 1000 });
   const productsQuery = trpc.product.list.useQuery(undefined);
+  const membersQuery = trpc.member.list.useQuery(undefined);
+  const settingsQuery = trpc.settings.get.useQuery(undefined);
   const stats = statsQuery.data;
 
   const firstName = (userName || "ผู้ใช้ระบบ").trim().split(/\s+/)[0];
@@ -291,9 +388,30 @@ export function Dashboard({ setView, role, userName }: { setView: (view: View) =
   const expirySoon = stats?.expirySoon ?? [];
   const recentActivities = stats?.recentActivities ?? [];
   const loading = statsQuery.isLoading;
+  // QA-FEAT-1 — onboarding banner shows when the store is in early state
+  // (no products/members/sales). Each step has a CTA that jumps to the right view.
+  // FEAT-5 — added "ตั้งค่าร้าน" step: considered configured when appName has
+  // been changed from the default, OR appLogo is set, OR ≥1 bank account exists.
+  const storeConfigured = useMemo(() => {
+    const s = settingsQuery.data;
+    if (!s) return false;
+    const hasCustomName = (s.appName ?? "").trim() !== "" && s.appName !== "ร้านค้าสวัสดิการ";
+    const hasLogo = Boolean(s.appLogo);
+    const hasBank = (s.bankAccounts ?? []).length > 0;
+    return hasCustomName || hasLogo || hasBank;
+  }, [settingsQuery.data]);
+  const onboardingProgress = {
+    storeConfigured,
+    productCount: productsQuery.data?.length ?? 0,
+    memberCount: membersQuery.data?.length ?? 0,
+    salesCount: stats?.totalOrders ?? 0,
+  };
   return (
     <>
       <SectionHeader eyebrow={`ภาพรวมการดำเนินงาน · ${role === "admin" ? "มุมมองผู้บริหาร" : role === "dev" ? "มุมมองผู้พัฒนา" : "มุมมองเจ้าหน้าที่"}`} title={`${greetingWord}, ${firstName}`} description="สรุปตัวเลขสำคัญอยู่บนสุด · เลือกมุมมองข้อมูลจากแถบด้านล่างเพื่อดูรายละเอียดแบบเต็มพื้นที่" action={<><div className={`permission-chip ${role}`}><span>{role === "admin" ? <Crown size={14} /> : role === "dev" ? <Terminal size={14} /> : <ShieldCheck size={14} />}</span>{role === "admin" ? "สิทธิ์ผู้บริหาร · วิเคราะห์เต็มรูปแบบ" : role === "dev" ? "สิทธิ์ผู้พัฒนา · เข้าถึงทุกส่วนของระบบ" : "สิทธิ์เจ้าหน้าที่ · ปฏิบัติงานหน้าร้าน"}</div><div className="permission-chip neutral" title="วันที่ปัจจุบัน"><span><CalendarDays size={14} /></span>วันนี้ · {formatThaiDate(new Date())}</div></>} />
+      <OnboardingBanner progress={onboardingProgress} setView={setView} />
+      {/* STYLE-9 — Today's snapshot mini-stats row (always visible, quick glance at today) */}
+      <TodaySnapshot stats={stats} deposits={deposits} loading={loading} rangeDays={rangeDays} setView={setView} />
       <div className="metric-grid">
         <div className="metric-card highlight"><div className="metric-top"><span>ยอดขายทั้งหมด · {range}</span><span className="metric-icon green"><ShoppingBag size={18} /></span></div><strong>{loading ? "…" : money(stats?.totalSales ?? 0)}</strong><div className="metric-foot"><span>{stats?.totalOrders ?? 0} บิล</span><span>สูงสุด {money(Math.max(...(stats?.revenueByDay ?? []).map((day) => day.total), 0))} ในหนึ่งวัน</span></div></div>
         <div className="metric-card"><div className="metric-top"><span>ออเดอร์ทั้งหมด</span><span className="metric-icon blue"><ReceiptText size={18} /></span></div><strong>{loading ? "…" : (stats?.totalOrders ?? 0).toLocaleString("th-TH")} <small>บิล</small></strong><div className="metric-foot"><span>เฉลี่ย {((stats?.totalOrders ?? 0) / rangeDays).toFixed(1)} บิล/วัน</span><span>ในช่วง{range}</span></div></div>
@@ -302,12 +420,13 @@ export function Dashboard({ setView, role, userName }: { setView: (view: View) =
       </div>
       <section className="dash-workbench" aria-label="มุมมองข้อมูลภาพรวม">
         <div className="dash-tabbar" role="tablist" aria-label="เลือกมุมมองข้อมูล">
-          {DASH_TABS.map((item) => <button type="button" role="tab" aria-selected={tab === item.id} className={`dash-tab${tab === item.id ? " active" : ""}`} key={item.id} onClick={() => setTab(item.id)}>{item.id === "sales" ? <BarChart3 size={15} /> : item.id === "best" ? <Crown size={15} /> : item.id === "watch" ? <PackageSearch size={15} /> : item.id === "activity" ? <Activity size={15} /> : <CalendarClock size={15} />}{item.label}{item.id === "watch" && lowStock.length > 0 && <i className="tab-badge red" title={`สินค้าใกล้หมดสต็อก ${lowStock.length} รายการ`}>{lowStock.length}</i>}{item.id === "watch" && expirySoon.length > 0 && <i className="tab-badge amber" title={`ใกล้หมดอายุ ${expirySoon.length} รายการ`}>{expirySoon.length}</i>}</button>)}
+          {DASH_TABS.map((item) => <button type="button" role="tab" aria-selected={tab === item.id} className={`dash-tab${tab === item.id ? " active" : ""}`} key={item.id} onClick={() => setTab(item.id)}>{item.id === "sales" ? <BarChart3 size={15} /> : item.id === "bills" ? <ReceiptText size={15} /> : item.id === "best" ? <Crown size={15} /> : item.id === "watch" ? <PackageSearch size={15} /> : item.id === "activity" ? <Activity size={15} /> : <CalendarClock size={15} />}{item.label}{item.id === "watch" && lowStock.length > 0 && <i className="tab-badge red" title={`สินค้าใกล้หมดสต็อก ${lowStock.length} รายการ`}>{lowStock.length}</i>}{item.id === "watch" && expirySoon.length > 0 && <i className="tab-badge amber" title={`ใกล้หมดอายุ ${expirySoon.length} รายการ`}>{expirySoon.length}</i>}</button>)}
           <span className="dash-tabbar-spacer" aria-hidden="true" />
         </div>
         <div className="dash-tab-body" role="tabpanel">
           {/* Round 34 — กราฟยอดขายออกแบบใหม่: เส้นเดียวอ่านง่าย + คำอธิบายครบ (จุด/ป้ายค่า/
               เส้นเฉลี่ย/แถบสุดสัปดาห์/ป้ายวันนี้ยังไม่ครบวัน/การ์ดสรุปจุดที่เลือก) */}
+          {tab === "bills" && <RecentBillsWidget setView={setView} range={range} />}
           {tab === "sales" && <section className="panel chart-panel interactive-chart-panel">
             <div className="panel-heading">
               <div>

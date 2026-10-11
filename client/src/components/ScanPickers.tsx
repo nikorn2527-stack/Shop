@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Camera, PackageSearch, ScanLine, X } from "lucide-react";
+import { Camera, PackageSearch, ScanLine, X } from "@/lib/icons";
 import { toast } from "sonner";
 import { blocker } from "@/components/BlockerAlert";
 import type { SqliteProduct } from "../../../server/sqliteStore";

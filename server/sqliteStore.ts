@@ -168,6 +168,15 @@ export type CheckoutReceipt = {
   memberName: string | null;
   balanceAfter: number | null;
   cashier: string | null;
+  /** FIX-7 (user) — ยอดเงินสดที่รับมา (เฉพาะ "เงินสด") ใช้พิมพ์ "รับเงินมา X / ทอน Y" ท้ายใบเสร็จ */
+  receivedCash?: number | null;
+  /** FIX-7 (user) — ยอดเงินทอน (เฉพาะ "เงินสด") */
+  changeDue?: number | null;
+  /** FIX-7 (user) — บิล QR ที่แคชเชียร์ยืนยันตรวจสอบแล้ว (เก็บไว้ในตารางเพื่อ audit) */
+  paymentVerified?: boolean | null;
+  /** FIX-8 (user) — พรีวิวก่อนพิมพ์ใบเสร็จ/บัตร/รายงาน: true = เปิด preview ก่อน (default, ปลอดภัย)
+   *  false = กดปุ่มพิมพ์แล้ว window.print() เลย (เร็วกว่า แต่ไม่มีโอกาสตรวจก่อน) */
+  printPreviewBefore?: boolean;
 };
 
 /** A past receipt rebuilt from the sales/sale_items tables — balanceAfter is replayed from the member ledger when that bill was a wallet purchase. */
@@ -176,6 +185,8 @@ export type SaleHistoryEntry = CheckoutReceipt & {
   id: number;
   /** ROUND 63 — บิลนี้มีรูปหลักฐานการชำระแนบอยู่ไหม (ตัวรูปดึงแยกที่ sales.slip เพื่อไม่ให้ลิสต์หนัก) */
   hasSlip: boolean;
+  /** FEAT-9 — บิลนี้ถูกยกเลิกหรือไม่ (true = void, แสดง red strikethrough ใน RecentBillsWidget) */
+  voided?: boolean;
 };
 
 export type DailySalesRow = {
@@ -202,6 +213,30 @@ export type DashboardStats = {
   recentActivities: SqliteAuditLog[];
   memberWalletTotal: number;
   memberCount: { total: number; active: number; suspended: number };
+};
+
+/** FIX-5 (user) — บัญชีธนาคารของร้าน (รับเงินโอน)
+ *  เก็บเป็น JSON array ใน StoreSettings.bankAccounts ·
+ *  ใช้แสดงที่หน้ายืนยันการชำระ POS + ท้ายใบเสร็จ (เมื่อชำระด้วย QR/สแกน)
+ *  แทนที่จะมีเฉพาะ QR PromptPay อย่างเดียว */
+export type BankAccount = {
+  /** id คงที่ (crypto.randomUUID()) — ใช้เป็น React key + อ้างอิงตอนลบ/แก้ */
+  id: string;
+  /** รหัสธนาคาร — เช่น "BBL" "KBANK" "SCB" "KTB" "BAY" "TTB" "TCD" "CIMBT" "TISCO" "KKTB" "ICB" "TCRB" "LHFB" "GHIB"
+   *  เก็บเพื่อ sort/group และแสดงสี/ไอคอน (ถ้ามี) ในอนาคต */
+  bankCode: string;
+  /** ชื่อธนาคาร (display) เช่น "ธนาคารกสิกรไทย" — ตรงกับที่ผู้ใช้พิมพ์เข้ามา */
+  bankName: string;
+  /** เลขที่บัญชี (ตัวเลขเท่านั้น, 10-12 หลัก) */
+  accountNumber: string;
+  /** ชื่อบัญชี (ตัวอักษรตามสมุดบัญชี) — ลูกค้าใช้ตรวจสอบก่อนโอน */
+  accountName: string;
+  /** ชื่อสาขา (ถ้ามี) — ไม่บังคับ */
+  branch?: string;
+  /** ปิด/เปิดใช้งาน — ปิดได้โดยไม่ลบ (สำหรับเปลี่ยนบัญชีชั่วคราว) */
+  active: boolean;
+  /** หมายเหตุ (ถ้ามี) เช่น "บัญชีออมทรัพย์" "เฉพาะโอนภายในเวลาทำการ" */
+  note?: string;
 };
 
 export type StoreSettings = {
@@ -249,6 +284,22 @@ export type StoreSettings = {
   backupKeepCount: number;
   /** ROUND 42 (ข้อ 32 ตอนที่ 3 — ข้อ 4) — ความกว้างกระดาษสลิปเครื่องพิมพ์: "58" (สลิปเล็ก) | "72" (มาตรฐานเดิม) | "80" (สลิปใหญ่) */
   receiptPaperWidth: "58" | "72" | "80";
+  /** FIX-8 (user) — พรีวิวก่อนพิมพ์ (ใบเสร็จ/บัตร/รายงาน): true = เปิดก่อน (default ปลอดภัย)
+   *  false = กดปุ่มพิมพ์แล้ว window.print() ทันที (เร็ว แต่ไม่มีโอกาสตรวจก่อน) */
+  printPreviewBefore: boolean;
+  /** FIX-9 (user) — @deprecated ใช้ receiptPrinterName/reportPrinterName/cardPrinterName แทน
+   *  เก็บไว้เพื่อ backward compat (บิลเก่าที่ยังไม่ได้อัปเดต) */
+  defaultPrinterName: string;
+  /** FIX-15 (user) — เครื่องพิมพ์ใบเสร็จ (thermal) — พิมพ์ใบเสร็จ/สลิปเติม-ถอน · "" = ยังไม่ตั้ง */
+  receiptPrinterName: string;
+  /** FIX-15 (user) — เครื่องพิมพ์รายงาน (A4 laser/inkjet) — พิมพ์รายงานสมาชิก/สรุปยอด · "" = ยังไม่ตั้ง */
+  reportPrinterName: string;
+  /** FIX-15 (user) — เครื่องพิมพ์บัตรสมาชิก — พิมพ์บัตรสมาชิก · "" = ยังไม่ตั้ง */
+  cardPrinterName: string;
+  /** FIX-18 (user) — toggle พรีวิวแยกตามประเภทเอกสาร */
+  receiptPreviewBefore: boolean;
+  reportPreviewBefore: boolean;
+  cardPreviewBefore: boolean;
   /** ROUND 56 (user) — เช็คลิสต์วันขึ้นระบบ (โซนเครื่องมือติดตั้ง): JSON array ของ id ที่ติ๊กแล้ว
    *  เก็บฝั่งเซิร์ฟเวอร์ให้ทุกเครื่องเห็นตรงกัน · "" = ยังไม่ได้ติ๊กอะไร */
   goliveChecks: string;
@@ -262,6 +313,10 @@ export type StoreSettings = {
   /** ROUND 63 (user) — บัญชีพร้อมเพย์ของร้าน (เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก)
    *  ใช้สร้าง QR ให้ลูกค้าสแกนจ่ายที่หน้ายืนยันการชำระเงิน · "" = ยังไม่ตั้ง (ไม่แสดง QR) */
   promptpayId: string;
+  /** FIX-5 (user) — บัญชีธนาคารของร้าน (รับเงินโอน) · เก็บเป็น JSON array ใน store_settings
+   *  แสดงที่หน้ายืนยันการชำระ POS (ควบคู่กับ QR) และท้ายใบเสร็จเมื่อชำระด้วย QR / สแกน ·
+   *  [] = ยังไม่มีบัญชี (ลูกค้าไม่เห็นตัวเลือกโอนผ่านธนาคาร) */
+  bankAccounts: BankAccount[];
   /** ROUND 68 (user) — เบอร์โทรศูนย์ช่วยเหลือของร้าน แสดงท้ายหน้าจอทุกหน้า
    *  (แถบ footer) · "" = ไม่แสดง (เดิมเคยเป็นข้อความล็อก 02-XXX-XXXX แก้ไม่ได้) */
   helpPhone: string;
@@ -470,6 +525,24 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (member_number) REFERENCES members(member_number)
     );
+    -- P4 (release/rollback) — every install/update/rollback/hotfix lands a row
+    -- here so the on-premise deployment has an auditable release history. The
+    -- scripts/update.sh and scripts/rollback.sh drivers append a row each
+    -- time they run; system.releases (admin only) reads it back. Action is
+    -- CHECK-constrained to the four canonical actions so ad-hoc strings cannot
+    -- pollute the history. Migrations / health_check / backup_file are stored as
+    -- TEXT (the scripts pass JSON or markdown); actor is who/what triggered it.
+    CREATE TABLE IF NOT EXISTS release_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      version TEXT NOT NULL,
+      action TEXT NOT NULL CHECK (action IN ('install', 'update', 'rollback', 'hotfix')),
+      notes TEXT,
+      migrations TEXT,
+      backup_file TEXT,
+      health_check TEXT,
+      actor TEXT,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
   `);
   ensureColumn(db, "members", "phone", "TEXT");
   ensureColumn(db, "members", "type", "TEXT NOT NULL DEFAULT 'สมาชิก'");
@@ -520,6 +593,19 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
   ensureColumn(db, "sales", "void_actor", "TEXT");
   ensureColumn(db, "sales", "voided_at", "TEXT");
   ensureColumn(db, "member_transactions", "slip_url", "TEXT");
+  // P2-b (idempotency) — client_request_id lets checkout() + walletTx()
+  // short-circuit a retried submit and return the original receipt/ledger row
+  // instead of double-charging the member or double-decrementing stock.
+  // NULL on legacy rows; only present on rows written through the idempotent path.
+  ensureColumn(db, "sales", "client_request_id", "TEXT");
+  ensureColumn(db, "member_transactions", "client_request_id", "TEXT");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_sales_client_req ON sales(client_request_id) WHERE client_request_id IS NOT NULL");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_member_tx_client_req ON member_transactions(client_request_id) WHERE client_request_id IS NOT NULL");
+  // FIX-7 (user) — ยอดเงินสดที่รับมา + ยอดเงินทอน สำหรับบิล "เงินสด" + flag ยืนยันตรวจสอบสำหรับบิล "QR / สแกน"
+  // NULL on legacy rows (บิลเก่าไม่มีข้อมูลนี้ → ไม่แสดงในใบเสร็จ)
+  ensureColumn(db, "sales", "received_cash", "REAL");
+  ensureColumn(db, "sales", "change_due", "REAL");
+  ensureColumn(db, "sales", "payment_verified", "INTEGER");
   // ROUND 65 (user) — รหัสบัตรเงินสด (23951…) และรหัสผู้ป่วย (HN) ของสมาชิกร้านค้าสวัสดิการ
   ensureColumn(db, "members", "card_number", "TEXT");
   ensureColumn(db, "members", "patient_code", "TEXT");
@@ -708,6 +794,150 @@ export function logAction(
 export function listAuditLogs(db: SqliteDb, limit = 200): SqliteAuditLog[] {
   const capped = Math.max(1, Math.min(1000, Math.floor(limit)));
   return db.prepare(`SELECT id, action, actor, actor_role AS actorRole, detail, tone, created_at AS createdAt FROM audit_logs ORDER BY created_at DESC, id DESC LIMIT ?`).all(capped) as unknown as SqliteAuditLog[];
+}
+
+// --- P4: release/rollback log + schema version tracking --------------------
+
+/**
+ * P4 (release/rollback) — One row per install/update/rollback/hotfix action,
+ * so the on-premise deployment has an auditable release history that pairs
+ * with `scripts/update.sh` and `scripts/rollback.sh`. Action is constrained
+ * to the four canonical values by a CHECK clause on the table itself; the
+ * TypeScript union here mirrors that and keeps callers type-safe.
+ */
+export type ReleaseAction = "install" | "update" | "rollback" | "hotfix";
+
+export type ReleaseLogRow = {
+  id: number;
+  version: string;
+  action: ReleaseAction;
+  notes: string | null;
+  migrations: string | null;
+  backupFile: string | null;
+  healthCheck: string | null;
+  actor: string | null;
+  createdAt: string;
+};
+
+export type LogReleaseInput = {
+  version: string;
+  action: ReleaseAction;
+  notes?: string | null;
+  migrations?: string | null;
+  backupFile?: string | null;
+  healthCheck?: string | null;
+  actor?: string | null;
+  /** actorRole is preserved for audit-trail parity with logAction. */
+  actorRole?: string | null;
+};
+
+/**
+ * Append a release_logs row AND a matching audit_logs entry. The audit log
+ * is what shows up on the "ประวัติระบบ" page (red tone for rollback, blue for
+ * install/update, amber for hotfix) so admins see release events next to
+ * every other system action. Returns the inserted row.
+ *
+ * Idempotent: callers that re-send the same input (e.g. a script that gets
+ * re-run after a transient failure) will get a duplicate row. The script
+ * drivers therefore pass `--actor "$USER@$(hostname)"` plus a timestamp
+ * inside `notes` so duplicates are easy to spot in the history.
+ */
+export function logRelease(db: SqliteDb, input: LogReleaseInput): ReleaseLogRow {
+  const version = (input.version ?? "").trim() || "0.0.0";
+  const notes = input.notes?.trim() || null;
+  const migrations = input.migrations ?? null;
+  const backupFile = input.backupFile?.trim() || null;
+  const healthCheck = input.healthCheck ?? null;
+  const actor = input.actor?.trim() || null;
+  const actorRole = input.actorRole ?? null;
+  const result = db
+    .prepare(
+      `INSERT INTO release_logs (version, action, notes, migrations, backup_file, health_check, actor)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(version, input.action, notes, migrations, backupFile, healthCheck, actor);
+  const id = Number(result.lastInsertRowid);
+  const tone = input.action === "rollback" ? "red" : input.action === "hotfix" ? "amber" : "blue";
+  const summaryParts: string[] = [`เวอร์ชัน ${version}`];
+  if (backupFile) summaryParts.push(`สำรองไว้ที่ ${backupFile}`);
+  if (migrations) summaryParts.push(`migrations: ${migrations}`);
+  if (healthCheck) summaryParts.push(`health: ${healthCheck}`);
+  if (notes) summaryParts.push(notes);
+  logAction(
+    db,
+    input.action === "install"
+      ? "ติดตั้งระบบ"
+      : input.action === "update"
+        ? "อัปเดตระบบ"
+        : input.action === "rollback"
+          ? "ย้อนระบบกลับ"
+          : "Hotfix",
+    actor ?? "ระบบ",
+    summaryParts.join(" · "),
+    tone,
+    actorRole,
+  );
+  return db
+    .prepare(
+      `SELECT id, version, action, notes, migrations, backup_file AS backupFile, health_check AS healthCheck, actor, created_at AS createdAt
+       FROM release_logs WHERE id = ?`,
+    )
+    .get(id) as unknown as ReleaseLogRow;
+}
+
+/** Release history newest-first. Caps at 200 to match audit_logs behavior. */
+export function listReleases(db: SqliteDb, limit = 100): ReleaseLogRow[] {
+  const capped = Math.max(1, Math.min(200, Math.floor(limit)));
+  return db
+    .prepare(
+      `SELECT id, version, action, notes, migrations, backup_file AS backupFile, health_check AS healthCheck, actor, created_at AS createdAt
+       FROM release_logs ORDER BY created_at DESC, id DESC LIMIT ?`,
+    )
+    .all(capped) as unknown as ReleaseLogRow[];
+}
+
+// --- P4: schema version tracking (separate from app version) ----------------
+
+/**
+ * P4 — DB schema version, stored in `store_settings` under `schema_version`.
+ *
+ * This is INTENTIONALLY separate from the app semver (`package.json` version
+ * returned by `getVersion()` in `server/_core/version.ts`):
+ *   • The app version changes with every release (features, fixes).
+ *   • The schema version only bumps when a DB migration runs (new table,
+ *     new column, CHECK constraint change, etc.).
+ *
+ * `scripts/update.sh` reads this before/after running migrations so it can
+ * skip a migration that was already applied and refuse to downgrade.
+ *
+ * Default "1.0" matches the schema as of P4 (no migration versioning existed
+ * before this task — the value is backfilled the first time it is read).
+ */
+const SCHEMA_VERSION_KEY = "schema_version";
+const DEFAULT_SCHEMA_VERSION = "1.0";
+
+/** Current DB schema version (default "1.0" when never set). */
+export function getSchemaVersion(db: SqliteDb): string {
+  const row = db
+    .prepare(`SELECT value FROM store_settings WHERE key = ?`)
+    .get(SCHEMA_VERSION_KEY) as { value: string } | undefined;
+  const raw = (row?.value ?? "").trim();
+  return raw || DEFAULT_SCHEMA_VERSION;
+}
+
+/**
+ * Update the schema version setting. Called by the migration runner inside
+ * `scripts/update.sh` (and by any future in-app migration path) right after
+ * a successful migration commit. Does NOT log to audit_logs on its own —
+ * the caller (script or migration runner) writes a `logRelease` entry that
+ * already records the migration, so a second audit row would be noise.
+ */
+export function setSchemaVersion(db: SqliteDb, version: string): void {
+  const clean = (version ?? "").trim();
+  if (!clean) return;
+  db.prepare(
+    `INSERT INTO store_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+  ).run(SCHEMA_VERSION_KEY, clean);
 }
 
 // --- products & stock -------------------------------------------------------
@@ -1500,9 +1730,62 @@ export type CheckoutInput = {
   actorRole?: string;
   /** ROUND 63 (user) — รูปหลักฐานการชำระ (สลิปโอน/สแกนจ่าย) data-URL · ไม่แนบ = ไม่ส่ง */
   slipImage?: string | null;
+  /**
+   * P2-b (idempotency) — client-generated key (UUID) sent once per checkout
+   * attempt. Retries with the SAME key return the original receipt instead
+   * of writing a second bill. Omitted on legacy clients → no idempotency.
+   */
+  clientRequestId?: string | null;
+  /** FIX-7 (user) — ยอดเงินที่รับมาจากลูกค้า (เฉพาะ "เงินสด") · null/undefined สำหรับ QR/wallet */
+  receivedCash?: number | null;
+  /** FIX-7 (user) — ยอดเงินทอน (เฉพาะ "เงินสด") · null/undefined สำหรับ QR/wallet */
+  changeDue?: number | null;
+  /** FIX-7 (user) — แคชเชียร์ยืนยันว่าตรวจสอบการชำระแล้ว (เฉพาะ "QR / สแกน") · null สำหรับเงินสด/wallet */
+  paymentVerified?: boolean | null;
 };
 
 export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
+  // P2-b (idempotency) — short-circuit a retried submit BEFORE touching stock
+  // or wallet balance. The client is expected to send the SAME clientRequestId
+  // for every retry of one logical checkout. We replay the original receipt
+  // (items + totals + balanceAfter) so the UI shows the same slip again.
+  if (input.clientRequestId) {
+    const existing = db.prepare(`SELECT id, order_number AS orderNumber, created_at AS createdAt, subtotal, discount, total, payment_method AS paymentMethod, member_number AS memberNumber, cashier, received_cash AS receivedCash, change_due AS changeDue, payment_verified AS paymentVerified FROM sales WHERE client_request_id = ? LIMIT 1`).get(input.clientRequestId) as
+      | { id: number; orderNumber: string; createdAt: string; subtotal: number; discount: number; total: number; paymentMethod: string; memberNumber: string | null; cashier: string | null; receivedCash: number | null; changeDue: number | null; paymentVerified: number | null }
+      | undefined;
+    if (existing) {
+      const itemRows = db.prepare(`SELECT product_id AS productId, name, COALESCE(unit, 'ชิ้น') AS unit, qty, price, ROUND(qty * price, 2) AS amount FROM sale_items WHERE sale_id = ?`).all(existing.id) as { productId: number | null; name: string; unit: string; qty: number; price: number; amount: number }[];
+      // Replay memberName + balanceAfter the same way salesList() does so the
+      // reprinted slip is byte-identical to the original.
+      let memberName: string | null = null;
+      let balanceAfter: number | null = null;
+      if (existing.memberNumber) {
+        const memberRow = db.prepare(`SELECT prename, first_name, last_name FROM members WHERE member_number = ?`).get(existing.memberNumber) as { prename: string | null; first_name: string; last_name: string } | undefined;
+        if (memberRow) {
+          memberName = [memberRow.prename, memberRow.first_name, memberRow.last_name].filter(Boolean).join(" ").trim() || null;
+        }
+        const balanceRow = db.prepare(`SELECT balance_after AS balanceAfter FROM member_transactions WHERE member_number = ? AND detail LIKE ? ORDER BY id DESC LIMIT 1`).get(existing.memberNumber, `บิล #${existing.orderNumber} ·%`) as { balanceAfter: number | null } | undefined;
+        balanceAfter = balanceRow?.balanceAfter ?? null;
+      }
+      return {
+        orderNumber: existing.orderNumber,
+        createdAt: existing.createdAt,
+        items: itemRows,
+        subtotal: existing.subtotal,
+        discount: existing.discount,
+        total: existing.total,
+        paymentMethod: existing.paymentMethod,
+        memberNumber: existing.memberNumber,
+        memberName,
+        balanceAfter,
+        cashier: existing.cashier,
+        // FIX-7 — replay ยอดเงินสด/ทอน และ flag ยืนยันด้วย (null/undefined สำหรับบิลเก่า)
+        receivedCash: existing.receivedCash ?? null,
+        changeDue: existing.changeDue ?? null,
+        paymentVerified: existing.paymentVerified === 1 ? true : existing.paymentVerified === 0 ? false : null,
+      };
+    }
+  }
   if (!input.items?.length) throw new StoreError("ยังไม่มีสินค้าในบิล");
   if (!PAYMENT_METHODS.includes(input.paymentMethod)) throw new StoreError("วิธีชำระเงินไม่ถูกต้อง");
   // Catalog lines merge by productId+price+label (round 31-12: money-mode
@@ -1587,7 +1870,7 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
   const slipImage = typeof input.slipImage === "string" && input.slipImage.startsWith("data:image/") ? input.slipImage.slice(0, 600_000) : null;
 
   return runInTransaction(db, () => {
-    const saleResult = db.prepare(`INSERT INTO sales (order_number, payment_method, member_number, subtotal, discount, total, cashier, created_at, slip_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    const saleResult = db.prepare(`INSERT INTO sales (order_number, payment_method, member_number, subtotal, discount, total, cashier, created_at, slip_url, client_request_id, received_cash, change_due, payment_verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
       orderNumber,
       input.paymentMethod,
       member?.memberNumber ?? (input.memberNumber?.trim() || null),
@@ -1597,6 +1880,11 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
       cashier,
       createdAt,
       slipImage,
+      input.clientRequestId ?? null,
+      // FIX-7 — บิลเงินสดเก็บยอดรับ/ทอน · บิล QR เก็บ flag ยืนยัน · บิล wallet = null ทั้งคู่
+      input.paymentMethod === "เงินสด" ? (typeof input.receivedCash === "number" ? round2(input.receivedCash) : null) : null,
+      input.paymentMethod === "เงินสด" ? (typeof input.changeDue === "number" ? round2(input.changeDue) : null) : null,
+      input.paymentMethod === "QR / สแกน" ? (input.paymentVerified ? 1 : 0) : null,
     );
     const saleId = Number(saleResult.lastInsertRowid);
     const insertItem = db.prepare(`INSERT INTO sale_items (sale_id, product_id, name, qty, price, cost, unit) VALUES (?, ?, ?, ?, ?, ?, ?)`);
@@ -1646,6 +1934,10 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
       memberName: member ? [member.prename, member.firstName, member.lastName].filter(Boolean).join(" ") : null,
       balanceAfter,
       cashier,
+      // FIX-7 — ส่งยอดเงินสด/ทอน และ flag ยืนยันกลับไปแสดงในใบเสร็จ
+      receivedCash: input.paymentMethod === "เงินสด" ? (typeof input.receivedCash === "number" ? round2(input.receivedCash) : null) : null,
+      changeDue: input.paymentMethod === "เงินสด" ? (typeof input.changeDue === "number" ? round2(input.changeDue) : null) : null,
+      paymentVerified: input.paymentMethod === "QR / สแกน" ? !!input.paymentVerified : null,
     };
   });
 }
@@ -1668,7 +1960,7 @@ export function salesList(db: SqliteDb, input: SalesListInput = {}): SaleHistory
     params.push(`%${search}%`, `%${search}%`);
   }
   const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
-  const sales = db.prepare(`SELECT s.id, s.order_number AS orderNumber, s.payment_method AS paymentMethod, s.member_number AS memberNumber, s.subtotal, s.discount, s.total, s.cashier, s.created_at AS createdAt, s.slip_url IS NOT NULL AS hasSlip, CASE WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sales s LEFT JOIN members m ON m.member_number = s.member_number${where} ORDER BY s.created_at DESC, s.id DESC LIMIT ?`).all(...params, limit) as unknown as {
+  const sales = db.prepare(`SELECT s.id, s.order_number AS orderNumber, s.payment_method AS paymentMethod, s.member_number AS memberNumber, s.subtotal, s.discount, s.total, s.cashier, s.created_at AS createdAt, s.slip_url IS NOT NULL AS hasSlip, s.received_cash AS receivedCash, s.change_due AS changeDue, s.payment_verified AS paymentVerified, s.voided AS voided, CASE WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sales s LEFT JOIN members m ON m.member_number = s.member_number${where} ORDER BY s.created_at DESC, s.id DESC LIMIT ?`).all(...params, limit) as unknown as {
     id: number;
     orderNumber: string;
     paymentMethod: string;
@@ -1679,6 +1971,10 @@ export function salesList(db: SqliteDb, input: SalesListInput = {}): SaleHistory
     cashier: string | null;
     createdAt: string;
     hasSlip: number;
+    receivedCash: number | null;
+    changeDue: number | null;
+    paymentVerified: number | null;
+    voided: number;
     memberName: string | null;
   }[];
   if (sales.length === 0) return [];
@@ -1714,6 +2010,12 @@ export function salesList(db: SqliteDb, input: SalesListInput = {}): SaleHistory
       : null,
     cashier: sale.cashier,
     hasSlip: sale.hasSlip === 1,
+    // FIX-7 — replay ยอดเงินสด/ทอน และ flag ยืนยัน (null สำหรับบิลเก่าที่ไม่มีข้อมูลนี้)
+    receivedCash: sale.receivedCash ?? null,
+    changeDue: sale.changeDue ?? null,
+    paymentVerified: sale.paymentVerified === 1 ? true : sale.paymentVerified === 0 ? false : null,
+    // FEAT-9 — voided flag for RecentBillsWidget red strikethrough indicator
+    voided: sale.voided === 1,
   }));
 }
 
@@ -1882,16 +2184,60 @@ export type WalletTxInput = {
   actorRole?: string;
   /** ROUND 63 (user) — รูปหลักฐาน (สลิปโอน/ถอน) data-URL · ไม่แนบ = ไม่ส่ง */
   slipImage?: string | null;
+  /**
+   * P2-b (idempotency) — client-generated key (UUID) sent once per wallet
+   * operation. Retries with the SAME key return the original transaction row
+   * instead of double-debiting/crediting the member. Omitted on legacy clients
+   * → no idempotency.
+   */
+  clientRequestId?: string | null;
 };
 
 export function walletTx(db: SqliteDb, input: WalletTxInput) {
+  // P2-b (idempotency) — short-circuit a retried submit BEFORE touching the
+  // member's balance. The client is expected to send the SAME clientRequestId
+  // for every retry of one logical wallet operation. We replay the original
+  // ledger row so the UI shows the same slip/result again.
+  if (input.clientRequestId) {
+    const existing = db.prepare(`SELECT member_number AS memberNumber, type, amount, balance_after AS balanceAfter, detail FROM member_transactions WHERE client_request_id = ? LIMIT 1`).get(input.clientRequestId) as
+      | { memberNumber: string; type: "deposit" | "withdrawal" | "refund"; amount: number; balanceAfter: number | null; detail: string }
+      | undefined;
+    if (existing) {
+      const memberRow = db.prepare(`SELECT prename, first_name, last_name, balance FROM members WHERE member_number = ?`).get(existing.memberNumber) as { prename: string | null; first_name: string; last_name: string; balance: number } | undefined;
+      // Match the normal-path return shape so the inferred walletTx return
+      // type stays the strict `string`/`number` the UI consumers expect —
+      // existing.balanceAfter is only null on legacy rows that predate the
+      // balance_after column; we fall back to the live balance in that case.
+      const memberName = memberRow
+        ? [memberRow.prename, memberRow.first_name, memberRow.last_name].filter(Boolean).join(" ")
+        : "";
+      const balanceAfter = existing.balanceAfter ?? memberRow?.balance ?? 0;
+      const balanceBefore = existing.type === "deposit"
+        ? round2(balanceAfter - Math.abs(existing.amount))
+        : round2(balanceAfter + Math.abs(existing.amount));
+      return {
+        memberNumber: existing.memberNumber,
+        memberName,
+        type: existing.type,
+        amount: Math.abs(existing.amount),
+        balanceBefore,
+        balanceAfter,
+        detail: existing.detail,
+      };
+    }
+  }
   if (!(input.amount > 0)) throw new StoreError("จำนวนเงินต้องมากกว่า 0");
   const amount = round2(input.amount);
   const member = db.prepare(`SELECT id, member_number as memberNumber, prename, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, credit_limit as creditLimit, card_number as cardNumber, patient_code as patientCode FROM members WHERE member_number = ?`).get(input.memberNumber?.trim()) as SqliteMember | undefined;
   if (!member) throw new StoreError(`ไม่พบสมาชิก ${input.memberNumber} ในระบบ`);
   if (member.status !== "active") throw new StoreError(`สมาชิกถูกระงับการใช้งาน · ${member.memberNumber}`);
-  if (input.type !== "deposit" && member.balance < amount) {
-    throw new StoreError(`ยอดเงินคงเหลือไม่พอ · ${input.type === "refund" ? "คืนบัตร" : "ถอน"} ${money(amount)} คงเหลือ ${money(member.balance)}`);
+  // FIX-4 issue 3 — SQLite stores REAL as IEEE-754 double, so a stored 99.99
+  // may come back as 99.98999999999. Comparing raw balance < amount would
+  // reject a refund that exactly matches the displayed balance. Round both
+  // sides to 2 decimals before the check (refund = return-all-money case).
+  const roundedBalance = round2(member.balance);
+  if (input.type !== "deposit" && roundedBalance < amount) {
+    throw new StoreError(`ยอดเงินคงเหลือไม่พอ · ${input.type === "refund" ? "คืนบัตร" : "ถอน"} ${money(amount)} คงเหลือ ${money(roundedBalance)}`);
   }
   const signedAmount = input.type === "deposit" ? amount : -amount;
   const balanceAfter = round2(member.balance + signedAmount);
@@ -1908,7 +2254,7 @@ export function walletTx(db: SqliteDb, input: WalletTxInput) {
   const slipImage = typeof input.slipImage === "string" && input.slipImage.startsWith("data:image/") ? input.slipImage.slice(0, 600_000) : null;
   runInTransaction(db, () => {
     db.prepare(`UPDATE members SET balance = ? WHERE member_number = ?`).run(balanceAfter, member.memberNumber);
-    db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, actor, created_at, slip_url) VALUES (?, ?, ?, ?, 'เงินสด', ?, ?, ?, ?)`).run(
+    db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, actor, created_at, slip_url, client_request_id) VALUES (?, ?, ?, ?, 'เงินสด', ?, ?, ?, ?, ?)`).run(
       member.memberNumber,
       input.type,
       detail,
@@ -1917,6 +2263,7 @@ export function walletTx(db: SqliteDb, input: WalletTxInput) {
       actor,
       createdAt,
       slipImage,
+      input.clientRequestId ?? null,
     );
     logAction(
       db,
@@ -2774,6 +3121,22 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   trialStart: "",
   // ROUND 63 — บัญชีพร้อมเพย์ร้าน ยังไม่ตั้ง → หน้า POS จะแนะนำให้ไปตั้งที่หน้าตั้งค่า การชำระเงิน
   promptpayId: "",
+  // FIX-5 — บัญชีธนาคารร้าน (รับเงินโอน) เริ่มต้นว่าง → ลูกค้าเห็นเฉพาะ QR เท่านั้น
+  // ผู้บริหารเพิ่มได้ที่ ตั้งค่า → การชำระเงิน → บัญชีธนาคารร้าน
+  bankAccounts: [],
+  // FIX-8 (user) — พรีวิวก่อนพิมพ์ (ใบเสร็จ/บัตร/รายงาน): default true (ปลอดภัย) —
+  // owner ที่อยากเร็วกว่านี้ปิดเพื่อ window.print() ทันทีเมื่อกดปุ่มพิมพ์
+  printPreviewBefore: true,
+  // FIX-9 (user) — @deprecated เก็บไว้ backward compat
+  defaultPrinterName: "",
+  // FIX-15 (user) — 3 เครื่องพิมพ์แยกตามประเภทเอกสาร
+  receiptPrinterName: "",
+  reportPrinterName: "",
+  cardPrinterName: "",
+  // FIX-18 (user) — toggle พรีวิวแยกตามประเภทเอกสาร (default true = ปลอดภัย)
+  receiptPreviewBefore: true,
+  reportPreviewBefore: true,
+  cardPreviewBefore: true,
   // ROUND 68 — เบอร์ศูนย์ช่วยเหลือท้ายหน้าจอ ยังไม่ตั้ง → ไม่แสดงแถบช่วยเหลือใน footer
   helpPhone: "",
 };
@@ -2891,6 +3254,16 @@ export function closeBusinessDay(db: SqliteDb, input: CloseDayInput = {}): DayCl
   const actor = input.actor?.trim() || "เจ้าหน้าที่ร้านค้า";
   const totals = status.totals;
   runInTransaction(db, () => {
+    // P2-b (double-close guard) — once this period is already snapshotted,
+    // a second close must NOT insert a duplicate row. The early SELECT inside
+    // the transaction prevents the common double-submit (double-click /
+    // double-tap on the close button). Note: SQLite's default BEGIN DEFERRED
+    // does not take a write lock until the first write, so two truly
+    // concurrent closes could still both pass the SELECT — but the UI sends
+    // closes serially per user, and the SELECT guard handles the realistic
+    // double-submit race cleanly.
+    const alreadyClosed = db.prepare(`SELECT 1 FROM day_closures WHERE period_start = ?`).get(status.periodStart);
+    if (alreadyClosed) throw new StoreError("รอบขายนี้ถูกตัดยอดไปแล้ว — ไม่สามารถตัดซ้อนได้");
     db.prepare(`INSERT INTO day_closures (period_start, closed_at, bills, pieces, revenue, cash_total, qr_total, wallet_total, deposits, withdrawals, closed_by, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
       status.periodStart,
       closedAt,
@@ -3195,11 +3568,15 @@ export function listShifts(db: SqliteDb, status?: string): CashierShift[] {
 export function voidSale(db: SqliteDb, input: { saleId: number; reason: string; actor?: string; actorRole?: string }): { reversed: boolean } {
   const sale = db.prepare(`SELECT id, order_number AS orderNumber, total, payment_method AS paymentMethod, member_number AS memberNumber FROM sales WHERE id = ?`).get(input.saleId) as { id: number; orderNumber: string; total: number; paymentMethod: string; memberNumber: string | null } | undefined;
   if (!sale) throw new StoreError("ไม่พบบิลนี้ในระบบ");
-  const existingVoid = db.prepare(`SELECT 1 FROM sales WHERE id = ? AND voided = 1`).get(input.saleId);
-  if (existingVoid) throw new StoreError("บิลนี้ถูกยกเลิกไปแล้ว");
   if (!input.reason.trim()) throw new StoreError("ต้องระบุเหตุผลในการยกเลิก");
   const items = db.prepare(`SELECT product_id AS productId, qty, cost FROM sale_items WHERE sale_id = ?`).all(input.saleId) as { productId: number; qty: number; cost: number }[];
   runInTransaction(db, () => {
+    // P2-b (TOCTOU fix) — the "already voided" check MUST live INSIDE the
+    // transaction. Otherwise two concurrent void requests can both pass the
+    // outer SELECT (neither sees the other's UPDATE) and double-refund the
+    // wallet + double-restore the stock.
+    const existingVoid = db.prepare(`SELECT 1 FROM sales WHERE id = ? AND voided = 1`).get(input.saleId);
+    if (existingVoid) throw new StoreError("บิลนี้ถูกยกเลิกไปแล้ว");
     // Reverse stock for each catalog item
     for (const item of items) {
       if (!item.productId) continue;

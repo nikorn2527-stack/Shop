@@ -1,0 +1,70 @@
+# PNG Shop — On-Premise Docker Compose
+#
+# One-command bring-up for a self-hosted PNG Shop instance on a customer-
+# controlled server / VM. Pairs with `Dockerfile` (same source tree).
+#
+# Usage:
+#   1.  Copy `.env.example` → `.env` and fill in JWT_SECRET, OWNER_OPEN_ID,
+#       OAUTH_SERVER_URL, SQLITE_DB_PATH, DATA_RESIDENCY=thailand, etc.
+#   2.  `docker compose up -d --build`
+#   3.  Health-check:  curl http://localhost:3000/api/trpc/system.health
+#   4.  Update:        `git pull && docker compose up -d --build`
+#   5.  Rollback:       see scripts/rollback.sh (still runs on the host,
+#                       not inside compose — see docs/RELEASE_CHECKLIST_TH.md)
+#
+# Layout on the host (see docs/ON_PREMISE_STRUCTURE_TH.md):
+#   ./data                    → /app/data            (welfare-store.sqlite)
+#   ./data/backups            → /app/data/backups    (backup files)
+#   ./.env                    → /app/.env            (read-only mount)
+#
+# The compose file deliberately does NOT bind-mount /app (the application
+# source + node_modules) — that lives entirely inside the image so that
+# `docker compose up -d --build` is the canonical upgrade path.
+
+version: "3.8"
+
+services:
+  png-shop:
+    build: .
+    image: png-shop:latest
+    container_name: png-shop
+    ports:
+      - "3000:3000"
+    volumes:
+      # Persistent SQLite database (welfare-store.sqlite, -wal, -shm)
+      - ./data:/app/data
+      # Backup files (welfare-store-<ISO>.sqlite, config-<ISO>/) — kept on
+      # the host so they survive container recreation.
+      - ./data/backups:/app/data/backups
+      # Configuration: env vars, HTTPS certificates, OAuth keys. Mounted
+      # read-only so the application cannot accidentally rewrite secrets.
+      - ./.env:/app/.env:ro
+    environment:
+      - NODE_ENV=production
+      - DEPLOYMENT_MODE=onpremise
+      # SQLITE_DB_PATH must point inside the bind-mounted /app/data volume
+      # so the database file persists across container restarts.
+      - SQLITE_DB_PATH=/app/data/welfare-store.sqlite
+      - SQLITE_BACKUP_DIR=/app/data/backups
+      # JWT_SECRET, OWNER_OPEN_ID, OAUTH_SERVER_URL, VITE_APP_ID, etc.
+      # are picked up from ./.env (mounted above) by the dotenv loader.
+    restart: unless-stopped
+    # Health check uses the tRPC health endpoint exposed in P4. The
+    # endpoint accepts an optional `timestamp` query param (kept for
+    # backward-compat with the Settings page latency probe).
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >
+          curl -fsS
+          "http://localhost:3000/api/trpc/system.health?input=%7B%22timestamp%22%3A0%7D"
+          || exit 1
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"

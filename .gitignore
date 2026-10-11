@@ -102,7 +102,7 @@ tmp/
 temp/
 
 # Database
-data/
+/data/
 *.db
 *.sqlite
 *.sqlite3
@@ -113,3 +113,24 @@ data/
 # Manus version file (auto-generated, not part of source)
 client/public/__manus__/version.json
 .project-config.json
+
+# ===== Sandbox environment (not part of Shop project) =====
+# These are managed by the cloud sandbox, not the Shop repo.
+.zscripts/
+Caddyfile
+examples/
+mini-services/
+# FIX-10b — printer-helper เป็น feature จริงของ Shop (enumerate เครื่องพิมพ์ในเครื่อง POS)
+# ต้อง track ใน git ไม่ใช่ sandbox infrastructure → เพิ่ม exception
+!mini-services/printer-helper/
+!mini-services/printer-helper/**
+skills/
+tests/
+download/
+upload/
+agent-ctx/
+start-dev.sh
+dev.log
+dev.pid
+.zscripts-*.log
+tool-results/

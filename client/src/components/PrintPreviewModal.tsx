@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Printer, X } from "lucide-react";
+import { Printer, X } from "@/lib/icons";
 import { toast } from "sonner";
 import { HelpDisclosure } from "./HelpDisclosure";
 
@@ -28,7 +28,7 @@ export type PrintPreviewPaper = "thermal" | "a4" | "card";
 const PAPER_LABEL: Record<PrintPreviewPaper, string> = {
   thermal: "สลิป · กระดาษต่อเนื่อง 58–80 มม.",
   a4: "กระดาษ A4 · 210 × 297 มม.",
-  card: "บัตรพลาสติก 85.6 × 54 มม. (CR80)",
+  card: "บัตรสมาชิก · นามบัตรไทย 90 × 55 มม.",
 };
 
 /** ความกว้างกระดาษสลิป (มม.) ตามที่ตั้งใน ตั้งค่า → ใบเสร็จ */
@@ -89,7 +89,7 @@ export function PrintPreviewModal({
       const doc = holder.firstElementChild as HTMLElement | null;
       if (!stage || !doc) return;
       const stagePx = stage.clientWidth || 1;
-      const widthMm = paper === "a4" ? 210 : paper === "card" ? 85.6 : thermalPaperWidthMm();
+      const widthMm = paper === "a4" ? 210 : paper === "card" ? 90 : thermalPaperWidthMm();
       const heightMm = Math.round((doc.scrollHeight / stagePx) * widthMm);
       if (heightMm > 0 && !Number.isNaN(heightMm)) setContentMm(heightMm);
     };
@@ -160,16 +160,14 @@ export function PrintPreviewModal({
         </div>
 
         <div className="export-preview-summary">
-          <span className="preview-chip ok">{PAPER_LABEL[paper]}</span>
           {paper === "thermal" && contentMm != null && (
-            <span className="preview-chip mute" title="ความยาวที่เนื้อหาต้องการตามจำนวนรายการ — ตั้งขนาดกระดาษเครื่องพิมพ์ให้รองรับความยาวนี้ (ดูข้อแนะนำด้านล่าง)">
+            <span className="preview-chip mute" title="ความยาวที่เนื้อหาต้องการตามจำนวนรายการ">
               ความยาวเนื้อหา ≈ {contentMm.toLocaleString("th-TH")} มม.
             </span>
           )}
           {chips.map((chip) => (
             <span key={chip} className="preview-chip mute">{chip}</span>
           ))}
-          <span className="preview-chip mute">พิมพ์จากเครื่องพิมพ์เริ่มต้นของเครื่องนี้</span>
         </div>
 
         <div className={`print-preview-stage paper-${paper}`}>

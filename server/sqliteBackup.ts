@@ -1,7 +1,8 @@
-import { createHash } from "node:crypto";
-import { mkdirSync, readdirSync, statSync, unlinkSync, copyFileSync, writeFileSync, readFileSync, existsSync } from "node:fs";
+import { createHash, scryptSync, createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+import { mkdirSync, readdirSync, statSync, unlinkSync, copyFileSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
+import { tmpdir } from "node:os";
 
 const require = createRequire(import.meta.url);
 const { DatabaseSync } = require("node:sqlite") as typeof import("node:sqlite");
@@ -20,6 +21,8 @@ export type BackupManifest = {
   sizeBytes: number;
   sha256: string;
   integrity: "ok";
+  /** P3 — true when the on-disk backup is AES-256-GCM encrypted (.sqlite.enc). */
+  encrypted?: boolean;
 };
 
 function sha256(filePath: string) {
@@ -40,10 +43,90 @@ function assertSqliteIntegrity(filePath: string) {
   }
 }
 
+// P3 — Optional AES-256-GCM backup encryption. Activated only when
+// BACKUP_ENCRYPTION_KEY (>= 32 chars) is set in the environment. Encrypted
+// backups use the .sqlite.enc extension; restore auto-detects via extension
+// so the same code path works for encrypted and plain backups. Without the
+// env var the entire pipeline behaves exactly as before (backward compatible).
+const ENCRYPTION_SALT = "png-shop-backup-salt";
+const ENC_IV_BYTES = 12;   // 96-bit GCM IV
+const ENC_TAG_BYTES = 16;  // 128-bit GCM auth tag
+
+/** Returns a 32-byte AES-256 key derived from BACKUP_ENCRYPTION_KEY, or null when unset/short. */
+function getEncryptionKey(): Buffer | null {
+  const raw = process.env.BACKUP_ENCRYPTION_KEY;
+  if (!raw || raw.length < 32) return null;
+  return scryptSync(raw, ENCRYPTION_SALT, 32);
+}
+
+function isEncryptedFile(filePath: string): boolean {
+  return filePath.endsWith(".enc");
+}
+
+/**
+ * Encrypts a plain SQLite backup with AES-256-GCM. Writes `<plainPath>.enc`
+ * (format: [12-byte IV][16-byte auth tag][ciphertext]), deletes the plain
+ * file so only the encrypted form remains on disk, and returns the .enc path.
+ */
+function encryptBackup(plainPath: string): string {
+  const key = getEncryptionKey();
+  if (!key) throw new Error("BACKUP_ENCRYPTION_KEY is not set — cannot encrypt backup");
+  const iv = randomBytes(ENC_IV_BYTES);
+  const cipher = createCipheriv("aes-256-gcm", key, iv);
+  const plain = readFileSync(plainPath);
+  const ciphertext = Buffer.concat([cipher.update(plain), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  const encPath = `${plainPath}.enc`;
+  writeFileSync(encPath, Buffer.concat([iv, tag, ciphertext]));
+  unlinkSync(plainPath);
+  return encPath;
+}
+
+/**
+ * Decrypts a .enc backup to a temp .sqlite file and returns the temp path.
+ * Caller is responsible for cleaning up the temp file (rmSync with force).
+ */
+function decryptBackup(encPath: string): string {
+  const key = getEncryptionKey();
+  if (!key) throw new Error("BACKUP_ENCRYPTION_KEY is not set — cannot decrypt encrypted backup");
+  const data = readFileSync(encPath);
+  if (data.byteLength < ENC_IV_BYTES + ENC_TAG_BYTES) {
+    throw new Error("Encrypted backup file is corrupted (too small to contain IV + auth tag)");
+  }
+  const iv = data.subarray(0, ENC_IV_BYTES);
+  const tag = data.subarray(ENC_IV_BYTES, ENC_IV_BYTES + ENC_TAG_BYTES);
+  const ciphertext = data.subarray(ENC_IV_BYTES + ENC_TAG_BYTES);
+  const decipher = createDecipheriv("aes-256-gcm", key, iv);
+  decipher.setAuthTag(tag);
+  let plain: Buffer;
+  try {
+    plain = Buffer.concat([decipher.update(ciphertext), decipher.final()]);
+  } catch (error) {
+    throw new Error(`Failed to decrypt backup (wrong key or corrupted file): ${error instanceof Error ? error.message : String(error)}`);
+  }
+  const tempPath = join(tmpdir(), `.backup-decrypt-${Date.now()}-${randomBytes(4).toString("hex")}.sqlite`);
+  writeFileSync(tempPath, plain);
+  return tempPath;
+}
+
 export function verifySqliteBackup(filePath: string) {
-  if (!existsSync(filePath)) throw new Error(`SQLite file not found: ${filePath}`);
-  assertSqliteIntegrity(filePath);
-  return { ok: true as const, sha256: sha256(filePath), sizeBytes: statSync(filePath).size };
+  const resolved = resolve(filePath);
+  if (!existsSync(resolved)) throw new Error(`SQLite file not found: ${resolved}`);
+  // Encrypted backups must be decrypted to a temp file before SQLite can
+  // integrity-check them. The returned sha256/sizeBytes still describe the
+  // on-disk backup file (.enc) so the manifest's hash stays meaningful for
+  // verifying the bytes that are actually stored on disk.
+  if (isEncryptedFile(resolved)) {
+    const tempPath = decryptBackup(resolved);
+    try {
+      assertSqliteIntegrity(tempPath);
+    } finally {
+      rmSync(tempPath, { force: true });
+    }
+    return { ok: true as const, sha256: sha256(resolved), sizeBytes: statSync(resolved).size };
+  }
+  assertSqliteIntegrity(resolved);
+  return { ok: true as const, sha256: sha256(resolved), sizeBytes: statSync(resolved).size };
 }
 
 export function pruneSqliteBackups(backupDir: string, retentionDays: number, now = new Date()) {
@@ -51,7 +134,7 @@ export function pruneSqliteBackups(backupDir: string, retentionDays: number, now
   const removed: string[] = [];
   if (!existsSync(backupDir)) return removed;
   for (const file of readdirSync(backupDir)) {
-    if (!/^welfare-store-\d{8}T\d{6}Z\.sqlite$/.test(file)) continue;
+    if (!BACKUP_FILE_PATTERN.test(file)) continue;
     const filePath = join(backupDir, file);
     if (statSync(filePath).mtimeMs < cutoff) {
       unlinkSync(filePath);
@@ -76,16 +159,30 @@ export function backupSqliteDatabase({ sourcePath, backupDir, retentionDays = 30
   const file = nextBackupFileName(destinationDir, now);
   const destination = join(destinationDir, file);
   copyFileSync(source, destination);
-  const verified = verifySqliteBackup(destination);
+  // Verify the plain SQLite copy (still unencrypted at this point).
+  verifySqliteBackup(destination);
+
+  // P3 — if an encryption key is configured, replace the plain .sqlite with
+  // an encrypted .sqlite.enc on disk and record the flag in the manifest.
+  let finalPath = destination;
+  let finalFile = file;
+  let encrypted = false;
+  if (getEncryptionKey()) {
+    finalPath = encryptBackup(destination);
+    finalFile = `${file}.enc`;
+    encrypted = true;
+  }
+
   const manifest: BackupManifest = {
-    file,
+    file: finalFile,
     source,
     createdAt: now.toISOString(),
-    sizeBytes: verified.sizeBytes,
-    sha256: verified.sha256,
+    sizeBytes: statSync(finalPath).size,
+    sha256: sha256(finalPath),
     integrity: "ok",
+    encrypted,
   };
-  writeFileSync(`${destination}.json`, JSON.stringify(manifest, null, 2) + "\n", "utf8");
+  writeFileSync(`${finalPath}.json`, JSON.stringify(manifest, null, 2) + "\n", "utf8");
   pruneSqliteBackups(destinationDir, retentionDays, now);
   return manifest;
 }
@@ -97,7 +194,8 @@ export function backupSqliteDatabase({ sourcePath, backupDir, retentionDays = 30
  */
 function nextBackupFileName(destinationDir: string, now: Date) {
   let candidate = `welfare-store-${timestamp(now)}.sqlite`;
-  for (let bump = 1; bump <= 60 && existsSync(join(destinationDir, candidate)); bump += 1) {
+  // P3 — also avoid colliding with an encrypted .sqlite.enc from the same second.
+  for (let bump = 1; bump <= 60 && (existsSync(join(destinationDir, candidate)) || existsSync(join(destinationDir, `${candidate}.enc`))); bump += 1) {
     candidate = `welfare-store-${timestamp(new Date(now.getTime() + bump * 1000))}.sqlite`;
   }
   return candidate;
@@ -106,12 +204,73 @@ function nextBackupFileName(destinationDir: string, now: Date) {
 export function restoreSqliteBackup({ backupPath, targetPath, overwrite = false }: { backupPath: string; targetPath: string; overwrite?: boolean }) {
   const source = resolve(backupPath);
   const target = resolve(targetPath);
-  verifySqliteBackup(source);
+  if (!existsSync(source)) throw new Error(`SQLite file not found: ${source}`);
   if (existsSync(target) && !overwrite) throw new Error(`Restore target already exists: ${target}. Pass overwrite=true to replace it.`);
   mkdirSync(dirname(target), { recursive: true });
-  copyFileSync(source, target);
+
+  // P3 — encrypted backups: decrypt to a temp file, verify the temp, then copy
+  // temp → target. Plain backups keep the original copy-then-verify flow.
+  let tempPath: string | null = null;
+  let copySource: string;
+  try {
+    if (isEncryptedFile(source)) {
+      tempPath = decryptBackup(source);
+      assertSqliteIntegrity(tempPath);
+      copySource = tempPath;
+    } else {
+      assertSqliteIntegrity(source);
+      copySource = source;
+    }
+    copyFileSync(copySource, target);
+  } finally {
+    if (tempPath) rmSync(tempPath, { force: true });
+  }
   assertSqliteIntegrity(target);
   return { target, sha256: sha256(target), sizeBytes: statSync(target).size };
+}
+
+/**
+ * P3 — Restore drill: opens a backup read-only (decrypting first if needed),
+ * runs PRAGMA integrity_check, lists the tables, and counts rows in the key
+ * business tables (products, members, sales, sale_items). The temp decrypted
+ * file (if any) is cleaned up. Nothing is written to the live database.
+ */
+export function testRestore(backupPath: string): { ok: true; tables: string[]; rowCount: number } {
+  const source = resolve(backupPath);
+  if (!existsSync(source)) throw new Error(`Backup file not found: ${source}`);
+
+  let tempPath: string | null = null;
+  let dbPath: string;
+  try {
+    if (isEncryptedFile(source)) {
+      tempPath = decryptBackup(source);
+      dbPath = tempPath;
+    } else {
+      dbPath = source;
+    }
+
+    const db = new DatabaseSync(dbPath, { readOnly: true });
+    try {
+      const integrityRow = db.prepare("PRAGMA integrity_check").get() as { integrity_check: string };
+      if (integrityRow.integrity_check !== "ok") {
+        throw new Error(`SQLite integrity check failed: ${integrityRow.integrity_check}`);
+      }
+      const tableRows = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name").all() as { name: string }[];
+      const tables = tableRows.map((row) => row.name);
+
+      let rowCount = 0;
+      for (const table of ["products", "members", "sales", "sale_items"]) {
+        if (!tables.includes(table)) continue;
+        const row = db.prepare(`SELECT COUNT(*) AS n FROM "${table}"`).get() as { n: number };
+        rowCount += Number(row.n);
+      }
+      return { ok: true as const, tables, rowCount };
+    } finally {
+      db.close();
+    }
+  } finally {
+    if (tempPath) rmSync(tempPath, { force: true });
+  }
 }
 
 export function readBackupManifest(backupPath: string): BackupManifest | undefined {
@@ -128,7 +287,8 @@ export type SqliteBackupEntry = {
   integrity: "ok" | "unknown";
 };
 
-const BACKUP_FILE_PATTERN = /^welfare-store-\d{8}T\d{6}Z\.sqlite$/;
+// P3 — pattern now also matches encrypted .sqlite.enc backups alongside plain .sqlite.
+const BACKUP_FILE_PATTERN = /^welfare-store-\d{8}T\d{6}Z\.sqlite(\.enc)?$/;
 
 /**
  * Lists timestamped backup files in backupDir, newest first (createdAt, then

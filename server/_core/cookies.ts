@@ -39,10 +39,15 @@ export function getSessionCookieOptions(
   //       ? hostname
   //       : undefined;
 
+  // P1-fix: sameSite MUST match the value used at login ("lax"), otherwise
+  // Express clearCookie sends a Set-Cookie with different SameSite and the
+  // browser treats it as a different cookie — the real session cookie is
+  // never deleted, so logout silently fails and the user appears stuck.
+  // "none" would also require secure=true (HTTPS) which breaks local dev.
   return {
     httpOnly: true,
     path: "/",
-    sameSite: "none",
+    sameSite: "lax",
     secure: isSecureRequest(req),
   };
 }

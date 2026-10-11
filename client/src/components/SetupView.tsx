@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { Crown, Eye, EyeOff, Gift, KeyRound, LogIn, ShieldCheck, Store } from "lucide-react";
+import { Crown, Eye, EyeOff, Gift, KeyRound, LogIn, ShieldCheck, Store } from "@/lib/icons";
 import { EDITIONS, EDITION_TRIAL_DAYS } from "@shared/editions";
 import { trpc } from "@/lib/trpc";
 import { getErrorMessage } from "@/pages/viewFormat";

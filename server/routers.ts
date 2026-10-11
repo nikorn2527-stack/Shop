@@ -13,7 +13,7 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { readAppSessionCookie, type TrpcContext } from "./_core/context";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
-import { backupSqliteDatabase, listSqliteBackups, pruneSqliteBackupsByCount, restoreSqliteBackup, verifySqliteBackup } from "./sqliteBackup";
+import { backupSqliteDatabase, listSqliteBackups, pruneSqliteBackupsByCount, restoreSqliteBackup, testRestore, verifySqliteBackup } from "./sqliteBackup";
 import { buildTemplateBase64, importMembers, importProducts, parseSpreadsheetBase64, readSheetRows, type MemberFieldMapping, type ProductFieldMapping } from "./importTool";
 import { closeWelfareDb, getBackupDir, getWelfareDb, getWelfareDbPath } from "./welfareStore";
 import {
@@ -224,6 +224,10 @@ const memberWalletInput = z.object({
   actorRole: z.string().optional(),
   // ROUND 63 (user) — รูปหลักฐานการโอน/สลิป แนบไปกับรายการเติม/ถอน
   slipImage: z.string().max(600_000).nullish(),
+  // P2-b (idempotency) — client-generated key per wallet op. Retries with the
+  // same key return the original ledger row instead of double-debiting/crediting
+  // the member. Optional — frontend will be updated in a follow-up.
+  clientRequestId: z.string().max(200).nullish(),
 });
 
 const memberUpdateInput = z.object({
@@ -318,6 +322,19 @@ const checkoutInput = z.object({
   actorRole: z.string().optional(),
   // ROUND 63 (user) — รูปหลักฐานการชำระ (สลิป QR / สแกน) แนบไปกับบิล
   slipImage: z.string().max(600_000).nullish(),
+  // P2-b (idempotency) — client-generated key per checkout attempt. Retries
+  // with the same key return the original receipt instead of writing a second
+  // bill. Frontend will be updated to send a UUID per attempt in a follow-up;
+  // for now the field is optional so the existing UI keeps working.
+  clientRequestId: z.string().max(200).nullish(),
+  // FIX-7 (user) — ยอดเงินสดที่รับมา (เฉพาะ "เงินสด") — ใช้พิมพ์ "รับเงินมา X / ทอน Y" ท้ายใบเสร็จ
+  // null สำหรับ QR/wallet — backend จะ ignore ถ้าไม่ใช่เงินสด
+  receivedCash: z.number().min(0).nullish(),
+  // FIX-7 (user) — ยอดเงินทอน (เฉพาะ "เงินสด") — backend คำนวณจาก receivedCash - total
+  changeDue: z.number().min(0).nullish(),
+  // FIX-7 (user) — แคชเชียร์ยืนยันตรวจสอบการชำระแล้ว (เฉพาะ "QR / สแกน")
+  // บังคับให้ติ๊ก checkbox ก่อนปุ่ม "ยืนยันการชำระเงิน" ถึงจะ enable
+  paymentVerified: z.boolean().nullish(),
 });
 
 const productCreateInput = z.object({
@@ -517,10 +534,44 @@ const settingsPatchInput = z
     backupKeepCount: z.number().int().min(3).max(60).optional(),
     // ROUND 42 (ข้อ 32 ตอนที่ 3 — ข้อ 4) — ความกว้างกระดาษสลิปเครื่องพิมพ์ 58/72/80 มม.
     receiptPaperWidth: z.enum(["58", "72", "80"]).optional(),
+    // FIX-8 (user) — พรีวิวก่อนพิมพ์ (ใบเสร็จ/บัตร/รายงาน): true = เปิด preview ก่อน (default)
+    // false = กดปุ่มพิมพ์แล้ว window.print() ทันที (เร็วกว่า แต่ไม่มีโอกาสตรวจก่อน)
+    printPreviewBefore: z.boolean().optional(),
+    // FIX-9 (user) — @deprecated ใช้ 3 fields ด้านล่างแทน
+    defaultPrinterName: z.string().max(80).optional(),
+    // FIX-15 (user) — 3 เครื่องพิมพ์แยกตามประเภทเอกสาร
+    receiptPrinterName: z.string().max(80).optional(),
+    reportPrinterName: z.string().max(80).optional(),
+    cardPrinterName: z.string().max(80).optional(),
+    // FIX-18 (user) — toggle พรีวิวแยกตามประเภทเอกสาร
+    receiptPreviewBefore: z.boolean().optional(),
+    reportPreviewBefore: z.boolean().optional(),
+    cardPreviewBefore: z.boolean().optional(),
     // ROUND 56 (user) — เช็คลิสต์วันขึ้นระบบ (โซนเครื่องมือติดตั้ง): JSON รหัสรายการที่ติ๊กแล้ว
     goliveChecks: z.string().max(4000).optional(),
     // ROUND 63 (user) — บัญชีพร้อมเพย์ร้าน: เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก
     promptpayId: z.string().max(20).optional(),
+    // FIX-5 (user) — บัญชีธนาคารร้าน (รับเงินโอน): หลายบัญชีได้ · ผู้บริหารเพิ่ม/ลบ/แก้ที่ ตั้งค่า → การชำระเงิน
+    // รูปแบบเดียวกับ BankAccount ใน server/sqliteStore.ts (id/bankCode/bankName/accountNumber/accountName/branch/active/note)
+    bankAccounts: z
+      .array(
+        z.object({
+          id: z.string().min(1).max(80),
+          bankCode: z.string().min(1).max(20),
+          bankName: z.string().min(1).max(80),
+          accountNumber: z
+            .string()
+            .min(7)
+            .max(20)
+            .regex(/^[0-9\- ]+$/, "เลขที่บัญชีเป็นตัวเลขเท่านั้น (ใส่ - หรือช่องว่างคั่นได้)"),
+          accountName: z.string().min(1).max(120),
+          branch: z.string().max(80).optional(),
+          active: z.boolean(),
+          note: z.string().max(160).optional(),
+        }),
+      )
+      .max(20, "บัญชีธนาคารเกิน 20 บัญชี — เกินความจำเป็น")
+      .optional(),
     // ROUND 68 (user) — เบอร์โทรศูนย์ช่วยเหลือ แสดงท้ายหน้าจอ (footer) · "" = ไม่แสดง
     helpPhone: z.string().max(32).optional(),
   })
@@ -528,7 +579,9 @@ const settingsPatchInput = z
 
 // ROUND 38 (ข้อ 39) — ชื่อไฟล์สำรองที่รับได้: welfare-store-YYYYMMDDTHHMMSSZ.sqlite เท่านั้น
 const backupFileInput = z.object({
-  file: z.string().regex(/^welfare-store-\d{8}T\d{6}Z\.sqlite$/, "ชื่อไฟล์สำรองไม่ถูกต้อง"),
+  // P3 — ยอมรับทั้ง .sqlite (plain) และ .sqlite.enc (AES-256-GCM) เพื่อให้ download/restore/testRestore
+  // ทำงานกับไฟล์สำรองที่เข้ารหัสได้ (รูปแบบชื่อเดิม + .enc ต่อท้าย)
+  file: z.string().regex(/^welfare-store-\d{8}T\d{6}Z\.sqlite(\.enc)?$/, "ชื่อไฟล์สำรองไม่ถูกต้อง"),
 });
 
 const authLoginInput = z.object({
@@ -1513,6 +1566,39 @@ export const appRouter = router({
             actorRole ?? null,
           );
           return { ok: true as const, safetyBackupFile };
+        });
+      }),
+    // P3 — Restore drill: ทดสอบกู้คืนโดยไม่แตะฐานข้อมูลจริง — ถอดรหัส (ถ้าเข้ารหัส) → เปิด read-only
+    // → PRAGMA integrity_check → รายชื่อตาราง → นับแถวในตารางหลัก (products/members/sales/sale_items)
+    // คืนสรุปผลให้ผู้บริหารยืนยันก่อนกดกู้คืนจริง พร้อม audit log สีฟ้า
+    testRestore: publicProcedure
+      .input(backupFileInput)
+      .mutation(({ ctx, input }) => {
+        const { actor, actorRole } = resolveActor(ctx, {});
+        return withStoreErrors(() => {
+          if (!isAdminCtx(ctx, {})) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "การทดสอบกู้คืนต้องใช้สิทธิ์ผู้บริหาร" });
+          }
+          requireEdition("backupRestore");
+          const backupPath = join(getBackupDir(), input.file);
+          if (!existsSync(backupPath)) {
+            throw new TRPCError({ code: "NOT_FOUND", message: `ไม่พบไฟล์สำรอง ${input.file}` });
+          }
+          let result;
+          try {
+            result = testRestore(backupPath);
+          } catch (error) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: `ทดสอบกู้คืนไม่สำเร็จ: ${error instanceof Error ? error.message : String(error)}` });
+          }
+          logAction(
+            getWelfareDb(),
+            "ทดสอบกู้คืน",
+            actor ?? "ผู้บริหาร",
+            `ทดสอบกู้คืนจากไฟล์สำรอง ${input.file} · ตาราง ${result.tables.length} ตาราง · แถวรวม ${result.rowCount} แถว`,
+            "blue",
+            actorRole ?? null,
+          );
+          return result;
         });
       }),
   }),

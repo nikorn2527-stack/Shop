@@ -1,4 +1,4 @@
-import { Check, X } from "lucide-react";
+import { Check, X } from "@/lib/icons";
 
 /**
  * ROUND 36 (ข้อ 31) — ตัววัดความแข็งแรงของรหัสผ่าน (client)
