@@ -107,8 +107,8 @@ try {
   if (discard.asElement()) await discard.asElement().click();
   await discard.dispose();
   await page.waitForFunction(() => !document.querySelector('.stock-receive-modal'));
-  await page.evaluate(() => window.dispatchEvent(new CustomEvent('pos-rail', { detail: 'limit' })));
-  const memberInput = '#pos-limit-member';
+  await page.evaluate(() => window.dispatchEvent(new CustomEvent('pos-rail', { detail: 'card' })));
+  const memberInput = '#pos-card-member';
   await page.waitForSelector(memberInput);
   for (const term of [member.first_name, member.member_number, member.card_number]) {
     await page.$eval(memberInput, n => n.select());
