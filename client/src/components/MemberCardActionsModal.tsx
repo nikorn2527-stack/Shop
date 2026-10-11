@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { getErrorMessage } from "@/pages/viewFormat";
+import { MEMBER_CARD_ACTION_LABELS as labels } from "../../../shared/memberCardActions";
 
 export function MemberCardActionsModal({ memberNumber, onClose, onSuccess, initialAction }: {
   memberNumber: string; onClose: () => void; onSuccess: () => void; initialAction?: "close";
@@ -27,13 +28,13 @@ export function MemberCardActionsModal({ memberNumber, onClose, onSuccess, initi
   const busy = release.isPending || assign.isPending || closeAccount.isPending;
   const ready = Boolean(member && member.status === "active" && (action === "assign" ? code.trim() && (!member.cardNumber || session) : member.cardNumber && session && member.balance >= 0 && (action !== "close" || !member.accountClosed)));
   return <div className="modal-backdrop"><section className="form-modal" role="dialog" aria-modal="true" aria-label="จัดการบัตรสมาชิก">
-    <div className="modal-heading"><h2>{action === "close" ? "ขอลดวงเงิน / ปิดบัญชี" : action === "return" ? "คืนบัตร" : "จ่ายบัตรให้สมาชิกเดิม"}</h2><button type="button" className="icon-button" aria-label="ปิดหน้าต่าง" disabled={busy} onClick={onClose}>×</button></div>
+    <div className="modal-heading"><h2>{labels[action]}</h2><button type="button" className="icon-button" aria-label="ปิดหน้าต่าง" disabled={busy} onClick={onClose}>×</button></div>
     {detail.isLoading ? <p role="status">กำลังโหลด…</p> : member && <>
       <p>{member.firstName} {member.lastName} · {memberNumber}</p>
       <p>บัตร {member.cardNumber || "ยังไม่มีบัตร"} · ยอดคงเหลือ {member.balance.toFixed(2)} บาท</p>
       {Boolean(member.accountClosed) && <p className="notice-bar" role="status">บัญชีรอบนี้ปิดแล้ว · ยังไม่ได้รับบัตรคืน เลือกคืนบัตรเมื่อรับบัตรกลับมาจริง</p>}
       {!confirm ? <>
-        {member.cardNumber && <div className="modal-actions"><button type="button" className={choice === "close" ? "primary-button" : "outline-button"} onClick={() => { setChoice("close"); setError(""); }}>ขอลดวงเงิน / ปิดบัญชี</button><button type="button" className={choice === "return" ? "primary-button" : "outline-button"} onClick={() => { setChoice("return"); setError(""); }}>คืนบัตร</button></div>}
+        {member.cardNumber && <div className="modal-actions"><button type="button" className={choice === "close" ? "primary-button" : "outline-button"} onClick={() => { setChoice("close"); setError(""); }}>{labels.close}</button><button type="button" className={choice === "return" ? "primary-button" : "outline-button"} onClick={() => { setChoice("return"); setError(""); }}>{labels.return}</button></div>}
         <h3>{action === "close" ? "คืนเงินทั้งหมด โดยยังไม่ได้รับบัตรคืน" : action === "return" ? "รับบัตรคืนและคืนเงินคงเหลือ" : "สมาชิกยังไม่มีบัตร"}</h3>
         {action === "assign" && <p>จ่ายบัตรว่างให้สมาชิกก่อนเติมเงิน โดยใช้เลขสมาชิกเดิม</p>}
         {action === "assign" ? <label>สแกนหรือกรอกรหัสบัตร<input type="text" autoComplete="off" maxLength={30} value={code} onChange={e => setCode(e.target.value)} /></label> : <><div className="receipt-line"><span>เงินที่ต้องจ่ายคืน</span><b>{member.balance.toFixed(2)} บาท</b></div><div className="receipt-line"><span>ยอดหลังทำรายการ</span><b>0.00 บาท</b></div><p>{action === "close" ? "บัตรยังผูกกับสมาชิกและยังจ่ายให้คนอื่นไม่ได้ บัญชีรอบนี้จะใช้ซื้อหรือเติมเงินไม่ได้ จนกว่าจะรับบัตรคืนและจ่ายบัตรใหม่" : "เมื่อรับบัตรคืนแล้ว บัตรจะเป็นว่างพร้อมจ่ายให้สมาชิกคนอื่น หากเคยคืนเงินแล้วจะไม่จ่ายเงินซ้ำ"}</p></>}

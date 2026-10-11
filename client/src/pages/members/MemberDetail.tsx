@@ -464,7 +464,7 @@ export function MemberDetail({
           </div>
         </div>
         <div className="member-detail-actions">
-          <button type="button" className="outline-button" onClick={() => setCardActionsOpen(true)}><IdCard size={15} /> คืน / จ่ายบัตร</button>
+          <button type="button" className="outline-button" onClick={() => setCardActionsOpen(true)}><IdCard size={15} /> จัดการบัตร</button>
           {cardActionsOpen && <MemberCardActionsModal memberNumber={member.memberNumber} onClose={() => setCardActionsOpen(false)} onSuccess={() => { void detailQuery.refetch(); setNotice("จัดการบัตรเรียบร้อยแล้ว"); }} />}
           <button
             className="primary-button"
@@ -494,9 +494,9 @@ export function MemberDetail({
           <button
             className="outline-button"
             onClick={openLimitDialog}
-            title="คืนเงินทั้งหมดและคืนบัตร"
+            title="คืนเงินทั้งหมดโดยยังไม่รับบัตรคืน"
           >
-            <TrendingDown size={15} /> ขอลดวงเงิน / คืนบัตร
+            <TrendingDown size={15} /> ขอลดวงเงิน
           </button>
           {profile.status === "active" ? (
             <button
