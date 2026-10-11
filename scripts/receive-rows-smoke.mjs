@@ -173,7 +173,7 @@ try {
   await fill(productInput, 'INLINE-AUDIT');
   await page.keyboard.press('Enter');
   await page.waitForSelector('.form-modal:not(.stock-receive-modal) .form-grid');
-  const sourceUnchanged = new DatabaseSync(dbPath, {readOnly:true});
+  const sourceUnchanged = new DatabaseSync(target, {readOnly:true});
   try { assert.equal(sourceUnchanged.prepare("SELECT id FROM products WHERE barcode='INLINE-AUDIT'").get(), undefined); } finally { sourceUnchanged.close(); }
   const addScope = '.form-modal:not(.stock-receive-modal)';
   assert.ok(await page.$eval(addScope, n => n.textContent.includes('จะสร้างสินค้าและเพิ่มสต็อกเมื่อกดบันทึกรับเข้าทั้งหมด')));

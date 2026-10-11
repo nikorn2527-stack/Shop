@@ -128,7 +128,7 @@ try {
     await page.waitForFunction(number => [...document.querySelectorAll('[aria-label="รายการสมาชิก"] tbody tr')].some(r => r.textContent.includes(number)), {}, member.memberNumber);
     const row = await page.evaluateHandle(number => [...document.querySelectorAll('[aria-label="รายการสมาชิก"] tbody tr')].find(r => r.textContent.includes(number)), member.memberNumber);
     await row.asElement().click(); await row.dispose();
-    await click('คืน / จ่ายบัตร');
+    await click('จัดการบัตร');
     await page.waitForSelector(dialog);
   };
   const submit = async () => {
