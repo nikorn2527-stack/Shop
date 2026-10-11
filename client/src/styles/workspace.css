@@ -18,8 +18,10 @@
   padding-top: 12px;
   flex-wrap: wrap;
 }
-.member-duplicate-dialog { z-index: 1100; max-height: calc(100dvh - 32px); }
-.member-duplicate-list { min-height: 0; overflow-y: auto; max-height: 45dvh; }
+.member-duplicate-dialog { z-index: 1100; max-height: calc(100dvh - 32px); display: flex; flex-direction: column; overflow: hidden; }
+.member-duplicate-dialog > [data-slot="dialog-header"],
+.member-duplicate-dialog > [data-slot="dialog-footer"] { flex: 0 0 auto; }
+.member-duplicate-list { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .member-duplicate-list .notice-bar { overflow-wrap: anywhere; }
 @media screen {
   .receive-entry-edit-modal[data-slot="dialog-content"] { z-index: 1101; width: min(760px, calc(100vw - 32px)); max-width: min(760px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; background: #fff; color: #0f172a; }

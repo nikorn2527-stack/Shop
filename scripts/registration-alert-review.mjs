@@ -18,10 +18,11 @@ try {
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('pos-rail', { detail: 'register' })));
   await page.waitForSelector('.pos-register-modal');
   const fixture = { memberNumber: cfg.memberNumber, name: 'สมาชิกตัวอย่าง', status: 'active', reason: 'name' };
+  const matches = Array.from({ length: 12 }, (_, index) => ({ ...fixture, memberNumber: index ? `REVIEW-${index}` : cfg.memberNumber }));
   await page.setRequestInterception(true);
   page.on('request', req => {
     if (req.url().includes('member.checkExisting')) {
-      req.respond({ status: 200, contentType: 'application/json', body: JSON.stringify([{ result: { data: { json: [fixture] } } }]) });
+      req.respond({ status: 200, contentType: 'application/json', body: JSON.stringify([{ result: { data: { json: matches } } }]) });
     } else req.continue();
   });
   for (const [width, height] of [[1366, 768], [1139, 334], [390, 844]]) {
@@ -38,6 +39,19 @@ try {
   await page.click('.pos-register-modal > .modal-actions .primary-button');
   await page.waitForSelector('.member-duplicate-dialog');
   assert.ok((await page.$eval('.member-duplicate-dialog', el => el.innerText)).includes(cfg.memberNumber));
+  for (const [width, height] of [[1366, 768], [1139, 334], [390, 844]]) {
+    await page.setViewport({ width, height });
+    await new Promise(resolve => setTimeout(resolve, 250));
+    assert.ok(await page.$eval('.member-duplicate-dialog [data-slot="dialog-footer"]', el => {
+      const r = el.getBoundingClientRect();
+      return r.top >= 0 && r.bottom <= innerHeight && r.left >= 0 && r.right <= innerWidth;
+    }), `Duplicate decision buttons must remain visible at ${width}x${height}`);
+    assert.ok(await page.$eval('.member-duplicate-list', el => {
+      el.scrollTop = el.scrollHeight;
+      return el.scrollHeight <= el.clientHeight || el.scrollTop > 0;
+    }), 'Duplicate member list must scroll independently');
+    await page.screenshot({ path: path.join(cfg.dir, `duplicate-warning-${width}.png`), fullPage: true });
+  }
   await page.screenshot({ path: path.join(cfg.dir, 'duplicate-warning.png'), fullPage: true });
   await page.evaluate(() => [...document.querySelectorAll('.member-duplicate-dialog button')].find(b => b.innerText.includes('กลับไปตรวจสอบ')).click());
   await page.waitForSelector('.member-duplicate-dialog', { hidden: true });
