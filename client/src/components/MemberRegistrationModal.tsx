@@ -78,7 +78,7 @@ export function MemberRegistrationModal({
       void utils.reports.memberBalances.invalidate();
       void utils.logs.list.invalidate();
     },
-    onError: cause => setError(getErrorMessage(cause)),
+    onError: cause => blocker.error("???????????????????????", getErrorMessage(cause), { confirmLabel: "???????" }),
   });
   const numberMode = settingsQuery.data?.memberNumberMode ?? "running";
   const nextNumber = nextNumberQuery.data?.memberNumber;
@@ -88,16 +88,10 @@ export function MemberRegistrationModal({
     if (!file) return;
     if (!/^image\/(png|jpe?g|webp)$/.test(file.type)) {
       setError("รองรับเฉพาะไฟล์รูป PNG JPG WEBP");
-      toast.error("รองรับเฉพาะไฟล์รูป PNG JPG WEBP", {
-        description: "เลือกไฟล์รูปชนิด PNG, JPG หรือ WEBP",
-      });
       return;
     }
     if (file.size > 8_000_000) {
       setError("ไฟล์รูปใหญ่เกิน 8MB — เลือกไฟล์เล็กลง");
-      toast.error("ไฟล์รูปใหญ่เกิน 8MB", {
-        description: "ย่อขนาดรูปหรือเลือกไฟล์เล็กลงก่อนอัปโหลด",
-      });
       return;
     }
     compressImageToDataUrl(file, 480, 0.72)
@@ -107,25 +101,16 @@ export function MemberRegistrationModal({
       })
       .catch(() => {
         setError("อ่านไฟล์รูปไม่สำเร็จ");
-        toast.error("อ่านไฟล์รูปไม่สำเร็จ", {
-          description: "ลองเลือกไฟล์ใหม่อีกครั้ง",
-        });
       });
   };
   const submitRegister = async (confirmedDifferentPerson = false) => {
     if (registerMutation.isPending || checkingExisting || !settingsQuery.data) return;
     if (!registerForm.firstName.trim() || !registerForm.lastName.trim()) {
       setError("กรุณาระบุชื่อและนามสกุลสมาชิก");
-      toast.error("กรุณาระบุชื่อและนามสกุลสมาชิก", {
-        description: "ต้องมีทั้งชื่อและนามสกุลก่อนบันทึก",
-      });
       return;
     }
     if (numberMode === "manual" && !registerForm.memberNumber.trim()) {
       setError("โหมดกำหนดหมายเลขเอง: กรุณาระบุหมายเลขสมาชิก");
-      toast.error("กรุณาระบุหมายเลขสมาชิก", {
-        description: "โหมดนี้ต้องกำหนดหมายเลขสมาชิกด้วยตนเอง",
-      });
       return;
     }
     const initialBalance =
@@ -137,9 +122,6 @@ export function MemberRegistrationModal({
       (!Number.isFinite(initialBalance) || !(initialBalance > 0))
     ) {
       setError("เงินเริ่มต้นต้องมากกว่า 0");
-      toast.error("เงินเริ่มต้นต้องมากกว่า 0", {
-        description: "เว้นว่างไว้หากยังไม่เติมเงิน",
-      });
       return;
     }
     const card = cardsQuery.data?.find(
