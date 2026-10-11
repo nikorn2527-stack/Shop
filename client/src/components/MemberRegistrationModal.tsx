@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { blocker } from "./BlockerAlert";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "./ui/dialog";
 import { trpc } from "@/lib/trpc";
 import {
   Camera,
@@ -35,6 +37,10 @@ export function MemberRegistrationModal({
   const [error, setError] = useState("");
   const [checkingExisting, setCheckingExisting] = useState(false);
   const [existingMembers, setExistingMembers] = useState<{ memberNumber: string; name: string; status: string; reason: string }[]>([]);
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
+  useEffect(() => {
+    if (error && !duplicateOpen) blocker.warning("ตรวจสอบข้อมูลก่อนบันทึก", error);
+  }, [error, duplicateOpen]);
   const [registerForm, setRegisterForm] = useState({
     prename: "",
     firstName: "",
@@ -128,7 +134,7 @@ export function MemberRegistrationModal({
       card => card.cardNumber === registerForm.cardNumber.trim()
     );
     if (!card || !["blank", "returned_vacant"].includes(card.status)) {
-      setError("กรุณายิงบัตรว่างที่มีในระบบ");
+      setError("กรุณาสแกนหรือกรอกรหัสบัตรที่พร้อมใช้งานในทะเบียนบัตร");
       return;
     }
     setError("");
@@ -137,10 +143,12 @@ export function MemberRegistrationModal({
       const matches = await utils.member.checkExisting.fetch({ firstName: registerForm.firstName.trim(), lastName: registerForm.lastName.trim(), citizenId: registerForm.idCard.trim() || undefined, phone: registerForm.phone.trim() || undefined });
       if (matches.length && (!confirmedDifferentPerson || matches.some(member => member.reason === "citizenId"))) {
         setExistingMembers(matches);
-        setError("พบข้อมูลสมาชิกเดิม กรุณาตรวจสอบก่อนสมัครใหม่");
+        setError("");
+        setDuplicateOpen(true);
         return;
       }
       setExistingMembers([]);
+      setDuplicateOpen(false);
     } catch (cause) {
       setError(getErrorMessage(cause));
       return;
@@ -168,6 +176,25 @@ export function MemberRegistrationModal({
 
   return (
     <>
+      <Dialog open={duplicateOpen} onOpenChange={setDuplicateOpen}>
+        <DialogContent className="member-duplicate-dialog" showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>พบข้อมูลสมาชิกเดิม</DialogTitle>
+            <DialogDescription>ตรวจสอบว่าเป็นสมาชิกคนเดิมหรือไม่ ก่อนสมัครใหม่ หากเป็นคนเดิมให้ใช้เลขสมาชิกเดิมเพื่อจ่ายบัตร</DialogDescription>
+          </DialogHeader>
+          <div className="member-duplicate-list">
+            {existingMembers.map(member => <div className="notice-bar" key={member.memberNumber} style={{ display: "block" }}>
+              <strong>{member.name}</strong>
+              <p>เลขสมาชิก {member.memberNumber} · {member.status === "active" ? "ใช้งาน" : "ระงับการใช้งาน"}</p>
+              <small>ข้อมูลตรงกัน: {member.reason === "citizenId" ? "เลขบัตรประชาชน" : member.reason === "phone" ? "เบอร์โทรศัพท์" : "ชื่อและนามสกุล"}</small>
+            </div>)}
+          </div>
+          <DialogFooter>
+            <button type="button" className="outline-button" disabled={checkingExisting || registerMutation.isPending} onClick={() => setDuplicateOpen(false)}>กลับไปตรวจสอบ</button>
+            {!existingMembers.some(member => member.reason === "citizenId") && <button type="button" className="primary-button" disabled={checkingExisting || registerMutation.isPending} onClick={() => void submitRegister(true)}>ยืนยันว่าเป็นคนละคน</button>}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       {registerCameraOpen && (
         <CameraCaptureModal
           open
@@ -207,6 +234,7 @@ export function MemberRegistrationModal({
               <X size={17} />
             </button>
           </div>
+          <div className="member-registration-body">
           <div className="member-number-preview">
             <span>
               <IdCard size={16} />{" "}
@@ -423,16 +451,6 @@ export function MemberRegistrationModal({
               />
             </label>
           </div>
-          {existingMembers.length > 0 && (
-            <div className="notice-bar" role="alert" style={{ display: "block" }}>
-              <strong>พบข้อมูลสมาชิกเดิม</strong>
-              {existingMembers.map(member => <div key={member.memberNumber}>
-                <p>{member.memberNumber} · {member.name} · {member.status === "active" ? "ใช้งาน" : "ระงับการใช้งาน"}</p><small>ข้อมูลตรงกัน: {member.reason === "citizenId" ? "เลขบัตรประชาชน" : member.reason === "phone" ? "เบอร์โทรศัพท์" : "ชื่อและนามสกุล"}</small>
-                <span>ใช้เลขสมาชิกนี้ค้นหาในหน้าจัดการสมาชิก แล้วจ่ายบัตรให้สมาชิกเดิม</span>
-              </div>)}
-              {!existingMembers.some(member => member.reason === "citizenId") && <button type="button" className="outline-button" onClick={() => void submitRegister(true)}>ตรวจแล้วว่าเป็นคนละคน — สมัครใหม่</button>}
-            </div>
-          )}
           {error && (
             <div className="notice-bar error">
               <CircleAlert size={16} /> {error}
@@ -441,6 +459,7 @@ export function MemberRegistrationModal({
               </button>
             </div>
           )}
+          </div>
           <div className="modal-actions">
             <button
               className="outline-button"

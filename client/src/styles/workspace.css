@@ -1,3 +1,26 @@
+.form-modal.pos-register-modal {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  max-height: calc(100dvh - 24px);
+}
+.pos-register-modal > .modal-heading,
+.pos-register-modal > .modal-actions { flex: 0 0 auto; }
+.pos-register-modal > .member-registration-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 2px 4px 12px;
+}
+.pos-register-modal > .modal-actions {
+  background: white;
+  border-top: 1px solid #cbd5e1;
+  padding-top: 12px;
+  flex-wrap: wrap;
+}
+.member-duplicate-dialog { z-index: 1100; max-height: calc(100dvh - 32px); }
+.member-duplicate-list { min-height: 0; overflow-y: auto; max-height: 45dvh; }
+.member-duplicate-list .notice-bar { overflow-wrap: anywhere; }
 @media screen {
   .receive-entry-edit-modal[data-slot="dialog-content"] { z-index: 1101; width: min(760px, calc(100vw - 32px)); max-width: min(760px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); overflow: auto; background: #fff; color: #0f172a; }
   body:has(.receive-entry-edit-modal) [data-slot="dialog-overlay"] { z-index: 1100; }
