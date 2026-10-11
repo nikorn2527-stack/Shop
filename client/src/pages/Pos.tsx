@@ -66,7 +66,7 @@ const SPECIAL_SHORTCUT = "สินค้าไม่ระบุตายตั
 
 function getErrorMessage(error: unknown) {
   if (error instanceof TRPCClientError) return error.message;
-  return "เกิดข้อผิดพลาดในการเชื่อมต่อระบบ กรุณาลองอีกครั้ง";
+  return "เชื่อมต่อระบบไม่ได้ ลองอีกครั้ง";
 }
 
 function holdTimeLabel(savedAt: number) {
@@ -417,8 +417,8 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
     compressImageToDataUrl(file, 480, 0.72).then((dataUrl) => { setRegisterForm((current) => ({ ...current, photoUrl: dataUrl })); setError(""); }).catch(() => { setError("อ่านไฟล์รูปไม่สำเร็จ"); toast.error("อ่านไฟล์รูปไม่สำเร็จ", { description: "ลองเลือกไฟล์ใหม่อีกครั้ง" }); });
   };
   const submitRegister = () => {
-    if (!registerForm.firstName.trim() || !registerForm.lastName.trim()) { setError("กรุณาระบุชื่อและนามสกุลสมาชิก"); toast.error("กรุณาระบุชื่อและนามสกุลสมาชิก", { description: "ต้องมีทั้งชื่อและนามสกุลก่อนบันทึก" }); return; }
-    if (numberMode === "manual" && !registerForm.memberNumber.trim()) { setError("โหมดกำหนดหมายเลขเอง: กรุณาระบุหมายเลขสมาชิก"); toast.error("กรุณาระบุหมายเลขสมาชิก", { description: "โหมดนี้ต้องกำหนดหมายเลขสมาชิกด้วยตนเอง" }); return; }
+    if (!registerForm.firstName.trim() || !registerForm.lastName.trim()) { setError("ระบุชื่อและนามสกุลสมาชิก"); toast.error("ระบุชื่อและนามสกุลสมาชิก", { description: "ต้องมีทั้งชื่อและนามสกุลก่อนบันทึก" }); return; }
+    if (numberMode === "manual" && !registerForm.memberNumber.trim()) { setError("โหมดกำหนดหมายเลขเอง: ระบุหมายเลขสมาชิก"); toast.error("ระบุหมายเลขสมาชิก", { description: "โหมดนี้ต้องกำหนดหมายเลขสมาชิกด้วยตนเอง" }); return; }
     const initialBalance = registerForm.initialBalance.trim() === "" ? undefined : Number(registerForm.initialBalance);
     if (initialBalance !== undefined && !(initialBalance > 0)) { setError("เงินเริ่มต้นต้องมากกว่า 0"); toast.error("เงินเริ่มต้นต้องมากกว่า 0", { description: "เว้นว่างไว้หากยังไม่เติมเงิน" }); return; }
     setError("");
@@ -677,7 +677,7 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
   const requestPayment = (method: PaymentMethod) => {
     if (cart.length === 0) return;
     if (method === "หักบัญชีสมาชิก" && !selectedMember) {
-      setError("กรุณาเลือกสมาชิกก่อนชำระแบบหักบัญชี");
+      setError("เลือกสมาชิกก่อนชำระแบบหักบัญชี");
       blocker.warning("ยังไม่ได้เลือกสมาชิก", "ชำระแบบหักบัญชีสมาชิก ต้องมีสมาชิกในบิลก่อน\nยิงบัตรสมาชิกที่ช่องสแกน หรือกด F1 เพื่อเลือกสมาชิก");
       return;
     }
@@ -711,9 +711,9 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
   };
   const submitWallet = () => {
     const memberNumber = walletMemberNumber || selectedMemberNumber;
-    if (!memberNumber) { setError("กรุณาเลือกสมาชิกก่อนบันทึกรายการ"); blocker.warning("ยังไม่ได้เลือกสมาชิก", "ยิงบัตรสมาชิกที่ช่องด้านบน หรือเลือกจากรายการก่อนบันทึกรายการ"); return; }
+    if (!memberNumber) { setError("เลือกสมาชิกก่อนบันทึกรายการ"); blocker.warning("ยังไม่ได้เลือกสมาชิก", "ยิงบัตรสมาชิกที่ช่องด้านบน หรือเลือกจากรายการก่อนบันทึกรายการ"); return; }
     const amount = Number(walletAmount);
-    if (!(amount > 0)) { setError("กรุณาระบุจำนวนเงินมากกว่า 0"); blocker.warning("กรุณาระบุจำนวนเงินให้ถูกต้อง", "ใส่ยอดเงินที่จะเติมหรือถอนเป็นตัวเลขมากกว่า 0"); return; }
+    if (!(amount > 0)) { setError("ใส่จำนวนเงินมากกว่า 0"); blocker.warning("ระบุจำนวนเงินให้ถูกต้อง", "ใส่ยอดเงินที่จะเติมหรือถอนเป็นตัวเลขมากกว่า 0"); return; }
     clearNotices();
     setWalletStep("confirm");
   };
@@ -763,7 +763,7 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
     const price = Number(specialPrice);
     const qty = Math.max(1, Math.floor(Number(specialQty) || 1));
     const unit = specialUnit.trim() || "รายการ";
-    if (!name) { setError("กรุณาระบุชื่อรายการพิเศษ"); blocker.warning("กรุณาระบุชื่อรายการพิเศษ", "เช่น ข้าวราดแกงนอกรายการ / ค่าฝากของ"); return; }
+    if (!name) { setError("ระบุชื่อรายการพิเศษ"); blocker.warning("ระบุชื่อรายการพิเศษ", "เช่น ข้าวราดแกงนอกรายการ / ค่าฝากของ"); return; }
     if (!(price > 0)) { setError("ราคาต่อหน่วยต้องมากกว่า 0"); blocker.warning("ราคาต่อหน่วยต้องมากกว่า 0", "ใส่ราคาของรายการพิเศษนี้ให้ถูกต้องก่อนเพิ่มเข้าบิล"); return; }
     const specialId = -(Date.now() + ++specialSeq.current);
     setCart((items) => [...items, { id: specialId, name, price, qty, unit, special: true }]);
@@ -962,7 +962,7 @@ export function Pos({ shortcut, setShortcut, role, userName }: { shortcut: strin
         <div className="pos-head">
         <div className="scan-hero" ref={scanHeroRef}>
           <ScanLine size={22} className="scan-hero-icon" />
-          <input ref={scanRef} name={`${formNoiseRef.current}-scan`} value={query} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} onKeyDownCapture={scanLayout.onKeyDownCapture} onChange={(event) => { setQuery(event.target.value); setScanOpen(true); setScanHighlight(-1); }} onFocus={() => setScanOpen(true)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); handleScanSubmit(); return; } if (event.key === "ArrowDown" && scanRows.length > 0) { event.preventDefault(); setScanOpen(true); setScanHighlight((current) => Math.min(current + 1, scanRows.length - 1)); return; } if (event.key === "ArrowUp" && scanRows.length > 0) { event.preventDefault(); setScanHighlight((current) => Math.max(current - 1, 0)); return; } if (event.key === "Escape" && scanOpen && (query.trim() !== "" || recentScanProducts.length > 0)) { event.preventDefault(); event.stopPropagation(); closeScanDrop(); } }} placeholder="สแกน/ค้นหา สินค้าหรือสมาชิก · พิมพ์แล้วเลือกจากรายการใต้ช่อง · ยิงบาร์โค้ดเต็ม = เพิ่มทันที" autoFocus aria-label="ช่องสแกนบาร์โค้ดและค้นหาสินค้าหรือสมาชิก" title="ค้นหาสินค้า (ชื่อ/SKU/บาร์โค้ด) และสมาชิก (เลข/ชื่อ) — เลือกจากรายการใต้ช่อง · ไม่เก็บประวัติการคีย์ในเบราว์เซอร์" />
+          <input ref={scanRef} name={`${formNoiseRef.current}-scan`} value={query} autoComplete="off" autoCorrect="off" autoCapitalize="off" spellCheck={false} onKeyDownCapture={scanLayout.onKeyDownCapture} onChange={(event) => { setQuery(event.target.value); setScanOpen(true); setScanHighlight(-1); }} onFocus={() => setScanOpen(true)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); handleScanSubmit(); return; } if (event.key === "ArrowDown" && scanRows.length > 0) { event.preventDefault(); setScanOpen(true); setScanHighlight((current) => Math.min(current + 1, scanRows.length - 1)); return; } if (event.key === "ArrowUp" && scanRows.length > 0) { event.preventDefault(); setScanHighlight((current) => Math.max(current - 1, 0)); return; } if (event.key === "Escape" && scanOpen && (query.trim() !== "" || recentScanProducts.length > 0)) { event.preventDefault(); event.stopPropagation(); closeScanDrop(); } }} placeholder="สแกนหรือค้นหาสินค้า · ยิงบาร์โค้ดเต็มเพิ่มทันที" autoFocus aria-label="ช่องสแกนบาร์โค้ดและค้นหาสินค้าหรือสมาชิก" title="ค้นหาสินค้า (ชื่อ/SKU/บาร์โค้ด) และสมาชิก (เลข/ชื่อ) — เลือกจากรายการใต้ช่อง · ไม่เก็บประวัติการคีย์ในเบราว์เซอร์" />
           <button type="button" className="scan-camera-btn scan-camera-hero" onClick={openCamera} aria-label="สแกนด้วยกล้อง" title={hasCameraScan ? "สแกนด้วยกล้องโทรศัพท์/เว็บแคม — ไม่มีปืนสแกนก็ยิงบาร์โค้ดได้ อ่านได้ทั้งสินค้าและบัตรสมาชิก (QR ด้วย)" : "กล้องสแกนบาร์โค้ดเป็นฟีเจอร์เวอร์ชันโปรพลัส — กดเพื่อดูรายละเอียด"}><Camera size={16} />{!hasCameraScan && <Lock size={10} style={{ position: "absolute", right: 3, bottom: 3 }} />}</button>{query ? <button type="button" className="scan-clear" onClick={() => { setQuery(""); setScanHighlight(-1); focusScan(); }} aria-label="ล้างคำค้นหา"><X size={15} /></button> : <span className="scan-live"><span className="live-dot" /> พร้อมสแกน</span>}
           <kbd>Enter</kbd>
           {scanOpen && (query.trim() !== "" || recentScanProducts.length > 0) && (
