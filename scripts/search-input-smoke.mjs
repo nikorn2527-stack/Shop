@@ -110,6 +110,7 @@ try {
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('pos-rail', { detail: 'card' })));
   const memberInput = '#pos-card-member';
   await page.waitForSelector(memberInput);
+  await page.waitForFunction(() => document.activeElement?.id === 'pos-card-member', { timeout: 2000 });
   for (const term of [member.first_name, member.member_number, member.card_number]) {
     await page.$eval(memberInput, n => n.select());
     await page.keyboard.press('Backspace');

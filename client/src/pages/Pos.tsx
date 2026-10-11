@@ -222,6 +222,17 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
   const [cardActionsOpen, setCardActionsOpen] = useState(false);
   const [cardActionMember, setCardActionMember] = useState<MemberLite | null>(null);
   const [limitMember, setLimitMember] = useState<MemberLite | null>(null);
+  useEffect(() => {
+    const inputId = cardActionsOpen && !cardActionMember
+      ? "pos-card-member"
+      : limitShortcutOpen && !limitMember ? "pos-limit-member" : null;
+    if (!inputId) return;
+    // Wait for the shared search to mount inside the dialog before focusing it.
+    const timer = window.setTimeout(() => {
+      document.getElementById(inputId)?.focus();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [cardActionsOpen, cardActionMember, limitShortcutOpen, limitMember]);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [cardForNew, setCardForNew] = useState<{ memberNumber: string; prename?: string | null; firstName: string; lastName: string; type: string; balance: number; status: "active" | "suspended"; createdAt: string; photoUrl: string | null; gender: string | null } | null>(null);
   // ROUND 38 (ข้อ 37) — ถ่ายรูปสมาชิกจากกล้อง ตอนลงทะเบียนสมาชิกใหม่
