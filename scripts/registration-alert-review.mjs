@@ -6,13 +6,15 @@ const cfg = JSON.parse(fs.readFileSync(process.env.AUDIT_CONFIG_PATH, 'utf8'));
 const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
 try {
   const page = await browser.newPage();
+  await page.setViewport({ width: 1366, height: 768 });
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   await page.setCookie({ name: 'app_session_id', value: cfg.sessionId, url: cfg.baseUrl });
   await page.goto(cfg.baseUrl, { waitUntil: 'networkidle2' });
   await page.waitForSelector('.app-shell');
-  await page.evaluate(() => [...document.querySelectorAll('button')].find(b => b.getClientRects().length && b.innerText.includes('POS')).click());
+  await page.evaluate(() => [...document.querySelectorAll('button[data-nav-item]')].find(b => b.getClientRects().length && b.innerText.includes('POS')).click());
   await page.waitForSelector('.pos-head');
+  await new Promise(resolve => setTimeout(resolve, 500));
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('pos-rail', { detail: 'register' })));
   await page.waitForSelector('.pos-register-modal');
   const fixture = { memberNumber: cfg.memberNumber, name: 'สมาชิกตัวอย่าง', status: 'active', reason: 'name' };
