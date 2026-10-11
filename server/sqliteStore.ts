@@ -45,6 +45,7 @@ export type SqliteMember = {
   creditLimit: number | null;
   /** ROUND 65 (user) — รหัสบัตรเงินสดของสมาชิก (เช่น 2395100201) · null = ยังไม่ผูกบัตร */
   cardNumber: string | null;
+  accountClosed?: number;
   /** ROUND 65 (user) — รหัสผู้ป่วย (HN) ที่ผูกกับบัตร · null = ไม่มี */
   patientCode: string | null;
 };
@@ -620,6 +621,7 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
   ensureColumn(db, "members", "prename", "TEXT");
   // Req 23.2 — วงเงินซื้อสินค้าต่อวันของสมาชิก (NULL = ไม่จำกัด)
   ensureColumn(db, "members", "credit_limit", "REAL");
+  ensureColumn(db, "members", "account_closed", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn(db, "member_transactions", "actor", "TEXT");
   // Backfill the new actor column from audit_logs (round 30): every wallet /
   // purchase transaction was logged with the same timestamp as its
@@ -909,7 +911,7 @@ export function assignMemberCard(db: SqliteDb, input: {
       }
     }
     assignPhysicalCardTx(db, input.cardNumber, input.memberNumber, input.actor, input.actorRole);
-    db.prepare(`UPDATE members SET card_number = ? WHERE member_number = ?`).run(input.cardNumber.trim(), input.memberNumber);
+    db.prepare(`UPDATE members SET card_number = ?, account_closed = 0 WHERE member_number = ?`).run(input.cardNumber.trim(), input.memberNumber);
     logAction(db, "จ่ายบัตรสมาชิก", input.actor || "ระบบ", `${input.memberNumber} · ${input.cardNumber.trim()}`, "blue", input.actorRole ?? null);
     return getMemberDetail(db, input.memberNumber);
   });
@@ -957,6 +959,23 @@ export function returnMemberCard(db: SqliteDb, input: { memberNumber: string; ca
     return getMemberDetail(db, input.memberNumber);
   }
   return releasePhysicalCard(db, input.cardNumber, input.actor, input.actorRole, "รับคืนบัตรยอดศูนย์", input.expectedSessionId);
+}
+
+/** Close the current account use without claiming that the physical card was returned. */
+export function closeMemberAccount(db: SqliteDb, input: { memberNumber: string; cardNumber: string; expectedSessionId: number; actor?: string; actorRole?: string; clientRequestId?: string }) {
+  return runInTransaction(db, () => {
+    const member = getMemberDetail(db, input.memberNumber)?.member;
+    const session = db.prepare(`SELECT id FROM card_usage_sessions WHERE card_number = ? AND member_number = ? AND ended_at IS NULL`).get(input.cardNumber, input.memberNumber) as { id: number } | undefined;
+    if (!member || member.cardNumber !== input.cardNumber || session?.id !== input.expectedSessionId) throw new StoreError("ข้อมูลบัตรเปลี่ยนแล้ว ค้นหาสมาชิกอีกครั้ง");
+    if (member.status !== "active") throw new StoreError("สมาชิกถูกระงับการใช้งาน");
+    if (member.balance < 0) throw new StoreError("มียอดค้าง ต้องจัดการยอดก่อนปิดบัญชี");
+    const closed = db.prepare(`SELECT account_closed FROM members WHERE member_number = ?`).get(input.memberNumber) as { account_closed: number };
+    if (closed.account_closed) return getMemberDetail(db, input.memberNumber);
+    if (member.balance > 0) walletTx(db, { memberNumber: input.memberNumber, type: "refund", amount: member.balance, retainCard: true, note: "ขอลดวงเงิน · คืนเงินทั้งหมดและปิดบัญชี · ยังไม่ได้รับบัตรคืน", actor: input.actor, actorRole: input.actorRole, clientRequestId: input.clientRequestId });
+    db.prepare(`UPDATE members SET account_closed = 1 WHERE member_number = ?`).run(input.memberNumber);
+    logAction(db, "ขอลดวงเงิน / ปิดบัญชี", input.actor || "เจ้าหน้าที่", `${input.memberNumber} · บัตร ${input.cardNumber} ยังไม่ได้รับคืน`, "amber", input.actorRole ?? null);
+    return getMemberDetail(db, input.memberNumber);
+  });
 }
 
 
@@ -1017,7 +1036,7 @@ export function seedSqliteDemoData(db: SqliteDb) {
 }
 
 export function getMemberDetail(db: SqliteDb, memberNumber: string, transactionLimit = 50) {
-  const member = db.prepare(`SELECT id, member_number as memberNumber, prename, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, photo_url as photoUrl, gender, credit_limit as creditLimit, card_number as cardNumber, patient_code as patientCode FROM members WHERE member_number = ?`).get(memberNumber) as SqliteMember | undefined;
+  const member = db.prepare(`SELECT id, member_number as memberNumber, prename, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, photo_url as photoUrl, gender, credit_limit as creditLimit, card_number as cardNumber, account_closed as accountClosed, patient_code as patientCode FROM members WHERE member_number = ?`).get(memberNumber) as SqliteMember | undefined;
   if (!member) return undefined;
   const transactions = db.prepare(`SELECT id, member_number as memberNumber, type, detail, amount, payment_method as paymentMethod, balance_after as balanceAfter, created_at as createdAt, slip_url IS NOT NULL AS hasSlip FROM member_transactions WHERE member_number = ? ORDER BY created_at DESC, id DESC LIMIT ?`).all(memberNumber, transactionLimit) as unknown as SqliteTransaction[];
   return { member, transactions };
@@ -2275,6 +2294,8 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
     member = db.prepare(`SELECT id, member_number as memberNumber, prename, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, photo_url as photoUrl, gender, credit_limit as creditLimit FROM members WHERE member_number = ?`).get(input.memberNumber!.trim()) as SqliteMember | undefined;
     if (!member) throw new StoreError(`ไม่พบสมาชิก ${input.memberNumber} ในระบบ`);
     if (member.status !== "active") throw new StoreError(`สมาชิกถูกระงับการใช้งาน · ${member.memberNumber}`);
+    const account = db.prepare(`SELECT account_closed FROM members WHERE member_number = ?`).get(member.memberNumber) as { account_closed: number };
+    if (account.account_closed) throw new StoreError("บัญชีรอบนี้ปิดแล้ว ไม่สามารถซื้อด้วยเงินสมาชิกได้");
     if (member.balance < total) throw new StoreError(`ยอดเงินคงเหลือไม่พอ · ยอดชำระ ${money(total)} คงเหลือ ${money(member.balance)}`);
     // Req 23.2 — วงเงินซื้อสินค้าต่อวัน: wallet bills of TODAY plus this bill
     // must stay within the member's credit limit (null = ไม่จำกัด).
@@ -2621,6 +2642,8 @@ export type WalletTxInput = {
   memberNumber: string;
   /** ROUND 65 — 'refund' = คืนบัตรเงินสด (ผู้ป่วยคืนบัตร ร้านจ่ายเงินคืน) คิดเหมือนถอน */
   type: "deposit" | "withdrawal" | "refund";
+  /** Internal account closure: refund money but keep the physical card assigned. */
+  retainCard?: boolean;
   amount: number;
   note?: string;
   actor?: string;
@@ -2675,6 +2698,8 @@ export function walletTx(db: SqliteDb, input: WalletTxInput) {
   if (!member) throw new StoreError(`ไม่พบสมาชิก ${input.memberNumber} ในระบบ`);
   if (member.status !== "active") throw new StoreError(`สมาชิกถูกระงับการใช้งาน · ${member.memberNumber}`);
   if (input.type === "deposit") {
+    const account = db.prepare(`SELECT account_closed FROM members WHERE member_number = ?`).get(member.memberNumber) as { account_closed: number };
+    if (account.account_closed) throw new StoreError("บัญชีรอบนี้ปิดแล้ว ต้องรับคืนบัตรและจ่ายบัตรใหม่ก่อนเติมเงิน");
     if (!member.cardNumber) throw new StoreError("สมาชิกยังไม่มีบัตร กรุณาจ่ายบัตรก่อนเติมเงิน");
     const card = db.prepare(`SELECT status, assigned_member_number FROM physical_cards WHERE card_number = ? AND archived_at IS NULL`).get(member.cardNumber) as { status: string; assigned_member_number: string | null } | undefined;
     if (!card || card.status !== "assigned" || card.assigned_member_number !== member.memberNumber) {
@@ -2702,7 +2727,7 @@ export function walletTx(db: SqliteDb, input: WalletTxInput) {
   const createdAt = formatDateTime();
   // ROUND 63 — รูปหลักฐานที่แนบมากับการเติม/ถอน (เช่น สลิปโอนเข้า) เก็บไปกับรายการ
   const slipImage = typeof input.slipImage === "string" && input.slipImage.startsWith("data:image/") ? input.slipImage.slice(0, 600_000) : null;
-  runInTransaction(db, () => {
+  const writeWallet = () => {
     db.prepare(`UPDATE members SET balance = ? WHERE member_number = ?`).run(balanceAfter, member.memberNumber);
     db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, actor, created_at, slip_url, client_request_id) VALUES (?, ?, ?, ?, 'เงินสด', ?, ?, ?, ?, ?)`).run(
       member.memberNumber,
@@ -2716,7 +2741,7 @@ export function walletTx(db: SqliteDb, input: WalletTxInput) {
       input.clientRequestId ?? null,
     );
     // Record the refund in the holding round before closing and releasing the card.
-    if (input.type === "refund" && balanceAfter === 0 && member.cardNumber) {
+    if (input.type === "refund" && balanceAfter === 0 && member.cardNumber && !input.retainCard) {
       releasePhysicalCardTx(db, member.cardNumber, actor, input.actorRole, "คืนเงินครบยอดและรับคืนบัตร");
     }
     logAction(
@@ -2728,7 +2753,10 @@ export function walletTx(db: SqliteDb, input: WalletTxInput) {
       input.actorRole ?? null,
       createdAt,
     );
-  });
+  };
+  // Account closure owns the enclosing transaction; ordinary wallet operations own theirs.
+  if (input.retainCard) writeWallet();
+  else runInTransaction(db, writeWallet);
   return {
     memberNumber: member.memberNumber,
     memberName: [member.prename, member.firstName, member.lastName].filter(Boolean).join(" "),

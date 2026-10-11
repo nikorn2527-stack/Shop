@@ -30,6 +30,7 @@ import {
   releasePhysicalCard,
   assignMemberCard,
   returnMemberCard,
+  closeMemberAccount,
   markPhysicalCard,
   StoreError,
   appRoleThai,
@@ -1139,6 +1140,10 @@ export const appRouter = router({
   }),
 
   card: router({
+    closeAccount: permissionProcedure("MEMBER.WALLET").input(z.object({ memberNumber: z.string().trim().min(1), cardNumber: z.string().trim().min(1), expectedSessionId: z.number().int().positive(), clientRequestId: z.string().max(100).optional() })).mutation(({ ctx, input }) => withStoreErrors(() => {
+      const { actor, actorRole } = resolveActor(ctx, {});
+      return closeMemberAccount(getWelfareDb(), { ...input, actor, actorRole });
+    })),
     previewNumbers: publicProcedure.input(z.object({ prefix: z.string().max(16), digits: z.number().int().min(3).max(10), count: z.number().int().min(1).max(500) })).query(({ ctx, input }) => withStoreErrors(() => {
       requireAdmin(ctx);
       return previewGeneratedCards(getWelfareDb(), input.prefix, input.digits, input.count);

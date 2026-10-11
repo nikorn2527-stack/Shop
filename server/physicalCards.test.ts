@@ -1,10 +1,31 @@
 import { describe, expect, it } from "vitest";
 import { assignMemberCard, checkout, createProduct, receiveStockLines, voidSale } from "./sqliteStore";
 import { generateBlankCards, previewGeneratedCards } from "./sqliteStore";
-import { returnMemberCard } from "./sqliteStore";
+import { returnMemberCard, closeMemberAccount } from "./sqliteStore";
 import { createSqliteStore, createBlankCards, registerMember, releasePhysicalCard, listPhysicalCards, markPhysicalCard, getMemberDetail, setSettings, setMemberNumberMode, bindExistingMembersToDemoCards, cardUsageHistory, walletTx, setMemberStatus } from "./sqliteStore";
 
 describe("reusable physical cards", () => {
+  it("closes the account before physical return without releasing the card or refunding twice", () => {
+    const db = createSqliteStore();
+    try {
+      createBlankCards(db, ["CLOSE-FIRST", "CLOSE-NEXT"]);
+      const member = registerMember(db, { firstName: "Close", lastName: "Later", cardNumber: "CLOSE-FIRST", initialDeposit: 45 }).member;
+      const session = cardUsageHistory(db, "CLOSE-FIRST").sessions[0];
+      const input = { memberNumber: member.memberNumber, cardNumber: "CLOSE-FIRST", expectedSessionId: session.id, clientRequestId: "close-test" };
+      closeMemberAccount(db, input);
+      closeMemberAccount(db, input);
+      expect(getMemberDetail(db, member.memberNumber)?.member).toMatchObject({ balance: 0, cardNumber: "CLOSE-FIRST" });
+      expect(listPhysicalCards(db).find(c => c.cardNumber === "CLOSE-FIRST")?.status).toBe("assigned");
+      expect(() => walletTx(db, { memberNumber: member.memberNumber, type: "deposit", amount: 20 })).toThrow("บัญชีรอบนี้ปิดแล้ว");
+      expect(() => assignMemberCard(db, { memberNumber: member.memberNumber, cardNumber: "CLOSE-NEXT", expectedCardNumber: "CLOSE-FIRST" })).toThrow();
+      returnMemberCard(db, { ...input, mode: "refund" });
+      expect(getMemberDetail(db, member.memberNumber)?.member.cardNumber).toBeNull();
+      expect(db.prepare("SELECT COUNT(*) AS n FROM member_transactions WHERE type = 'refund'").get()).toMatchObject({ n: 1 });
+      assignMemberCard(db, { memberNumber: member.memberNumber, cardNumber: "CLOSE-NEXT", expectedCardNumber: null });
+      walletTx(db, { memberNumber: member.memberNumber, type: "deposit", amount: 20 });
+      expect(getMemberDetail(db, member.memberNumber)?.member.balance).toBe(20);
+    } finally { db.close(); }
+  });
   it("requires an assigned card before topping up a returning member", () => {
     const db = createSqliteStore();
     try {
