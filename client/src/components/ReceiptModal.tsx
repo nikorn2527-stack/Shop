@@ -44,11 +44,35 @@ export function ReceiptModal({ receipt, onClose, onNewSale, onPrinted, mode = "n
   const [receiptBusy, setReceiptBusy] = useState("");
   const settingsQuery = trpc.settings.get.useQuery(undefined);
   const showBalance = settingsQuery.data?.showBalanceOnReceipt !== false;
-  // FIX-26 (user) — ปุ่ม 'พิมพ์' พิมพ์เลย ไม่เข้าพรีวิวก่อน (ลบ printPreviewBefore toggle ออก)
+  // FIX-26 (user) — ปุ่ม 'พิมพ์' พิมพ์เลย ไม่เข้าพรีวิวก่อน
   // ROUND 25 — แบรนด์ที่ผู้บริหารปรับเอง แสดงบนหัวใบเสร็จด้วย
   const receiptName = (settingsQuery.data?.appName ?? "").trim() || "ร้านค้าสวัสดิการ";
-  // FIX-26 (user) — ปุ่ม 'พิมพ์' พิมพ์เลย ไม่เข้าพรีวิวก่อน
-  const printReceipt = () => { window.print(); onPrinted?.(); };
+  // พิมพ์สลิป Thermal ตรง ๆ — ฉีด @page size ให้ตรงความกว้างสลิป (58/72/80 มม.)
+  // ก่อนสั่งพิมพ์ ไม่เช่นนั้นเบราว์เซอร์จะใช้กระดาษ A4/Letter ปริ้นใบเสร็จเล็กอยู่กลางหน้า
+  // (พรีวิวก่อนพิมพ์ใน PrintPreviewModal ฉีดกฎนี้อยู่แล้ว — เส้นทางตรงนี้เคยขาด)
+  const printReceipt = () => {
+    const widthMm = settingsQuery.data?.receiptPaperWidth === "58" ? 58 : settingsQuery.data?.receiptPaperWidth === "80" ? 80 : 72;
+    const runtimeId = "receipt-print-page-runtime";
+    let styleEl = document.getElementById(runtimeId) as HTMLStyleElement | null;
+    if (!styleEl) {
+      styleEl = document.createElement("style");
+      styleEl.id = runtimeId;
+      document.head.appendChild(styleEl);
+    }
+    styleEl.textContent = `@media print { @page { margin: 0; size: ${widthMm}mm auto; } }`;
+    const cleanup = () => {
+      styleEl?.remove();
+      document.body.classList.remove("printing-receipt");
+      window.removeEventListener("afterprint", cleanup);
+    };
+    window.addEventListener("afterprint", cleanup);
+    // เผื่อเบราว์เซอร์บางรุ่นไม่ยิง afterprint — ถอดกฎเองไม่ให้ติดค้างไปกระทบเอกสาร A4 ครั้งถัดไป
+    window.setTimeout(cleanup, 4000);
+    document.body.classList.add("printing-receipt");
+    window.print();
+    document.body.classList.remove("printing-receipt");
+    onPrinted?.();
+  };
   // FIX-8 — Enter key = สั่งพิมพ์ทันที
   useEffect(() => {
     if (mode !== "new") return;
@@ -58,8 +82,7 @@ export function ReceiptModal({ receipt, onClose, onNewSale, onPrinted, mode = "n
       const tag = target?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea" || tag === "select") return;
       event.preventDefault();
-      window.print();
-      onPrinted?.();
+      printReceipt();
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
