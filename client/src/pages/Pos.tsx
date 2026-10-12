@@ -714,10 +714,8 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
     if (amount === "exact") {
       setCashReceived(String(Math.round(payable * 100) / 100));
     } else {
-      // กดปุ่ม 100 → ถ้ามี 50 อยู่แล้ว → กลายเป็น 150 (สะสม) ถ้าว่าง → 100
-      const current = Number(cashReceived || 0);
-      const next = Math.round((current + amount) * 100) / 100;
-      setCashReceived(String(next));
+      // เลือกยอดรับเงินใหม่แทนยอดเดิม ไม่สะสมเมื่อเปลี่ยนปุ่ม
+      setCashReceived(String(amount));
     }
   };
   const completePayment = (method: PaymentMethod) => {
