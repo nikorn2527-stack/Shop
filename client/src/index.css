@@ -5121,16 +5121,29 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .pay-confirm-items::-webkit-scrollbar { width: 6px; }
 .pay-confirm-items::-webkit-scrollbar-thumb { background: #c3d6cc; border-radius: 999px; }
 @media (max-width: 560px) {
-  .pay-confirm-rows { grid-template-columns: 1fr; }
-  .pay-confirm-rows > div:not(.pay-confirm-total):nth-child(odd) { border-right: 0; }
-  .pay-confirm-modal .modal-actions { bottom: -15px; margin: 14px -15px -15px; padding: 11px 15px 12px; }
+  /* FIX (user) — มือถือ: เดิมบังคับ 1 คอลัมน์ กินความสูง ~260px ดัน checkbox ยืนยัน/แถบเตือน ตกใต้ sticky footer
+     → คง 2 คอลัมน์เหมือนเดสก์ท็อป (label สั้นพอ) ลดเหลือ ~164px */
+  .pay-confirm-items { max-height: 88px; }
   .pay-confirm-item b { white-space: normal; }
   .pay-confirm-items-head { grid-template-columns: minmax(0, 1fr) auto; }
   .pay-confirm-items-head span:nth-child(2) { display: none; }
   .pay-confirm-item { grid-template-columns: minmax(0, 1fr) auto; row-gap: 2px; }
   .pay-confirm-item span { text-align: right; }
-  .pay-confirm-modal .modal-actions { flex-direction: column-reverse; }
-  .pay-confirm-modal .modal-actions .outline-button { width: 100%; justify-content: center; }
+  /* ปุ่มล่าง: แถวเดียว (ยืนยัน flex:1 + ปุ่มรอง) แทน column-reverse 3 แถว กิน 161px */
+  .pay-confirm-modal .modal-actions { bottom: -15px; margin: 12px -15px -15px; padding: 10px 15px 11px; gap: 6px; }
+  .pay-confirm-modal .modal-actions .outline-button { width: auto; justify-content: center; }
+  .pay-confirm-button { min-height: 40px; }
+  /* QR/สลิป/แถบตรวจสอบ กระชับพอให้เห็นในจอเดียว */
+  .pay-confirm-modal .pay-qr-figure img { width: 96px; height: 96px; flex: 0 0 96px; }
+  .pay-confirm-modal .pay-qr-figure { padding: 8px 10px; gap: 10px; }
+  .pay-confirm-modal .pay-slip-block { padding: 7px 9px; }
+  .pay-confirm-modal .pay-verify-block { padding: 8px 10px; }
+  .pay-confirm-modal .pay-bank-accounts { padding: 8px 10px; }
+  /* แถบเตือนท้ายซ้ำกับหัวโมดัล ("กดยืนยันแล้วตัดสต็อกทันที") — ตัดบนมือถือเพื่อให้ checkbox อยู่ในจอ */
+  .pay-confirm-modal .wallet-confirm-warning { display: none; }
+  /* กัน sticky footer ทับจุดที่ระบบเลื่อนไปโฟกัสเอง (checkbox/แถบเตือนเงินไม่พอ) */
+  .pay-confirm-modal { scroll-padding-bottom: 104px; }
+  .pay-confirm-modal .pay-verify-checkbox input { scroll-margin-bottom: 104px; }
 }
 /* ROUND 54 (user) — hint ราคา ฿0 (ยังไม่ได้ตั้งราคา) ใน dialog เพิ่ม/แก้ไขสินค้า */
 .price-zero-hint { display: inline-flex; align-items: center; gap: 4px; margin-top: 5px; color: #9a6b1f; font-size: 10px; line-height: 1.4; }
