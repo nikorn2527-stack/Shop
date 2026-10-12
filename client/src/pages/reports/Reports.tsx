@@ -1519,8 +1519,8 @@ export function Reports({
       ["มูลค่าคงเหลือตามราคาขายปัจจุบัน", money(stockTotals.sellingValue)],
     ],
     columns: hospitalPreset === "stock"
-      ? ["รหัสสินค้า", "ชื่อสินค้า", "ยอดยกมา", "ยอดขาย", "คงเหลือ", "ราคาขาย", "มูลค่าคงเหลือ"]
-      : ["ลำดับ", "รหัสสินค้า", "ชื่อสินค้า", "หน่วย", "ยอดยกมา", "ยอดขาย", "คงเหลือ", "ราคาขาย", "มูลค่าคงเหลือ"],
+      ? ["รหัสสินค้า", "ชื่อสินค้า", "ยอดยกมา", "ยอดขาย", "คงเหลือ", "ราคาต่อหน่วย", "มูลค่าคงเหลือ"]
+      : ["ลำดับ", "รหัสสินค้า", "ชื่อสินค้า", "หน่วย", "ยอดยกมา", "ยอดขาย", "คงเหลือ", "ราคาต่อหน่วย", "มูลค่าคงเหลือ"],
     numericCols: hospitalPreset === "stock" ? [2, 3, 4, 5, 6] : [4, 5, 6, 7, 8],
     rows: stockBalanceRows.map((row, index) => hospitalPreset === "stock"
       ? [row.code, row.name, exportCount(row.opening), exportCount(row.sold), exportCount(row.remaining), exportNumber(row.sellingPrice), exportNumber(row.sellingValue)]
@@ -1553,7 +1553,7 @@ export function Reports({
           "ยอดยกมา",
           "ยอดขาย",
           "คงเหลือ",
-          "ราคาขาย",
+          "ราคาต่อหน่วย",
           "มูลค่าคงเหลือ",
         ],
         ...stockBalanceRows.map((row, index) => [
@@ -3260,7 +3260,7 @@ export function Reports({
                         <th className="num">ยอดยกมา</th>
                         <th className="num">ยอดขาย</th>
                         <th className="num">คงเหลือ</th>
-                        <th className="num">ราคาขาย</th>
+                        <th className="num">ราคาต่อหน่วย</th>
                         <th className="num">มูลค่าคงเหลือ</th>
                       </tr>
                     </thead>
