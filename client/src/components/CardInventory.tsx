@@ -132,7 +132,7 @@ export function CardInventory({ canManage }: { canManage: boolean }) {
           {error || getErrorMessage(cards.error)}
         </p>
       )}
-      {notice && <p role="status">{notice}</p>}
+      {notice && <p role="status" className="notice-bar success">{notice}</p>}
       {cards.isLoading ? (
         <p>กำลังโหลด…</p>
       ) : (
@@ -229,7 +229,7 @@ export function CardInventory({ canManage }: { canManage: boolean }) {
         </div>
         <div className="card-history-content">
         {history.isLoading && <p role="status">กำลังโหลด…</p>}
-        {history.error && <p role="alert">{getErrorMessage(history.error)}</p>}
+        {history.error && <p role="alert" className="notice-bar error">{getErrorMessage(history.error)}</p>}
         <div className="table-wrap"><table><thead><tr>
           <th>รอบ / สมาชิก</th><th>เริ่ม / เจ้าหน้าที่</th><th>สิ้นสุด / เจ้าหน้าที่</th><th>ยอดเริ่ม</th><th>รับเข้า</th><th>หักออก</th><th>ยอดปิด</th><th>รายการ</th>
         </tr></thead><tbody>{history.data?.sessions.map(s => <tr key={s.id}>

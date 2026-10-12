@@ -1,5 +1,25 @@
 /* Shared screen-only semantic colors; printed documents retain their own palette. */
 @media screen {
+  :root:root :is(.app-shell, .modal-backdrop, [role="dialog"]) .outline-button:not(:disabled) {
+    background: #e2e8f0; color: #0f172a; border-color: #64748b;
+  }
+  :root:root :is(.app-shell, .modal-backdrop, [role="dialog"]) .outline-button:not(:disabled):hover {
+    background: #cbd5e1; color: #0f172a; border-color: #334155;
+  }
+  :root:root .card-inventory-status { border: 1px solid #64748b; font-weight: 700; }
+  :root:root :is(.card-inventory-status.is-blank, .card-inventory-status.is-returned_vacant) {
+    background: #bbf7d0; color: #14532d; border-color: #16a34a;
+  }
+  :root:root .card-inventory-status.is-assigned { background: #bfdbfe; color: #1e3a8a; border-color: #2563eb; }
+  :root:root :is(.card-inventory-status.is-lost, .card-inventory-status.is-damaged) {
+    background: #fecaca; color: #991b1b; border-color: #dc2626;
+  }
+  :root:root [data-sonner-toast][data-type="success"] { background: #bbf7d0; color: #14532d; border-color: #16a34a; }
+  :root:root [data-sonner-toast][data-type="warning"] { background: #fde68a; color: #713f12; border-color: #d97706; }
+  :root:root [data-sonner-toast][data-type="error"] { background: #fecaca; color: #991b1b; border-color: #dc2626; }
+  :root:root [data-sonner-toast][data-type] :is([data-title], [data-description], [data-icon], [data-icon] svg) { color: inherit; }
+}
+@media screen {
   :root :is(.app-shell, .modal-backdrop, [role="dialog"]) .ghost-button:not(:disabled) {
     background: #e2e8f0; border: 1px solid #64748b; color: #0f172a; font-weight: 700;
   }
