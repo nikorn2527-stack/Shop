@@ -5506,6 +5506,13 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
    ROUND 63 (user) — QR พร้อมเพย์ที่หน้ายืนยันการชำระเงิน + แนบหลักฐานสลิป
    ================================================================ */
 .pay-qr-block { margin-top: 12px; display: grid; gap: 10px; }
+/* FIX (user) — โมดัลยืนยัน: QR กระชับ (รูปเล็กลง/ช่องไฟลด) ให้ปุ่ม "ยืนยันการชำระเงิน" เห็นในหน้าจอเดียว */
+.pay-confirm-modal .pay-qr-block { margin-top: 8px; gap: 8px; }
+.pay-confirm-modal .pay-qr-figure { padding: 10px 12px; gap: 12px; }
+.pay-confirm-modal .pay-qr-figure img { width: 112px; height: 112px; flex: 0 0 112px; }
+.pay-confirm-modal .pay-slip-block { padding: 8px 10px; }
+.pay-confirm-modal .pay-verify-block { padding: 9px 12px; }
+.pay-confirm-modal .wallet-confirm-warning { padding: 7px 10px; }
 .pay-qr-figure { display: flex; align-items: center; gap: 14px; border: 1px solid #dbece5; background: #f6fbf8; border-radius: 10px; padding: 12px; }
 .pay-qr-figure img { width: 150px; height: 150px; border-radius: 8px; border: 1px solid #d8e8e0; background: #fff; flex: 0 0 150px; }
 .pay-qr-caption b { display: flex; align-items: center; gap: 6px; color: #2d5c4a; font-size: 14px; }

@@ -109,12 +109,45 @@ try {
   console.log('PAY_MODAL_LAYOUT', JSON.stringify(layout));
   await page.screenshot({ path: path.join(dir, 'pay-modal-1366.png') });
 
-  // มือถือ 390×844
+  // FIX (user) — โหมด QR: ข้อความหัว QR ต้องเป็น "สแกนจ่าย X · พร้อมเพย์ เลขบัญชี" (ไม่มีคำอธิบายยาว)
+  // และปุ่มยืนยันต้องเห็นในหน้าจอเดียว
+  await click('ย้อนกลับ', '.pay-confirm-modal');
+  await page.waitForSelector('.pay-confirm-modal', { hidden: true });
+  await click('QR / สแกน');
+  await page.waitForSelector('.pay-confirm-modal');
+  await page.waitForSelector('.pay-qr-figure img', { timeout: 10000 });
+  const qrCaption = await page.$eval('.pay-qr-caption', el => el.textContent);
+  console.log('QR_CAPTION', qrCaption);
+  if (!qrCaption.includes('สแกนจ่าย')) throw new Error(`QR caption should say สแกนจ่าย, got: ${qrCaption}`);
+  if (!qrCaption.includes('พร้อมเพย์ 0812345678')) throw new Error(`QR caption should show PromptPay account number, got: ${qrCaption}`);
+  if (qrCaption.includes('เปิดแอปธนาคาร')) throw new Error('QR caption still has long AI-style explanation');
+  const qrActor = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('.pay-confirm-rows > div')];
+    const row = rows.find(r => r.querySelector('span')?.textContent === 'ผู้ทำรายการ');
+    return row?.querySelector('b')?.textContent ?? '(missing)';
+  });
+  console.log('QR_ACTOR_ROW', qrActor);
+  if (qrActor === '(missing)' || qrActor.includes('·')) throw new Error(`actor row should be label ผู้ทำรายการ + name only (no role), got: ${qrActor}`);
+  const qrItems = await page.evaluate(() => {
+    const rows = [...document.querySelectorAll('.pay-confirm-rows > div')];
+    const row = rows.find(r => r.querySelector('span')?.textContent === 'จำนวนรายการ');
+    return row?.querySelector('b')?.textContent ?? '(missing)';
+  });
+  console.log('QR_ITEMS_ROW', qrItems);
+  if (!qrItems.endsWith('รายการ') || qrItems.includes('แถว')) throw new Error(`item-count row should say "N รายการ" (no แถว/ชิ้น mix), got: ${qrItems}`);
+  const qrLayout = await page.evaluate(() => {
+    const pick = sel => { const el = document.querySelector(sel); if (!el) return null; const r = el.getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom), inView: r.top >= 0 && r.bottom <= window.innerHeight }; };
+    return { confirm: pick('.pay-confirm-button'), qrFigure: pick('.pay-qr-figure'), verify: pick('.pay-verify-block') };
+  });
+  console.log('PAY_QR_LAYOUT', JSON.stringify(qrLayout));
+  await page.screenshot({ path: path.join(dir, 'pay-qr-1366.png') });
+
+  // มือถือ 390×844 (โมดัลยังเปิดอยู่ในโหมด QR)
   await page.setViewport({ width: 390, height: 844 });
   await new Promise(r => setTimeout(r, 400));
   const mobile = await page.evaluate(() => {
     const pick = sel => { const el = document.querySelector(sel); if (!el) return null; const r = el.getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom), inView: r.top >= 0 && r.bottom <= window.innerHeight }; };
-    return { confirm: pick('.pay-confirm-button'), cashInput: pick('.pay-cash-input-row input') };
+    return { confirm: pick('.pay-confirm-button'), qrFigure: pick('.pay-qr-figure') };
   });
   console.log('PAY_MODAL_MOBILE', JSON.stringify(mobile));
   await page.screenshot({ path: path.join(dir, 'pay-modal-390.png') });
@@ -122,7 +155,10 @@ try {
   if (cashValue !== '50') throw new Error(`quick cash should REPLACE (expected 50, got ${cashValue})`);
   if (!layout.confirm?.inView) throw new Error('confirm button not visible without scrolling at 1366x768');
   if (!layout.cashInput?.inView) throw new Error('cash input not visible without scrolling at 1366x768');
+  if (!qrLayout.confirm?.inView) throw new Error('QR mode: confirm button not visible on same screen at 1366x768');
+  if (!qrLayout.verify?.inView) throw new Error('QR mode: verify checkbox not visible at 1366x768');
   if (!mobile.confirm?.inView) throw new Error('confirm button not visible on mobile');
+  if (!mobile.qrFigure?.inView) throw new Error('QR figure not visible on mobile');
   if (errors.length) throw new Error('page errors: ' + errors.join('; '));
   console.log('PAY_MODAL_LAYOUT_PASS', dir);
 } finally {
