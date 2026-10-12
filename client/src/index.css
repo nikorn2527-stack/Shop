@@ -5084,8 +5084,17 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 
 /* ROUND 54 (user) — ขั้นยืนยันก่อนชำระเงินทุกครั้ง: ปุ่มจ่ายเงินเปิดโมดัลตรวจรายการก่อน
    บิลยังไม่ถูกบันทึก/ตัดสต็อก/พิมพ์ จนกว่าจะกด "ยืนยันการชำระเงิน" */
-.pay-confirm-modal { width: min(520px, 100%); }
+.pay-confirm-modal { width: min(560px, 100%); }
+/* FIX (user) — หัวโมดัลกระชับ: คำอธิบายยาวตัด 2 แถว ไม่ดันช่องเงินสด/ปุ่มยืนยันตกจอ */
+.pay-confirm-modal .modal-heading p { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .pay-confirm-body { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+/* FIX (user) — สรุปบิลเป็น 2 คอลัมน์: ลดความสูง ~120px ให้ช่องเงินสด/QR + ปุ่มยืนยันอยู่หน้าจอเดียวกัน */
+.pay-confirm-rows { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.pay-confirm-rows > div { min-width: 0; }
+.pay-confirm-rows > div:not(.pay-confirm-total):nth-child(odd) { border-right: 1px solid #f0f4f1; }
+.pay-confirm-rows > .pay-confirm-total { grid-column: 1 / -1; }
+/* แถบปุ่มยืนยัน sticky ติดท้ายโมดัลเสมอ — เลื่อนรายการยาวแค่ไหนก็กดยืนยันได้ทันที */
+.pay-confirm-modal .modal-actions { position: sticky; bottom: -20px; z-index: 3; margin: 16px -20px -20px; padding: 12px 20px 13px; background: #fff; box-shadow: 0 -8px 20px rgba(24, 61, 48, .07); }
 .pay-confirm-items { border: 1px solid #e4eee9; border-radius: 10px; background: #fff; overflow: hidden; }
 .pay-confirm-items-head, .pay-confirm-item { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: baseline; gap: 10px; padding: 7px 12px; }
 .pay-confirm-items-head { position: sticky; top: 0; background: #f2f7f4; border-bottom: 1px solid #e2ece7; color: #79806d; font-size: 10px; font-weight: 600; }
@@ -5104,11 +5113,14 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .pay-confirm-modal .modal-actions .outline-button { align-self: center; }
 .pay-confirm-button { flex: 1; justify-content: center; min-height: 42px; font-size: 12.5px; font-weight: 700; }
 .pay-confirm-button:disabled { opacity: .55; }
-/* บิลยาว: รายการเลื่อนภายใน ไม่ดันโมดัลสูงเกินจอ */
-.pay-confirm-items { max-height: 236px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #c3d6cc transparent; }
+/* บิลยาว: รายการเลื่อนภายใน ไม่ดันโมดัลสูงเกินจอ (กระชับลงจาก 236px ให้หัว+สรุป+ช่องเงินสดอยู่หน้าจอเดียวกัน) */
+.pay-confirm-items { max-height: 168px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #c3d6cc transparent; }
 .pay-confirm-items::-webkit-scrollbar { width: 6px; }
 .pay-confirm-items::-webkit-scrollbar-thumb { background: #c3d6cc; border-radius: 999px; }
 @media (max-width: 560px) {
+  .pay-confirm-rows { grid-template-columns: 1fr; }
+  .pay-confirm-rows > div:not(.pay-confirm-total):nth-child(odd) { border-right: 0; }
+  .pay-confirm-modal .modal-actions { bottom: -15px; margin: 14px -15px -15px; padding: 11px 15px 12px; }
   .pay-confirm-item b { white-space: normal; }
   .pay-confirm-items-head { grid-template-columns: minmax(0, 1fr) auto; }
   .pay-confirm-items-head span:nth-child(2) { display: none; }
