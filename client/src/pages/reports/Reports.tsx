@@ -1526,14 +1526,14 @@ export function Reports({
       ["มูลค่าคงเหลือตามราคาขายปัจจุบัน", money(stockTotals.sellingValue)],
     ],
     columns: hospitalPreset === "stock"
-      ? ["รหัสสินค้า", "ชื่อสินค้า", "ยอดยกมา", "ยอดขาย", "คงเหลือ"]
+      ? ["รหัสสินค้า", "ชื่อสินค้า", "ยอดยกมา", "ยอดขาย", "คงเหลือ", "ราคาขาย", "มูลค่าคงเหลือ"]
       : ["ลำดับ", "รหัสสินค้า", "ชื่อสินค้า", "หน่วย", "ยอดยกมา", "ยอดขาย", "คงเหลือ", "ราคาขาย", "มูลค่าคงเหลือ"],
-    numericCols: hospitalPreset === "stock" ? [2, 3, 4] : [4, 5, 6, 7, 8],
+    numericCols: hospitalPreset === "stock" ? [2, 3, 4, 5, 6] : [4, 5, 6, 7, 8],
     rows: stockBalanceRows.map((row, index) => hospitalPreset === "stock"
-      ? [row.code, row.name, exportCount(row.opening), exportCount(row.sold), exportCount(row.remaining)]
+      ? [row.code, row.name, exportCount(row.opening), exportCount(row.sold), exportCount(row.remaining), exportNumber(row.sellingPrice), exportNumber(row.sellingValue)]
       : [exportCount(index + 1), row.code, row.name, row.unit, exportCount(row.opening), exportCount(row.sold), exportCount(row.remaining), exportNumber(row.sellingPrice), exportNumber(row.sellingValue)]),
     totalsRow: hospitalPreset === "stock"
-      ? ["รวม", `${stockTotals.items} รายการ`, exportCount(stockTotals.opening), exportCount(stockTotals.sold), exportCount(stockTotals.remaining)]
+      ? ["รวม", `${stockTotals.items} รายการ`, exportCount(stockTotals.opening), exportCount(stockTotals.sold), exportCount(stockTotals.remaining), "", exportNumber(stockTotals.sellingValue)]
       : ["รวม", `${stockTotals.items} รายการ`, "", "", exportCount(stockTotals.opening), exportCount(stockTotals.sold), exportCount(stockTotals.remaining), "", exportNumber(stockTotals.sellingValue)],
     brandName: "ร้านค้าสวัสดิการ",
     footnote:

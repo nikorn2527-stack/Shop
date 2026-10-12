@@ -62,7 +62,7 @@ export default function CostProfit() {
       <label>ตั้งแต่<ThaiDatePicker value={from} onChange={value => { setRange("custom"); setFrom(value); }} ariaLabel="วันที่เริ่มต้นต้นทุนและกำไร" /></label>
       <label>ถึง<ThaiDatePicker value={to} onChange={value => { setRange("custom"); setTo(value); }} ariaLabel="วันที่สิ้นสุดต้นทุนและกำไร" /></label>
     </div>
-    <p className="cost-profit-provisional">ต้นทุนขายใช้ต้นทุนที่บันทึกไว้ในแต่ละบิล</p>
+    <p className="cost-profit-provisional">กำไรขั้นต้น = ยอดขายสุทธิ − ต้นทุนสินค้าที่ขายจาก Lot ที่บันทึกในบิล ไม่ใช่ยอดรับเข้าทั้งหมด</p>
     {!valid && <p role="alert">กรุณาเลือกวันที่เริ่มต้นไม่เกินวันที่สิ้นสุด</p>}
     {query.isError && <p role="alert">โหลดข้อมูลไม่สำเร็จ: {query.error.message} <button type="button" className="outline-button" onClick={() => void query.refetch()}>ลองอีกครั้ง</button></p>}
     <div className="cost-profit-cards">{cards.map(([label, value]) => <article key={label}><span>{label}</span><strong>{ready ? value : "—"}</strong></article>)}</div>

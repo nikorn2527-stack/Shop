@@ -606,11 +606,15 @@ describe("member registration numbering", () => {
     expect(row.sold).toBe(3);
     expect(row.remaining).toBe(7);
     expect(row.code).toBe("885000000001");
+    expect(row.sellingPrice).toBe(6);
+    expect(row.sellingValue).toBe(42);
     // รับเข้าเพิ่มในช่วง 5 ชิ้น → ยอดยกมายังเป็น 10 เท่าเดิม แต่คงเหลือเพิ่มเป็น 12
     receiveStock(database, product.id, "LOT-B", null, 5, 4, "นายนิกร พันโนนงิ้ว");
     const refreshed = stockBalanceReport(database, {}).find((entry) => entry.productId === product.id)!;
     expect(refreshed.opening).toBe(10);
     expect(refreshed.remaining).toBe(12);
+    expect(refreshed.sellingPrice).toBe(6);
+    expect(refreshed.sellingValue).toBe(72);
   });
 });
 
