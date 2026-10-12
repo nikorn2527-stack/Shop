@@ -9,12 +9,13 @@ describe('standard application palette', () => {
     vi.stubGlobal('document', { documentElement: root });
     try {
       for (const saved of ['pastel', 'blue', '#00875a', undefined]) {
-        expect(applyThemeColor(saved)).toBe('#1d4ed8');
-        expect(root.dataset.palette).toBe('slate-blue');
-        expect(values.get('--teal')).toBe('#1d4ed8');
-        expect(values.get('--teal-soft')).toBe('#bfdbfe');
-        expect(values.get('--teal-mist')).toBe('#eff6ff');
-        expect(values.get('--app-secondary')).toBe('#1d4ed8');
+        expect(applyThemeColor(saved)).toBe('#c94f08');
+        expect(root.dataset.palette).toBe('orange-pink-health');
+        expect(values.get('--teal')).toBe('#c94f08');
+        expect(values.get('--teal-soft')).toBe('#fed7aa');
+        expect(values.get('--teal-mist')).toBe('#fff7ed');
+        expect(values.get('--app-secondary')).toBe('#be185d');
+        expect(values.get('--app-health')).toBe('#15803d');
       }
     } finally {
       vi.unstubAllGlobals();

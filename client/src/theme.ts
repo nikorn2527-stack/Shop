@@ -131,7 +131,7 @@ export function resolveThemeColor(theme: string | undefined | null): string {
 export function applyThemeColor(theme: string | undefined | null): string {
   // One application palette; legacy saved colors remain readable but no longer
   // override the shared design after removing the theme selector.
-  const base = "#1d4ed8";
+  const base = "#c94f08";
   const rgb = hexToRgb(base);
   if (!rgb) return base;
   const [r, g, b] = rgb;
@@ -142,14 +142,16 @@ export function applyThemeColor(theme: string | undefined | null): string {
     return rgbToHex(rr, gg, bb);
   };
   const root = document.documentElement;
-  root.dataset.palette = "slate-blue";
+  root.dataset.palette = "orange-pink-health";
   const vars: Record<string, string> = {
     "--teal": base,
     "--teal-dark": build(clamp(l - 0.07, 0.12, 0.82)),
-    "--teal-soft": "#bfdbfe",
-    "--teal-mist": "#eff6ff",
-    "--app-secondary": "#1d4ed8",
-    "--app-secondary-soft": "#dbeafe",
+    "--teal-soft": "#fed7aa",
+    "--teal-mist": "#fff7ed",
+    "--app-secondary": "#be185d",
+    "--app-secondary-soft": "#fce7f3",
+    "--app-health": "#15803d",
+    "--app-health-soft": "#dcfce7",
     // เฉดเข้มของสีธีม — ยังใช้โดะ member-balance-card (การ์ดยอดเงินคงเหลือ)
     "--rail-a": build(0.2, sat * 0.92),
     // ROUND 48 — ราง POS ไม่ตามสีธีมแล้ว: ใช้สีเดียวกับแอปตามที่ผู้ใช้ขอ (ปุ่มเท่านั้นที่มีสีของใครของมัน)
