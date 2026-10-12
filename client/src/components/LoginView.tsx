@@ -4,6 +4,7 @@ import { Eye, EyeOff, IdCard, LogIn, ShieldCheck } from "@/lib/icons";
 import { trpc } from "@/lib/trpc";
 import { getErrorMessage } from "@/pages/viewFormat";
 import { brandInitial, type BrandSettings } from "@/theme";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 /**
  * Full-screen login card shown by the Home auth gate when auth.me returns no
@@ -77,18 +78,11 @@ export function LoginView({ brand, onAuthed }: { brand?: BrandSettings | null | 
               </button>
             </span>
           </label>
-          {error && (
+          {error && !transfer && (
             <div className="login-error" role="alert">
               <ShieldCheck size={15} /> {error}
             </div>
           )}
-          {transfer && <div className="login-error" role="alert">
-            <strong>บัญชีนี้เข้าใช้งานอยู่แล้ว</strong>
-            <p>เข้าสู่ระบบเมื่อ {transfer.createdAt} · ติดต่อระบบล่าสุด {transfer.lastSeenAt}</p>
-            <p>ย้ายมาเครื่องนี้จะยุติการเข้าใช้งานเดิม กรุณาตรวจว่างานที่เครื่องเดิมเสร็จแล้ว</p>
-            <button type="button" className="outline-button" disabled={loginMutation.isPending} onClick={() => setTransfer(null)}>ยกเลิก</button>
-            <button type="button" className="primary-button" disabled={loginMutation.isPending} onClick={() => loginMutation.mutate({ username: username.trim(), password, replaceSession: true })}>ยืนยันย้ายมาเครื่องนี้</button>
-          </div>}
           <button type="submit" className="primary-button login-submit" disabled={loginMutation.isPending || !username.trim() || !password}>
             <LogIn size={16} /> {loginMutation.isPending ? "กำลังตรวจสอบ…" : "เข้าสู่ระบบ"}
           </button>
@@ -99,6 +93,23 @@ export function LoginView({ brand, onAuthed }: { brand?: BrandSettings | null | 
         </div>
         <p className="login-footer">v1.0.0 · ระบบร้านค้าสวัสดิการ<span className="powered-line">⚡ Powered by <b>PNG TEAM</b></span></p>
       </div>
+      <Dialog open={transfer !== null} onOpenChange={open => { if (!open && !loginMutation.isPending) { setTransfer(null); setError(""); } }}>
+        <DialogContent showCloseButton={false} className="max-h-[calc(100dvh-2rem)] overflow-y-auto" onEscapeKeyDown={event => { if (loginMutation.isPending) event.preventDefault(); }} onPointerDownOutside={event => event.preventDefault()} onOpenAutoFocus={event => { event.preventDefault(); document.getElementById("cancel-session-transfer")?.focus(); }}>
+          <DialogHeader>
+            <DialogTitle className="text-amber-800">บัญชีนี้เข้าใช้งานอยู่แล้ว</DialogTitle>
+            <DialogDescription>ย้ายมาเครื่องนี้จะออกจากระบบที่เครื่องเดิม ตรวจให้แน่ใจว่างานที่เครื่องเดิมเสร็จแล้วก่อนยืนยัน</DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+            <p>เข้าสู่ระบบเมื่อ {transfer?.createdAt}</p>
+            <p>ติดต่อระบบล่าสุด {transfer?.lastSeenAt}</p>
+          </div>
+          {error && <div className="login-error" role="alert">{error}</div>}
+          <DialogFooter>
+            <button id="cancel-session-transfer" type="button" className="outline-button" disabled={loginMutation.isPending} onClick={() => { setTransfer(null); setError(""); }}>ยกเลิก</button>
+            <button type="button" className="primary-button" disabled={loginMutation.isPending} onClick={() => { if (loginMutation.isPending) return; setError(""); loginMutation.mutate({ username: username.trim(), password, replaceSession: true }); }}>{loginMutation.isPending ? "กำลังย้ายเครื่อง…" : "ยืนยันย้ายมาเครื่องนี้"}</button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

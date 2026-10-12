@@ -60,6 +60,22 @@ try {
   await login.type('[name=username]','sessionbrowser'); await login.type('[name=password]','Password123!');
   await login.click('.login-submit');
   await login.waitForFunction(() => document.body.textContent.includes('บัญชีนี้เข้าใช้งานอยู่แล้ว'));
+  await login.waitForSelector('[role="dialog"]');
+  for (const viewport of [{width:1366,height:768}, {width:1139,height:334}, {width:390,height:844}]) {
+    await login.setViewport(viewport);
+    await login.waitForFunction(() => {
+      const dialog = document.querySelector('[role="dialog"]');
+      if (!dialog) return false;
+      const bounds = dialog.getBoundingClientRect();
+      return bounds.left >= 0 && bounds.right <= innerWidth && bounds.top >= 0 && bounds.bottom <= innerHeight;
+    });
+    assert.equal(await login.evaluate(() => [...document.querySelectorAll('h2')].filter(node => node.textContent === 'บัญชีนี้เข้าใช้งานอยู่แล้ว').length), 1);
+    await login.screenshot({path:path.join(dir,`session-dialog-${viewport.width}.png`)});
+  }
+  await login.click('#cancel-session-transfer');
+  await login.waitForFunction(() => !document.querySelector('[role="dialog"]'));
+  await login.click('.login-submit');
+  await login.waitForSelector('[role="dialog"]');
   const before = new DatabaseSync(dbPath,{readOnly:true});try{assert.ok(before.prepare('SELECT id FROM app_sessions WHERE id=?').get(session.sessionId));}finally{before.close();}
   const transfer = await login.evaluateHandle(() => [...document.querySelectorAll('button')].find(n=>n.textContent.includes('ยืนยันย้ายมาเครื่องนี้')));
   await transfer.asElement().click(); await login.waitForSelector('.app-shell');
