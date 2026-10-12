@@ -1011,8 +1011,6 @@ export function Reports({
           exportNumber(totals.profit),
         ],
         brandName: "ร้านค้าสวัสดิการ",
-        footnote:
-          "ตัวเลขจากระบบขายหน้าร้าน · รายงานสร้างตามช่วงเวลาที่เลือกไว้",
       };
     }
     if (salesView === "product" || salesView === "category") {
@@ -1071,7 +1069,6 @@ export function Reports({
         rows,
         totalsRow,
         brandName: "ร้านค้าสวัสดิการ",
-        footnote: "เรียงตามยอดขายสูงสุดก่อน · ตัวเลขจากระบบขายหน้าร้าน",
       };
     }
     if (salesView === "items") {
@@ -1099,8 +1096,6 @@ export function Reports({
           ? ["รวม", `${exportCount(lineItemTotals.lines)} รายการ`, "", exportCount(lineItemTotals.qty), "—", exportNumber(lineItemTotals.revenue)]
           : ["รวม", `${exportCount(lineItemTotals.bills)} บิล`, `${exportCount(lineItemTotals.lines)} รายการ`, exportCount(lineItemTotals.qty), "—", exportNumber(lineItemTotals.revenue), "—", "—"],
         brandName: "ร้านค้าสวัสดิการ",
-        footnote:
-          hospitalSales ? "รหัสสินค้าใช้ SKU เป็นหลัก และใช้ barcode เมื่อ SKU ว่าง · แสดงสูงสุด 1,000 รายการ" : "ทุกบรรทัดสินค้าจากทุกบิลในช่วงเวลาที่เลือก · เรียงจากล่าสุดขึ้นก่อน · แสดงสูงสุด 1,000 รายการ",
         compact: true, // ตาราง 8 คอลัมน์ — ลดขนาดตามฟอร์มให้อยู่บรรทัดเดียว
       };
     }
@@ -1134,7 +1129,6 @@ export function Reports({
         exportNumber(cashierTotal.total),
       ],
       brandName: "ร้านค้าสวัสดิการ",
-      footnote: "สรุปจากบิลขายจริง · แยกตามผู้ทำรายการที่หน้าร้าน",
     };
   };
   // ROUND 48 (user) — "ก่อนจะ Export ควรมีพรีวิวดูก่อนได้"
@@ -1259,8 +1253,6 @@ export function Reports({
         exportNumber(total),
       ],
       brandName: "ร้านค้าสวัสดิการ",
-      footnote:
-        "กดแถวบนหน้าจอเพื่อเปิดใบเสร็จฉบับเต็มได้ · รายงานนี้สร้างจากบิลที่โหลดไว้ตามตัวกรอง",
       compact: true, // ตาราง 7 คอลัมน์ — ลดขนาดตามฟอร์มให้อยู่บรรทัดเดียว
     };
   };
@@ -1298,13 +1290,18 @@ export function Reports({
     refund: "รายงานการคืนบัตรเงินสด",
     activation: "รายงานการเปิดใช้บัตรเงินสด",
   };
+  const transactionDescription = (row: typeof txRows[number]) => {
+    const label = TX_TYPE_LABEL[row.type];
+    const detail = (row.detail || "").trim();
+    return !detail || detail === label ? label : detail.startsWith(label) ? detail : `${label} · ${detail}`;
+  };
   const txAmountForReport = (row: typeof txRows[number]) => hospitalTxPreset ? Math.abs(row.amount) : row.amount;
   const txExportRows = () => [
     [
       "วันที่ · เวลา",
       "เลขสมาชิก",
       "ชื่อสมาชิก",
-      ...(hospitalTxPreset ? [] : ["ประเภท", "รายละเอียด"]),
+      ...(hospitalTxPreset ? [] : ["รายการ"]),
       "ยอด (บาท)",
       ...(hospitalTxPreset ? [] : ["คงเหลือ(บาท)"]),
       "ผู้ทำรายการ",
@@ -1313,7 +1310,7 @@ export function Reports({
       formatLogDateTime(row.createdAt),
       row.memberNumber,
       row.memberName ?? "—",
-      ...(hospitalTxPreset ? [] : [TX_TYPE_LABEL[row.type], row.detail]),
+      ...(hospitalTxPreset ? [] : [transactionDescription(row)]),
       exportNumber(txAmountForReport(row)),
       ...(hospitalTxPreset ? [] : [row.balanceAfter !== null ? exportNumber(row.balanceAfter) : "—"]),
       row.actor ?? "ไม่ระบุ",
@@ -1345,18 +1342,18 @@ export function Reports({
     ],
     columns: hospitalTxPreset
       ? ["วันที่ · เวลา", "เลขสมาชิก", "ชื่อสมาชิก", "ยอด (บาท)", "ผู้ทำรายการ"]
-      : ["วันที่ · เวลา", "เลขสมาชิก", "ชื่อสมาชิก", "ประเภท", "รายละเอียด", "ยอด (บาท)", "คงเหลือ(บาท)", "ผู้ทำรายการ"],
-    numericCols: hospitalTxPreset ? [3] : [5, 6],
+      : ["วันที่ · เวลา", "เลขสมาชิก", "ชื่อสมาชิก", "รายการ", "ยอด (บาท)", "คงเหลือ(บาท)", "ผู้ทำรายการ"],
+    numericCols: hospitalTxPreset ? [3] : [4, 5],
     rows: txRows.map(row => [
       formatLogDateTime(row.createdAt),
       row.memberNumber,
       row.memberName ?? "—",
-      ...(hospitalTxPreset ? [] : [TX_TYPE_LABEL[row.type], row.detail]),
+      ...(hospitalTxPreset ? [] : [transactionDescription(row)]),
       exportNumber(txAmountForReport(row)),
       ...(hospitalTxPreset ? [] : [row.balanceAfter !== null ? exportNumber(row.balanceAfter) : "—"]),
       row.actor ?? "ไม่ระบุ",
     ]),
-    // แยกสรุปประเภทเงินออกเป็นกล่อง เพื่อไม่ให้ข้อความยาวถูกบีบอยู่ในคอลัมน์รายละเอียด
+    // Summarize the filtered transactions below the document table.
     summaryBlocks: hospitalTxPreset ? [["จำนวนรายการ", `${exportCount(txRows.length)} รายการ`], ["ยอดรวม", exportNumber(txRows.reduce((sum, row) => sum + Math.abs(row.amount), 0))]] : [
       [
         "เติมเงิน",
@@ -1385,10 +1382,8 @@ export function Reports({
     ],
     totalsRow: hospitalTxPreset
       ? [`รวม ${exportCount(txRows.length)} รายการ`, "", "", exportNumber(txRows.reduce((sum, row) => sum + Math.abs(row.amount), 0)), ""]
-      : [`รวมทั้งหมด ${txRows.length} รายการ`, "—", "—", "—", "—", "—", "—", "—"],
+      : [`รวมทั้งหมด ${txRows.length} รายการ`, "", "", "", exportNumber(txRows.reduce((sum, row) => sum + row.amount, 0)), "", ""],
     brandName: "ร้านค้าสวัสดิการ",
-    footnote:
-      hospitalTxPreset ? "ข้อมูลจากบัญชีสมาชิกโดยตรง · ยอดเงินแสดงเป็นจำนวนบวกตามฟอร์มโรงพยาบาล" : "ข้อมูลจากบัญชีสมาชิกโดยตรง · แยกสรุปยอดเติมเงิน ถอนเงิน ซื้อสินค้า เปิดใช้บัตร และคืนเงินด้านบน",
     compact: true, // ตาราง 10 คอลัมน์ — ลดขนาดตามฟอร์มให้อยู่บรรทัดเดียว
   });
   const openTxExportPreview = async (preferred?: ExportFormat, direct = false) => {
@@ -1457,8 +1452,6 @@ export function Reports({
       exportNumber(balanceTotals.balance),
     ],
     brandName: "ร้านค้าสวัสดิการ",
-    footnote:
-      "ยอดทั้งหมด = เปิดใช้บัตร + เติมเงิน · ยอดจ่าย = ใช้ซื้อ + ถอน + คืนบัตรเงินสด · คงเหลือ = ยอดปัจจุบัน",
   });
   const openBalancesExportPreview = async (preferred?: ExportFormat, direct = false) => {
     if (balanceRows.length === 0) {
@@ -1536,8 +1529,6 @@ export function Reports({
       ? ["รวม", `${stockTotals.items} รายการ`, exportCount(stockTotals.opening), exportCount(stockTotals.sold), exportCount(stockTotals.remaining), "", exportNumber(stockTotals.sellingValue)]
       : ["รวม", `${stockTotals.items} รายการ`, "", "", exportCount(stockTotals.opening), exportCount(stockTotals.sold), exportCount(stockTotals.remaining), "", exportNumber(stockTotals.sellingValue)],
     brandName: "ร้านค้าสวัสดิการ",
-    footnote:
-      "ยอดยกมา = จำนวนต้นช่วง · ยอดขาย = ขายออกในช่วงที่เลือก · คงเหลือ = สต็อกปัจจุบัน",
     compact: true, // ตาราง 7 คอลัมน์ — ลดขนาดตามฟอร์มให้อยู่บรรทัดเดียว
   });
   const openStockBalanceExportPreview = async (preferred?: ExportFormat, direct = false) => {
@@ -2943,67 +2934,6 @@ export function Reports({
                     <Eye size={15} /> ดูพรีวิว
                   </button>
                 </div>
-              <div className="tx-log-strip" role="note">
-                <WalletCards size={14} />
-                <span>
-                  การเงินสมาชิกทั้งระบบ (จาก Log):{" "}
-                  <b className="green-text">
-                    เติมเงิน {walletTotals.depositCount} รายการ ·{" "}
-                    {money(walletTotals.deposit)}
-                  </b>{" "}
-                  ·{" "}
-                  <b className="amber-text">
-                    ถอนเงิน {walletTotals.withdrawCount} รายการ ·{" "}
-                    {money(walletTotals.withdraw)}
-                  </b>
-                </span>
-              </div>
-              <div className="tx-summary-cards six">
-                <div>
-                  <small>ใช้จ่ายรวม</small>
-                  <strong className="red-text">
-                    −{money(Math.abs(txTotals.spend))}
-                  </strong>
-                  <span>{txTotals.spendCount} รายการ</span>
-                </div>
-                <div>
-                  <small>เติมเงินรวม</small>
-                  <strong className="green-text">
-                    +{money(txTotals.deposit)}
-                  </strong>
-                  <span>{txTotals.depositCount} รายการ</span>
-                </div>
-                <div>
-                  <small>ถอนเงินรวม</small>
-                  <strong className="amber-text">
-                    −{money(Math.abs(txTotals.withdraw))}
-                  </strong>
-                  <span>{txTotals.withdrawCount} รายการ</span>
-                </div>
-                <div>
-                  <small>เปิดใช้บัตรรวม</small>
-                  <strong className="green-text">
-                    +{money(txTotals.activation)}
-                  </strong>
-                  <span>{txTotals.activationCount} รายการ</span>
-                </div>
-                <div>
-                  <small>คืนบัตรเงินสดรวม</small>
-                  <strong className="red-text">
-                    −{money(Math.abs(txTotals.refund))}
-                  </strong>
-                  <span>{txTotals.refundCount} รายการ</span>
-                </div>
-                <div>
-                  <small>ขอลดวงเงิน</small>
-                  <strong className="purple-text">{txTotals.limitCount}</strong>
-                  <span>
-                    {limitRequestsQuery.isLoading
-                      ? "…"
-                      : `รอพิจารณา ${pendingLimitCount} รายการ`}
-                  </span>
-                </div>
-              </div>
               <div className="table-wrap">
                 {txQuery.isLoading ? (
                   <div className="table-loading">
@@ -3032,8 +2962,7 @@ export function Reports({
                       <tr>
                         <th>วันที่ · เวลา</th>
                         <th>สมาชิก / เลขสมาชิก</th>
-                        <th>ประเภท</th>
-                        <th>รายละเอียด</th>
+                        <th>รายการ</th>
                         <th className="num">ยอดเคลื่อน</th>
                         <th className="num hide-sm">คงเหลือ(บาท)</th>
                         <th className="hide-sm">ผู้ทำรายการ</th>
@@ -3068,23 +2997,8 @@ export function Reports({
                               </small>
                             </td>
                             <td>
-                              {isLimit ? (
-                                <span className="tx-type-cell">
-                                  <StatusPill tone={TX_TYPE_TONE[row.type]}>
-                                    {TX_TYPE_LABEL[row.type]}
-                                  </StatusPill>
-                                  <StatusPill tone={limitStatus.tone}>
-                                    {limitStatus.label}
-                                  </StatusPill>
-                                </span>
-                              ) : (
-                                <StatusPill tone={TX_TYPE_TONE[row.type]}>
-                                  {TX_TYPE_LABEL[row.type]}
-                                </StatusPill>
-                              )}
-                            </td>
-                            <td>
-                              <span className="tx-detail">{row.detail || "—"}</span>
+                              <span className="tx-detail">{transactionDescription(row)}</span>
+                              {isLimit && <StatusPill tone={limitStatus.tone}>{limitStatus.label}</StatusPill>}
                             </td>
                             <td className="num">
                               {isLimit ? (
@@ -3168,16 +3082,53 @@ export function Reports({
                   </table>
                 )}
               </div>
-              <div className="session-table-note">
-                <span>
-                  {txMember
-                    ? `สมาชิก ${txMember.memberNumber} · แสดง 300 รายการล่าสุด`
-                    : `แสดง 300 รายการล่าสุดของทุกสมาชิก`}
-                  {txFrom || txTo ? ` · ช่วง ${txFrom || "ต้นช่วง"}` : ""}
-                  {txTo ? ` → ${txTo}` : ""}
-                </span>
-                <span>ข้อมูลจากบัญชีสมาชิกโดยตรง</span>
+              <div className="report-summary-footer">
+                <div>
+                  <small>ใช้จ่ายรวม</small>
+                  <strong className="red-text">
+                    −{money(Math.abs(txTotals.spend))}
+                  </strong>
+                  <span>{txTotals.spendCount} รายการ</span>
+                </div>
+                <div>
+                  <small>เติมเงินรวม</small>
+                  <strong className="green-text">
+                    +{money(txTotals.deposit)}
+                  </strong>
+                  <span>{txTotals.depositCount} รายการ</span>
+                </div>
+                <div>
+                  <small>ถอนเงินรวม</small>
+                  <strong className="amber-text">
+                    −{money(Math.abs(txTotals.withdraw))}
+                  </strong>
+                  <span>{txTotals.withdrawCount} รายการ</span>
+                </div>
+                <div>
+                  <small>เปิดใช้บัตรรวม</small>
+                  <strong className="green-text">
+                    +{money(txTotals.activation)}
+                  </strong>
+                  <span>{txTotals.activationCount} รายการ</span>
+                </div>
+                <div>
+                  <small>คืนบัตรเงินสดรวม</small>
+                  <strong className="red-text">
+                    −{money(Math.abs(txTotals.refund))}
+                  </strong>
+                  <span>{txTotals.refundCount} รายการ</span>
+                </div>
+                <div>
+                  <small>ขอลดวงเงิน</small>
+                  <strong className="purple-text">{txTotals.limitCount}</strong>
+                  <span>
+                    {limitRequestsQuery.isLoading
+                      ? "…"
+                      : `รอพิจารณา ${pendingLimitCount} รายการ`}
+                  </span>
+                </div>
               </div>
+
             </section>
           )}
           {reportTab === "stock" && (
@@ -3274,64 +3225,6 @@ export function Reports({
                   >
                     <Eye size={15} /> ดูพรีวิว
                   </button>
-                </div>
-              </div>
-              <div className="tx-summary-cards">
-                <div>
-                  <small>รายการทั้งหมด</small>
-                  <strong>
-                    {stockBalanceQuery.isLoading ? (
-                      "…"
-                    ) : (
-                      <>
-                        {stockTotals.items.toLocaleString("th-TH")}{" "}
-                        <em className="card-unit">รายการ</em>
-                      </>
-                    )}
-                  </strong>
-                  <span>ทุกสินค้าในระบบ</span>
-                </div>
-                <div>
-                  <small>ยอดยกมารวม</small>
-                  <strong>
-                    {stockBalanceQuery.isLoading ? (
-                      "…"
-                    ) : (
-                      <>
-                        {stockTotals.opening.toLocaleString("th-TH")}{" "}
-                        <em className="card-unit">ชิ้น</em>
-                      </>
-                    )}
-                  </strong>
-                  <span>ต้นช่วง {rangeLabel}</span>
-                </div>
-                <div>
-                  <small>ขายออกในช่วง</small>
-                  <strong className="red-text">
-                    {stockBalanceQuery.isLoading ? (
-                      "…"
-                    ) : (
-                      <>
-                        {stockTotals.sold.toLocaleString("th-TH")}{" "}
-                        <em className="card-unit">ชิ้น</em>
-                      </>
-                    )}
-                  </strong>
-                  <span>{rangeLabel}</span>
-                </div>
-                <div>
-                  <small>คงเหลือรวม</small>
-                  <strong className="green-text">
-                    {stockBalanceQuery.isLoading ? (
-                      "…"
-                    ) : (
-                      <>
-                        {stockTotals.remaining.toLocaleString("th-TH")}{" "}
-                        <em className="card-unit">ชิ้น</em>
-                      </>
-                    )}
-                  </strong>
-                  <span>สต็อกปัจจุบัน</span>
                 </div>
               </div>
               <div className="table-wrap">
@@ -3433,13 +3326,65 @@ export function Reports({
                   </table>
                 )}
               </div>
-              <div className="session-table-note">
-                <span>
-                  ยอดยกมา = จำนวนต้นช่วง · ยอดขาย = ขายออกในช่วงที่เลือก ·
-                  คงเหลือ = สต็อกปัจจุบัน
-                </span>
-                <span>เปลี่ยนช่วงเวลาได้ที่ปุ่มลัดด้านบนของหน้ารายงาน</span>
+              <div className="report-summary-footer">
+                <div>
+                  <small>รายการทั้งหมด</small>
+                  <strong>
+                    {stockBalanceQuery.isLoading ? (
+                      "…"
+                    ) : (
+                      <>
+                        {stockTotals.items.toLocaleString("th-TH")}{" "}
+                        <em className="card-unit">รายการ</em>
+                      </>
+                    )}
+                  </strong>
+                  <span>ทุกสินค้าในระบบ</span>
+                </div>
+                <div>
+                  <small>ยอดยกมารวม</small>
+                  <strong>
+                    {stockBalanceQuery.isLoading ? (
+                      "…"
+                    ) : (
+                      <>
+                        {stockTotals.opening.toLocaleString("th-TH")}{" "}
+                        <em className="card-unit">ชิ้น</em>
+                      </>
+                    )}
+                  </strong>
+                  <span>ต้นช่วง {rangeLabel}</span>
+                </div>
+                <div>
+                  <small>ขายออกในช่วง</small>
+                  <strong className="red-text">
+                    {stockBalanceQuery.isLoading ? (
+                      "…"
+                    ) : (
+                      <>
+                        {stockTotals.sold.toLocaleString("th-TH")}{" "}
+                        <em className="card-unit">ชิ้น</em>
+                      </>
+                    )}
+                  </strong>
+                  <span>{rangeLabel}</span>
+                </div>
+                <div>
+                  <small>คงเหลือรวม</small>
+                  <strong className="green-text">
+                    {stockBalanceQuery.isLoading ? (
+                      "…"
+                    ) : (
+                      <>
+                        {stockTotals.remaining.toLocaleString("th-TH")}{" "}
+                        <em className="card-unit">ชิ้น</em>
+                      </>
+                    )}
+                  </strong>
+                  <span>สต็อกปัจจุบัน</span>
+                </div>
               </div>
+
             </section>
           )}
           {reportTab === "balances" && (
@@ -3505,52 +3450,6 @@ export function Reports({
                   >
                     <Eye size={15} /> ดูพรีวิว
                   </button>
-                </div>
-              </div>
-              <div className="tx-summary-cards">
-                <div>
-                  <small>สมาชิกในรายงาน</small>
-                  <strong>
-                    {balancesQuery.isLoading ? (
-                      "…"
-                    ) : (
-                      <>
-                        {balanceTotals.members.toLocaleString("th-TH")}{" "}
-                        <em className="card-unit">ราย</em>
-                      </>
-                    )}
-                  </strong>
-                  <span>
-                    ใช้งาน {balanceTotals.active} · ระงับ{" "}
-                    {balanceTotals.members - balanceTotals.active}
-                  </span>
-                </div>
-                <div>
-                  <small>ยอดเงินเข้ารวม</small>
-                  <strong className="green-text">
-                    {balancesQuery.isLoading
-                      ? "…"
-                      : `+${money(balanceTotals.totalIn)}`}
-                  </strong>
-                  <span>เปิดใช้บัตร + เติมเงิน ทุกใบ</span>
-                </div>
-                <div>
-                  <small>ยอดจ่ายรวม</small>
-                  <strong className="red-text">
-                    {balancesQuery.isLoading
-                      ? "…"
-                      : `−${money(balanceTotals.totalOut)}`}
-                  </strong>
-                  <span>ใช้ซื้อ + ถอน + คืนบัตรเงินสด</span>
-                </div>
-                <div>
-                  <small>คงเหลือรวม</small>
-                  <strong>
-                    {balancesQuery.isLoading
-                      ? "…"
-                      : money(balanceTotals.balance)}
-                  </strong>
-                  <span>ยอดเงินคงเหลือของสมาชิกในรายงาน</span>
                 </div>
               </div>
               <div className="table-wrap">
@@ -3645,13 +3544,53 @@ export function Reports({
                   </table>
                 )}
               </div>
-              <div className="session-table-note">
-                <span>
-                  ยอดทั้งหมด = เปิดใช้บัตร + เติมเงิน · ยอดจ่าย = ใช้ซื้อ + ถอน
-                  + คืนบัตรเงินสด
-                </span>
-                <span>คงเหลือต้องเท่ากับ ยอดทั้งหมด − ยอดจ่าย เสมอ</span>
+              <div className="report-summary-footer">
+                <div>
+                  <small>สมาชิกในรายงาน</small>
+                  <strong>
+                    {balancesQuery.isLoading ? (
+                      "…"
+                    ) : (
+                      <>
+                        {balanceTotals.members.toLocaleString("th-TH")}{" "}
+                        <em className="card-unit">ราย</em>
+                      </>
+                    )}
+                  </strong>
+                  <span>
+                    ใช้งาน {balanceTotals.active} · ระงับ{" "}
+                    {balanceTotals.members - balanceTotals.active}
+                  </span>
+                </div>
+                <div>
+                  <small>ยอดเงินเข้ารวม</small>
+                  <strong className="green-text">
+                    {balancesQuery.isLoading
+                      ? "…"
+                      : `+${money(balanceTotals.totalIn)}`}
+                  </strong>
+                  <span>เปิดใช้บัตร + เติมเงิน ทุกใบ</span>
+                </div>
+                <div>
+                  <small>ยอดจ่ายรวม</small>
+                  <strong className="red-text">
+                    {balancesQuery.isLoading
+                      ? "…"
+                      : `−${money(balanceTotals.totalOut)}`}
+                  </strong>
+                  <span>ใช้ซื้อ + ถอน + คืนบัตรเงินสด</span>
+                </div>
+                <div>
+                  <small>คงเหลือรวม</small>
+                  <strong>
+                    {balancesQuery.isLoading
+                      ? "…"
+                      : money(balanceTotals.balance)}
+                  </strong>
+                  <span>ยอดเงินคงเหลือของสมาชิกในรายงาน</span>
+                </div>
               </div>
+
             </section>
           )}
         </div>

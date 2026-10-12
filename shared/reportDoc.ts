@@ -52,6 +52,9 @@ export function escapeHtml(value: string) {
 
 /** SINGLE SOURCE OF TRUTH สำหรับสไตล์เอกสารรายงาน (.rd-* classes) */
 export const REPORT_DOC_CSS = `
+  .rd-summary-footer { margin-top: 12px; border-top: 2px solid #111; padding-top: 8px; break-inside: avoid; }
+  .rd-summary-footer > div { display: flex; justify-content: space-between; gap: 16px; padding: 3px 0; }
+  .rd-summary-footer b { font-variant-numeric: tabular-nums; text-align: right; }
   .report-doc { background: #ffffff; color: #1c1c1a; font-family: "Sarabun", "TH Sarabun New", "Leelawadee UI", Tahoma, sans-serif; font-size: 13px; line-height: 1.5; box-sizing: border-box; }
   .report-doc.compact { font-size: 12px; }
   .rd-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; padding-bottom: 12px; border-bottom: 2.5px solid #1c1c1a; }
@@ -186,8 +189,8 @@ export function buildReportDocumentHtml(config: ReportDocConfig, opts: BuildRepo
     </div>
     <div class="rd-title"><h1>${escapeHtml(config.title)}</h1>${config.periodLabel ? `<p>${escapeHtml(config.periodLabel)}</p>` : ""}</div>
     ${metaRows ? `<div class="rd-meta">${metaRows}</div>` : ""}
-    ${summaryRows ? `<div class="rd-summary-grid">${summaryRows}</div>` : ""}
     <table class="rd-table"><thead><tr>${headCells}</tr></thead>${bodyRows}${totalsRow}</table>
+    ${summaryRows ? `<div class="rd-summary-footer">${summaryRows}</div>` : ""}
     ${config.footnote ? `<div class="rd-note">${escapeHtml(config.footnote)}</div>` : ""}
   </div>
 ${autoPrintScript}

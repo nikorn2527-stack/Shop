@@ -51,14 +51,15 @@ function buildPage(config: ReportDocConfig, rows: string[][], pageIndex: number,
     }
     page.appendChild(meta);
   }
-  if (config.summaryBlocks?.length) {
+  if (config.summaryBlocks?.length && pageIndex === pageCount - 1) {
     const summary = document.createElement("div");
-    summary.className = "rd-summary-grid";
+    summary.className = "rd-summary-footer";
     for (const [label, value] of config.summaryBlocks) {
       const block = document.createElement("div");
       block.innerHTML = `<span>${escapeHtmlLocal(label)}</span><b>${escapeHtmlLocal(value)}</b>`;
       summary.appendChild(block);
     }
+    // Append after the table, on the last page only.
     page.appendChild(summary);
   }
   const table = document.createElement("table");
@@ -98,6 +99,8 @@ function buildPage(config: ReportDocConfig, rows: string[][], pageIndex: number,
     table.appendChild(tfoot);
   }
   page.appendChild(table);
+  const summary = page.querySelector(".rd-summary-footer");
+  if (summary) page.appendChild(summary);
   if (config.footnote) {
     const note = document.createElement("div");
     note.className = "rd-note";

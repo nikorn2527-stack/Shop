@@ -13,6 +13,11 @@ const config: ReportDocConfig = {
 };
 
 describe("monochrome report document", () => {
+  it("places the summary after the table without summary cards", () => {
+    const html = buildReportDocumentHtml(config, { mode: "preview", stampText: "test" });
+    expect(html.indexOf('class="rd-summary-footer"')).toBeGreaterThan(html.indexOf("</table>"));
+    expect(html).not.toContain('class="rd-summary-grid"');
+  });
   it("protects paper, text and borders from application theme styles", () => {
     expect(REPORT_DOC_CSS).toContain(".report-doc, .report-doc *");
     expect(REPORT_DOC_CSS).toContain("color: #000000 !important;");
