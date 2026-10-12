@@ -1,3 +1,27 @@
+/* Shared screen-only semantic colors; printed documents retain their own palette. */
+@media screen {
+  :root :is(.app-shell, .modal-backdrop, [role="dialog"]) .ghost-button:not(:disabled) {
+    background: #e2e8f0; border: 1px solid #64748b; color: #0f172a; font-weight: 700;
+  }
+  :root :is(.app-shell, .modal-backdrop, [role="dialog"]) .ghost-button:not(:disabled):hover {
+    background: #cbd5e1; border-color: #334155; color: #0f172a;
+  }
+  :root .ghost-button:focus-visible { outline: 3px solid #1d4ed8; outline-offset: 3px; }
+  :root:root :is(.notice-bar.warning, .notice-bar.warn, .inline-message.warning, .status-pill.amber, .status-badge.amber) {
+    background: #fde68a; color: #713f12; border: 1px solid #d97706;
+  }
+  :root:root :is(.notice-bar.error, .inline-message.error, .status-pill.red, .status-badge.red) {
+    background: #fecaca; color: #991b1b; border: 1px solid #dc2626;
+  }
+  :root:root :is(.notice-bar.success, .inline-message.success, .status-pill.green, .status-badge.green) {
+    background: #bbf7d0; color: #14532d; border: 1px solid #16a34a;
+  }
+  :root :is(.notice-bar.warning, .notice-bar.warn, .inline-message.warning, .notice-bar.error, .inline-message.error, .notice-bar.success, .inline-message.success) :is(button, svg) { color: inherit; }
+  :root .blocker-icon.warning { background: #fde68a; color: #713f12; box-shadow: none; }
+  :root .blocker-button.warning { background: #facc15; color: #422006; }
+  :root .blocker-button.warning:hover { background: #eab308; color: #422006; }
+  :root .blocker-icon.error { background: #fecaca; color: #991b1b; }
+}
 .form-modal.pos-register-modal {
   display: flex;
   flex-direction: column;
