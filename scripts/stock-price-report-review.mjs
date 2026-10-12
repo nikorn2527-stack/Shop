@@ -39,7 +39,8 @@ try {
     const preview = await page.waitForSelector('#stock-balance-report .report-export-actions .preview-btn', { visible: true });
     await preview.evaluate(node => node.scrollIntoView({ block: 'center', inline: 'center' }));
     await new Promise(resolve => setTimeout(resolve, 400));
-    await preview.click();
+    await preview.focus();
+    await page.keyboard.press('Enter');
     await page.screenshot({ path: `${cfg.dir}/preview-click-${width}.png`, fullPage: true });
     console.log('PREVIEW_CLICK', width, await preview.evaluate(node => ({ html: node.outerHTML, rect: node.getBoundingClientRect().toJSON(), hit: document.elementFromPoint(node.getBoundingClientRect().x + 10, node.getBoundingClientRect().y + 10)?.outerHTML.slice(0, 500) })), await page.$$eval('[role="dialog"]', nodes => nodes.map(node => node.innerText.slice(0, 500))));
     await page.waitForSelector('.export-preview-modal');
