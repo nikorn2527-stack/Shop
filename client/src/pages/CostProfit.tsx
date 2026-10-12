@@ -62,7 +62,6 @@ export default function CostProfit() {
       <label>ตั้งแต่<ThaiDatePicker value={from} onChange={value => { setRange("custom"); setFrom(value); }} ariaLabel="วันที่เริ่มต้นต้นทุนและกำไร" /></label>
       <label>ถึง<ThaiDatePicker value={to} onChange={value => { setRange("custom"); setTo(value); }} ariaLabel="วันที่สิ้นสุดต้นทุนและกำไร" /></label>
     </div>
-    <p className="cost-profit-provisional">กำไรขั้นต้น = ยอดขายสุทธิ − ต้นทุนสินค้าที่ขายจาก Lot ที่บันทึกในบิล ไม่ใช่ยอดรับเข้าทั้งหมด</p>
     {!valid && <p role="alert">กรุณาเลือกวันที่เริ่มต้นไม่เกินวันที่สิ้นสุด</p>}
     {query.isError && <p role="alert">โหลดข้อมูลไม่สำเร็จ: {query.error.message} <button type="button" className="outline-button" onClick={() => void query.refetch()}>ลองอีกครั้ง</button></p>}
     <div className="cost-profit-cards">{cards.map(([label, value]) => <article key={label}><span>{label}</span><strong>{ready ? value : "—"}</strong></article>)}</div>
@@ -80,7 +79,6 @@ export default function CostProfit() {
           {valid && !productsQuery.isLoading && !productsQuery.isError && <tfoot><tr><th colSpan={5}>รวม {productRows.length} รายการสินค้า</th><td>{money(productTotals.revenue)}</td><td>{money(productTotals.cogs)}</td><td>{money(productTotals.revenue - productTotals.cogs)}</td><td>{productTotals.revenue > 0 ? ((productTotals.revenue - productTotals.cogs) / productTotals.revenue * 100).toFixed(2) : "0.00"}%</td></tr></tfoot>}
         </table>
       </div>
-      <p className="cost-profit-product-note">รายละเอียดสินค้าเป็นยอดก่อนส่วนลดระดับบิล ส่วนแท็บสรุปรายวันเป็นยอดสุทธิหลังส่วนลด</p>
     </article>}
     {view === "daily" && <article className="cost-profit-detail" role="tabpanel" id="cost-profit-panel-daily" aria-labelledby="cost-profit-tab-daily">
       <header><div><h2>สรุปรายวัน</h2><span>{valid ? `${formatThaiDate(from)} – ${formatThaiDate(to)}` : "—"}</span></div><span>{ready ? `${totals.orders.toLocaleString("th-TH")} บิล` : "—"}</span></header>
@@ -92,6 +90,5 @@ export default function CostProfit() {
         {ready && <tfoot><tr><th>รวม</th><td>{totals.orders}</td><td>{money(totals.revenue)}</td><td>{money(totals.cost)}</td><td>{money(profit)}</td><td>{cards[3][1]}</td></tr></tfoot>}
       </table></div>
     </article>}
-    <div className="cost-profit-next"><strong>ส่วนกระทบยอดต้นทุน</strong><span>มูลค่าต้นงวด + รับเข้า + ปรับปรุง − ต้นทุนขาย = มูลค่าปลายงวด</span><small>จะแสดงเมื่อเชื่อมระบบมูลค่าสินค้าแล้ว ไม่ใช้ยอดซื้อแทนต้นทุนขาย</small></div>
   </section>;
 }

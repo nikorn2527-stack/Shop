@@ -6,8 +6,9 @@
     min-height: 0;
   }
 }
-.cost-profit-page { display: grid; gap: 16px; min-width: 0; color: #0f172a; font-size: 14px; }
-.cost-profit-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; padding: 20px; background: white; border: 1px solid #e2e8f0; border-radius: 16px; }
+.cost-profit-page { display: grid; gap: 10px; min-width: 0; color: #0f172a; font-size: 14px; }
+.cost-profit-page .section-header { margin-bottom: 0; }
+.cost-profit-filters { display: flex; flex-wrap: wrap; align-items: end; gap: 10px; padding: 10px 12px; background: white; border: 1px solid #e2e8f0; border-radius: 12px; }
 .cost-profit-ranges { display: flex; flex-wrap: wrap; gap: 8px; }
 .cost-profit-tabs { display: flex; gap: 6px; padding: 4px; background: #e2e8f0; border-radius: 12px; width: fit-content; max-width: 100%; }
 .cost-profit-tabs button { padding: 9px 14px; border: 0; border-radius: 9px; background: transparent; color: #475569; font: inherit; cursor: pointer; }
@@ -15,14 +16,14 @@
 .cost-profit-tabs button:focus-visible { outline: 2px solid #537fa6; outline-offset: 2px; }
 .cost-profit-filters label { display: grid; gap: 6px; min-width: 180px; font-size: 13px; }
 .cost-profit-provisional { margin: 0; color: #92400e; background: #fffbeb; padding: 10px 14px; border-radius: 10px; font-size: 13px; }
-.cost-profit-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
-.cost-profit-cards article { display: grid; align-content: start; gap: 8px; min-width: 0; padding: 16px 18px; background: white; border: 1px solid #f1f5f9; border-radius: 12px; box-shadow: 0 2px 5px #0f172a05; }
+.cost-profit-cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.cost-profit-cards article { display: grid; align-content: start; gap: 3px; min-width: 0; padding: 8px 12px; background: white; border: 1px solid #f1f5f9; border-radius: 12px; }
 .cost-profit-cards span, .cost-profit-detail header span { color: #64748b; font-size: 13px; }
-.cost-profit-cards strong { color: #0f172a; font-size: 24px; line-height: 1.3; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.cost-profit-cards strong { color: #0f172a; font-size: 19px; line-height: 1.3; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .cost-profit-detail { border: 1px solid #e2e8f0; border-radius: 16px; background: white; min-width: 0; overflow: hidden; }
-.cost-profit-detail header { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; padding: 16px 18px; }
+.cost-profit-detail header { display: flex; justify-content: space-between; gap: 12px; align-items: center; flex-wrap: wrap; padding: 10px 12px; }
 .cost-profit-detail h2 { margin: 0 0 4px; font-size: 17px; font-weight: 700; }
-.cost-profit-table { overflow: auto; max-height: min(60vh, 640px); max-width: 100%; scrollbar-gutter: stable; }
+.cost-profit-table { overflow: auto; max-height: max(280px, calc(100dvh - 340px)); max-width: 100%; scrollbar-gutter: stable; }
 .cost-profit-table table { width: 100%; border-collapse: collapse; min-width: 680px; }
 .cost-profit-table th, .cost-profit-table td { padding: 10px 14px; font-size: 13px; line-height: 1.5; text-align: right; white-space: nowrap; border-bottom: 1px solid #f1f5f9; font-variant-numeric: tabular-nums; }
 .cost-profit-table thead th { position: sticky; top: 0; z-index: 1; background: #f8fafc; }
@@ -39,4 +40,4 @@
 .cost-profit-products td:nth-child(2) { white-space: normal; min-width: 180px; }
 .cost-profit-product-note { padding: 0 18px 14px; margin: 0; color: #475569; font-size: 13px; }
 @media (max-width: 1000px) { .cost-profit-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 500px) { .cost-profit-cards { grid-template-columns: 1fr; } .cost-profit-filters label { width: 100%; min-width: 0; } }
+@media (max-width: 500px) { .cost-profit-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } .cost-profit-filters label { flex: 1 1 130px; min-width: 0; } }

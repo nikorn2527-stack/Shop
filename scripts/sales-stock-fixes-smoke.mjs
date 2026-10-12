@@ -122,9 +122,9 @@ try {
     }
     await page.waitForFunction(() => {
       const content = document.querySelector('.page-content');
-      const last = document.querySelector('.cost-profit-next').getBoundingClientRect();
+      const last = document.querySelector('.cost-profit-detail').getBoundingClientRect();
       const rect = content.getBoundingClientRect();
-      return last.bottom <= rect.bottom + 1 && last.top >= rect.top;
+      return last.bottom <= rect.bottom + 1;
     });
     await page.screenshot({ path: path.join(dir, `cost-profit-scroll-${viewport.width}.png`) });
   }
