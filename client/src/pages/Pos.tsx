@@ -1,3 +1,4 @@
+import "../styles/pos-depth-preview.css";
 import { MemberRegistrationModal } from "@/components/MemberRegistrationModal";
 import { MemberCardActionsModal } from "@/components/MemberCardActionsModal";
 import type { MemberCardData } from "@/components/MemberCardModal";
