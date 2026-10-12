@@ -1,3 +1,22 @@
+/* Status labels: a semantic dot and readable text, never an alert background. */
+@media screen {
+  :root:root :is(.status-pill, .status-badge, .card-inventory-status) {
+    --status-color: #475569;
+    display: inline-flex; align-items: center; gap: 7px;
+    background: transparent !important; border: 0 !important;
+    box-shadow: none; padding: 2px 0; color: var(--status-color) !important;
+    font-weight: 700; white-space: nowrap;
+  }
+  :root:root :is(.status-pill, .status-badge, .card-inventory-status)::before {
+    content: ""; display: inline-block; flex: 0 0 7px;
+    width: 7px; height: 7px; border-radius: 50%; background: var(--status-color);
+  }
+  :root:root :is(.status-pill.green, .status-badge.green, .card-inventory-status.is-blank, .card-inventory-status.is-returned_vacant) { --status-color: #15803d; }
+  :root:root :is(.status-pill.blue, .status-badge.blue, .card-inventory-status.is-assigned) { --status-color: #1d4ed8; }
+  :root:root :is(.status-pill.amber, .status-badge.amber) { --status-color: #a16207; }
+  :root:root :is(.status-pill.red, .status-badge.red, .card-inventory-status.is-lost, .card-inventory-status.is-damaged) { --status-color: #b91c1c; }
+  :root:root :is(.status-pill.purple, .status-badge.purple) { --status-color: #475569; }
+}
 /* Shared screen-only semantic colors; printed documents retain their own palette. */
 @media screen {
   :root:root :is(.app-shell, .modal-backdrop, [role="dialog"]) .outline-button:not(:disabled) {
