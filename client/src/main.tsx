@@ -13,6 +13,7 @@ import App from "./App";
 import { startLogin } from "./const";
 import "./index.css";
 import "./styles/workspace.css";
+import "./styles/clear-palette.css";
 
 const queryClient = new QueryClient();
 

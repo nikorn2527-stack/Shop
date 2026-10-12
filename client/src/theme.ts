@@ -131,7 +131,7 @@ export function resolveThemeColor(theme: string | undefined | null): string {
 export function applyThemeColor(theme: string | undefined | null): string {
   // One application palette; legacy saved colors remain readable but no longer
   // override the shared design after removing the theme selector.
-  const base = "#c94f08";
+  const base = "#1d4ed8";
   const rgb = hexToRgb(base);
   if (!rgb) return base;
   const [r, g, b] = rgb;
@@ -142,12 +142,12 @@ export function applyThemeColor(theme: string | undefined | null): string {
     return rgbToHex(rr, gg, bb);
   };
   const root = document.documentElement;
-  root.dataset.palette = "slate-orange";
+  root.dataset.palette = "slate-blue";
   const vars: Record<string, string> = {
     "--teal": base,
     "--teal-dark": build(clamp(l - 0.07, 0.12, 0.82)),
-    "--teal-soft": "#fdba74",
-    "--teal-mist": "#fff7ed",
+    "--teal-soft": "#bfdbfe",
+    "--teal-mist": "#eff6ff",
     "--app-secondary": "#1d4ed8",
     "--app-secondary-soft": "#dbeafe",
     // เฉดเข้มของสีธีม — ยังใช้โดะ member-balance-card (การ์ดยอดเงินคงเหลือ)

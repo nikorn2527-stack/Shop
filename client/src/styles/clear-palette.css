@@ -1,0 +1,58 @@
+/* Shared screen palette. Status dots and alerts have distinct semantics.
+   Keep print documents independent from the application theme. */
+@media screen {
+  :root:root {
+    --ink: #0f172a;
+    --muted: #475569;
+    --canvas: #f1f5f9;
+    --surface: #ffffff;
+    --line: #cbd5e1;
+    --red: #dc2626;
+    --amber: #a16207;
+    --green: #15803d;
+    --teal: #1d4ed8;
+    --teal-dark: #1e40af;
+    --teal-soft: #bfdbfe;
+    --teal-mist: #eff6ff;
+    color: var(--ink);
+    background: var(--canvas);
+  }
+  :root:root :is(.primary-button, .scan-button, .login-submit) {
+    background: #1d4ed8; border-color: #1d4ed8; color: #ffffff;
+  }
+  :root:root :is(.primary-button, .scan-button, .login-submit):not(:disabled):hover {
+    background: #1e40af; border-color: #1e40af;
+  }
+  :root:root :is(.status-pill.green, .status-badge.green, .card-inventory-status.is-blank, .card-inventory-status.is-returned_vacant) { --status-color: #15803d; }
+  :root:root :is(.status-pill.blue, .status-badge.blue, .card-inventory-status.is-assigned) { --status-color: #1d4ed8; }
+  :root:root :is(.status-pill.amber, .status-badge.amber) { --status-color: #a16207; }
+  :root:root :is(.status-pill.red, .status-badge.red, .card-inventory-status.is-lost, .card-inventory-status.is-damaged) { --status-color: #dc2626; }
+  :root:root :is(.notice-bar.success, .inline-message.success, [data-sonner-toast][data-type="success"]) {
+    background: #bbf7d0; border: 1px solid #16a34a; color: #14532d;
+  }
+  :root:root :is(.notice-bar.warning, .notice-bar.warn, .inline-message.warning, [data-sonner-toast][data-type="warning"]) {
+    background: #fef08a; border: 1px solid #ca8a04; color: #713f12;
+  }
+  :root:root :is(.notice-bar.error, .inline-message.error, .login-error, [data-sonner-toast][data-type="error"]) {
+    background: #fecaca; border: 1px solid #dc2626; color: #991b1b;
+  }
+  :root:root .blocker-icon.error { background: #fecaca; color: #dc2626; }
+  :root:root .blocker-button.error { background: #dc2626; color: #ffffff; }
+  :root:root .blocker-button.error:hover { background: #b91c1c; }
+  :root:root .blocker-icon.warning { background: #fef08a; color: #854d0e; }
+  :root:root .blocker-button.warning { background: #facc15; color: #422006; }
+  :root:root .blocker-icon.success { background: #bbf7d0; color: #15803d; }
+  :root:root .blocker-button.success { background: #15803d; color: #ffffff; }
+  :root:root .notif-badge { background: #dc2626; }
+  :root:root .notif-bell.has-alert { color: #dc2626; }
+  :root:root .login-blob.amber { background: #bfdbfe; }
+  :root:root :is(.app-shell, .page-content, .login-screen) { background-color: #f1f5f9; }
+  /* Action categories are blue; reserve green/yellow/red for actual status. */
+  :root:root .pos-rail .rail-btn > svg { background: #dbeafe; color: #1d4ed8; }
+  :root:root .pos-rail .rail-btn { color: #1e3a8a; }
+  :root:root .pos-rail .rail-btn.active { background: #dbeafe; border-color: #2563eb; color: #1e40af; }
+  :root:root :is(.status-pill, .status-badge, .card-inventory-status) {
+    background: transparent !important; border: 0 !important;
+    color: var(--status-color, #475569) !important;
+  }
+}
