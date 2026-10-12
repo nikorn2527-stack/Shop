@@ -6,6 +6,7 @@ import type { CheckoutReceipt } from "../../../server/sqliteStore";
 import { money } from "../pages/pageData";
 import { trpc } from "@/lib/trpc";
 import { PrintPreviewModal } from "./PrintPreviewModal";
+import { printViaHelper, getPrinterName } from "@/lib/printHelper";
 import { parseBangkokDate, STORE_TIME_ZONE } from "../../../shared/storeTime";
 
 /** "2026-09-18 14:42:33" → "18 ก.ย. 2569 · 14:42 น." */
@@ -50,8 +51,8 @@ export function ReceiptModal({ receipt, onClose, onNewSale, onPrinted, mode = "n
   // พิมพ์สลิป Thermal ตรง ๆ — ฉีด @page size ให้ตรงความกว้างสลิป (58/72/80 มม.)
   // ก่อนสั่งพิมพ์ ไม่เช่นนั้นเบราว์เซอร์จะใช้กระดาษ A4/Letter ปริ้นใบเสร็จเล็กอยู่กลางหน้า
   // (พรีวิวก่อนพิมพ์ใน PrintPreviewModal ฉีดกฎนี้อยู่แล้ว — เส้นทางตรงนี้เคยขาด)
-  const printReceipt = () => {
-    const widthMm = settingsQuery.data?.receiptPaperWidth === "58" ? 58 : settingsQuery.data?.receiptPaperWidth === "80" ? 80 : 72;
+  const printReceipt = async () => {
+    setReceiptBusy("printing");
     const runtimeId = "receipt-print-page-runtime";
     let styleEl = document.getElementById(runtimeId) as HTMLStyleElement | null;
     if (!styleEl) {
@@ -60,19 +61,33 @@ export function ReceiptModal({ receipt, onClose, onNewSale, onPrinted, mode = "n
       document.head.appendChild(styleEl);
     }
     styleEl.textContent = `@media print { @page { margin: 0; size: ${widthMm}mm auto; } }`;
+    const doc = document.getElementById("receipt-paper");
+    const htmlContent = doc
+      ? `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${styleEl.textContent}</style></head><body>${doc.outerHTML}</body></html>`
+      : "";
+    // ใช้เครื่องพิมพ์ที่ตั้งไว้ใน ตั้งค่า → เครื่องพิมพ์ 3 เครื่องจริง (ใบเสร็จ / รายงาน / บัตรสมาชิก)
+    // ถ้ามี — ถ้าไม่กำหนด → พิมพ์แปลงทีหลังผ่าน Browser Print Dialog (ระบบเลือกเครื่องพิมพ์เอง)
+    const printerName = getPrinterName("receipt");
+    if (printerName) {
+      await printViaHelper(printerName, htmlContent);
+      setReceiptBusy("");
+      onPrinted?.();
+      return;
+    }
     const cleanup = () => {
       styleEl?.remove();
       document.body.classList.remove("printing-receipt");
       window.removeEventListener("afterprint", cleanup);
     };
     window.addEventListener("afterprint", cleanup);
-    // เผื่อเบราว์เซอร์บางรุ่นไม่ยิง afterprint — ถอดกฎเองไม่ให้ติดค้างไปกระทบเอกสาร A4 ครั้งถัดไป
     window.setTimeout(cleanup, 4000);
     document.body.classList.add("printing-receipt");
     window.print();
     document.body.classList.remove("printing-receipt");
+    setReceiptBusy("");
     onPrinted?.();
   };
+
   // FIX-8 — Enter key = สั่งพิมพ์ทันที
   useEffect(() => {
     if (mode !== "new") return;

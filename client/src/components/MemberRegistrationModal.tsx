@@ -129,9 +129,42 @@ export function MemberRegistrationModal({
       fail("เงินเริ่มต้นต้องมากกว่า 0", "ใส่ตัวเลข เช่น 100 หรือเว้นว่างไว้ก่อน แล้วบันทึกใหม่");
       return;
     }
-    const card = cardsQuery.data?.find(
+    const cardEntry = cardsQuery.data?.find(
       card => card.cardNumber === registerForm.cardNumber.trim()
     );
+    if (cardEntry && !["blank", "returned_vacant"].includes(cardEntry.status)) {
+      // บัตรนี้ยังใช้งานไม่ได้ (assigned / lost / damaged) — ตรวจสอบว่าผูกกับใคร
+      const assignedMemberNumber = cardEntry.assignedMemberNumber;
+      if (assignedMemberNumber) {
+        try {
+          const detail = await utils.member.detail.fetch({
+            memberNumber: assignedMemberNumber,
+          });
+          setExistingMembers((prev) => [
+            ...prev,
+            {
+              memberNumber: detail.member.memberNumber,
+              name: `${detail.member.firstName} ${detail.member.lastName}`,
+              status: detail.member.status,
+              reason: "card",
+            } as const,
+          ]);
+        } catch {
+          fail(
+            "บัตรนี้ถูกผูกกับสมาชิกอื่นแล้ว",
+            "ระบุบัตรใหม่ หรือใช้บัตร/สมาชิกเดิมที่ระบบรักษาไว้แล้ว"
+          );
+          return;
+        }
+      } else {
+        fail(
+          "บัตรนี้ยังไม่พร้อมใช้งาน (ยังว่างในคลัง)",
+          "จ่ายบัตรจากเมนู บัตรสมาชิก → จ่ายบัตรให้สมาชิกก่อน"
+        );
+        return;
+      }
+    }
+
     if (!card || !["blank", "returned_vacant"].includes(card.status)) {
       fail("ยังไม่มีบัตรพร้อมใช้สำหรับสมาชิกใหม่", "สแกนหรือกรอกรหัสบัตรที่ขึ้นทะเบียนแล้ว (สถานะว่าง/คืนแล้ว) — ดูรายการบัตรว่างได้ที่ทะเบียนบัตร แล้วบันทึกใหม่");
       return;
@@ -185,7 +218,7 @@ export function MemberRegistrationModal({
             {existingMembers.map(member => <div className="notice-bar" key={member.memberNumber} style={{ display: "block" }}>
               <strong>{member.name}</strong>
               <p>เลขสมาชิก {member.memberNumber} · {member.status === "active" ? "ใช้งาน" : "ระงับการใช้งาน"}</p>
-              <small>{member.reason === "citizenId" ? "เลขบัตรประชาชนตรงกับสมาชิกนี้ จึงไม่สามารถสมัครซ้ำได้" : member.reason === "phone" ? "เบอร์โทรศัพท์ที่กรอกตรงกับสมาชิกนี้ หากใช้เบอร์ร่วมกันและเป็นคนละคน สามารถยืนยันสมัครใหม่ได้" : "ชื่อและนามสกุลที่กรอกตรงกับสมาชิกนี้ หากเป็นคนละคนที่ชื่อเหมือนกัน สามารถยืนยันสมัครใหม่ได้"}</small>
+              <small>{member.reason === "citizenId" ? "เลขบัตรประชาชนตรงกับสมาชิกนี้ จึงไม่สามารถสมัครซ้ำได้" : member.reason === "phone" ? "เบอร์โทรศัพท์ที่กรอกตรงกับสมาชิกนี้ หากใช้เบอร์ร่วมกันและเป็นคนละคน สามารถยืนยันสมัครใหม่ได้" : member.reason === "card" ? "รหัสบัตรซ้ำกับสมาชิกที่ลงทะเบียนไว้แล้ว กรุณาใช้บัญชีเดิม" : "ชื่อและนามสกุลที่กรอกตรงกับสมาชิกนี้ หากเป็นคนละคนที่ชื่อเหมือนกัน สามารถยืนยันสมัครใหม่ได้"}</small>
             </div>)}
           </div>
           <DialogFooter>

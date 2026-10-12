@@ -107,9 +107,22 @@ export async function printViaHelper(
 /**
  * เลือกชื่อ printer ตามประเภทเอกสาร (จาก localStorage ของเครื่องนี้)
  */
+/** เลือกชื่อ printer ตามประเภทเอกสาร (จาก localStorage ของเครื่องนี้) */
 export function getPrinterName(docType: PrintDocType): string {
   return getLocalPrinterSettings()[docType];
 }
+
+/** ตรวจสอบว่ามีการระบุเครื่องพิมพ์สำหรับประเภทเอกสารนี้ไหม (จากการตั้งค่าบนเครื่องนี้) */
+export function isPrinterDesignated(docType: PrintDocType): boolean {
+  return getPrinterName(docType).trim() !== "";
+}
+
+/** คำอธิบายประเภทเอกสารสำหรับแสดงในเมนูตั้งค่าและข้อความเตือน */
+export const PRINTER_DOC_LABELS: Record<PrintDocType, string> = {
+  receipt: "ใบเสร็จ",
+  report: "รายงาน",
+  card: "บัตรสมาชิก",
+};
 
 /**
  * ตรวจสอบว่า Helper ทำงานอยู่ไหม

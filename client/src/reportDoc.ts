@@ -1,5 +1,6 @@
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
+import { printViaHelper, getPrinterName } from "@/lib/printHelper";
 import {
   buildReportDocumentHtml,
   thaiStamp,
@@ -214,6 +215,16 @@ async function downloadReportPdfRaster(config: ReportDocConfig) {
 export function printReportDoc(config: ReportDocConfig) {
   const stampText = `พิมพ์เมื่อ ${thaiStamp(new Date())}`;
   const html = buildReportDocumentHtml(config, { mode: "print", stampText });
+  const printerName = getPrinterName("report");
+  if (printerName) {
+    // ส่งไปยังเครื่องพิมพ์รายงานที่เลือกไว้ (ตั้งค่า → เครื่องพิมพ์ 3 เครื่องจริง)
+    // ถ้า Helper ไม่ตอบ จะเข้า fallback อัตโนมัติ
+    const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${REPORT_DOC_CSS}</style></head><body>${html}</body></html>`;
+    printViaHelper(printerName, fullHtml).catch(() => {
+      printReportDocFallback(html);
+    });
+    return;
+  }
   const frame = document.createElement("iframe");
   frame.setAttribute("aria-hidden", "true");
   frame.style.position = "fixed";
@@ -225,4 +236,22 @@ export function printReportDoc(config: ReportDocConfig) {
   frame.srcdoc = html;
   document.body.appendChild(frame);
   window.setTimeout(() => { frame.remove(); }, 60_000);
+}
+
+/** ฟอลล์แบ็กของ printReportDoc เมื่อ Helper ไม่ตอบสนอง */
+function printReportDocFallback(html: string) {
+  const frame = document.createElement("iframe");
+  frame.setAttribute("aria-hidden", "true");
+  frame.style.position = "fixed";
+  frame.style.right = "0";
+  frame.style.bottom = "0";
+  frame.style.width = "0";
+  frame.style.height = "0";
+  frame.style.border = "0";
+  frame.srcdoc = html;
+  document.body.appendChild(frame);
+  window.setTimeout(() => { frame.remove(); }, 60_000);
+}
+
+
 }
