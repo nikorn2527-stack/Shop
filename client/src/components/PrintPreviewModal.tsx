@@ -1,3 +1,4 @@
+import { printElementDocument } from "@/lib/printHelper";
 import { useEffect, useRef, useState } from "react";
 import { Printer, X } from "@/lib/icons";
 import { toast } from "sonner";
@@ -107,47 +108,9 @@ export function PrintPreviewModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const doPrint = () => {
-    // ROUND 72 (user) — ปิด toast ที่ยังเด้งอยู่ทั้งหมดก่อนสั่งพิมพ์
-    // (เคยมีข้อความแจ้งเตือนค้างอยู่บนจอ แล้วหลุดไปติดในสลิปที่พิมพ์ออกมา —
-    // คู่กับกฎ @media print ที่ซ่อน [data-sonner-toaster] ใน index.css)
+  const doPrint = async () => {
     toast.dismiss();
-
-    // ROUND 80 — ฉีดกฎ @page ให้เหมาะกับชนิดกระดาษของเอกสารนี้ก่อนพิมพ์
-    // (สลิป: ไม่มีขอบ + บอกความสูงตามเนื้อหา · A4: ขอบ 8 มม. ตามเดิม)
-    const runtimeId = "print-page-runtime";
-    let styleEl = document.getElementById(runtimeId) as HTMLStyleElement | null;
-    if (!styleEl) {
-      styleEl = document.createElement("style");
-      styleEl.id = runtimeId;
-      document.head.appendChild(styleEl);
-    }
-    if (paper === "thermal") {
-      const widthMm = thermalPaperWidthMm();
-      // +10 มม. กันขาดท้าย (เบราว์เซอร์ที่อ่าน @page size จะได้ไม่ตัดเนื้อหา)
-      const heightMm = contentMm != null ? Math.max(60, contentMm + 10) : 0;
-      styleEl.textContent = heightMm > 0
-        ? `@media print { @page { margin: 0; size: ${widthMm}mm ${heightMm}mm; } .receipt-paper, .receipt-line, .receipt-total, .receipt-meta, .receipt-customer, .receipt-payment, .receipt-balance, .receipt-thanks, .receipt-brand, .receipt-divider { break-inside: avoid; page-break-inside: avoid; } body { margin: 0; padding: 0; } }`
-        : `@media print { @page { margin: 0; } .receipt-paper, .receipt-line, .receipt-total, .receipt-meta, .receipt-customer, .receipt-payment, .receipt-balance, .receipt-thanks, .receipt-brand, .receipt-divider { break-inside: avoid; page-break-inside: avoid; } body { margin: 0; padding: 0; } }`;
-    } else {
-      const marginMm = targetId === "stock-count-sheet" ? 6 : 8;
-      styleEl.textContent = `@media print { @page { margin: ${marginMm}mm; ${paper === "a4" ? "size: A4;" : ""} } }`;
-    }
-    const printClass = targetId === "stock-count-sheet" ? "printing-stock-count" : "printing-receipt";
-    const cleanup = () => {
-      styleEl?.remove();
-      document.body.classList.remove(printClass);
-      window.removeEventListener("afterprint", cleanup);
-    };
-    window.addEventListener("afterprint", cleanup);
-    // ปีกไฟล์ Chrome บางรุ่นไม่ยิง afterprint — เผื่อไว้ถอดเอง
-    window.setTimeout(cleanup, 4000);
-
-    // เพิ่ม class เพื่อซ่อนส่วนอื่นขณะพิมพ์ (รองรับเบราว์เซอร์ที่ไม่มี :has)
-    document.body.classList.add(printClass);
-    window.print();
-    document.body.classList.remove(printClass);
-    onPrint?.();
+    try { await printElementDocument(targetId, paper === "thermal" ? thermalPaperWidthMm() : undefined); onPrint?.(); } catch { toast.error("เปิดหน้าต่างพิมพ์ไม่สำเร็จ กรุณาลองอีกครั้ง"); }
   };
 
   return (

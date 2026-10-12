@@ -413,12 +413,12 @@ export function Members({
           <div className="batch-print-bar">
             <div>
               <b>เลือก {selectedForPrint.size} ราย</b>
-              <small>พิมพ์บัตรสมาชิกทุกใบที่เลือกในการสั่งพิมพ์ครั้งเดียว — มาตรฐานนามบัตรไทย 90 × 55 มม.</small>
+              <small>ดูบัตรสมาชิกที่เลือกและดาวน์โหลด PDF</small>
             </div>
             <div className="batch-print-actions">
               <button className="outline-button" onClick={clearPrintSelection}>ล้างที่เลือก</button>
               <button className="primary-button" onClick={() => setBatchCardOpen(true)} disabled={batchCardMembers.length === 0}>
-                <Printer size={15} /> พิมพ์บัตร {selectedForPrint.size} ใบ
+                <Printer size={15} /> บัตรสมาชิก {selectedForPrint.size} ใบ
               </button>
             </div>
           </div>

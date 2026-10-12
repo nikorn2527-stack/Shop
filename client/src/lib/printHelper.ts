@@ -73,7 +73,7 @@ export async function printViaHelper(
   htmlContent: string,
 ): Promise<PrintResult> {
   if (!printerName) {
-    window.print();
+    await printHtmlDocument(htmlContent);
     return {
       ok: true,
       message: "ใช้ Browser Print Dialog — เลือกเครื่องพิมพ์เองในหน้าต่างพิมพ์",
@@ -95,13 +95,48 @@ export async function printViaHelper(
       usedFallback: false,
     };
   } catch {
-    window.print();
+    await printHtmlDocument(htmlContent);
     return {
       ok: true,
       message: "⚠️ สั่งพิมพ์ผ่าน Browser (Helper ไม่ทำงาน) — ตรวจสอบว่า printer-helper รันอยู่",
       usedFallback: true,
     };
   }
+}
+
+/** Print only the supplied document, not the application behind its popup. */
+export async function printHtmlDocument(html: string): Promise<void> {
+  const frame = document.createElement("iframe");
+  frame.title = "เอกสารสำหรับพิมพ์";
+  frame.style.cssText = "position:fixed;left:-10000px;top:0;width:800px;height:1000px;border:0";
+  await new Promise<void>((resolve, reject) => {
+    frame.onload = async () => {
+      try {
+        const win = frame.contentWindow;
+        if (!win) throw new Error("เปิดหน้าต่างพิมพ์ไม่สำเร็จ");
+        await win.document.fonts.ready;
+        await Promise.all(Array.from(win.document.images, image => image.complete ? Promise.resolve() : new Promise<void>(done => { image.onload = () => done(); image.onerror = () => done(); })));
+        win.addEventListener("afterprint", () => frame.remove(), { once: true });
+        win.focus();
+        win.print();
+        resolve();
+      } catch (error) { frame.remove(); reject(error); }
+    };
+    frame.srcdoc = html;
+    document.body.appendChild(frame);
+  });
+}
+
+export function printElementDocument(targetId: string, widthMm?: number): Promise<PrintResult> {
+  const source = document.getElementById(targetId);
+  if (!source) return Promise.reject(new Error("ไม่พบเอกสารสำหรับพิมพ์"));
+  const clone = source.cloneNode(true) as HTMLElement;
+  clone.style.cssText = widthMm ? `width:${widthMm}mm;box-sizing:border-box;margin:0;padding:3mm;height:auto;max-height:none;overflow:visible` : "";
+  const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'), el => el.outerHTML).join("");
+  const heightMm = Math.max(60, Math.ceil(source.scrollHeight * (widthMm ?? 210) / Math.max(1, source.offsetWidth)) + 10);
+  const pageSize = widthMm ? `${widthMm}mm ${heightMm}mm` : "A4";
+  const html = `<!doctype html><html><head><meta charset="utf-8"><base href="${location.origin}/">${styles}<style>@page{size:${pageSize};margin:${widthMm ? 0 : 8}mm}html,body{margin:0;padding:0;background:white}body>*{display:block!important;visibility:visible!important}#${targetId}{position:static!important;transform:none!important;box-shadow:none!important;height:auto!important;max-height:none!important;overflow:visible!important}</style></head><body>${clone.outerHTML}</body></html>`;
+  return printViaHelper(getPrinterName(widthMm ? "receipt" : "report"), html);
 }
 
 /**

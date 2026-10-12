@@ -33,7 +33,7 @@ export function A4DocumentPreview({ html, label, children }: { html?: string; la
   }, []);
 
   return (
-    <div ref={stageRef} className="document-preview-stage document-preview-stage-a4 export-doc-preview" role="tabpanel" aria-label={label}>
+    <div ref={stageRef} style={{ width: "100%", minWidth: 0 }} className="document-preview-stage document-preview-stage-a4 export-doc-preview" role="tabpanel" aria-label={label}>
       <div className="export-doc-scaler" style={{ width: A4_WIDTH_PX * scale, height: height * scale }}>
         {html !== undefined ? (
           <iframe title={label} srcDoc={html} className="export-doc-iframe" style={{ transform: `scale(${scale})` }} loading="lazy" />

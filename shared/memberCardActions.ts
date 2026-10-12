@@ -1,6 +1,6 @@
 /** Labels for the current workflow. Account closure is not member deletion. */
 export const MEMBER_CARD_ACTION_LABELS = {
-  manage: "จัดการบัตร",
+  manage: "ขอลดวงเงิน",
   close: "ขอลดวงเงิน",
   return: "คืนบัตร",
   assign: "จ่ายบัตรให้สมาชิกเดิม",

@@ -464,7 +464,6 @@ export function MemberDetail({
           </div>
         </div>
         <div className="member-detail-actions">
-          <button type="button" className="outline-button" onClick={() => setCardActionsOpen(true)}><IdCard size={15} /> จัดการบัตร</button>
           {cardActionsOpen && <MemberCardActionsModal memberNumber={member.memberNumber} onClose={() => setCardActionsOpen(false)} onSuccess={() => { void detailQuery.refetch(); setNotice("จัดการบัตรเรียบร้อยแล้ว"); }} />}
           <button
             className="primary-button"
@@ -524,7 +523,7 @@ export function MemberDetail({
             <FileText size={15} /> ส่งออกรายงานธุรกรรม
           </button>
           <button className="outline-button" onClick={() => setCardOpen(true)}>
-            <IdCard size={15} /> พิมพ์บัตรสมาชิก
+            <IdCard size={15} /> บัตรสมาชิก
           </button>
           {isAdminRole(role) && (
             <button

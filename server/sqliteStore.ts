@@ -2410,7 +2410,7 @@ export type SalesListInput = {
 /** Lists past receipts, newest first. Search matches order number or member number (case-insensitive contains). */
 export function salesList(db: SqliteDb, input: SalesListInput = {}): SaleHistoryEntry[] {
   const search = input.search?.trim();
-  const limit = Math.max(1, Math.min(500, Math.floor(input.limit ?? 50)));
+  const limit = input.limit == null ? null : Math.max(1, Math.min(500, Math.floor(input.limit)));
   const conditions: string[] = [];
   const params: string[] = [];
   if (search) {
@@ -2418,7 +2418,7 @@ export function salesList(db: SqliteDb, input: SalesListInput = {}): SaleHistory
     params.push(`%${search}%`, `%${search}%`);
   }
   const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
-  const sales = db.prepare(`SELECT s.id, s.order_number AS orderNumber, s.payment_method AS paymentMethod, s.member_number AS memberNumber, s.subtotal, s.discount, s.total, s.cashier, s.created_at AS createdAt, s.slip_url IS NOT NULL AS hasSlip, s.received_cash AS receivedCash, s.change_due AS changeDue, s.payment_verified AS paymentVerified, s.voided AS voided, CASE WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sales s LEFT JOIN members m ON m.member_number = s.member_number${where} ORDER BY s.created_at DESC, s.id DESC LIMIT ?`).all(...params, limit) as unknown as {
+  const sales = db.prepare(`SELECT s.id, s.order_number AS orderNumber, s.payment_method AS paymentMethod, s.member_number AS memberNumber, s.subtotal, s.discount, s.total, s.cashier, s.created_at AS createdAt, s.slip_url IS NOT NULL AS hasSlip, s.received_cash AS receivedCash, s.change_due AS changeDue, s.payment_verified AS paymentVerified, s.voided AS voided, CASE WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sales s LEFT JOIN members m ON m.member_number = s.member_number${where} ORDER BY s.created_at DESC, s.id DESC${limit == null ? "" : " LIMIT ?"}`).all(...params, ...(limit == null ? [] : [limit])) as unknown as {
     id: number;
     orderNumber: string;
     paymentMethod: string;

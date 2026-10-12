@@ -1,6 +1,6 @@
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
-import { printViaHelper, getPrinterName } from "@/lib/printHelper";
+import { printViaHelper, getPrinterName, printHtmlDocument } from "@/lib/printHelper";
 import {
   buildReportDocumentHtml,
   thaiStamp,
@@ -225,33 +225,9 @@ export function printReportDoc(config: ReportDocConfig) {
     });
     return;
   }
-  const frame = document.createElement("iframe");
-  frame.setAttribute("aria-hidden", "true");
-  frame.style.position = "fixed";
-  frame.style.right = "0";
-  frame.style.bottom = "0";
-  frame.style.width = "0";
-  frame.style.height = "0";
-  frame.style.border = "0";
-  frame.srcdoc = html;
-  document.body.appendChild(frame);
-  window.setTimeout(() => { frame.remove(); }, 60_000);
+  void printHtmlDocument(html);
 }
 
-/** ฟอลล์แบ็กของ printReportDoc เมื่อ Helper ไม่ตอบสนอง */
 function printReportDocFallback(html: string) {
-  const frame = document.createElement("iframe");
-  frame.setAttribute("aria-hidden", "true");
-  frame.style.position = "fixed";
-  frame.style.right = "0";
-  frame.style.bottom = "0";
-  frame.style.width = "0";
-  frame.style.height = "0";
-  frame.style.border = "0";
-  frame.srcdoc = html;
-  document.body.appendChild(frame);
-  window.setTimeout(() => { frame.remove(); }, 60_000);
-}
-
-
+  void printHtmlDocument(html);
 }

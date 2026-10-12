@@ -128,8 +128,9 @@ try {
     await page.waitForFunction(number => [...document.querySelectorAll('[aria-label="รายการสมาชิก"] tbody tr')].some(r => r.textContent.includes(number)), {}, member.memberNumber);
     const row = await page.evaluateHandle(number => [...document.querySelectorAll('[aria-label="รายการสมาชิก"] tbody tr')].find(r => r.textContent.includes(number)), member.memberNumber);
     await row.asElement().click(); await row.dispose();
-    await click('จัดการบัตร');
+    await click('ขอลดวงเงิน');
     await page.waitForSelector(dialog);
+    if (await page.evaluate(scope => [...document.querySelectorAll(scope + ' button')].some(b => b.textContent.trim() === 'คืนบัตร'), dialog)) await click('คืนบัตร', dialog);
   };
   const submit = async () => {
     await page.waitForFunction(scope => ![...document.querySelector(scope).querySelectorAll('button')].find(b => b.textContent.trim() === 'ตรวจสอบ')?.disabled, {}, dialog);

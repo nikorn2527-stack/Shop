@@ -597,7 +597,6 @@ function LocalPrinterSettings() {
   const docs: { type: "receipt" | "report" | "card"; label: string; hint: string }[] = [
     { type: "receipt", label: "ใบเสร็จ", hint: "พิมพ์ใบเสร็จจากหน้า POS" },
     { type: "report", label: "รายงาน", hint: "พิมพ์รายงาน A4" },
-    { type: "card", label: "บัตรสมาชิก", hint: "พิมพ์บัตรสมาชิก 90×55 มม." },
   ];
   return (
     <div className="printer-settings-list">

@@ -1087,11 +1087,11 @@ describe("sales history", () => {
     expect(byPrefix.every((entry) => entry.orderNumber.startsWith("RC-"))).toBe(true);
   });
 
-  it("respects the requested limit and defaults to 50", () => {
+  it("respects explicit limits and returns all receipts by default", () => {
     const database = freshDb();
     expect(salesList(database, { limit: 3 })).toHaveLength(3);
     const total = tableCount(database, "sales");
-    expect(salesList(database)).toHaveLength(Math.min(50, total));
+    expect(salesList(database)).toHaveLength(total);
   });
 
   it("backfills sale_items.unit when opening a pre-migration database file", () => {

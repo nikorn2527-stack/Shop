@@ -2,13 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import QRCode from "qrcode";
-import { Barcode, CreditCard, FileImage, LayoutGrid, Printer, QrCode as QrIcon, ScanLine, ShieldAlert, UserCheck, X } from "@/lib/icons";
+import { Barcode, CreditCard, Download, FileImage, LayoutGrid, Printer, QrCode as QrIcon, ScanLine, ShieldAlert, UserCheck, X } from "@/lib/icons";
 import { money } from "../pages/pageData";
 import { code128DataUrl } from "../barcode";
 import { MemberAvatar } from "./MemberAvatar";
 import { trpc } from "@/lib/trpc";
 import { brandInitial } from "@/theme";
-import { printViaHelper, getPrinterName } from "@/lib/printHelper";
 import { BUILT_IN_PROFILES, loadCardSheetProfile, saveCardSheetProfile, slotPositions, slotsPerSheet, type CardSheetProfile } from "@shared/cardSheet";
 
 /** Fields the wallet card actually renders (subset of the member record). */
@@ -216,30 +215,6 @@ export function MemberCardModal({
       document.body.removeChild(link);
     } finally { setBusy(""); }
   };
-  const printCard = async () => {
-    // Task A3 — สั่งพิมพ์ผ่าน Helper ไปยัง card printer ที่เลือกใน Settings (localStorage)
-    const printerName = getPrinterName("card");
-    const cardHtml = document.getElementById("member-card")?.outerHTML ?? "";
-    const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
-@page { size: 90mm 55mm; margin: 0; }
-body { margin: 0; }
-${document.querySelector('style')?.textContent ?? ""}
-</style></head><body>${cardHtml}</body></html>`;
-    await printViaHelper(printerName, fullHtml);
-  };
-  useEffect(() => {
-    if (confirmForBill) return;
-    const handler = (event: KeyboardEvent) => {
-      if (event.key !== "Enter") return;
-      const target = event.target as HTMLElement;
-      const tag = target?.tagName?.toLowerCase();
-      if (tag === "input" || tag === "textarea" || tag === "select") return;
-      event.preventDefault();
-      window.print();
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [confirmForBill]);
   return <div className="modal-backdrop" onClick={onClose}><div className={`member-card-modal${confirmForBill ? " confirm-mode" : ""}`} onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label={confirmForBill ? "ยืนยันข้อมูลสมาชิกก่อนทำรายการ" : "บัตรสมาชิก"}>
     <div className="modal-heading">
       <div>
@@ -286,7 +261,6 @@ ${document.querySelector('style')?.textContent ?? ""}
       </> : <>
         <button className="outline-button amber" disabled={busy !== ""} onClick={downloadCardPdf} title="ดาวน์โหลดบัตรสมาชิกเป็นไฟล์ PDF 90×55 มม. (ส่งร้านพิมพ์)"><Printer size={16} /> {busy === "pdf" ? "กำลังสร้าง PDF..." : "ดาวน์โหลด PDF"}</button>
         <button className="outline-button" disabled={busy !== ""} onClick={downloadCardPng} title="ดาวน์โหลดบัตรเป็น PNG ความละเอียดสูง 1440×880px (ส่งไลน์/ตรวจภาพ/พิมพ์ด่วน)"><FileImage size={16} /> {busy === "png" ? "กำลังสร้าง PNG..." : "ดาวน์โหลด PNG"}</button>
-        <button className="primary-button" disabled={busy !== ""} onClick={printCard} title="พิมพ์บัตรสมาชิก (มาตรฐานนามบัตรไทย 90×55 มม.) ผ่านเครื่องพิมพ์"><Printer size={16} /> พิมพ์บัตรสมาชิก</button>
       </>}
     </div>
   </div></div>;
@@ -344,8 +318,8 @@ export function MemberCardBatchModal({
     <div className="modal-heading">
       <div>
         <span className="eyebrow">MEMBER CARD · BATCH PRINT</span>
-        <h2>พิมพ์บัตรสมาชิก {members.length} ใบ</h2>
-        <p>รูปแบบบัตรขนาดมาตรฐานนามบัตรไทย (90 × 55 มม.) — พิมพ์ทุกใบในการสั่งพิมพ์ครั้งเดียว</p>
+        <h2>บัตรสมาชิก {members.length} ใบ</h2>
+        <p>ตรวจสอบบัตรสมาชิกและดาวน์โหลด PDF</p>
       </div>
       <button className="icon-button" onClick={onClose} aria-label="ปิดหน้าต่าง"><X size={17} /></button>
     </div>
@@ -409,8 +383,16 @@ export function MemberCardBatchModal({
     )}
     <div className="modal-actions">
       <button className="outline-button" onClick={onClose}>ปิด</button>
-      {sheetMode && <button className="outline-button amber" onClick={() => { setTestPrint(true); window.setTimeout(() => { window.print(); }, 60); }} title="พิมพ์โครงร่างกล่อง (ไม่มีบัตร) เพื่อตรวจแนวบนกระดาพจริง — วางทาบกับสติกเกอร์/กระดาษปรุแล้วดูว่าตรงทุกช่องไหม"><Printer size={16} /> พิมพ์แผ่นทดสอบ</button>}
-      <button className="primary-button" onClick={() => { setTestPrint(false); window.setTimeout(() => { window.print(); }, 60); }}><Printer size={16} /> {sheetMode ? `พิมพ์ลง A4 (${sheetCount} แผ่น)` : `พิมพ์บัตร ${members.length} ใบ`}</button>
+      <button className="primary-button" onClick={async () => {
+        const elements = Array.from(document.querySelectorAll<HTMLElement>(sheetMode ? '.card-sheet-print-host .card-sheet-a4' : '#member-card-batch .member-card-batch-item'));
+        const pdf = new jsPDF({ unit: 'mm', format: sheetMode ? 'a4' : [90, 55], orientation: sheetMode ? 'portrait' : 'landscape' });
+        for (let i = 0; i < elements.length; i++) {
+          const canvas = await html2canvas(elements[i], { scale: 2, backgroundColor: '#ffffff', useCORS: true });
+          if (i) pdf.addPage(sheetMode ? 'a4' : [90, 55], sheetMode ? 'portrait' : 'landscape');
+          pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, sheetMode ? 210 : 90, sheetMode ? 297 : 55);
+        }
+        pdf.save('member-cards.pdf');
+      }}><Download size={16} /> ดาวน์โหลด PDF</button>
     </div>
 
     {/* P0-UX-02 part 2 — hidden A4 sheet print host (เห็นเฉพาะตอน @media print) */}

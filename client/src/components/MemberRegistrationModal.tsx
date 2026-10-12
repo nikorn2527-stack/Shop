@@ -149,6 +149,8 @@ export function MemberRegistrationModal({
               reason: "card",
             } as const,
           ]);
+          setDuplicateOpen(true);
+          return;
         } catch {
           fail(
             "บัตรนี้ถูกผูกกับสมาชิกอื่นแล้ว",
@@ -158,14 +160,14 @@ export function MemberRegistrationModal({
         }
       } else {
         fail(
-          "บัตรนี้ยังไม่พร้อมใช้งาน (ยังว่างในคลัง)",
-          "จ่ายบัตรจากเมนู บัตรสมาชิก → จ่ายบัตรให้สมาชิกก่อน"
+          "บัตรนี้ไม่พร้อมใช้งาน",
+          "เลือกบัตรว่างใบอื่น บัตรที่แจ้งหายหรือชำรุดใช้สมัครไม่ได้"
         );
         return;
       }
     }
 
-    if (!card || !["blank", "returned_vacant"].includes(card.status)) {
+    if (!cardEntry || !["blank", "returned_vacant"].includes(cardEntry.status)) {
       fail("ยังไม่มีบัตรพร้อมใช้สำหรับสมาชิกใหม่", "สแกนหรือกรอกรหัสบัตรที่ขึ้นทะเบียนแล้ว (สถานะว่าง/คืนแล้ว) — ดูรายการบัตรว่างได้ที่ทะเบียนบัตร แล้วบันทึกใหม่");
       return;
     }

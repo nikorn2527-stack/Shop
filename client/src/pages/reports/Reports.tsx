@@ -604,7 +604,7 @@ export function Reports({
   );
   const salesHistoryQuery = trpc.sales.list.useQuery(
     billMember
-      ? { search: billMember.memberNumber, limit: 200 }
+      ? { search: billMember.memberNumber }
       : debouncedBillSearch
         ? { search: debouncedBillSearch }
         : undefined,
