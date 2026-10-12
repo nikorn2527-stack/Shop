@@ -69,6 +69,14 @@ try {
   };
   await click('เงินสด');
   await page.waitForSelector('.pay-confirm-modal');
+  // FIX (user) — เปิดโมดัลเงินสด: โฟกัสต้องอยู่ที่ "ช่องรับเงิน" ทันที (ไม่ต้องเลื่อนเมาส์หา)
+  await new Promise(r => setTimeout(r, 200));
+  const focusOnOpen = await page.evaluate(() => {
+    const el = document.activeElement;
+    return el ? (el.closest('.pay-cash-input-row input') ? 'INPUT.pay-cash-input-row' : `${el.tagName}.${el.className}`) : '(none)';
+  });
+  console.log('FOCUS_ON_OPEN', focusOnOpen);
+  if (!focusOnOpen.includes('pay-cash-input-row')) throw new Error(`cash input should be auto-focused on open, got ${focusOnOpen}`);
 
   // กดปุ่มยอดด่วน 2 ครั้ง (100 แล้วตามด้วย 50) — ต้องแทนค่า ไม่ใช่บวกเป็น 150
   await page.waitForFunction(() => [...document.querySelectorAll('.pay-confirm-modal .quick-amount-btn')].some(b => b.textContent.trim() === '100'));
@@ -76,6 +84,14 @@ try {
   await click('50', '.pay-confirm-modal');
   const cashValue = await page.$eval('.pay-cash-input-row input', i => i.value);
   console.log('CASH_VALUE_AFTER_TWO_TAPS', cashValue);
+  // FIX (user) — เงินพอแล้ว: โฟกัสต้องเด้งไป "ปุ่มยืนยัน" อัตโนมัติ
+  await new Promise(r => setTimeout(r, 200));
+  const focusAfterSufficient = await page.evaluate(() => {
+    const el = document.activeElement;
+    return el ? `${el.tagName}.${el.className}` : '(none)';
+  });
+  console.log('FOCUS_AFTER_SUFFICIENT', focusAfterSufficient);
+  if (!focusAfterSufficient.includes('pay-confirm-button')) throw new Error(`focus should jump to confirm button when cash sufficient, got ${focusAfterSufficient}`);
 
   const layout = await page.evaluate(() => {
     const modalEl = document.querySelector('.pay-confirm-modal');

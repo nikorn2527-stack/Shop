@@ -5093,6 +5093,9 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .pay-confirm-rows > div { min-width: 0; }
 .pay-confirm-rows > div:not(.pay-confirm-total):nth-child(odd) { border-right: 1px solid #f0f4f1; }
 .pay-confirm-rows > .pay-confirm-total { grid-column: 1 / -1; }
+/* แถบเตือนเงินสมาชิกไม่พอ: โฟกัสอัตโนมัติได้ (ไม่เห็นเส้นขอบ focus แต่ขอทำไฮไลต์นุ่ม ๆ ให้แคชเชียร์รู้ว่าระบบพาไปที่เตือน) */
+.pay-confirm-modal .pay-wallet-shortfall { outline: none; box-shadow: 0 0 0 3px rgba(214, 69, 69, .16); animation: pay-shortfall-pulse .5s ease-out; }
+@keyframes pay-shortfall-pulse { from { box-shadow: 0 0 0 8px rgba(214, 69, 69, .28); } to { box-shadow: 0 0 0 3px rgba(214, 69, 69, .16); } }
 /* แถบปุ่มยืนยัน sticky ติดท้ายโมดัลเสมอ — เลื่อนรายการยาวแค่ไหนก็กดยืนยันได้ทันที */
 .pay-confirm-modal .modal-actions { position: sticky; bottom: -20px; z-index: 3; margin: 16px -20px -20px; padding: 12px 20px 13px; background: #fff; box-shadow: 0 -8px 20px rgba(24, 61, 48, .07); }
 .pay-confirm-items { border: 1px solid #e4eee9; border-radius: 10px; background: #fff; overflow: hidden; }
