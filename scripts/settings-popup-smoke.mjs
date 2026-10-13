@@ -35,18 +35,55 @@ try {
     const button=await page.evaluateHandle(text=>[...document.querySelectorAll('button')].find(b=>b.getClientRects().length&&b.textContent.includes(text)),text);
     assert.ok(button.asElement(),'Missing button '+text);await button.asElement().click();await button.dispose();
   };
+  const savedMemberMode = () => {
+    const check = new DatabaseSync(target, { readOnly: true });
+    try {
+      return JSON.parse(check.prepare("SELECT value FROM store_settings WHERE key='app_settings'").get().value).memberNumberMode;
+    } finally {
+      check.close();
+    }
+  };
+  const saveSettings = async () => {
+    await page.waitForSelector('.settings-save-bar');
+    await click('บันทึกการตั้งค่า');
+    await page.waitForFunction(() => !document.querySelector('.settings-save-bar'));
+  };
   await page.waitForSelector('[data-nav-item=settings]');
   await page.click('[data-nav-item=settings]');
   await click('เลขสมาชิก');
   await page.waitForSelector('.member-mode-segmented');
+  assert.equal(await page.$$eval('.member-mode-seg', nodes => nodes.length), 2, 'Member-number workflow must only ask automatic or manual');
+  assert.equal(await page.$eval('.member-mode-segmented', n => n.textContent.includes('ลำดับรัน') || n.textContent.includes('ตามปี')), false, 'Running and yearly behavior must not be separate top-level modes');
   assert.ok(await page.$('.member-preview-card'), 'Automatic mode must show the next generated member number');
   assert.ok(await page.$('.member-advanced-toggle'), 'Automatic mode must expose number-format settings in one place');
-  await click('กำหนดเอง');
+  await click('ตั้งค่ารูปแบบเลข');
+  await page.waitForSelector('select[aria-label="ใส่ปีในเลขสมาชิก"]');
+  const yearSelect = 'select[aria-label="ใส่ปีในเลขสมาชิก"]';
+  await page.select(yearSelect, 'none');
+  assert.equal(await page.$eval('.member-number-format-grid', n => n.textContent.includes('เดือนเริ่มรอบปี')), false, 'Continuous numbering must hide yearly-cycle settings');
+  await saveSettings();
+  assert.equal(savedMemberMode(), 'running', 'Removing the year must persist the internal continuous mode');
+  await page.select(yearSelect, 'buddhist');
+  assert.ok(await page.$eval('.member-number-format-grid', n => n.textContent.includes('เดือนเริ่มรอบปี')), 'Choosing a year must reveal yearly-cycle settings');
+  assert.ok((await page.$eval('.member-preview-card .value', n => n.textContent)).match(/\d/), 'Year mode must keep showing a generated preview');
+  await saveSettings();
+  assert.equal(savedMemberMode(), 'year', 'Choosing a year must persist the internal yearly mode');
+  for (const width of [1366, 390]) {
+    await page.setViewport({ width, height: 768 });
+    const overflow = await page.$eval('.settings-single .settings-card', n => n.scrollWidth > n.clientWidth + 1);
+    assert.equal(overflow, false, 'Automatic member-number settings must fit available width');
+    await page.$eval('.member-mode-segmented', n => n.scrollIntoView({ block: 'start' }));
+    await page.screenshot({ path: path.join(dir, `member-number-automatic-${width}.png`) });
+  }
+  await page.setViewport({ width: 1366, height: 768 });
+  await click('กรอกเลขเอง');
   await page.waitForSelector('.member-manual-guidance');
   assert.equal(await page.$('.member-preview-card'), null, 'Manual mode must not imply that the system generates a number');
   assert.equal(await page.$('.member-advanced-toggle'), null, 'Manual mode must hide automatic number-format settings');
   assert.equal(await page.$('[aria-label="ทดลองกรอกหมายเลขสมาชิก"]'), null, 'Settings must not duplicate the real registration field');
   assert.ok((await page.$eval('.member-manual-guidance', n => n.textContent)).includes('กรอกเลขสมาชิกเองตอนลงทะเบียน'));
+  await saveSettings();
+  assert.equal(savedMemberMode(), 'manual', 'Manual entry must persist the internal manual mode');
   for (const width of [1366, 390]) {
     await page.setViewport({ width, height: 768 });
     const overflow = await page.$eval('.settings-single .settings-card', n => n.scrollWidth > n.clientWidth + 1);
@@ -54,7 +91,7 @@ try {
     await page.$eval('.member-manual-guidance', n => n.scrollIntoView({ block: 'center' }));
     await page.screenshot({ path: path.join(dir, `member-number-manual-${width}.png`) });
   }
-  await click('ลำดับรัน');
+  await click('ระบบออกเลขให้อัตโนมัติ');
   await page.waitForSelector('.member-preview-card');
   await page.setViewport({ width: 1366, height: 768 });
   await click('การชำระเงิน');

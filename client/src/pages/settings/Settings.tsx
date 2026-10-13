@@ -1076,10 +1076,15 @@ export function Settings({
     }
   }, [settingsQuery.data, hydrated]);
   const numberMode = form?.memberNumberMode ?? "running";
-  // UI-4 — active segment index for the iOS-style sliding indicator
-  // (running=0, year=1, manual=2). Drives the slider's translateX value.
-  const memberModeIndex =
-    numberMode === "year" ? 1 : numberMode === "manual" ? 2 : 0;
+  const automaticMemberNumbers = numberMode !== "manual";
+  // The UI presents one automatic mode. The saved backend mode remains
+  // running/year and is derived from whether the selected format includes a year.
+  const memberModeIndex = automaticMemberNumbers ? 0 : 1;
+  const memberYearMode = numberMode === "running"
+    ? "none"
+    : form?.memberNumberYearMode === "gregorian"
+      ? "gregorian"
+      : "buddhist";
   const numberFormat = form
     ? {
         prefix: form.memberNumberPrefix,
@@ -2167,20 +2172,25 @@ export function Settings({
                     }}
                   />
                   {[
-                    { value: "running" as const, label: "ลำดับรัน" },
-                    { value: "year" as const, label: "ตามปี" },
-                    { value: "manual" as const, label: "กำหนดเอง" },
+                    { value: "automatic" as const, label: "ระบบออกเลขให้อัตโนมัติ" },
+                    { value: "manual" as const, label: "กรอกเลขเอง" },
                   ].map(({ value, label }) => (
                     <button
                       type="button"
                       role="tab"
                       key={value}
-                      aria-selected={numberMode === value}
-                      className={`member-mode-seg${numberMode === value ? " active" : ""}`}
+                      aria-selected={value === "automatic" ? automaticMemberNumbers : !automaticMemberNumbers}
+                      className={`member-mode-seg${(value === "automatic" ? automaticMemberNumbers : !automaticMemberNumbers) ? " active" : ""}`}
                       onClick={() =>
                         updateForm({
-                          memberNumberMode:
-                            value as SettingsForm["memberNumberMode"],
+                          memberNumberMode: value === "manual"
+                            ? "manual"
+                            : (form?.memberNumberYearMode ?? "none") === "none"
+                              ? "running"
+                              : "year",
+                          ...(value === "manual"
+                            ? { memberNumberYearMode: memberYearMode }
+                            : {}),
                         })
                       }
                       disabled={!form}
@@ -2262,23 +2272,26 @@ export function Settings({
                         </select>
                       </label>
                       <label>
-                        รูปแบบปี
+                        ใส่ปีในเลขสมาชิก
                         <select
-                          value={form?.memberNumberYearMode ?? "none"}
-                          onChange={event =>
+                          aria-label="ใส่ปีในเลขสมาชิก"
+                          value={memberYearMode}
+                          onChange={event => {
+                            const yearMode = event.target
+                              .value as SettingsForm["memberNumberYearMode"];
                             updateForm({
-                              memberNumberYearMode: event.target
-                                .value as SettingsForm["memberNumberYearMode"],
-                            })
-                          }
+                              memberNumberMode: yearMode === "none" ? "running" : "year",
+                              memberNumberYearMode: yearMode,
+                            });
+                          }}
                           disabled={!form}
                         >
-                          <option value="none">ไม่ใช้ปี</option>
-                          <option value="buddhist">พ.ศ.</option>
-                          <option value="gregorian">ค.ศ.</option>
+                          <option value="none">ไม่ใส่ปี — นับต่อเนื่อง</option>
+                          <option value="buddhist">พ.ศ. — เริ่มเลขใหม่ตามรอบปี</option>
+                          <option value="gregorian">ค.ศ. — เริ่มเลขใหม่ตามรอบปี</option>
                         </select>
                       </label>
-                      {(form?.memberNumberYearMode ?? "none") !== "none" && (
+                      {memberYearMode !== "none" && (
                         <>
                           <label>
                             จำนวนหลักปี

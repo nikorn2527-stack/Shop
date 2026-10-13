@@ -6186,14 +6186,9 @@ button, .primary-button, .outline-button, .icon-button, .quick-amount-btn, .pay-
 .printer-flow-disclosure .help-disclosure-toggle:hover { background: #e8f4ed; border-color: #9bcdba; }
 .printer-flow-disclosure .help-disclosure-body { background: #fff; border-style: solid; border-color: #d8e8df; padding: 10px 12px; }
 
-/* UI-4 — member-number mode → iOS-style sliding segmented control.
-   A single white "pill" indicator slides between segments (translateX
-   based on memberModeIndex), instead of just toggling bg-color at the
-   clicked spot. No divider lines between segments — the only visual
-   separation is the gap created by the sliding indicator. Container
-   is a muted track with 3px padding + radius 9999px. */
+/* Member-number workflow: automatic generation or manual entry. */
 .member-mode-segmented { position: relative; display: inline-flex; padding: 3px; background: #eef2ec; border: 1px solid #e2e8e0; border-radius: 9999px; gap: 0; }
-.member-mode-slider { position: absolute; top: 3px; left: 3px; height: calc(100% - 6px); width: calc((100% - 6px) / 3); background: #fff; border-radius: 9999px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08); transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1); z-index: 0; pointer-events: none; }
+.member-mode-slider { position: absolute; top: 3px; left: 3px; height: calc(100% - 6px); width: calc((100% - 6px) / 2); background: #fff; border-radius: 9999px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08); transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1); z-index: 0; pointer-events: none; }
 .member-mode-seg { position: relative; z-index: 1; flex: 1 1 0; border: 0; background: transparent; padding: 7px 16px; border-radius: 9999px; font-size: 13px; font-weight: 500; color: #838a78; cursor: pointer; transition: color 0.15s ease; white-space: nowrap; min-height: 32px; }
 .member-mode-seg.active { font-weight: 600; color: #4a5240; }
 .member-mode-seg:not(.active):hover { color: #4a5240; }
