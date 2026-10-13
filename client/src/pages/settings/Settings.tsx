@@ -2372,7 +2372,6 @@ export function Settings({
                     <h2>พร้อมเพย์รับเงิน</h2>
                     <p>เปิดหรือปิดได้ทันที โดยไม่ต้องลบเลขพร้อมเพย์</p>
                   </div>
-                  <button type="button" className={`toggle ${form?.promptpayActive !== false ? "on" : ""}`} onClick={togglePromptPay} disabled={!form || saveMutation.isPending} aria-pressed={form?.promptpayActive !== false} aria-label={form?.promptpayActive !== false ? "ปิดรับเงินผ่านพร้อมเพย์" : "เปิดรับเงินผ่านพร้อมเพย์"} title={form?.promptpayActive !== false ? "ปิดรับเงินผ่านพร้อมเพย์" : "เปิดรับเงินผ่านพร้อมเพย์"}><span /></button>
                 </div>
                 <div className="form-grid">
                   <label className="wide">
@@ -2391,6 +2390,7 @@ export function Settings({
                     />
                   </label>
                 </div>
+                <button type="button" className={`toggle promptpay-row-toggle ${form?.promptpayActive !== false ? "on" : ""}`} onClick={togglePromptPay} disabled={!form || saveMutation.isPending} aria-pressed={form?.promptpayActive !== false} aria-label={form?.promptpayActive !== false ? "ปิดรับเงินผ่านพร้อมเพย์" : "เปิดรับเงินผ่านพร้อมเพย์"} title={form?.promptpayActive !== false ? "ปิดรับเงินผ่านพร้อมเพย์" : "เปิดรับเงินผ่านพร้อมเพย์"}><span /></button>
                 {form?.promptpayActive === false ? (
                   <div className="settings-inline-note amber">
                     <CircleAlert size={16} />

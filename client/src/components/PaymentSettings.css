@@ -9,7 +9,7 @@
 
 .payment-settings-compact .settings-card:first-child {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(280px, 2fr);
+  grid-template-columns: minmax(180px, 1fr) minmax(280px, 2fr) auto;
   align-items: center;
   gap: 8px 20px;
 }
@@ -22,6 +22,10 @@
 
 .payment-settings-compact .settings-card:first-child .form-grid {
   margin: 0;
+}
+
+.payment-settings-compact .promptpay-row-toggle {
+  justify-self: end;
 }
 
 .payment-settings-compact .settings-card:first-child .settings-inline-note,
@@ -59,12 +63,16 @@
 
 @media (max-width: 720px) {
   .payment-settings-compact .settings-card:first-child {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .payment-settings-compact .settings-card:first-child .settings-heading {
+    grid-column: 1 / -1;
   }
 
   .payment-settings-compact .settings-card:first-child .settings-inline-note,
   .payment-settings-compact .settings-card:first-child .notice-bar {
-    grid-column: 1;
+    grid-column: 1 / -1;
   }
 
   .payment-settings-compact .bank-draft-panel .form-grid {
@@ -89,19 +97,10 @@
   border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: #0f172a;
 }
 .bank-accounts-compact .bank-draft-actions { margin-top: 10px; }
-.bank-accounts-compact .bank-row {
-  display: grid;
-  grid-template-columns: 26px 192px 48px minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-}
-.bank-accounts-compact .bank-row-info { min-width: 0; }
-.bank-accounts-compact .bank-row-status { display: flex; align-items: center; justify-content: center; }
+.bank-accounts-compact .bank-row { display: flex; align-items: center; gap: 10px; }
+.bank-accounts-compact .bank-row-info { flex: 1; min-width: 0; }
 .bank-accounts-compact .bank-row-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 @media (max-width: 720px) {
-  .bank-accounts-compact .bank-row {
-    grid-template-columns: 26px minmax(0, 1fr) 48px;
-  }
-  .bank-accounts-compact .bank-row-status { margin-left: auto; }
-  .bank-accounts-compact .bank-row-actions { grid-column: 2 / -1; justify-content: flex-end; }
+  .bank-accounts-compact .bank-row { flex-wrap: wrap; }
+  .bank-accounts-compact .bank-row-actions { margin-left: auto; }
 }
