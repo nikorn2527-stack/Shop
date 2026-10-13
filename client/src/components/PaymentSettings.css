@@ -8,30 +8,50 @@
 }
 
 .payment-settings-compact .settings-card:first-child {
-  display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(280px, 2fr) auto;
-  align-items: center;
-  gap: 8px 20px;
+  display: block;
 }
 
 .payment-settings-compact .settings-card:first-child .settings-heading {
-  margin: 0;
-  padding: 0;
-  border: 0;
+  margin-bottom: 0;
 }
 
-.payment-settings-compact .settings-card:first-child .form-grid {
+.payment-settings-compact .promptpay-details-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #e1ece5;
+  border-radius: 10px;
+  transition: .14s ease;
+}
+
+.payment-settings-compact .promptpay-details-row:hover {
+  border-color: #c8ddd3;
+  box-shadow: 0 2px 8px rgba(45, 102, 80, .08);
+}
+
+.payment-settings-compact .promptpay-details-row.inactive {
+  background: #f6f8f7;
+}
+
+.payment-settings-compact .promptpay-details-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.payment-settings-compact .promptpay-details-info .form-grid {
   margin: 0;
 }
 
 .payment-settings-compact .promptpay-row-toggle {
-  justify-self: end;
+  flex: 0 0 auto;
 }
 
-.payment-settings-compact .settings-card:first-child .settings-inline-note,
-.payment-settings-compact .settings-card:first-child .notice-bar {
-  grid-column: 2;
-  margin: 0;
+.payment-settings-compact .promptpay-details-info .settings-inline-note,
+.payment-settings-compact .promptpay-details-info .notice-bar {
+  margin: 6px 0 0;
   padding: 4px 0;
   background: transparent;
   border: 0;
@@ -62,17 +82,8 @@
 }
 
 @media (max-width: 720px) {
-  .payment-settings-compact .settings-card:first-child {
-    grid-template-columns: minmax(0, 1fr) auto;
-  }
-
-  .payment-settings-compact .settings-card:first-child .settings-heading {
-    grid-column: 1 / -1;
-  }
-
-  .payment-settings-compact .settings-card:first-child .settings-inline-note,
-  .payment-settings-compact .settings-card:first-child .notice-bar {
-    grid-column: 1 / -1;
+  .payment-settings-compact .promptpay-details-row {
+    align-items: flex-start;
   }
 
   .payment-settings-compact .bank-draft-panel .form-grid {

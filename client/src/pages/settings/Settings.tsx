@@ -2373,48 +2373,51 @@ export function Settings({
                     <p>เปิดหรือปิดได้ทันที โดยไม่ต้องลบเลขพร้อมเพย์</p>
                   </div>
                 </div>
-                <div className="form-grid">
-                  <label className="wide">
-                    เบอร์โทร / เลขประจำตัวประชาชน
-                    <input
-                      value={form?.promptpayId ?? ""}
-                      onChange={event =>
-                        updateForm({ promptpayId: event.target.value })
-                      }
-                      onBlur={savePromptPay}
-                      placeholder="เช่น 0812345678 หรือ 1234567890123"
-                      disabled={!form}
-                      maxLength={20}
-                      inputMode="numeric"
-                      title="ใช้เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก ของบัญชีพร้อมเพย์ที่รับเงินของร้าน"
-                    />
-                  </label>
+                <div className={`promptpay-details-row${form?.promptpayActive === false ? " inactive" : ""}`}>
+                  <div className="bank-row-ico">
+                    <QrCode size={18} />
+                  </div>
+                  <div className="promptpay-details-info">
+                    <div className="form-grid">
+                      <label className="wide">
+                        เบอร์โทร / เลขประจำตัวประชาชน
+                        <input
+                          value={form?.promptpayId ?? ""}
+                          onChange={event =>
+                            updateForm({ promptpayId: event.target.value })
+                          }
+                          onBlur={savePromptPay}
+                          placeholder="เช่น 0812345678 หรือ 1234567890123"
+                          disabled={!form}
+                          maxLength={20}
+                          inputMode="numeric"
+                          title="ใช้เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก ของบัญชีพร้อมเพย์ที่รับเงินของร้าน"
+                        />
+                      </label>
+                    </div>
+                    {form?.promptpayActive === false ? (
+                      <div className="settings-inline-note amber">
+                        <CircleAlert size={16} />
+                        <span>ปิดรับเงินผ่านพร้อมเพย์อยู่</span>
+                      </div>
+                    ) : (form?.promptpayId ?? "").trim() === "" ? (
+                      <div className="settings-inline-note amber">
+                        <CircleAlert size={16} />
+                        <span>ยังไม่ได้ตั้งค่าพร้อมเพย์</span>
+                      </div>
+                    ) : !isValidPromptPayId(form?.promptpayId ?? "") ? (
+                      <div className="notice-bar error">
+                        <CircleAlert size={16} /> ใช้เบอร์โทร 9–10 หลัก หรือเลขประจำตัวประชาชน 13 หลัก
+                      </div>
+                    ) : (
+                      <div className="settings-inline-note">
+                        <ShieldCheck size={16} />
+                        <span>พร้อมสร้าง QR ตามยอดบิล</span>
+                      </div>
+                    )}
+                  </div>
+                  <button type="button" className={`toggle promptpay-row-toggle ${form?.promptpayActive !== false ? "on" : ""}`} onClick={togglePromptPay} disabled={!form || saveMutation.isPending} aria-pressed={form?.promptpayActive !== false} aria-label={form?.promptpayActive !== false ? "ปิดรับเงินผ่านพร้อมเพย์" : "เปิดรับเงินผ่านพร้อมเพย์"} title={form?.promptpayActive !== false ? "ปิดรับเงินผ่านพร้อมเพย์" : "เปิดรับเงินผ่านพร้อมเพย์"}><span /></button>
                 </div>
-                <button type="button" className={`toggle promptpay-row-toggle ${form?.promptpayActive !== false ? "on" : ""}`} onClick={togglePromptPay} disabled={!form || saveMutation.isPending} aria-pressed={form?.promptpayActive !== false} aria-label={form?.promptpayActive !== false ? "ปิดรับเงินผ่านพร้อมเพย์" : "เปิดรับเงินผ่านพร้อมเพย์"} title={form?.promptpayActive !== false ? "ปิดรับเงินผ่านพร้อมเพย์" : "เปิดรับเงินผ่านพร้อมเพย์"}><span /></button>
-                {form?.promptpayActive === false ? (
-                  <div className="settings-inline-note amber">
-                    <CircleAlert size={16} />
-                    <span>ปิดรับเงินผ่านพร้อมเพย์อยู่</span>
-                  </div>
-                ) : (form?.promptpayId ?? "").trim() === "" ? (
-                  <div className="settings-inline-note amber">
-                    <CircleAlert size={16} />
-                    <span>
-                      ยังไม่ได้ตั้งค่าพร้อมเพย์
-                    </span>
-                  </div>
-                ) : !isValidPromptPayId(form?.promptpayId ?? "") ? (
-                  <div className="notice-bar error">
-                    <CircleAlert size={16} /> ใช้เบอร์โทร 9–10 หลัก หรือเลขประจำตัวประชาชน 13 หลัก
-                  </div>
-                ) : (
-                  <div className="settings-inline-note">
-                    <ShieldCheck size={16} />
-                    <span>
-                      พร้อมสร้าง QR ตามยอดบิล
-                    </span>
-                  </div>
-                )}
               </section>
               <BankAccountsPanel
                 value={form?.bankAccounts ?? []}
