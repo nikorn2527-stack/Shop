@@ -4,14 +4,15 @@ import os from 'node:os';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 
-const cfg = JSON.parse(fs.readFileSync(path.join(os.tmpdir(), 'shop-ui-test-config.json'), 'utf8'));
+const configPath = process.env.AUDIT_CONFIG_PATH ?? path.join(os.tmpdir(), 'shop-ui-test-config.json');
+const cfg = JSON.parse(fs.readFileSync(configPath, 'utf8'));
 const browser = await puppeteer.launch({ headless: true, pipe: true, args: ['--no-sandbox', '--disable-gpu'] });
 try {
   const page = await browser.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
   await page.setViewport({ width: 1440, height: 1000 });
-  await page.goto('http://localhost:4173', { waitUntil: 'networkidle2' });
+  await page.goto(cfg.baseUrl ?? process.env.AUDIT_BASE_URL ?? 'http://localhost:4173', { waitUntil: 'networkidle2' });
   await page.type('[name=username]', cfg.username);
   await page.type('[name=password]', cfg.password);
   await page.click('.login-submit');
@@ -23,16 +24,17 @@ try {
   await page.waitForSelector('.pos-head');
   const accent = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--teal').trim());
   console.log('ACTIVE_ACCENT', accent);
-  assert.equal(accent, '#ad3973', 'Saved green or iris theme must migrate to the pastel palette');
-  assert.equal(await page.evaluate(() => document.documentElement.dataset.palette), 'pastel');
+  assert.equal(accent, '#1d4ed8', 'Every saved theme must migrate to Government Blue');
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.palette), 'government-blue');
   await page.screenshot({ path: path.join(cfg.dir, 'iris-pos.png') });
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('pos-rail', { detail: 'receive' })));
-  await page.waitForSelector('.member-scan-field');
-  await page.click('.member-scan-field input');
-  await page.waitForSelector('.product-scan-option');
+  await page.waitForSelector('.stock-receive-modal');
+  const productInput = '.stock-receive-modal .member-scan-field input';
+  await page.type(productInput, '8');
+  await page.waitForSelector('.stock-receive-modal .product-scan-option');
   const picker = await page.evaluate(() => {
-    const field = document.querySelector('.member-scan-field');
-    const thumb = document.querySelector('.product-scan-option .product-thumb');
+    const field = document.querySelector('.stock-receive-modal .member-scan-field');
+    const thumb = document.querySelector('.stock-receive-modal .product-scan-option .product-thumb');
     return { border: getComputedStyle(field).borderColor, thumbWidth: thumb.getBoundingClientRect().width, inputOutline: getComputedStyle(field.querySelector('input')).outlineStyle };
   });
   assert.equal(Math.round(picker.thumbWidth), 38);

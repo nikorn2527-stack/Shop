@@ -1,31 +1,36 @@
-/* Shared screen palette. Status dots and alerts have distinct semantics.
-   Keep print documents independent from the application theme. */
+/* Government Blue screen palette. Status dots and alerts retain their semantic
+   colours. Print documents remain independent from the application theme. */
 @media screen {
   :root:root {
-    --ink: #0f172a;
-    --muted: #475569;
-    --canvas: #f1f5f9;
+    --ink: #10233f;
+    --muted: #52657f;
+    --canvas: #f3f6fa;
     --surface: #ffffff;
-    --line: #cbd5e1;
-    --red: #dc2626;
+    --line: #c9d5e5;
+    --red: #b91c1c;
     --amber: #a16207;
     --green: #15803d;
-    --teal: #c94f08;
-    --teal-dark: #9a3412;
-    --teal-soft: #fed7aa;
-    --teal-mist: #fff7ed;
-    --app-secondary: #be185d;
-    --app-secondary-soft: #fce7f3;
+    --teal: #1d4ed8;
+    --teal-dark: #163b73;
+    --teal-soft: #dbeafe;
+    --teal-mist: #eff6ff;
+    --teal-glow: rgb(29 78 216 / 22%);
+    --rail-a: #163b73;
+    --rail-b: #0f2f5f;
+    --rail-solid: #123665;
+    --rail-edge: #0b2548;
+    --app-secondary: #0f766e;
+    --app-secondary-soft: #ccfbf1;
     --app-health: #15803d;
     --app-health-soft: #dcfce7;
     color: var(--ink);
     background: var(--canvas);
   }
   :root:root :is(.primary-button, .scan-button, .login-submit) {
-    background: #c94f08; border-color: #c94f08; color: #ffffff;
+    background: var(--teal); border-color: var(--teal); color: #ffffff;
   }
   :root:root :is(.primary-button, .scan-button, .login-submit):not(:disabled):hover {
-    background: #9a3412; border-color: #9a3412;
+    background: var(--teal-dark); border-color: var(--teal-dark);
   }
   :root:root :is(.status-pill.green, .status-badge.green, .card-inventory-status.is-blank, .card-inventory-status.is-returned_vacant) { --status-color: #15803d; }
   :root:root :is(.status-pill.blue, .status-badge.blue, .card-inventory-status.is-assigned) { --status-color: #1d4ed8; }
@@ -49,16 +54,28 @@
   :root:root .blocker-button.success { background: #15803d; color: #ffffff; }
   :root:root .notif-badge { background: #dc2626; }
   :root:root .notif-bell.has-alert { color: #dc2626; }
-  :root:root .login-blob.amber { background: #fbcfe8; }
-  :root:root :is(.app-shell, .page-content, .login-screen) { background-color: #f1f5f9; }
-  /* Shortcut icons have fixed task colors, independent of the brand palette. */
-  :root:root .pos-rail .rail-btn { color: #0f172a; }
-  :root:root .pos-rail .rail-btn.rail-member { --task-ink: #be185d; --task-tint: #fce7f3; }
-  :root:root .pos-rail .rail-btn > svg { background: var(--task-tint, #dbeafe); color: var(--task-ink, #1d4ed8); }
-  :root:root .pos-rail .rail-btn.active { background: var(--task-tint, #dbeafe); border-color: var(--task-ink, #1d4ed8); color: #0f172a; box-shadow: inset 3px 0 0 var(--task-ink, #1d4ed8), 0 2px 4px rgb(15 23 42 / 12%); }
-  :root:root :is(.sidebar, .login-brand) .brand-mark { background: #15803d; }
-  :root:root .sidebar .nav-item.active { background: #fce7f3; color: #9d174d; }
-  :root:root .quick-pick-panel .product-card.in-bill { border-color: #c94f08; box-shadow: inset 0 0 0 1px #c94f08, 0 2px 4px rgb(15 23 42 / 8%); }
+  :root:root .login-blob.amber { background: #dbeafe; }
+  :root:root :is(.app-shell, .page-content, .login-screen) { background-color: var(--canvas); }
+  :root:root :is(.sidebar, .login-card, .topbar) { background-color: #ffffff; }
+  :root:root .sidebar { border-color: #c9d5e5; }
+  :root:root :is(.sidebar, .login-brand) .brand-mark { background: #163b73; box-shadow: 0 5px 14px rgb(22 59 115 / 25%); }
+  :root:root .app-shell .sidebar nav button:hover:not(.active) { background: #f1f5fb; color: #163b73; }
+  :root:root .app-shell .sidebar nav button.active {
+    background: #dbeafe; color: #163b73; border-color: #93b4e6;
+    box-shadow: inset 3px 0 0 #1d4ed8, 0 4px 12px rgb(29 78 216 / 10%);
+  }
+  :root:root .app-shell .sidebar nav button.active :is(b, small, svg) { color: #163b73; }
+  :root:root :is(.global-search, .scan-hero, .search-box, input, select, textarea):focus-within { border-color: #1d4ed8; }
+  :root:root :is(.onboarding-banner, .setup-banner, .dashboard-ready-card) { background: #eff6ff; border-color: #93b4e6; }
+  :root:root :is(.dash-tab.active, .report-view-pills [aria-selected="true"], .cost-profit-ranges .primary-button) { background: #1d4ed8; border-color: #1d4ed8; color: #ffffff; }
+  :root:root .quick-pick-panel .product-card.in-bill { border-color: #1d4ed8; box-shadow: inset 0 0 0 1px #1d4ed8, 0 2px 4px rgb(15 23 42 / 8%); }
+  /* POS shortcuts use one restrained blue system; semantic green remains for success. */
+  :root:root .pos-rail .rail-btn { color: #10233f; --task-ink: #1d4ed8; --task-tint: #eff6ff; }
+  :root:root .pos-rail .rail-btn.rail-member { --task-ink: #0f766e; --task-tint: #ccfbf1; }
+  :root:root .pos-rail .rail-btn > svg { background: var(--task-tint); color: var(--task-ink); }
+  :root:root .pos-rail .rail-btn.active { background: #dbeafe; border-color: #1d4ed8; color: #10233f; box-shadow: inset 3px 0 0 #1d4ed8, 0 2px 4px rgb(15 23 42 / 12%); }
+  :root:root :is(.scan-hero:focus-within, .member-scan-field:focus-within) { border-color: #1d4ed8; box-shadow: 0 0 0 3px rgb(29 78 216 / 14%); }
+  :root:root :is(.cart-total strong, .cart-totals .total-line strong, .cost-profit-page a) { color: #163b73; }
   :root:root :is(.status-pill, .status-badge, .card-inventory-status) {
     background: transparent !important; border: 0 !important;
     color: var(--status-color, #475569) !important;

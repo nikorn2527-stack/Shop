@@ -1,8 +1,8 @@
 /**
  * ROUND 25 — ปรับแต่งแอป (แบรนด์ + ธีมสี)
  * สีธีมทั้งแอปควบคุมด้วย CSS variables (--teal กลุ่ม) — ไฟล์นี้เปลี่ยนค่า
- * ตอน runtime ตามที่ผู้บริหารเลือกใน ตั้งค่า → แบรนด์และธีม
- * (preset สำเร็จรูป หรือสี custom) พร้อมแคชชื่อ/โลโก้/สีไว้ใน localStorage
+ * ตอน runtime พร้อมแคชชื่อ/โลโก้ไว้ใน localStorage โดยสีเดิมที่เคยบันทึก
+ * จะถูกย้ายมาใช้ Government Blue เพื่อให้ทุกหน้ามีมาตรฐานเดียวกัน
  * เพื่อให้หน้า login ก็ได้ธีมเดียวกันทันทีในการเข้าใช้ครั้งถัดไป
  *
  * ROUND 38 (ข้อ 38) — สไตล์การแสดงผล (UI Style): นอกจากสีแบรนด์ ยังเลือก
@@ -14,16 +14,15 @@
 
 export type BrandSettings = { appName: string; appLogo: string; appTheme: string; appStyle?: string; appBackground?: string };
 
-/** Preset สีหลัก — คุมโทนทั้งแอป (ปุ่ม / แถบเมนู / จุดเน้น) */
+/**
+ * สีหลักมาตรฐานของระบบภาครัฐ — ใช้ชุดเดียวทั้งแอปเพื่อให้ทุกหน้าสม่ำเสมอ
+ * ค่าเดิมที่บันทึกไว้ยังอ่านได้ แต่จะถูกย้ายมาใช้ Government Blue อัตโนมัติ
+ */
 export const THEME_PRESETS: { id: string; label: string; base: string }[] = [
-  { id: "pastel", label: "ชมพู · ฟ้า · มิ้นต์", base: "#ad3973" },
-  { id: "indigo", label: "ครามไอริส", base: "#4f46b8" },
-  { id: "blue", label: "น้ำเงินสด", base: "#1976d2" },
-  { id: "rose", label: "แดงชาด", base: "#be4a5f" },
-  { id: "violet", label: "ม่วงคราม", base: "#7c5cbf" },
+  { id: "government", label: "น้ำเงินกรมท่า · ภาครัฐ", base: "#1d4ed8" },
 ];
 
-export const DEFAULT_THEME = "pastel";
+export const DEFAULT_THEME = "government";
 const BRAND_CACHE_KEY = "png-brand-v1";
 
 /** ROUND 38 (ข้อ 38) — สไตล์การแสดงผลทั้งระบบ (บุคลิกการออกแบบ)
@@ -53,10 +52,6 @@ export function applyUiStyle(style: string | undefined | null): UiStyleId {
   return resolved;
 }
 
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
-}
-
 export function hexToRgb(hex: string): [number, number, number] | null {
   const value = hex.trim().replace(/^#/, "");
   if (!/^[0-9a-fA-F]{6}$/.test(value)) return null;
@@ -67,95 +62,41 @@ export function hexToRgb(hex: string): [number, number, number] | null {
   ];
 }
 
-export function rgbToHex(r: number, g: number, b: number): string {
-  return `#${[r, g, b].map((part) => clamp(Math.round(part), 0, 255).toString(16).padStart(2, "0")).join("")}`;
-}
-
-function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
-  const rn = r / 255;
-  const gn = g / 255;
-  const bn = b / 255;
-  const max = Math.max(rn, gn, bn);
-  const min = Math.min(rn, gn, bn);
-  const l = (max + min) / 2;
-  if (max === min) return [0, 0, l];
-  const d = max - min;
-  const s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
-  let h: number;
-  if (max === rn) h = ((gn - bn) / d + (gn < bn ? 6 : 0)) / 6;
-  else if (max === gn) h = ((bn - rn) / d + 2) / 6;
-  else h = ((rn - gn) / d + 4) / 6;
-  return [h * 360, s, l];
-}
-
-function hslToRgb(h: number, s: number, l: number): [number, number, number] {
-  const hn = ((h % 360) + 360) % 360 / 360;
-  if (s === 0) return [l * 255, l * 255, l * 255];
-  const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
-  const p = 2 * l - q;
-  const channel = (t: number) => {
-    let tn = t;
-    if (tn < 0) tn += 1;
-    if (tn > 1) tn -= 1;
-    if (tn < 1 / 6) return p + (q - p) * 6 * tn;
-    if (tn < 1 / 2) return q;
-    if (tn < 2 / 3) return p + (q - p) * (2 / 3 - tn) * 6;
-    return p;
-  };
-  return [channel(hn + 1 / 3) * 255, channel(hn) * 255, channel(hn - 1 / 3) * 255];
-}
-
-/** Retire green and copper decoration, including previously saved custom accents. */
+/** ย้ายสีที่เคยบันทึกทั้งหมดมาใช้ธีมมาตรฐานเดียวกัน */
 export function normalizeTheme(theme: string | undefined | null): string {
-  if (!theme || ["indigo", "emerald", "forest", "matcha", "teal", "coffee", "amber"].includes(theme) || theme.toLowerCase() === "#4f46b8") return DEFAULT_THEME;
-  const rgb = /^#[0-9a-f]{6}$/i.test(theme) ? hexToRgb(theme) : null;
-  if (rgb) {
-    const [h, s] = rgbToHsl(...rgb);
-    if (h >= 65 && h <= 180 && s > 0.1) return DEFAULT_THEME;
-    if (h >= 15 && h < 65 && s > 0.1) return DEFAULT_THEME;
-  }
-  return theme;
+  return DEFAULT_THEME;
 }
 
-/** preset id หรือ hex → สีหลัก hex (fallback indigo) */
+/** preset id หรือ hex เดิม → สีน้ำเงินมาตรฐานของระบบ */
 export function resolveThemeColor(theme: string | undefined | null): string {
-  theme = normalizeTheme(theme);
-  if (!theme) return THEME_PRESETS[0].base;
-  const preset = THEME_PRESETS.find((item) => item.id === theme);
-  if (preset) return preset.base;
-  if (/^#[0-9a-fA-F]{6}$/.test(theme)) return theme.toLowerCase();
+  normalizeTheme(theme);
   return THEME_PRESETS[0].base;
 }
 
 /** เขียน CSS variables ทั้งกลุ่มจากสีหลักสีเดียว */
 export function applyThemeColor(theme: string | undefined | null): string {
-  // One application palette; legacy saved colors remain readable but no longer
-  // override the shared design after removing the theme selector.
-  const base = "#c94f08";
+  // One government palette; legacy saved colors remain readable but no longer
+  // override the shared design.
+  normalizeTheme(theme);
+  const base = "#1d4ed8";
   const rgb = hexToRgb(base);
   if (!rgb) return base;
   const [r, g, b] = rgb;
-  const [h, s, l] = rgbToHsl(r, g, b);
-  const sat = Math.max(s, 0.18); // กันสีเทาเกินไปสำหรับสีอ่อนจาง
-  const build = (lightness: number, saturation = sat) => {
-    const [rr, gg, bb] = hslToRgb(h, saturation, lightness);
-    return rgbToHex(rr, gg, bb);
-  };
   const root = document.documentElement;
-  root.dataset.palette = "orange-pink-health";
+  root.dataset.palette = "government-blue";
   const vars: Record<string, string> = {
     "--teal": base,
-    "--teal-dark": build(clamp(l - 0.07, 0.12, 0.82)),
-    "--teal-soft": "#fed7aa",
-    "--teal-mist": "#fff7ed",
-    "--app-secondary": "#be185d",
-    "--app-secondary-soft": "#fce7f3",
+    "--teal-dark": "#163b73",
+    "--teal-soft": "#dbeafe",
+    "--teal-mist": "#eff6ff",
+    "--app-secondary": "#0f766e",
+    "--app-secondary-soft": "#ccfbf1",
     "--app-health": "#15803d",
     "--app-health-soft": "#dcfce7",
-    // เฉดเข้มของสีธีม — ยังใช้โดะ member-balance-card (การ์ดยอดเงินคงเหลือ)
-    "--rail-a": build(0.2, sat * 0.92),
-    // ROUND 48 — ราง POS ไม่ตามสีธีมแล้ว: ใช้สีเดียวกับแอปตามที่ผู้ใช้ขอ (ปุ่มเท่านั้นที่มีสีของใครของมัน)
-    // ตัวแปร --rail-b / --rail-solid / --rail-edge จึงปลดลง (index.css ROUND 48)
+    "--rail-a": "#163b73",
+    "--rail-b": "#0f2f5f",
+    "--rail-solid": "#123665",
+    "--rail-edge": "#0b2548",
     "--teal-glow": `rgba(${r}, ${g}, ${b}, .22)`,
   };
   for (const [key, value] of Object.entries(vars)) root.style.setProperty(key, value);
