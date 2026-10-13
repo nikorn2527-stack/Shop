@@ -45,6 +45,8 @@ export function PrintPreviewModal({
   subtitle,
   paper = "thermal",
   chips = [],
+  showContentLength = true,
+  showPrintHelp = true,
   onPrint,
   onClose,
 }: {
@@ -55,6 +57,10 @@ export function PrintPreviewModal({
   paper?: PrintPreviewPaper;
   /** ข้อมูลเสริม เช่น "3 รายการ · พนักงาน: กัญญาณัฐ" */
   chips?: string[];
+  /** แสดงความยาวกระดาษที่คำนวณได้ เหมาะกับใบเสร็จที่มีหลายรายการ */
+  showContentLength?: boolean;
+  /** แสดงวิธีตั้งค่ากระดาษเพิ่มเติมใต้ปุ่มพิมพ์ */
+  showPrintHelp?: boolean;
   /** เรียกหลังสั่ง window.print() แล้ว (ใช้ทำ toast / ล้าง state) */
   onPrint?: () => void;
   onClose: () => void;
@@ -90,9 +96,9 @@ export function PrintPreviewModal({
       const stage = holder.closest(".print-preview-stage") as HTMLElement | null;
       const doc = holder.firstElementChild as HTMLElement | null;
       if (!stage || !doc) return;
-      const stagePx = stage.clientWidth || 1;
+      const documentPx = doc.getBoundingClientRect().width || stage.clientWidth || 1;
       const widthMm = paper === "a4" ? 210 : paper === "card" ? 90 : thermalPaperWidthMm();
-      const heightMm = Math.round((doc.scrollHeight / stagePx) * widthMm);
+      const heightMm = Math.round((doc.scrollHeight / documentPx) * widthMm);
       if (heightMm > 0 && !Number.isNaN(heightMm)) setContentMm(heightMm);
     };
     const frame = window.requestAnimationFrame(() => { measure(); });
@@ -110,7 +116,16 @@ export function PrintPreviewModal({
 
   const doPrint = async () => {
     toast.dismiss();
-    try { await printElementDocument(targetId, paper === "thermal" ? thermalPaperWidthMm() : undefined); onPrint?.(); } catch { toast.error("เปิดหน้าต่างพิมพ์ไม่สำเร็จ กรุณาลองอีกครั้ง"); }
+    try {
+      await printElementDocument(
+        targetId,
+        paper === "thermal" ? thermalPaperWidthMm() : undefined,
+        paper === "thermal" ? contentMm ?? undefined : undefined,
+      );
+      onPrint?.();
+    } catch {
+      toast.error("เปิดหน้าต่างพิมพ์ไม่สำเร็จ ลองอีกครั้ง");
+    }
   };
 
   return (
@@ -118,15 +133,15 @@ export function PrintPreviewModal({
       <div className={`form-modal print-preview-modal${paper === "a4" ? " export-preview-modal print-preview-a4" : ""}`} onClick={(event) => event.stopPropagation()}>
         <div className="modal-heading">
           <div>
-            <span className="eyebrow">{paper === "a4" ? "พรีวิวเอกสาร" : "PRINT PREVIEW"}</span>
+            <span className="eyebrow">ตรวจสอบก่อนพิมพ์</span>
             <h2>{title}</h2>
             {subtitle && <p>{subtitle}</p>}
           </div>
           <button className="icon-button" onClick={onClose} aria-label="ปิดหน้าต่างพรีวิว"><X size={17} /></button>
         </div>
 
-        {(chips.length > 0 || (paper === "thermal" && contentMm != null)) && <div className="export-preview-summary">
-          {paper === "thermal" && contentMm != null && (
+        {(chips.length > 0 || (paper === "thermal" && showContentLength && contentMm != null)) && <div className="export-preview-summary">
+          {paper === "thermal" && showContentLength && contentMm != null && (
             <span className="preview-chip mute" title="ความยาวที่เนื้อหาต้องการตามจำนวนรายการ">
               ความยาวเนื้อหา ≈ {contentMm.toLocaleString("th-TH")} มม.
             </span>
@@ -167,16 +182,14 @@ export function PrintPreviewModal({
         </div>
         )}
 
-        {paper !== "a4" && <HelpDisclosure id="print-length-help" label={paper === "thermal" ? "พิมพ์แล้วกระดาษยาวเกิน / ขาด?" : "ข้อแนะนำการพิมพ์"}>
+        {paper !== "a4" && showPrintHelp && <HelpDisclosure id="print-length-help" label={paper === "thermal" ? "ตั้งค่ากระดาษ" : "ข้อแนะนำการพิมพ์"}>
           {paper === "thermal" ? (
             <div className="help-disclosure-steps">
-              <p><b>ความยาวกระดาษเท่าไร มาจาก "ขนาดกระดาษ" ในไดรเวอร์เครื่องพิมพ์</b> — ระบบจัดหน้าให้เนื้อหายาวตามรายการสินค้าแล้ว (ไม่มีขอบกระดาษ) ถ้าออกมาแล้วมีส่วนเกิน ปรับตามนี้:</p>
+              <p><b>ถ้ากระดาษยาวหรือขาด ให้ตรวจการตั้งค่าก่อนพิมพ์</b></p>
               <ol>
-                <li>หน้าต่างพิมพ์ของ Chrome → <b>การตั้งค่าเพิ่มเติม</b> → ขอบกระดาษ = <b>ไม่มี (None)</b> และปิด <b>หัว-ท้ายกระดาษ</b> (Headers and footers)</li>
-                <li>ตรวจ <b>ขนาดกระดาษ</b> ให้กว้างตรงเครื่อง (เช่น 72×มม.) — ถ้ามีตัวเลือกความสูงหลายแบบ เลือกแบบที่สูงใกล้ความยาวสลิปจริง</li>
-                <li>ยังยาวอยู่: ไปที่ <b>Windows การตั้งค่า → อุปกรณ์ → เครื่องพิมพ์ → ปรับแต่งการพิมพ์ (Printing preferences) → ขนาดกระดาษ</b> ตั้งความสูงกระดาษให้เท่ากับสลิปที่พิมพ์บ่อยที่สุด — ตั้งครั้งเดียวทุกสลิปจะออกพอดี</li>
+                <li>เลือกขอบกระดาษ <b>ไม่มี</b> และปิด <b>หัวและท้ายกระดาษ</b></li>
+                <li>เลือกความกว้างกระดาษให้ตรงกับเครื่องพิมพ์</li>
               </ol>
-              <p className="help-disclosure-muted">ทดสอบง่าย ๆ ได้ที่ ตั้งค่า → เครื่องมือติดตั้งระบบ → พิมพ์สลิปทดสอบ</p>
             </div>
           ) : (
             <div className="help-disclosure-steps">

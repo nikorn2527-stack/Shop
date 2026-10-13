@@ -217,6 +217,7 @@ function CutoffWidget({ role, userName }: { role: Role; userName: string }) {
   const period: BusinessPeriodStatus | undefined = periodQuery.data;
   const actorRole = roleThaiLabel(role);
   const periodTotals = period?.totals;
+  const isAutomaticClosure = closed?.closedBy === "ระบบอัตโนมัติ";
   const dailyCoverDoc = (closure: DayClosureRow): ReportDocConfig => {
     const receiptCount = closure.depositCount + closure.activationCount;
     const receiptAmount = closure.depositAmount + closure.activationAmount;
@@ -289,8 +290,8 @@ function CutoffWidget({ role, userName }: { role: Role; userName: string }) {
       `}</style>
       <div className="receipt-brand"><div className="brand-mark small"><span>ส</span></div><div><b>ร้านค้าสวัสดิการ</b><small>สรุปยอดรอบตัดบัญชี</small></div></div>
       <div className="receipt-divider" />
-      <div className="receipt-meta"><span>ตัดยอดเมื่อ <b>{formatThaiDate(closed.closedAt)} · {formatTimeShort(closed.closedAt)}</b></span><span>โดย {closed.closedBy ?? "—"}</span></div>
-      <div className="receipt-meta"><span>รอบตั้งแต่ <b>{formatThaiDate(closed.periodStart)} · {formatTimeShort(closed.periodStart)}</b></span><span>ถึงเวลาตัดยอด</span></div>
+      <div className="receipt-meta"><span>ตัดยอด <b>{formatThaiDate(closed.closedAt)} · {formatTimeShort(closed.closedAt)}</b></span>{!isAutomaticClosure && <span>{closed.closedBy ?? "—"}</span>}</div>
+      <div className="receipt-meta"><span>เริ่มรอบ <b>{formatThaiDate(closed.periodStart)} · {formatTimeShort(closed.periodStart)}</b></span></div>
       <div className="receipt-divider" />
       <section aria-label="ยอดรวมรับ" style={{ display: "block", gridColumn: "1 / -1", padding: "10px 0", breakInside: "avoid" }}>
       <div className="receipt-total"><span>ยอดรวมรับ</span><b>{money(closed.depositAmount + closed.activationAmount)}</b></div>
@@ -304,11 +305,11 @@ function CutoffWidget({ role, userName }: { role: Role; userName: string }) {
       <div className="receipt-line"><span>ลดยอดเงินบัตร · {closed.withdrawalCount} รายการ</span><b>{money(closed.withdrawalAmount)}</b></div>
       <div className="receipt-line"><span>คืนบัตรเงินสด · {closed.refundCount} รายการ</span><b>{money(closed.refundAmount)}</b></div>
       </section>
-      {closed.note && <div className="receipt-line"><span>หมายเหตุ</span><b>{closed.note}</b></div>}
-      <div className="receipt-thanks">เจ้าหน้าที่ {closed.closedBy ?? "—"}</div>
+      {closed.note && closed.note !== "ตัดยอดตามเวลาที่กำหนด" && <div className="receipt-line"><span>หมายเหตุ</span><b>{closed.note}</b></div>}
+      {!isAutomaticClosure && <div className="receipt-thanks">ผู้ตัดยอด {closed.closedBy ?? "—"}</div>}
     </div>}
     <ConfirmDialog open={confirmOpen} title="ยืนยันตัดยอดรอบนี้?" description={`สรุปยอดตั้งแต่ ${period ? `${formatThaiDate(period.periodStart)} ${formatTimeShort(period.periodStart)}` : "ต้นรอบ"} จนถึงตอนนี้ แล้วเริ่มรอบใหม่ทันที · ยอดขายรอบนี้ ${period ? money(period.totals.revenue) : "—"} (${period?.totals.bills ?? 0} บิล) · ระบบจะสร้างสรุปรอบให้พิมพ์เก็บไว้ และบันทึกลง Log`} confirmLabel={closeMutation.isPending ? "กำลังตัดยอด…" : "ตัดยอดรอบนี้"} pending={closeMutation.isPending} error={closeMutation.isError ? closeMutation.error.message : undefined} onCancel={() => { if (closeMutation.isPending) return; setConfirmOpen(false); closeMutation.reset(); }} onConfirm={() => { if (!closeMutation.isPending) closeMutation.mutate({ actor: userName || "เจ้าหน้าที่ร้านค้า", actorRole: role }); }} />
-    {printPreviewOpen && closed && <PrintPreviewModal targetId="cutoff-report" title="พรีวิวก่อนพิมพ์สรุปรอบตัดยอด" subtitle={`ตัดยอดเมื่อ ${formatThaiDate(closed.closedAt)} · ${formatTimeShort(closed.closedAt)} · โดย ${closed.closedBy ?? "—"}`} paper="thermal" chips={[`${closed.bills.toLocaleString("th-TH")} บิล`, `ยอดขาย ${money(closed.revenue)}`, `เงินสด ${money(closed.cashTotal)} · QR ${money(closed.qrTotal)}`]} onClose={() => setPrintPreviewOpen(false)} />}
+    {printPreviewOpen && closed && <PrintPreviewModal targetId="cutoff-report" title="สรุปรอบตัดยอด" subtitle={`${formatThaiDate(closed.closedAt)} · ${formatTimeShort(closed.closedAt)}`} paper="thermal" showContentLength={false} showPrintHelp={false} onClose={() => setPrintPreviewOpen(false)} />}
   </section>;
 }
 

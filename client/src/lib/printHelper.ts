@@ -141,13 +141,16 @@ export async function printHtmlDocument(html: string): Promise<void> {
   });
 }
 
-export function printElementDocument(targetId: string, widthMm?: number): Promise<PrintResult> {
+export function printElementDocument(targetId: string, widthMm?: number, measuredHeightMm?: number): Promise<PrintResult> {
   const source = document.getElementById(targetId);
   if (!source) return Promise.reject(new Error("ไม่พบเอกสารสำหรับพิมพ์"));
   const clone = source.cloneNode(true) as HTMLElement;
   clone.style.cssText = widthMm ? `width:${widthMm}mm;box-sizing:border-box;margin:0;padding:3mm;height:auto;max-height:none;overflow:visible` : "";
   const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'), el => el.outerHTML).join("");
-  const heightMm = Math.max(60, Math.ceil(source.scrollHeight * (widthMm ?? 210) / Math.max(1, source.offsetWidth)) + 10);
+  // เอกสารบางชนิดซ่อนต้นฉบับบนหน้าจอด้วย display:none ทำให้ขนาดที่อ่านได้เป็น 0
+  // รับความสูงจาก clone ในพรีวิวเพื่อไม่ให้ browser ใช้หน้ากระดาษสั้นแล้วแบ่งเอกสาร
+  const measuredSourceHeightMm = Math.ceil(source.scrollHeight * (widthMm ?? 210) / Math.max(1, source.offsetWidth));
+  const heightMm = Math.max(60, Math.ceil(measuredHeightMm ?? measuredSourceHeightMm) + 6);
   const pageSize = widthMm ? `${widthMm}mm ${heightMm}mm` : "A4";
   const html = `<!doctype html><html><head><meta charset="utf-8"><base href="${location.origin}/">${styles}<style>@page{size:${pageSize};margin:${widthMm ? 0 : 8}mm}html,body{margin:0;padding:0;background:white}body>*{display:block!important;visibility:visible!important}#${targetId}{position:static!important;transform:none!important;box-shadow:none!important;height:auto!important;max-height:none!important;overflow:visible!important}</style></head><body>${clone.outerHTML}</body></html>`;
   return printViaHelper(getPrinterName(widthMm ? "receipt" : "report"), html, {

@@ -3464,7 +3464,7 @@ th { font-weight: 600; }
   body:has(#cutoff-report) .cutoff-widget { border: 0; padding: 0; margin: 0; }
   body:has(#cutoff-report) .cutoff-widget-main, body:has(#cutoff-report) .cutoff-widget-actions,
   body:has(#cutoff-report) .cutoff-widget .notice-bar { display: none !important; }
-  body:has(#cutoff-report) .cutoff-report { display: block; width: 300px; margin: 0 auto; border: 1px dashed #b8bdaa; box-shadow: none; }
+  body:has(#cutoff-report) .cutoff-report { display: block; width: 300px; margin: 0 auto; border: 0; box-shadow: none; break-inside: avoid; page-break-inside: avoid; }
 }
 
 /* --- ROUND 31-7 : เครื่องพิมพ์หน้าร้าน (settings → receipt tab) -------- */
@@ -4703,12 +4703,12 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
    มาแสดงในกรอบขนาดจริง แล้วค่อยกดพิมพ์ · ซ่อนเสมอตอนพิมพ์จริง
    (2) .report-staff-filter = ดรอปดาวน์เลือกพนักงานขาย ใช้ร่วมกับทุกมุมมอง
    ============================================================ */
-.print-preview-modal { width: min(620px, calc(100vw - 28px)); }
+.print-preview-modal { width: min(620px, calc(100vw - 28px)); max-height: calc(100dvh - 32px); overflow: hidden; display: flex; flex-direction: column; }
 .print-preview-modal.print-preview-a4 { width: min(940px, calc(100vw - 32px)); }
 @media (max-width: 700px) {
   .print-preview-modal.print-preview-a4 { width: calc(100vw - 20px); }
 }
-.print-preview-stage { margin-top: 4px; border-radius: 12px; padding: 18px 14px; max-height: min(58vh, 560px); overflow: auto; display: grid; place-items: start center; background: repeating-linear-gradient(-45deg, #f4f8f6 0 14px, #eff4f1 14px 28px); border: 1px solid #e2ebe7; }
+.print-preview-stage { margin-top: 4px; border-radius: 12px; padding: 18px 14px; min-height: 120px; max-height: min(58vh, 560px); flex: 1 1 auto; overflow: auto; display: grid; place-items: start center; background: repeating-linear-gradient(-45deg, #f4f8f6 0 14px, #eff4f1 14px 28px); border: 1px solid #e2ebe7; }
 /* Use the report viewport's fixed A4 geometry; scale the whole document, not its table. */
 .a4-preview-content { width: 794px; min-height: 1123px; box-sizing: border-box; background: #fff; transform-origin: top left; }
 .print-preview-a4 .print-preview-paper { width: 794px; min-height: 1123px; box-sizing: border-box; padding: 30px; background: #fff; }
@@ -4726,7 +4726,7 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .print-preview-paper .receipt-paper, .print-preview-paper .wallet-slip { box-shadow: 0 6px 18px rgba(35, 62, 52, .12); }
 .print-preview-paper .member-card { box-shadow: 0 8px 20px rgba(40, 70, 58, .16); }
 .print-preview-empty { color: #7d8172; font-size: 11.5px; padding: 30px 10px; }
-.print-preview-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+.print-preview-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex: 0 0 auto; flex-wrap: wrap; margin-top: 12px; }
 .print-preview-note { color: #7d8172; font-size: 10.5px; line-height: 1.5; flex: 1 1 240px; }
 .print-preview-buttons { display: flex; gap: 7px; flex-shrink: 0; }
 
