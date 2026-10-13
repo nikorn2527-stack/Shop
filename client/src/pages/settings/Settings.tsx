@@ -116,7 +116,7 @@ import { isValidPromptPayId } from "@/promptpay";
 import { PrintPreviewModal } from "@/components/PrintPreviewModal";
 import { BankAccountsPanel } from "@/components/BankAccountsPanel";
 import { PrinterPicker, PrinterHelperStatus } from "@/components/PrinterPicker";
-import { getLocalPrinterSettings, updateLocalPrinterSetting, getWorkstationId } from "@/lib/printHelper";
+import { getLocalPrinterSettings, updateLocalPrinterSetting } from "@/lib/printHelper";
 import {
   applyThermalPrintProfile,
   getThermalPrintProfile,
@@ -2224,16 +2224,13 @@ export function Settings({
                       <button type="button" className="outline-button compact" onClick={resetCurrentThermalProfile}><RotateCcw size={14} /> คืนค่ามาตรฐาน</button>
                       <button type="button" className="primary-button compact" onClick={testPrintReceipt}><Printer size={14} /> พิมพ์แผ่นทดสอบ</button>
                     </div>
-                    <p className="thermal-local-note">บันทึกค่าปรับละเอียดสำหรับ {receiptPrinterName ? `“${receiptPrinterName}”` : "เครื่องนี้ (ยังไม่ได้เลือกเครื่องพิมพ์)"} ทันที ไม่กระทบจุดขายหรือเครื่องพิมพ์ตัวอื่น</p>
+                    <p className="thermal-local-note">บันทึกเฉพาะ {receiptPrinterName ? `“${receiptPrinterName}”` : "เครื่องพิมพ์ที่เลือก"} บนคอมพิวเตอร์นี้</p>
                   </HelpDisclosure>
                 </div>
-                <div className="printer-workstation-note">
-                  <small>💻 คอมพิวเตอร์เครื่องนี้: <b>{getWorkstationId()}</b> — การตั้งค่านี้ใช้กับเครื่องนี้เท่านั้น</small>
-                </div>
                 <LocalPrinterSettings onReceiptPrinterChange={setReceiptPrinterName} />
-                <div className="settings-inline-note">
-                  <b>ตั้งค่าไดรเวอร์ให้ตรงกันด้วย</b> — ในหน้าต่างพิมพ์ของ Windows ให้เลือกม้วน {paperWidth} มม. และตั้งขอบเป็น “ไม่มี” หากเปลี่ยนเครื่องหรือเปลี่ยนม้วน ให้พิมพ์แผ่นทดสอบอีกครั้ง
-                </div>
+                <HelpDisclosure id="printer-driver-help" label="ตั้งค่าไดรเวอร์และการพิมพ์สำรอง">
+                  <p>ตั้งกระดาษใน Windows เป็น {paperWidth} มม. และขอบ “ไม่มี” หาก Helper ใช้ไม่ได้ ระบบจะเปิดหน้าต่างพิมพ์ของเบราว์เซอร์ให้เลือกเครื่องเอง</p>
+                </HelpDisclosure>
               </section>
 
             </>

@@ -34,7 +34,7 @@ describe("reusable physical cards", () => {
       const session = cardUsageHistory(db, "TOPUP-FIRST").sessions[0];
       returnMemberCard(db, { memberNumber: member.memberNumber, cardNumber: "TOPUP-FIRST", expectedSessionId: session.id, mode: "refund" });
       const count = db.prepare("SELECT COUNT(*) AS n FROM member_transactions").get();
-      expect(() => walletTx(db, { memberNumber: member.memberNumber, type: "deposit", amount: 100 })).toThrow("จ่ายบัตรก่อนเติมเงิน");
+      expect(() => walletTx(db, { memberNumber: member.memberNumber, type: "deposit", amount: 100 })).toThrow("จ่ายบัตรก่อนทำรายการ");
       expect(db.prepare("SELECT COUNT(*) AS n FROM member_transactions").get()).toEqual(count);
       expect(getMemberDetail(db, member.memberNumber)?.member.balance).toBe(0);
       assignMemberCard(db, { memberNumber: member.memberNumber, cardNumber: "TOPUP-NEXT", expectedCardNumber: null });
@@ -43,6 +43,22 @@ describe("reusable physical cards", () => {
       expect(cardUsageHistory(db, "TOPUP-NEXT").sessions[0].incoming).toBe(100);
       db.prepare("UPDATE physical_cards SET status = 'lost' WHERE card_number = 'TOPUP-NEXT'").run();
       expect(() => walletTx(db, { memberNumber: member.memberNumber, type: "deposit", amount: 5 })).toThrow("บัตรไม่พร้อมใช้งาน");
+    } finally { db.close(); }
+  });
+  it("requires a usable assigned card for member transactions but keeps refund recovery available", () => {
+    const db = createSqliteStore();
+    try {
+      const product = createProduct(db, { name: "Card gate fixture", price: 10, stock: 2, cost: 5 });
+      const withoutCard = registerMember(db, { firstName: "No", lastName: "Card" }).member;
+      expect(() => checkout(db, { items: [{ productId: product.id, qty: 1 }], paymentMethod: "เงินสด", memberNumber: withoutCard.memberNumber })).toThrow("จ่ายบัตรก่อนทำรายการ");
+      expect(() => walletTx(db, { memberNumber: withoutCard.memberNumber, type: "withdrawal", amount: 1 })).toThrow("จ่ายบัตรก่อนทำรายการ");
+
+      createBlankCards(db, ["RECOVERY-CARD"]);
+      const recovery = registerMember(db, { firstName: "Recovery", lastName: "Flow", cardNumber: "RECOVERY-CARD", initialDeposit: 25 }).member;
+      markPhysicalCard(db, "RECOVERY-CARD", "lost", "แจ้งหายระหว่างมียอดคงเหลือ");
+      expect(() => checkout(db, { items: [{ productId: product.id, qty: 1 }], paymentMethod: "QR / สแกน", memberNumber: recovery.memberNumber })).toThrow("จ่ายบัตรก่อนทำรายการ");
+      expect(() => walletTx(db, { memberNumber: recovery.memberNumber, type: "withdrawal", amount: 5 })).toThrow("จ่ายบัตรก่อนทำรายการ");
+      expect(walletTx(db, { memberNumber: recovery.memberNumber, type: "refund", amount: 25 }).balanceAfter).toBe(0);
     } finally { db.close(); }
   });
   it("attributes a cancelled wallet sale to its original card round after the card is reused", () => {

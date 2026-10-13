@@ -472,6 +472,14 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
       focusScan();
       return;
     }
+    if (!member.cardNumber) {
+      setError(`สมาชิก ${member.memberNumber} ยังไม่มีบัตรที่พร้อมใช้งาน`);
+      blocker.warning("สมาชิกยังไม่มีบัตร", `${memberFullName(member)} ต้องได้รับบัตรก่อนผูกกับบิลหรือทำธุรกรรมสมาชิก`);
+      setCardActionMember(member);
+      setCardActionsOpen(true);
+      focusScan();
+      return;
+    }
     setSelectedMemberNumber(member.memberNumber);
     clearNotices();
     toast.success(`ยืนยันสมาชิก${memberFullName(member)} แล้ว`, { description: `เลขสมาชิก ${member.memberNumber} · ยอดคงเหลือ ${money(member.balance)} · ใช้กับบิลนี้`, duration: 3200 });
@@ -705,7 +713,9 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
     if (cart.length === 0) return;
     if (method === "หักบัญชีสมาชิก" && !selectedMember) {
       setError("เลือกสมาชิกก่อนชำระแบบหักบัญชี");
-      blocker.warning("ยังไม่ได้เลือกสมาชิก", `ชำระแบบหักบัญชีสมาชิก ต้องมีสมาชิกในบิลก่อน\nยิงบัตรสมาชิกที่ช่องสแกน หรือกด ${shortcutLabel("customer", "F1")} เพื่อเลือกสมาชิก`);
+      setMessage("สแกนหรือค้นหาสมาชิกก่อน ระบบเก็บสินค้าในตะกร้าไว้ให้");
+      focusScan();
+      blocker.warning("เลือกสมาชิกก่อน", "สแกนบัตรหรือค้นหาสมาชิกที่ช่องด้านบน ตะกร้าปัจจุบันจะไม่หาย");
       return;
     }
     if (discountValue > subtotal) {
@@ -769,9 +779,10 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
     const memberNumber = walletMemberNumber || selectedMemberNumber;
     if (!memberNumber) { setError("เลือกสมาชิกก่อนบันทึกรายการ"); blocker.warning("ยังไม่ได้เลือกสมาชิก", "ยิงบัตรสมาชิกที่ช่องด้านบน หรือเลือกจากรายการก่อนบันทึกรายการ"); return; }
     const target = members.find(member => member.memberNumber === memberNumber);
-    if (shortcut === "เติมเงิน" && !target?.cardNumber) {
-      setError("สมาชิกยังไม่มีบัตร กรุณาจ่ายบัตรก่อนเติมเงิน");
-      blocker.warning("กรุณาจ่ายบัตรก่อนเติมเงิน", "สมาชิกคืนบัตรแล้ว ให้จ่ายบัตรว่างแก่สมาชิกเดิมก่อนทำรายการเติมเงิน");
+    if (!target?.cardNumber) {
+      setError("สมาชิกยังไม่มีบัตร กรุณาจ่ายบัตรก่อนทำรายการ");
+      blocker.warning("กรุณาจ่ายบัตรก่อน", "เติมหรือถอนเงินได้เมื่อสมาชิกมีบัตรที่ผูกและพร้อมใช้งานแล้ว");
+      if (target) { setCardActionMember(target); setCardActionsOpen(true); }
       return;
     }
     const amount = Number(walletAmount);

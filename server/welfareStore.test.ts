@@ -98,6 +98,12 @@ function listMemberTransactionCount(database: SqliteDb, memberNumber: string) {
   return (database.prepare(`SELECT COUNT(*) AS count FROM member_transactions WHERE member_number = ?`).get(memberNumber) as { count: number }).count;
 }
 
+function assignTestCard(database: SqliteDb, memberNumber: string) {
+  const cardNumber = `TEST-${memberNumber}`;
+  createBlankCards(database, [cardNumber]);
+  assignMemberCard(database, { memberNumber, cardNumber, expectedCardNumber: null });
+}
+
 function tableCount(database: SqliteDb, table: string) {
   return (database.prepare(`SELECT COUNT(*) AS count FROM ${table}`).get() as { count: number }).count;
 }
@@ -171,6 +177,7 @@ describe("POS checkout", () => {
   it("deducts the member wallet, records a purchase transaction and returns the new balance", () => {
     const database = freshDb();
     const milk = productBySku(database, "DRK-003");
+    assignTestCard(database, "M-000241");
 
     const receipt = checkout(database, {
       items: [{ productId: milk.id, qty: 2 }],
@@ -210,6 +217,7 @@ describe("POS checkout", () => {
   it("rejects a wallet sale when the balance is insufficient", () => {
     const database = freshDb();
     const rice = productBySku(database, "FD-014");
+    assignTestCard(database, "M-000241");
     expect(() =>
       checkout(database, {
         items: [{ productId: rice.id, qty: 8 }],
@@ -663,6 +671,7 @@ describe("wallet transactions", () => {
 
   it("rejects invalid amounts and overdrafts with Thai errors", () => {
     const database = freshDb();
+    assignTestCard(database, "M-000241");
     expect(() => walletTx(database, { memberNumber: "M-000241", type: "deposit", amount: 0 })).toThrowError(/จำนวนเงินต้องมากกว่า 0/);
     expect(() => walletTx(database, { memberNumber: "M-000241", type: "withdrawal", amount: 9999 })).toThrowError(/ยอดเงินคงเหลือไม่พอ/);
     expect(() => walletTx(database, { memberNumber: "M-000092", type: "deposit", amount: 50 })).toThrowError(/สมาชิกถูกระงับ/);
@@ -784,6 +793,7 @@ describe("member deletion", () => {
   it("refuses to delete a member with transaction history even at zero balance", () => {
     const database = freshDb();
     registerMember(database, { firstName: "ทดสอบ", lastName: "ประวัติ", initialDeposit: 100 });
+    assignTestCard(database, "M-000242");
     walletTx(database, { memberNumber: "M-000242", type: "withdrawal", amount: 100 });
     expect(getMemberDetail(database, "M-000242")?.member.balance).toBe(0);
 
@@ -1035,6 +1045,7 @@ describe("sales history", () => {
   it("returns receipts newest first with items, units and member names", () => {
     const database = freshDb();
     const water = productBySku(database, "DRK-001");
+    assignTestCard(database, "M-000241");
     const receipt = checkout(database, {
       items: [{ productId: water.id, qty: 2 }],
       paymentMethod: "หักบัญชีสมาชิก",
@@ -1066,6 +1077,7 @@ describe("sales history", () => {
   it("finds receipts by order number and member number (case-insensitive)", () => {
     const database = freshDb();
     const water = productBySku(database, "DRK-001");
+    assignTestCard(database, "M-000241");
     const receipt = checkout(database, {
       items: [{ productId: water.id, qty: 2 }],
       paymentMethod: "หักบัญชีสมาชิก",
@@ -1661,6 +1673,7 @@ describe("member spending stats", () => {
     const database = freshDb();
     const detail = registerMember(database, { firstName: "สถิติ", lastName: "ทดสอบ", initialDeposit: 200 });
     const memberNumber = detail.member.memberNumber;
+    assignTestCard(database, memberNumber);
     const water = productBySku(database, "DRK-001");
     const rice = productBySku(database, "FD-014");
 

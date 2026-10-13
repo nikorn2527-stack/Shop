@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  assignMemberCard,
   checkout,
   businessPeriodStatus,
   closeBusinessDay,
   createProduct,
+  createBlankCards,
   createSqliteStore,
   dailySalesRows,
   decideLimitRequest,
@@ -400,6 +402,8 @@ describe("member credit limit / การขอลดวงเงิน (req 23.
   it("blocks wallet bills over the daily credit limit but never cash bills", () => {
     db = createSqliteStore();
     seedSqliteDemoData(db);
+    createBlankCards(db, ["LIMIT-TEST-CARD"]);
+    assignMemberCard(db, { memberNumber: "M-000218", cardNumber: "LIMIT-TEST-CARD", expectedCardNumber: null });
     const water = createProduct(db, { name: "น้ำดื่มทดสอบวงเงิน", sku: "DRK-950", unit: "ขวด", price: 100, cost: 50, stock: 50 });
     updateMember(db, { memberNumber: "M-000218", creditLimit: 500 });
 

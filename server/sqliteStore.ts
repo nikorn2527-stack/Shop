@@ -768,6 +768,22 @@ function seedPhysicalCardsFromMembers(db: SqliteDb) {
   }
 }
 
+/** Require a live physical-card round before any normal member transaction. */
+function requireUsableMemberCard(db: SqliteDb, memberNumber: string): SqliteMember {
+  const member = db.prepare(`SELECT id, member_number AS memberNumber, prename, first_name AS firstName, last_name AS lastName, id_card AS idCard, phone, type, balance, status, created_at AS createdAt, photo_url AS photoUrl, gender, credit_limit AS creditLimit, card_number AS cardNumber, account_closed AS accountClosed, patient_code AS patientCode FROM members WHERE member_number = ?`).get(memberNumber.trim()) as SqliteMember | undefined;
+  if (!member) throw new StoreError(`ไม่พบสมาชิก ${memberNumber} ในระบบ`);
+  if (member.status !== "active") throw new StoreError(`สมาชิกถูกระงับการใช้งาน · ${member.memberNumber}`);
+  if (member.accountClosed) throw new StoreError("บัญชีรอบนี้ปิดแล้ว ต้องรับคืนบัตรและจ่ายบัตรใหม่ก่อนทำรายการ");
+  if (!member.cardNumber?.trim()) throw new StoreError("สมาชิกยังไม่มีบัตร กรุณาจ่ายบัตรก่อนทำรายการ");
+  const card = db.prepare(`SELECT status, assigned_member_number AS assignedMemberNumber FROM physical_cards WHERE card_number = ? AND archived_at IS NULL`).get(member.cardNumber) as { status: PhysicalCardStatus; assignedMemberNumber: string | null } | undefined;
+  if (!card || card.status !== "assigned" || card.assignedMemberNumber !== member.memberNumber) {
+    throw new StoreError("บัตรไม่พร้อมใช้งาน กรุณาตรวจสอบสถานะและการผูกบัตร");
+  }
+  const session = db.prepare(`SELECT id FROM card_usage_sessions WHERE card_number = ? AND member_number = ? AND ended_at IS NULL`).get(member.cardNumber, member.memberNumber);
+  if (!session) throw new StoreError("ไม่พบรอบใช้งานของบัตร กรุณารับคืนและจ่ายบัตรใหม่");
+  return member;
+}
+
 export function listPhysicalCards(db: SqliteDb, status?: PhysicalCardStatus | "all", search?: string): PhysicalCardRow[] {
   const conditions: string[] = ["archived_at IS NULL"];
   const params: (string | number)[] = [];
@@ -2292,12 +2308,8 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
   const total = round2(subtotal - discount);
 
   let member: SqliteMember | undefined;
-  if (isWallet) {
-    member = db.prepare(`SELECT id, member_number as memberNumber, prename, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, photo_url as photoUrl, gender, credit_limit as creditLimit FROM members WHERE member_number = ?`).get(input.memberNumber!.trim()) as SqliteMember | undefined;
-    if (!member) throw new StoreError(`ไม่พบสมาชิก ${input.memberNumber} ในระบบ`);
-    if (member.status !== "active") throw new StoreError(`สมาชิกถูกระงับการใช้งาน · ${member.memberNumber}`);
-    const account = db.prepare(`SELECT account_closed FROM members WHERE member_number = ?`).get(member.memberNumber) as { account_closed: number };
-    if (account.account_closed) throw new StoreError("บัญชีรอบนี้ปิดแล้ว ไม่สามารถซื้อด้วยเงินสมาชิกได้");
+  if (input.memberNumber?.trim()) member = requireUsableMemberCard(db, input.memberNumber);
+  if (isWallet && member) {
     if (member.balance < total) throw new StoreError(`ยอดเงินคงเหลือไม่พอ · ยอดชำระ ${money(total)} คงเหลือ ${money(member.balance)}`);
     // Req 23.2 — วงเงินซื้อสินค้าต่อวัน: wallet bills of TODAY plus this bill
     // must stay within the member's credit limit (null = ไม่จำกัด).
@@ -2309,10 +2321,6 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
         throw new StoreError(`เกินวงเงินซื้อสินค้าต่อวัน · วงเงิน ${money(member.creditLimit)} · ใช้ไปแล้ววันนี้ ${money(usedToday)} · บิลนี้ ${money(total)}`);
       }
     }
-  } else if (input.memberNumber?.trim()) {
-    // Cash / QR bills can still be tied to a member — the receipt then shows
-    // ผู้ทำรายการ + ยอดคงเหลือล่าสุด of that member (no deduction happens).
-    member = db.prepare(`SELECT id, member_number as memberNumber, prename, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, photo_url as photoUrl, gender, credit_limit as creditLimit FROM members WHERE member_number = ?`).get(input.memberNumber.trim()) as SqliteMember | undefined;
   }
 
   const now = new Date();
@@ -2696,18 +2704,12 @@ export function walletTx(db: SqliteDb, input: WalletTxInput) {
   }
   if (!(input.amount > 0)) throw new StoreError("จำนวนเงินต้องมากกว่า 0");
   const amount = round2(input.amount);
-  const member = db.prepare(`SELECT id, member_number as memberNumber, prename, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, credit_limit as creditLimit, card_number as cardNumber, patient_code as patientCode FROM members WHERE member_number = ?`).get(input.memberNumber?.trim()) as SqliteMember | undefined;
+  // Refund is a recovery operation: it must remain available for lost/damaged cards.
+  const member = input.type === "refund"
+    ? getMemberByNumber(db, input.memberNumber?.trim() ?? "")
+    : requireUsableMemberCard(db, input.memberNumber);
   if (!member) throw new StoreError(`ไม่พบสมาชิก ${input.memberNumber} ในระบบ`);
-  if (member.status !== "active") throw new StoreError(`สมาชิกถูกระงับการใช้งาน · ${member.memberNumber}`);
-  if (input.type === "deposit") {
-    const account = db.prepare(`SELECT account_closed FROM members WHERE member_number = ?`).get(member.memberNumber) as { account_closed: number };
-    if (account.account_closed) throw new StoreError("บัญชีรอบนี้ปิดแล้ว ต้องรับคืนบัตรและจ่ายบัตรใหม่ก่อนเติมเงิน");
-    if (!member.cardNumber) throw new StoreError("สมาชิกยังไม่มีบัตร กรุณาจ่ายบัตรก่อนเติมเงิน");
-    const card = db.prepare(`SELECT status, assigned_member_number FROM physical_cards WHERE card_number = ? AND archived_at IS NULL`).get(member.cardNumber) as { status: string; assigned_member_number: string | null } | undefined;
-    if (!card || card.status !== "assigned" || card.assigned_member_number !== member.memberNumber) {
-      throw new StoreError("บัตรไม่พร้อมใช้งาน กรุณาตรวจสอบการจ่ายบัตรก่อนเติมเงิน");
-    }
-  }
+  if (input.type === "refund" && member.status !== "active") throw new StoreError(`สมาชิกถูกระงับการใช้งาน · ${member.memberNumber}`);
   // FIX-4 issue 3 — SQLite stores REAL as IEEE-754 double, so a stored 99.99
   // may come back as 99.98999999999. Comparing raw balance < amount would
   // reject a refund that exactly matches the displayed balance. Round both
