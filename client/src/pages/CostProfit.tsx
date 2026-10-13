@@ -53,7 +53,7 @@ export default function CostProfit() {
     setFrom(next === "month" ? localDate(new Date(today.getFullYear(), today.getMonth(), 1)) : localDate(today));
   }
   return <section className="cost-profit-page">
-    <SectionHeader eyebrow="การเงิน" title="ต้นทุนและกำไร" description="" />
+    <SectionHeader eyebrow="การเงิน" title="ต้นทุนและกำไร" description="สินค้าที่ยังไม่มีต้นทุนจะใช้ราคาขายเป็นต้นทุนประเมิน เพื่อไม่ให้กำไรสูงเกินจริง" />
     <div className="cost-profit-filters">
       <div className="cost-profit-ranges" aria-label="ช่วงเวลาต้นทุนและกำไร">
         {([['today', 'วันนี้'], ['month', 'เดือนนี้'], ['custom', 'กำหนดเอง']] as const).map(([value, label]) =>

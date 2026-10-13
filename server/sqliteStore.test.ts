@@ -5,6 +5,7 @@ import {
   closeBusinessDay,
   createProduct,
   createSqliteStore,
+  dailySalesRows,
   decideLimitRequest,
   getMemberDetail,
   getMemberNumberMode,
@@ -15,6 +16,8 @@ import {
   memberTransactions,
   requestLimitReduction,
   registerMember,
+  salesByCashier,
+  salesByCategory,
   salesLineItems,
   salesByProduct,
   seedSqliteDemoData,
@@ -237,6 +240,26 @@ describe("per-product sales report (salesByProduct)", () => {
     // Sorted by revenue DESC; the from/to range is respected (a past window sees nothing).
     expect(rows.map((row) => row.revenue)).toEqual([40, 21, 20]);
     expect(salesByProduct(db, { from: "2020-01-01", to: "2020-01-02" })).toEqual([]);
+  });
+
+  it("uses the sale price as estimated cost when a product has no cost", () => {
+    db = createSqliteStore();
+    const missingCost = createProduct(db, { name: "สินค้ายังไม่ลงต้นทุน", sku: "NO-COST-001", category: "ทดสอบ", price: 50, cost: 0, stock: 10 });
+    const costed = createProduct(db, { name: "สินค้ามีต้นทุน", sku: "COSTED-001", category: "ทดสอบ", price: 50, cost: 30, stock: 10 });
+
+    checkout(db, {
+      items: [{ productId: missingCost.id, qty: 2 }, { productId: costed.id, qty: 1 }],
+      paymentMethod: "เงินสด",
+      cashier: "ผู้ทดสอบกำไร",
+    });
+
+    const productRows = salesByProduct(db, {});
+    expect(productRows.find(row => row.productId === missingCost.id)).toMatchObject({ revenue: 100, cogs: 100, profit: 0, marginPct: 0 });
+    expect(productRows.find(row => row.productId === costed.id)).toMatchObject({ revenue: 50, cogs: 30, profit: 20, marginPct: 40 });
+
+    expect(dailySalesRows(db, 1)[0]).toMatchObject({ revenue: 150, cogs: 130, profit: 20 });
+    expect(salesByCategory(db, {})[0]).toMatchObject({ revenue: 150, cogs: 130, profit: 20 });
+    expect(salesByCashier(db, {})[0]).toMatchObject({ total: 150, cogs: 130, profit: 20 });
   });
 });
 

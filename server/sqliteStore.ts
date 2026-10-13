@@ -3125,6 +3125,17 @@ function resolveRangeDates(input: DailyRangeInput): { fromDate: Date; toDate: Da
   return { fromDate, toDate };
 }
 
+/**
+ * Cost used by profit reports. A product whose sale-time cost is zero has not
+ * been costed yet, so treating it as free would overstate profit. Estimate its
+ * cost from the sale price instead, making that line's provisional profit zero.
+ * Special lines are excluded because they are not products with a cost field.
+ */
+const REPORT_COGS_SQL = `CASE
+  WHEN si.product_id IS NOT NULL AND COALESCE(si.cost, 0) <= 0 THEN si.qty * si.price
+  ELSE COALESCE(si.cost_total_satang / 100.0, si.qty * si.cost, 0)
+END`;
+
 export function dailySalesRows(db: SqliteDb, input: number | DailyRangeInput = 30): DailySalesRow[] {
   const options: DailyRangeInput = typeof input === "number" ? { days: input } : (input ?? {});
   const { fromDate, toDate } = resolveRangeDates(options);
@@ -3136,7 +3147,7 @@ export function dailySalesRows(db: SqliteDb, input: number | DailyRangeInput = 3
     salesByDay.set(row.date, { orders: row.orders, revenue: round2(row.revenue) });
   }
   const itemsByDay = new Map<string, { items: number; cogs: number }>();
-  for (const row of db.prepare(`SELECT substr(s.created_at, 1, 10) AS date, COALESCE(SUM(si.qty), 0) AS items, ROUND(COALESCE(SUM(COALESCE(si.cost_total_satang / 100.0, si.qty * si.cost)), 0), 2) AS cogs FROM sales s JOIN sale_items si ON si.sale_id = s.id WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY date`).all(since, until, ...filter.params) as unknown as { date: string; items: number; cogs: number }[]) {
+  for (const row of db.prepare(`SELECT substr(s.created_at, 1, 10) AS date, COALESCE(SUM(si.qty), 0) AS items, ROUND(COALESCE(SUM(${REPORT_COGS_SQL}), 0), 2) AS cogs FROM sales s JOIN sale_items si ON si.sale_id = s.id WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY date`).all(since, until, ...filter.params) as unknown as { date: string; items: number; cogs: number }[]) {
     itemsByDay.set(row.date, { items: row.items, cogs: round2(row.cogs) });
   }
   const rows: DailySalesRow[] = [];
@@ -3162,7 +3173,7 @@ export function salesByCategory(db: SqliteDb, input: DailyRangeInput = {}): Sale
   const since = `${formatDate(fromDate)} 00:00:00`;
   const until = `${formatDate(toDate)} 23:59:59`;
   const filter = cashierWhere("s", input);
-  const rows = db.prepare(`SELECT COALESCE(NULLIF(TRIM(p.category), ''), 'ไม่ระบุหมวด') AS category, COUNT(DISTINCT si.sale_id) AS orders, COALESCE(SUM(si.qty), 0) AS qty, ROUND(COALESCE(SUM(si.qty * si.price), 0), 2) AS revenue, ROUND(COALESCE(SUM(COALESCE(si.cost_total_satang / 100.0, si.qty * si.cost)), 0), 2) AS cogs FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY category ORDER BY revenue DESC`).all(since, until, ...filter.params) as unknown as { category: string; orders: number; qty: number; revenue: number; cogs: number }[];
+  const rows = db.prepare(`SELECT COALESCE(NULLIF(TRIM(p.category), ''), 'ไม่ระบุหมวด') AS category, COUNT(DISTINCT si.sale_id) AS orders, COALESCE(SUM(si.qty), 0) AS qty, ROUND(COALESCE(SUM(si.qty * si.price), 0), 2) AS revenue, ROUND(COALESCE(SUM(${REPORT_COGS_SQL}), 0), 2) AS cogs FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY category ORDER BY revenue DESC`).all(since, until, ...filter.params) as unknown as { category: string; orders: number; qty: number; revenue: number; cogs: number }[];
   return rows.map((row) => { const profit = round2(row.revenue - row.cogs); return { ...row, qty: Number(row.qty), cogs: round2(row.cogs), profit, marginPct: row.revenue > 0 ? round2((profit / row.revenue) * 100) : 0 }; });
 }
 
@@ -3191,7 +3202,7 @@ export function salesByProduct(db: SqliteDb, input: DailyRangeInput = {}): Sales
   const since = `${formatDate(fromDate)} 00:00:00`;
   const until = `${formatDate(toDate)} 23:59:59`;
   const filter = cashierWhere("s", input);
-  const rows = db.prepare(`SELECT si.product_id AS productId, CASE WHEN si.product_id IS NULL THEN 'รายการพิเศษ' ELSE COALESCE(p.name, si.name) END AS name, p.sku AS sku, p.barcode AS barcode, NULLIF(TRIM(p.category), '') AS category, COUNT(DISTINCT si.sale_id) AS bills, COALESCE(SUM(si.qty), 0) AS qty, ROUND(COALESCE(SUM(si.qty * si.price), 0), 2) AS revenue, ROUND(COALESCE(SUM(COALESCE(si.cost_total_satang / 100.0, si.qty * si.cost)), 0), 2) AS cogs FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY si.product_id ORDER BY revenue DESC`).all(since, until, ...filter.params) as unknown as { productId: number | null; name: string; sku: string | null; barcode: string | null; category: string | null; bills: number; qty: number; revenue: number; cogs: number }[];
+  const rows = db.prepare(`SELECT si.product_id AS productId, CASE WHEN si.product_id IS NULL THEN 'รายการพิเศษ' ELSE COALESCE(p.name, si.name) END AS name, p.sku AS sku, p.barcode AS barcode, NULLIF(TRIM(p.category), '') AS category, COUNT(DISTINCT si.sale_id) AS bills, COALESCE(SUM(si.qty), 0) AS qty, ROUND(COALESCE(SUM(si.qty * si.price), 0), 2) AS revenue, ROUND(COALESCE(SUM(${REPORT_COGS_SQL}), 0), 2) AS cogs FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY si.product_id ORDER BY revenue DESC`).all(since, until, ...filter.params) as unknown as { productId: number | null; name: string; sku: string | null; barcode: string | null; category: string | null; bills: number; qty: number; revenue: number; cogs: number }[];
   return rows.map((row) => { const profit = round2(row.revenue - row.cogs); return { ...row, bills: Number(row.bills), qty: Number(row.qty), cogs: round2(row.cogs), profit, marginPct: row.revenue > 0 ? round2((profit / row.revenue) * 100) : 0 }; });
 }
 
@@ -3233,7 +3244,7 @@ export function salesByCashier(db: SqliteDb, input: DailyRangeInput = {}): Sales
   const since = `${formatDate(fromDate)} 00:00:00`;
   const until = `${formatDate(toDate)} 23:59:59`;
   const filter = cashierWhere("s", input);
-  const base = db.prepare(`SELECT COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, COUNT(*) AS orders, ROUND(COALESCE(SUM(s.discount), 0), 2) AS discount, ROUND(COALESCE(SUM(s.total), 0), 2) AS total, SUM(CASE WHEN s.member_number IS NOT NULL AND s.member_number != '' THEN 1 ELSE 0 END) AS memberBills, ROUND(COALESCE(SUM(COALESCE(si.cost_total_satang / 100.0, si.qty * si.cost)), 0), 2) AS cogs FROM sales s LEFT JOIN sale_items si ON si.sale_id = s.id WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY cashier ORDER BY total DESC`).all(since, until, ...filter.params) as unknown as { cashier: string; orders: number; discount: number; total: number; memberBills: number; cogs: number }[];
+  const base = db.prepare(`SELECT COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, COUNT(*) AS orders, ROUND(COALESCE(SUM(s.discount), 0), 2) AS discount, ROUND(COALESCE(SUM(s.total), 0), 2) AS total, SUM(CASE WHEN s.member_number IS NOT NULL AND s.member_number != '' THEN 1 ELSE 0 END) AS memberBills, ROUND(COALESCE(SUM(sale_costs.cogs), 0), 2) AS cogs FROM sales s LEFT JOIN (SELECT si.sale_id, SUM(${REPORT_COGS_SQL}) AS cogs FROM sale_items si GROUP BY si.sale_id) sale_costs ON sale_costs.sale_id = s.id WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY cashier ORDER BY total DESC`).all(since, until, ...filter.params) as unknown as { cashier: string; orders: number; discount: number; total: number; memberBills: number; cogs: number }[];
   const itemsByCashier = new Map<string, number>();
   for (const row of db.prepare(`SELECT COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, COALESCE(SUM(si.qty), 0) AS items FROM sales s JOIN sale_items si ON si.sale_id = s.id WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY cashier`).all(since, until, ...filter.params) as unknown as { cashier: string; items: number }[]) {
     itemsByCashier.set(row.cashier, Number(row.items));

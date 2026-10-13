@@ -75,7 +75,7 @@ try {
   await click('เดือนนี้');
   await page.click('#cost-profit-tab-daily');
   const expected = checkDb.prepare("SELECT COUNT(*) bills, ROUND(COALESCE(SUM(total),0),2) revenue FROM sales WHERE COALESCE(voided,0)=0 AND created_at >= ? AND created_at <= ?").get(`${start} 00:00:00`, `${date} 23:59:59`);
-  const expectedCost = checkDb.prepare("SELECT ROUND(COALESCE(SUM(COALESCE(si.cost_total_satang/100.0,si.qty*si.cost)),0),2) cogs FROM sale_items si JOIN sales s ON s.id=si.sale_id WHERE COALESCE(s.voided,0)=0 AND s.created_at >= ? AND s.created_at <= ?").get(`${start} 00:00:00`, `${date} 23:59:59`).cogs;
+  const expectedCost = checkDb.prepare("SELECT ROUND(COALESCE(SUM(CASE WHEN si.product_id IS NOT NULL AND COALESCE(si.cost,0)<=0 THEN si.qty*si.price ELSE COALESCE(si.cost_total_satang/100.0,si.qty*si.cost,0) END),0),2) cogs FROM sale_items si JOIN sales s ON s.id=si.sale_id WHERE COALESCE(s.voided,0)=0 AND s.created_at >= ? AND s.created_at <= ?").get(`${start} 00:00:00`, `${date} 23:59:59`).cogs;
   assert.ok(expected.bills > 0, 'Monthly verification requires actual sales in the copied database');
   await page.waitForFunction(bills => {
     const tables = [...document.querySelectorAll('.cost-profit-table')];
@@ -83,7 +83,7 @@ try {
   }, {}, expected.bills);
   const displayed = await page.$$eval('.cost-profit-cards strong', nodes => nodes.map(n => Number(n.textContent.replace(/[^0-9.\-]/g,''))));
   assert.equal(displayed[0], expected.revenue, 'Net sales must match non-voided bills');
-  assert.equal(displayed[1], expectedCost, 'Cost must match sale-time cost snapshots');
+  assert.equal(displayed[1], expectedCost, 'Cost must use sale price when a product has no cost snapshot');
   assert.equal(displayed[2], Math.round((expected.revenue-expectedCost)*100)/100, 'Profit must match sales minus cost');
   const expectedProducts = checkDb.prepare("SELECT COUNT(DISTINCT si.product_id) n FROM sale_items si JOIN sales s ON s.id=si.sale_id WHERE COALESCE(s.voided,0)=0 AND s.created_at >= ? AND s.created_at <= ?").get(`${start} 00:00:00`, `${date} 23:59:59`).n;
   assert.equal(await page.$$eval('[role="tabpanel"]', nodes => nodes.length), 1);
