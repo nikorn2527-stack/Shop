@@ -568,6 +568,8 @@ const settingsPatchInput = z
     goliveChecks: z.string().max(4000).optional(),
     // ROUND 63 (user) — บัญชีพร้อมเพย์ร้าน: เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก
     promptpayId: z.string().max(20).optional(),
+    // FIX (user) — หน้า QR แสดงช่องทางไหน: qr = QR อย่างเดียว · bank = บัญชีอย่างเดียว · both = ทั้งคู่ (ค่าเดิม)
+    qrDisplayMode: z.enum(["qr", "bank", "both"]).optional(),
     // FIX-5 (user) — บัญชีธนาคารร้าน (รับเงินโอน): หลายบัญชีได้ · ผู้บริหารเพิ่ม/ลบ/แก้ที่ ตั้งค่า → การชำระเงิน
     // รูปแบบเดียวกับ BankAccount ใน server/sqliteStore.ts (id/bankCode/bankName/accountNumber/accountName/branch/active/note)
     bankAccounts: z

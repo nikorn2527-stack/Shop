@@ -5091,6 +5091,8 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 /* FIX (user) — สรุปบิลเป็น 2 คอลัมน์: ลดความสูง ~120px ให้ช่องเงินสด/QR + ปุ่มยืนยันอยู่หน้าจอเดียวกัน */
 .pay-confirm-rows { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .pay-confirm-rows > div { min-width: 0; }
+/* FIX (user) — แถวสรุปบิล (สมาชิก/ผู้ซื้อ/ผู้ทำรายการ): ค่าฝั่งขวาตัดไข่ปลา ไม่แตกบรรทัดแปลก */
+.pay-confirm-rows > div > b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pay-confirm-rows > div:not(.pay-confirm-total):nth-child(odd) { border-right: 1px solid #f0f4f1; }
 .pay-confirm-rows > .pay-confirm-total { grid-column: 1 / -1; }
 /* แถบเตือนเงินสมาชิกไม่พอ: โฟกัสอัตโนมัติได้ (ไม่เห็นเส้นขอบ focus แต่ขอทำไฮไลต์นุ่ม ๆ ให้แคชเชียร์รู้ว่าระบบพาไปที่เตือน) */
@@ -5120,6 +5122,8 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .pay-confirm-items { max-height: 168px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #c3d6cc transparent; }
 .pay-confirm-items::-webkit-scrollbar { width: 6px; }
 .pay-confirm-items::-webkit-scrollbar-thumb { background: #c3d6cc; border-radius: 999px; }
+/* FIX (user) — toast แจ้งเพิ่มสินค้าต้องไม่บังหัวโมดัลยืนยันชำระ (z-index เดิม 400 ลอยทับ modal 50) */
+body:has(.pay-confirm-modal) [data-sonner-toaster] { z-index: 40; }
 @media (max-width: 560px) {
   /* FIX (user) — มือถือ: เดิมบังคับ 1 คอลัมน์ กินความสูง ~260px ดัน checkbox ยืนยัน/แถบเตือน ตกใต้ sticky footer
      → คง 2 คอลัมน์เหมือนเดสก์ท็อป (label สั้นพอ) ลดเหลือ ~164px */
@@ -5130,9 +5134,12 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
   .pay-confirm-item { grid-template-columns: minmax(0, 1fr) auto; row-gap: 2px; }
   .pay-confirm-item span { text-align: right; }
   /* ปุ่มล่าง: แถวเดียว (ยืนยัน flex:1 + ปุ่มรอง) แทน column-reverse 3 แถว กิน 161px */
-  .pay-confirm-modal .modal-actions { bottom: -15px; margin: 12px -15px -15px; padding: 10px 15px 11px; gap: 6px; }
-  .pay-confirm-modal .modal-actions .outline-button { width: auto; justify-content: center; }
-  .pay-confirm-button { min-height: 40px; }
+  .pay-confirm-modal .modal-actions { bottom: -15px; margin: 12px -15px -15px; padding: 10px 15px 11px; gap: 6px; flex-wrap: nowrap; }
+  .pay-confirm-modal .modal-actions .outline-button { width: auto; flex: 0 0 auto; justify-content: center; white-space: nowrap; font-size: 11px; padding-left: 10px; padding-right: 10px; }
+  .pay-confirm-button { min-height: 40px; white-space: nowrap; }
+  /* FIX (user) — มือถือโหมด QR: ยอด + QR + บัญชี + สลิป + ช่องติ๊ก ยาวเกินจอ → เผื่อที่ให้ sticky footer (~104px)
+     ไม่งั้นช่องติ๊กโดนบังครึ่งบรรทัด */
+  .pay-confirm-modal .pay-confirm-body { padding-bottom: 108px; }
   /* QR/สลิป/แถบตรวจสอบ กระชับพอให้เห็นในจอเดียว */
   .pay-confirm-modal .pay-qr-figure img { width: 96px; height: 96px; flex: 0 0 96px; }
   .pay-confirm-modal .pay-qr-figure { padding: 8px 10px; gap: 10px; }
@@ -5520,14 +5527,31 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
    ================================================================ */
 .pay-qr-block { margin-top: 12px; display: grid; gap: 10px; }
 /* FIX (user) — โมดัลยืนยัน: QR กระชับ (รูปเล็กลง/ช่องไฟลด) ให้ปุ่ม "ยืนยันการชำระเงิน" เห็นในหน้าจอเดียว */
-.pay-confirm-modal .pay-qr-block { margin-top: 8px; gap: 8px; }
-.pay-confirm-modal .pay-qr-figure { padding: 10px 12px; gap: 12px; }
-.pay-confirm-modal .pay-qr-figure img { width: 112px; height: 112px; flex: 0 0 112px; }
-.pay-confirm-modal .pay-slip-block { padding: 8px 10px; }
-.pay-confirm-modal .pay-verify-block { padding: 9px 12px; }
-.pay-confirm-modal .wallet-confirm-warning { padding: 7px 10px; }
+.pay-confirm-modal .pay-qr-block { margin-top: 6px; gap: 6px; }
+.pay-confirm-modal .pay-qr-figure { padding: 8px 10px; gap: 10px; }
+.pay-confirm-modal .pay-qr-figure img { width: 96px; height: 96px; flex: 0 0 96px; }
+.pay-confirm-modal .pay-slip-block { padding: 7px 9px; }
+.pay-confirm-modal .pay-verify-block { padding: 8px 10px; }
+.pay-confirm-modal .wallet-confirm-warning { padding: 6px 9px; }
+/* FIX (user) — โหมด QR ยาวเกิน 768px จนช่องติ๊กหลุดจอ: ย่อรายการ+สรุปบิลเฉพาะโหมด QR ให้หัว+QR+ช่องติ๊ก+ปุ่มอยู่จอเดียว */
+/* FIX (user) — QR mode ยังยาวเกินจอ (รายการ+บัญชี+สลิป) → ตัดรายการเป็น 2 แถว, สรุปบิลบางลง, บัญชีสูงจำกัด
+   เพื่อให้ช่องติ๊ก "ตรวจสอบการชำระเงิน" + ปุ่มยืนยัน ขึ้นจอเดียวทั้ง 1366x768 และมือถือ */
+.pay-confirm-modal:has(.pay-qr-block) .pay-confirm-items { max-height: 54px; }
+.pay-confirm-modal:has(.pay-qr-block) .pay-confirm-rows > div { padding: 4px 12px; font-size: 11px; }
+.pay-confirm-modal:has(.pay-qr-block) .pay-confirm-items-head, .pay-confirm-modal:has(.pay-qr-block) .pay-confirm-item { padding-top: 5px; padding-bottom: 5px; }
+.pay-confirm-modal:has(.pay-qr-block) .pay-confirm-total b { font-size: 15px; }
+.pay-confirm-modal:has(.pay-qr-block) .pay-bank-list { max-height: 104px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.pay-confirm-modal:has(.pay-qr-block) .pay-slip-actions .outline-button { min-height: 32px; padding: 5px 10px; font-size: 11px; }
+/* FIX (user) — โหมด QR แต่ละบัญชีธนาคารกิน ~60px: ย่อแถว+ซ่อน hint ให้ช่องติ๊กขึ้นจอ */
+.pay-confirm-modal:has(.pay-qr-block) .pay-bank-row { padding: 5px 8px; }
+.pay-confirm-modal:has(.pay-qr-block) .pay-bank-hint { display: none; }
+.pay-confirm-modal:has(.pay-qr-block) .pay-confirm-body { gap: 8px; margin-top: 0; }
+/* FIX (user) — โหมด QR ยาวปริ่มจอ 768px: แถบเตือนท้ายซ้ำกับหัวโมดัล ซ่อนเฉพาะโหมด QR ให้ช่องติ๊ก+ปุ่มอยู่จอเดียว */
+.pay-confirm-modal:has(.pay-qr-block) .wallet-confirm-warning { display: none; }
 .pay-qr-figure { display: flex; align-items: center; gap: 14px; border: 1px solid #dbece5; background: #f6fbf8; border-radius: 10px; padding: 12px; }
 .pay-qr-figure img { width: 150px; height: 150px; border-radius: 8px; border: 1px solid #d8e8e0; background: #fff; flex: 0 0 150px; }
+/* FIX (user) — ช่องขวาของ QR ว่าง: ให้แคปชันยืดเต็มที่ (ยอด+พร้อมเพย์+ปุ่มคัดลอกอยู่แถวเดียวกับ QR ไม่กินแถวเพิ่ม) */
+.pay-qr-caption { flex: 1; min-width: 0; }
 .pay-qr-caption b { display: flex; align-items: center; gap: 6px; color: #2d5c4a; font-size: 14px; }
 .pay-qr-caption small { display: block; color: #6a705f; font-size: 11.5px; font-weight: 500; line-height: 1.5; margin-top: 6px; }
 .pay-qr-missing { display: flex; gap: 8px; align-items: flex-start; color: #8a6a2f; background: #fff8e8; border: 1px solid #f0dcae; border-radius: 8px; padding: 10px 11px; font-size: 11.5px; font-weight: 500; line-height: 1.55; }

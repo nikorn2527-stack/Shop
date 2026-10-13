@@ -134,7 +134,7 @@ try {
     return row?.querySelector('b')?.textContent ?? '(missing)';
   });
   console.log('QR_ITEMS_ROW', qrItems);
-  if (!qrItems.endsWith('รายการ') || qrItems.includes('แถว')) throw new Error(`item-count row should say "N รายการ" (no แถว/ชิ้น mix), got: ${qrItems}`);
+  if (!qrItems.endsWith('ชิ้น') || !qrItems.includes('รายการ')) throw new Error(`item-count row should say "N รายการ · M ชิ้น" in one row, got: ${qrItems}`);
   const qrLayout = await page.evaluate(() => {
     const pick = sel => { const el = document.querySelector(sel); if (!el) return null; const r = el.getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom), inView: r.top >= 0 && r.bottom <= window.innerHeight }; };
     return { confirm: pick('.pay-confirm-button'), qrFigure: pick('.pay-qr-figure'), verify: pick('.pay-verify-block') };

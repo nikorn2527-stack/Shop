@@ -198,6 +198,8 @@ type SettingsForm = {
   promptpayId: string;
   /** FIX-5 (user) — บัญชีธนาคารร้าน (รับเงินโอน) หลายบัญชีได้ · แสดงที่หน้า POS + ใบเสร็จ */
   bankAccounts: BankAccount[];
+  /** FIX (user) — หน้า QR/ยืนยันชำระ แสดงช่องทางไหน: qr = QR อย่างเดียว · bank = บัญชีอย่างเดียว · both = ทั้งคู่ */
+  qrDisplayMode: "qr" | "bank" | "both";
   /** ROUND 68 (user) — เบอร์โทรศูนย์ช่วยเหลือ แสดงท้ายหน้าจอ (footer) · ว่าง = ไม่แสดง */
   helpPhone: string;
 };
@@ -229,6 +231,7 @@ const SETTINGS_FIELD_LABELS: [keyof SettingsForm, string][] = [
   ["dailyCutOffMode", "โหมดตัดยอดรายวัน"],
   ["dailyCutOffTime", "เวลาตัดยอดรายวัน"],
   ["promptpayId", "บัญชีพร้อมเพย์ร้าน"],
+  ["qrDisplayMode", "ช่องทางหน้า QR"],
   ["bankAccounts", "บัญชีธนาคารร้าน"],
   ["helpPhone", "เบอร์ศูนย์ช่วยเหลือ"],
   ["devAccess", "การเข้าใช้งานสำหรับผู้พัฒนา"],
@@ -2389,6 +2392,42 @@ export function Settings({
                     </span>
                   </div>
                 )}
+              </section>
+              <section className="panel settings-card">
+                <div className="settings-heading">
+                  <div>
+                    <h2>หน้า QR ให้ลูกค้าเห็นอะไร</h2>
+                    <p>เลือกแล้วบันทึกทันที ไม่ต้องกดบันทึกท้ายหน้า</p>
+                  </div>
+                  <QrCode size={20} className="muted-icon" />
+                </div>
+                <div className="number-mode-grid">
+                  {([
+                    ["qr", "QR พร้อมเพย์อย่างเดียว", "เหมาะกับร้านที่ใช้ QR เป็นหลัก"],
+                    ["bank", "บัญชีธนาคารอย่างเดียว", "เหมาะกับร้านที่รับโอนเข้าบัญชี"],
+                    ["both", "โชว์ทั้งคู่", "ลูกค้าเลือกสแกนหรือโอนก็ได้"],
+                  ] as const).map(([value, title, detail]) => (
+                    <button
+                      className={(form?.qrDisplayMode ?? "both") === value ? "selected" : ""}
+                      key={value}
+                      onClick={() => {
+                        if (!form) return;
+                        updateForm({ qrDisplayMode: value });
+                        saveMutation.mutate({ qrDisplayMode: value });
+                      }}
+                      disabled={!form || saveMutation.isPending}
+                      type="button"
+                    >
+                      <span className="number-radio">
+                        {(form?.qrDisplayMode ?? "both") === value && <i />}
+                      </span>
+                      <span>
+                        <b>{title}</b>
+                        <small>{detail}</small>
+                      </span>
+                    </button>
+                  ))}
+                </div>
               </section>
               <BankAccountsPanel
                 value={form?.bankAccounts ?? []}
