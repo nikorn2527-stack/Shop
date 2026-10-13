@@ -5555,6 +5555,7 @@ body:has(.pay-confirm-modal) [data-sonner-toaster] { z-index: 40; }
 .pay-qr-caption b { display: flex; align-items: center; gap: 6px; color: #2d5c4a; font-size: 14px; }
 .pay-qr-caption small { display: block; color: #6a705f; font-size: 11.5px; font-weight: 500; line-height: 1.5; margin-top: 6px; }
 .pay-qr-missing { display: flex; gap: 8px; align-items: flex-start; color: #8a6a2f; background: #fff8e8; border: 1px solid #f0dcae; border-radius: 8px; padding: 10px 11px; font-size: 11.5px; font-weight: 500; line-height: 1.55; }
+.pay-bank-missing { display: flex; gap: 8px; align-items: flex-start; color: #5b7d72; background: #f5faf7; border: 1px dashed #c9dfd4; border-radius: 8px; padding: 10px 11px; font-size: 11.5px; font-weight: 500; line-height: 1.55; }
 .pay-slip-block { border: 1px dashed #cfe4db; border-radius: 9px; padding: 10px; background: #fcfefd; }
 .pay-slip-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .pay-slip-file { cursor: pointer; }

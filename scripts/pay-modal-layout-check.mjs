@@ -7,6 +7,10 @@ import { DatabaseSync, backup } from 'node:sqlite';
 import puppeteer from 'puppeteer';
 import { createAppSession, setSettings } from '../server/sqliteStore.ts';
 
+const displayMode = ['qr', 'bank', 'both'].includes(process.env.QR_DISPLAY_MODE ?? '') ? process.env.QR_DISPLAY_MODE : 'both';
+const bankEmpty = process.env.QR_BANK_EMPTY === '1';
+const promptpayEmpty = process.env.QR_PROMPTPAY_EMPTY === '1';
+
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pay-modal-'));
 const dbPath = path.join(dir, 'test.sqlite');
 const source = new DatabaseSync(path.resolve('data/welfare-store.sqlite'), { readOnly: true });
@@ -16,7 +20,7 @@ const db = new DatabaseSync(dbPath);
 const user = db.prepare("SELECT id FROM app_users WHERE active=1 AND role IN ('dev','admin','administrator','manager') LIMIT 1").get();
 if (!user) throw new Error('need admin');
 const session = createAppSession(db, user.id);
-setSettings(db, { promptpayId: '0812345678', posRailHidden: '[]', posShortcutKeys: '{}', receiptPaperWidth: '72' });
+setSettings(db, { promptpayId: promptpayEmpty ? '' : '0812345678', posRailHidden: '[]', posShortcutKeys: '{}', receiptPaperWidth: '72', qrDisplayMode: displayMode, bankAccounts: bankEmpty ? [] : [{ id: 'qa-bank', bankCode: 'KBANK', bankName: 'QA Bank', accountNumber: '1234567890', accountName: 'QA Account', branch: '', active: true, note: '' }] });
 const product = db.prepare("SELECT * FROM products WHERE active=1 AND barcode IS NOT NULL AND barcode<>'' LIMIT 1").get();
 if (!product) throw new Error('need product');
 db.close();
@@ -115,19 +119,30 @@ try {
   await page.waitForSelector('.pay-confirm-modal', { hidden: true });
   await click('QR / สแกน');
   await page.waitForSelector('.pay-confirm-modal');
-  await page.waitForSelector('.pay-qr-figure img', { timeout: 10000 });
-  const qrCaption = await page.$eval('.pay-qr-caption', el => el.textContent);
-  console.log('QR_CAPTION', qrCaption);
-  if (!qrCaption.includes('สแกนจ่าย')) throw new Error(`QR caption should say สแกนจ่าย, got: ${qrCaption}`);
-  if (!qrCaption.includes('พร้อมเพย์ 0812345678')) throw new Error(`QR caption should show PromptPay account number, got: ${qrCaption}`);
-  if (qrCaption.includes('เปิดแอปธนาคาร')) throw new Error('QR caption still has long AI-style explanation');
+  if (displayMode !== 'bank') await page.waitForSelector(promptpayEmpty ? '.pay-qr-missing' : '.pay-qr-figure img', { timeout: 10000 });
+  const qrVisible = await page.$('.pay-qr-figure img') !== null;
+  const qrMissingVisible = await page.$('.pay-qr-missing') !== null;
+  const bankVisible = await page.$('.pay-bank-accounts') !== null;
+  const bankMissingVisible = await page.$('.pay-bank-missing') !== null;
+  console.log('QR_DISPLAY_MODE', displayMode, { qrVisible, qrMissingVisible, bankVisible, bankMissingVisible });
+  if (qrVisible !== (displayMode !== 'bank' && !promptpayEmpty)) throw new Error(`QR visibility mismatch for ${displayMode}`);
+  if (qrMissingVisible !== (displayMode !== 'bank' && promptpayEmpty)) throw new Error(`PromptPay empty-state mismatch for ${displayMode}`);
+  if (bankVisible !== (displayMode !== 'qr' && !bankEmpty)) throw new Error(`bank visibility mismatch for ${displayMode}`);
+  if (bankMissingVisible !== (displayMode !== 'qr' && bankEmpty)) throw new Error(`bank empty-state mismatch for ${displayMode}`);
+  if (qrVisible) {
+    const qrCaption = await page.$eval('.pay-qr-caption', el => el.textContent);
+    console.log('QR_CAPTION', qrCaption);
+    if (!qrCaption.includes('สแกนจ่าย')) throw new Error(`QR caption should say สแกนจ่าย, got: ${qrCaption}`);
+    if (!qrCaption.includes('พร้อมเพย์ 0812345678')) throw new Error(`QR caption should show PromptPay account number, got: ${qrCaption}`);
+    if (qrCaption.includes('เปิดแอปธนาคาร')) throw new Error('QR caption still has long AI-style explanation');
+  }
   const qrActor = await page.evaluate(() => {
     const rows = [...document.querySelectorAll('.pay-confirm-rows > div')];
     const row = rows.find(r => r.querySelector('span')?.textContent === 'ผู้ทำรายการ');
     return row?.querySelector('b')?.textContent ?? '(missing)';
   });
   console.log('QR_ACTOR_ROW', qrActor);
-  if (qrActor === '(missing)' || qrActor.includes('·')) throw new Error(`actor row should be label ผู้ทำรายการ + name only (no role), got: ${qrActor}`);
+  if (qrActor !== '(missing)') throw new Error(`QR modal should not repeat the cashier row, got: ${qrActor}`);
   const qrItems = await page.evaluate(() => {
     const rows = [...document.querySelectorAll('.pay-confirm-rows > div')];
     const row = rows.find(r => r.querySelector('span')?.textContent === 'จำนวนรายการ');
@@ -158,7 +173,7 @@ try {
   if (!qrLayout.confirm?.inView) throw new Error('QR mode: confirm button not visible on same screen at 1366x768');
   if (!qrLayout.verify?.inView) throw new Error('QR mode: verify checkbox not visible at 1366x768');
   if (!mobile.confirm?.inView) throw new Error('confirm button not visible on mobile');
-  if (!mobile.qrFigure?.inView) throw new Error('QR figure not visible on mobile');
+  if (displayMode !== 'bank' && !promptpayEmpty && !mobile.qrFigure?.inView) throw new Error('QR figure not visible on mobile');
   if (errors.length) throw new Error('page errors: ' + errors.join('; '));
   console.log('PAY_MODAL_LAYOUT_PASS', dir);
 } finally {
