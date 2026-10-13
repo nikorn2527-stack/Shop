@@ -26,6 +26,19 @@ try {
   console.log('ACTIVE_ACCENT', accent);
   assert.equal(accent, '#1d4ed8', 'Every saved theme must migrate to Government Blue');
   assert.equal(await page.evaluate(() => document.documentElement.dataset.palette), 'government-blue');
+  const gradients = await page.evaluate(() => {
+    const image = selector => getComputedStyle(document.querySelector(selector)).backgroundImage;
+    return {
+      shell: image('.app-shell'),
+      page: image('.page-content'),
+      sidebar: image('.sidebar'),
+      surface: image('.pos-premium-bill'),
+    };
+  });
+  assert.ok(gradients.shell.includes('linear-gradient'), 'Application canvas must use a blue gradient');
+  assert.ok(gradients.page.includes('linear-gradient'), 'Workspace must use a blue gradient');
+  assert.ok(gradients.sidebar.includes('linear-gradient'), 'Sidebar must use a blue gradient');
+  assert.ok(gradients.surface.includes('linear-gradient'), 'Main surfaces must use a subtle gradient');
   await page.screenshot({ path: path.join(cfg.dir, 'iris-pos.png') });
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('pos-rail', { detail: 'receive' })));
   await page.waitForSelector('.stock-receive-modal');

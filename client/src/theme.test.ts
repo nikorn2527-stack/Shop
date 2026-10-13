@@ -15,6 +15,11 @@ describe('standard application palette', () => {
         expect(values.get('--teal-dark')).toBe('#163b73');
         expect(values.get('--teal-soft')).toBe('#dbeafe');
         expect(values.get('--teal-mist')).toBe('#eff6ff');
+        expect(values.get('--canvas-gradient')).toContain('linear-gradient');
+        expect(values.get('--workspace-gradient')).toContain('linear-gradient');
+        expect(values.get('--sidebar-gradient')).toContain('linear-gradient');
+        expect(values.get('--surface-gradient')).toContain('linear-gradient');
+        expect(values.get('--accent-gradient')).toContain('#163b73');
         expect(values.get('--app-secondary')).toBe('#0f766e');
         expect(values.get('--app-health')).toBe('#15803d');
       }
