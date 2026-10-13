@@ -62,6 +62,7 @@ import {
   PackageSearch,
   Palette,
   Pause,
+  Pencil,
   Plus,
   Printer,
   QrCode,
@@ -656,6 +657,8 @@ export function Settings({
     readFontScale()
   );
   const [form, setForm] = useState<SettingsForm | null>(null);
+  const [promptPayEditing, setPromptPayEditing] = useState(false);
+  const [promptPayDraft, setPromptPayDraft] = useState("");
   // Threshold input keeps raw digits while typing (cleared field = 0) —
   // committed into the shared form on every keystroke via updateForm.
   const [thresholdText, setThresholdText] = useState("");
@@ -1209,13 +1212,41 @@ export function Settings({
   };
   const savePromptPay = () => {
     if (!form) return;
-    const promptpayId = form.promptpayId.trim();
+    const promptpayId = promptPayDraft.trim();
     if (promptpayId && !isValidPromptPayId(promptpayId)) {
       toast.error("เลขพร้อมเพย์ไม่ถูกต้อง", { description: "ใช้เบอร์โทร 9–10 หลัก หรือเลขประจำตัวประชาชน 13 หลัก" });
       return;
     }
-    updateForm({ promptpayId });
-    saveMutation.mutate({ promptpayId });
+    saveMutation.mutate(
+      { promptpayId },
+      {
+        onSuccess: () => {
+          updateForm({ promptpayId });
+          setPromptPayEditing(false);
+        },
+      }
+    );
+  };
+  const startEditPromptPay = () => {
+    setPromptPayDraft(form?.promptpayId ?? "");
+    setPromptPayEditing(true);
+  };
+  const cancelEditPromptPay = () => {
+    setPromptPayDraft(form?.promptpayId ?? "");
+    setPromptPayEditing(false);
+  };
+  const copyPromptPay = async () => {
+    const promptpayId = form?.promptpayId.trim() ?? "";
+    if (!promptpayId) {
+      toast.error("ยังไม่มีเลขพร้อมเพย์ให้คัดลอก");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(promptpayId);
+      toast.success("คัดลอกเลขพร้อมเพย์แล้ว", { duration: 2200 });
+    } catch {
+      toast.error("คัดลอกไม่สำเร็จ", { description: promptpayId, duration: 4000 });
+    }
   };
   const togglePromptPay = () => {
     if (!form) return;
@@ -2378,46 +2409,55 @@ export function Settings({
                     <QrCode size={18} />
                   </div>
                   <div className="promptpay-details-info">
-                    <div className="form-grid">
-                      <label className="wide">
-                        เบอร์โทร / เลขประจำตัวประชาชน
-                        <input
-                          value={form?.promptpayId ?? ""}
-                          onChange={event =>
-                            updateForm({ promptpayId: event.target.value })
-                          }
-                          onBlur={savePromptPay}
-                          placeholder="เช่น 0812345678 หรือ 1234567890123"
-                          disabled={!form}
-                          maxLength={20}
-                          inputMode="numeric"
-                          title="ใช้เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก ของบัญชีพร้อมเพย์ที่รับเงินของร้าน"
-                        />
-                      </label>
-                    </div>
-                    {form?.promptpayActive === false ? (
-                      <div className="settings-inline-note amber">
-                        <CircleAlert size={16} />
-                        <span>ปิดรับเงินผ่านพร้อมเพย์อยู่</span>
-                      </div>
-                    ) : (form?.promptpayId ?? "").trim() === "" ? (
-                      <div className="settings-inline-note amber">
-                        <CircleAlert size={16} />
-                        <span>ยังไม่ได้ตั้งค่าพร้อมเพย์</span>
-                      </div>
-                    ) : !isValidPromptPayId(form?.promptpayId ?? "") ? (
-                      <div className="notice-bar error">
-                        <CircleAlert size={16} /> ใช้เบอร์โทร 9–10 หลัก หรือเลขประจำตัวประชาชน 13 หลัก
-                      </div>
-                    ) : (
-                      <div className="settings-inline-note">
-                        <ShieldCheck size={16} />
-                        <span>พร้อมสร้าง QR ตามยอดบิล</span>
-                      </div>
-                    )}
+                    <b>พร้อมเพย์</b>
+                    <small>
+                      {(form?.promptpayId ?? "").trim() || "ยังไม่ได้ตั้งค่าเลขพร้อมเพย์"}
+                      {form?.promptpayActive === false
+                        ? " · ปิดรับเงินอยู่"
+                        : (form?.promptpayId ?? "").trim()
+                          ? " · พร้อมสร้าง QR ตามยอดบิล"
+                          : ""}
+                    </small>
                   </div>
-                  <button type="button" className={`toggle promptpay-row-toggle ${form?.promptpayActive !== false ? "on" : ""}`} onClick={togglePromptPay} disabled={!form || saveMutation.isPending} aria-pressed={form?.promptpayActive !== false} aria-label={form?.promptpayActive !== false ? "ปิดรับเงินผ่านพร้อมเพย์" : "เปิดรับเงินผ่านพร้อมเพย์"} title={form?.promptpayActive !== false ? "ปิดรับเงินผ่านพร้อมเพย์" : "เปิดรับเงินผ่านพร้อมเพย์"}><span /></button>
+                  <div className="promptpay-row-actions">
+                    <button type="button" className="icon-button" onClick={() => void copyPromptPay()} disabled={!form?.promptpayId.trim()} title="คัดลอกเลขพร้อมเพย์" aria-label="คัดลอกเลขพร้อมเพย์">
+                      <Copy size={15} />
+                    </button>
+                    <button type="button" className="icon-button" onClick={startEditPromptPay} disabled={!form || saveMutation.isPending} title="แก้ไขเลขพร้อมเพย์" aria-label="แก้ไขเลขพร้อมเพย์">
+                      <Pencil size={15} />
+                    </button>
+                    <button type="button" className={`toggle promptpay-row-toggle ${form?.promptpayActive !== false ? "on" : ""}`} onClick={togglePromptPay} disabled={!form || saveMutation.isPending} aria-pressed={form?.promptpayActive !== false} aria-label={form?.promptpayActive !== false ? "ปิดรับเงินผ่านพร้อมเพย์" : "เปิดรับเงินผ่านพร้อมเพย์"} title={form?.promptpayActive !== false ? "ปิดรับเงินผ่านพร้อมเพย์" : "เปิดรับเงินผ่านพร้อมเพย์"}><span /></button>
+                  </div>
                 </div>
+                {promptPayEditing && (
+                  <div className="promptpay-edit-panel">
+                    <label>
+                      เบอร์โทร / เลขประจำตัวประชาชน
+                      <input
+                        autoFocus
+                        value={promptPayDraft}
+                        onChange={event => setPromptPayDraft(event.target.value)}
+                        onKeyDown={event => {
+                          if (event.key === "Enter") savePromptPay();
+                          if (event.key === "Escape") cancelEditPromptPay();
+                        }}
+                        placeholder="เช่น 0812345678 หรือ 1234567890123"
+                        disabled={!form || saveMutation.isPending}
+                        maxLength={20}
+                        inputMode="numeric"
+                        title="ใช้เบอร์โทร 9–10 หลัก หรือเลขบัตรประชาชน 13 หลัก ของบัญชีพร้อมเพย์ที่รับเงินของร้าน"
+                      />
+                    </label>
+                    <div className="compact-edit-actions">
+                      <button type="button" className="outline-button" onClick={cancelEditPromptPay} disabled={saveMutation.isPending}>
+                        <X size={15} /> ยกเลิก
+                      </button>
+                      <button type="button" className="primary-button" onClick={savePromptPay} disabled={!form || saveMutation.isPending || (!!promptPayDraft.trim() && !isValidPromptPayId(promptPayDraft))}>
+                        <Check size={15} /> {saveMutation.isPending ? "กำลังบันทึก…" : "บันทึก"}
+                      </button>
+                    </div>
+                  </div>
+                )}
               </section>
               <BankAccountsPanel
                 value={form?.bankAccounts ?? []}

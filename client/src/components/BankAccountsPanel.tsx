@@ -267,14 +267,23 @@ export function BankAccountsPanel({
             <div>
               <b>{editingId ? "แก้ไขบัญชีธนาคาร" : "เพิ่มบัญชีธนาคาร"}</b>
             </div>
-            <button
-              type="button"
-              className="icon-button"
-              onClick={cancelDraft}
-              aria-label="ยกเลิกการเพิ่ม/แก้ไขบัญชี"
-            >
-              <X size={17} />
-            </button>
+            <div className="compact-edit-actions">
+              <button
+                type="button"
+                className="outline-button"
+                onClick={cancelDraft}
+              >
+                <X size={14} /> ยกเลิก
+              </button>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={commitDraft}
+                disabled={disabled || !isComplete(draft)}
+              >
+                <Check size={14} /> {editingId ? "บันทึก" : "เพิ่มบัญชี"}
+              </button>
+            </div>
           </div>
           <div className="form-grid">
             <label>เลือกธนาคาร
@@ -346,23 +355,6 @@ export function BankAccountsPanel({
               </span>
             </div>
           )}
-          <div className="bank-draft-actions">
-            <button
-              type="button"
-              className="outline-button"
-              onClick={cancelDraft}
-            >
-              <X size={15} /> ยกเลิก
-            </button>
-            <button
-              type="button"
-              className="primary-button"
-              onClick={commitDraft}
-              disabled={disabled || !isComplete(draft)}
-            >
-              <Check size={15} /> {editingId ? "บันทึกการแก้ไข" : "เพิ่มบัญชี"}
-            </button>
-          </div>
         </div>
       )}
 

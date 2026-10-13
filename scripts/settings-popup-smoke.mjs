@@ -39,8 +39,16 @@ try {
   await page.click('[data-nav-item=settings]');
   await click('การชำระเงิน');
   await page.waitForSelector('.bank-accounts-compact');
+  assert.equal(await page.$('.promptpay-edit-panel'), null, 'PromptPay input must stay collapsed until edit is requested');
+  await page.click('button[aria-label="แก้ไขเลขพร้อมเพย์"]');
+  await page.waitForSelector('.promptpay-edit-panel input');
+  assert.ok(await page.$('button[aria-label="คัดลอกเลขพร้อมเพย์"]'), 'PromptPay row must include copy action');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.promptpay-edit-panel'));
   await click('เพิ่มบัญชี');
   await page.waitForSelector('.bank-draft-panel select');
+  assert.equal(await page.$('.bank-draft-actions'), null, 'Compact bank form must not render a separate footer action row');
+  assert.ok(await page.$('.bank-draft-head .compact-edit-actions'), 'Bank save actions must stay in the compact form header');
   await page.select('.bank-draft-panel select', 'KTB');
   assert.equal(await page.$eval('.bank-draft-panel input', n => n.value), 'ธนาคารกรุงไทย');
   assert.equal(await page.$('.bank-preset-chips'), null);
@@ -49,6 +57,8 @@ try {
     await page.setViewport({ width, height: 768 });
     const overflow = await page.$eval('.bank-accounts-compact', n => n.scrollWidth > n.clientWidth + 1);
     assert.equal(overflow, false, 'Bank panel must fit available width');
+    const promptPayOverflow = await page.$eval('.payment-settings-compact .settings-card:first-child', n => n.scrollWidth > n.clientWidth + 1);
+    assert.equal(promptPayOverflow, false, 'PromptPay panel must fit available width');
     const surfaces = await page.$eval('.bank-draft-panel', n => ({
       panel: getComputedStyle(n).backgroundColor,
       fields: [...n.querySelectorAll('input, select')].map(field => getComputedStyle(field).backgroundColor),

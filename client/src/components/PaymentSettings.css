@@ -41,20 +41,76 @@
   min-width: 0;
 }
 
-.payment-settings-compact .promptpay-details-info .form-grid {
-  margin: 0;
+.payment-settings-compact .promptpay-details-info b {
+  display: block;
+  color: #2e5b4c;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.payment-settings-compact .promptpay-details-info small {
+  display: block;
+  margin-top: 4px;
+  color: #6e756a;
+  font-size: 11px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.payment-settings-compact .promptpay-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
 }
 
 .payment-settings-compact .promptpay-row-toggle {
   flex: 0 0 auto;
+  margin-left: 2px;
 }
 
-.payment-settings-compact .promptpay-details-info .settings-inline-note,
-.payment-settings-compact .promptpay-details-info .notice-bar {
-  margin: 6px 0 0;
-  padding: 4px 0;
-  background: transparent;
-  border: 0;
+.payment-settings-compact .promptpay-edit-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.payment-settings-compact .promptpay-edit-panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  min-width: 0;
+}
+
+.payment-settings-compact .promptpay-edit-panel input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 9px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+  color: #0f172a;
+}
+
+.compact-edit-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.compact-edit-actions :is(.outline-button, .primary-button) {
+  min-height: 34px;
+  padding: 6px 11px;
 }
 
 .payment-settings-compact .bank-row {
@@ -84,6 +140,15 @@
 @media (max-width: 720px) {
   .payment-settings-compact .promptpay-details-row {
     align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .payment-settings-compact .promptpay-row-actions {
+    margin-left: auto;
+  }
+
+  .payment-settings-compact .promptpay-edit-panel {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .payment-settings-compact .bank-draft-panel .form-grid {
@@ -94,24 +159,25 @@
 .bank-accounts-compact .settings-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .bank-accounts-compact .settings-heading > button { width: auto; margin: 0; white-space: nowrap; }
 .bank-accounts-compact .bank-empty { padding: 10px 12px; }
-.bank-accounts-compact .bank-draft-panel { padding: 12px; margin-top: 10px; }
-.bank-accounts-compact .bank-draft-head { margin-bottom: 10px; }
-.bank-accounts-compact .bank-draft-panel .form-grid { gap: 10px 12px; }
+.bank-accounts-compact .bank-draft-panel { padding: 10px 12px; margin-top: 8px; gap: 8px; }
+.bank-accounts-compact .bank-draft-head { margin-bottom: 2px; align-items: center; }
+.bank-accounts-compact .bank-draft-panel .form-grid { gap: 7px 10px; }
 :root .app-shell .bank-accounts-compact .bank-draft-panel {
   background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 12px;
 }
 :root .app-shell .bank-accounts-compact .bank-draft-panel .form-grid label {
-  display: flex; flex-direction: column; gap: 4px; margin: 0; min-width: 0;
+  display: flex; flex-direction: column; gap: 3px; margin: 0; min-width: 0;
 }
 :root .app-shell .bank-accounts-compact .bank-draft-panel :is(input, select) {
-  box-sizing: border-box; width: 100%; min-height: 38px; padding: 8px 10px;
+  box-sizing: border-box; width: 100%; min-height: 34px; padding: 6px 9px;
   border: 1px solid #cbd5e1; border-radius: 8px; background: #fff; color: #0f172a;
 }
-.bank-accounts-compact .bank-draft-actions { margin-top: 10px; }
 .bank-accounts-compact .bank-row { display: flex; align-items: center; gap: 10px; }
 .bank-accounts-compact .bank-row-info { flex: 1; min-width: 0; }
 .bank-accounts-compact .bank-row-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 @media (max-width: 720px) {
   .bank-accounts-compact .bank-row { flex-wrap: wrap; }
   .bank-accounts-compact .bank-row-actions { margin-left: auto; }
+  .bank-accounts-compact .bank-draft-head { align-items: flex-start; flex-wrap: wrap; }
+  .bank-accounts-compact .bank-draft-head .compact-edit-actions { width: 100%; }
 }
