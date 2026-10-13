@@ -8,6 +8,7 @@ import { trpc } from "@/lib/trpc";
 import { PrintPreviewModal } from "./PrintPreviewModal";
 import { printElementDocument } from "@/lib/printHelper";
 import { parseBangkokDate, STORE_TIME_ZONE } from "../../../shared/storeTime";
+import { toast } from "sonner";
 
 /** "2026-09-18 14:42:33" → "18 ก.ย. 2569 · 14:42 น." */
 function formatReceiptDateTime(value: string) {
@@ -54,7 +55,17 @@ export function ReceiptModal({ receipt, onClose, onNewSale, onPrinted, mode = "n
   const printReceipt = async () => {
     setReceiptBusy("printing");
     const widthMm = settingsQuery.data?.receiptPaperWidth === "58" ? 58 : settingsQuery.data?.receiptPaperWidth === "80" ? 80 : 72;
-    try { await printElementDocument("receipt-paper", widthMm); onPrinted?.(); } finally { setReceiptBusy(""); }
+    try {
+      const result = await printElementDocument("receipt-paper", widthMm);
+      if (result.usedFallback) {
+        toast.info("เปิดหน้าต่างพิมพ์แล้ว", { description: `เลือกเครื่องพิมพ์และกระดาษ ${widthMm} มม. ก่อนกดพิมพ์` });
+      } else {
+        toast.success("ส่งสลิปเข้าเครื่องพิมพ์แล้ว", { description: result.message });
+      }
+      onPrinted?.();
+    } catch (error) {
+      toast.error("พิมพ์สลิปไม่สำเร็จ", { description: error instanceof Error ? error.message : "ลองตรวจเครื่องพิมพ์แล้วพิมพ์อีกครั้ง" });
+    } finally { setReceiptBusy(""); }
   };
 
   // FIX-8 — Enter key = สั่งพิมพ์ทันที

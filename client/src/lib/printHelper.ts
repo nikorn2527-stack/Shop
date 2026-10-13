@@ -56,10 +56,15 @@ export function getWorkstationId(): string {
   }
 }
 
-type PrintResult = {
+export type PrintResult = {
   ok: boolean;
   message: string;
   usedFallback: boolean;
+};
+
+type PrintOptions = {
+  paperWidthMm?: number;
+  paperHeightMm?: number;
 };
 
 const HELPER_BASE = "http://localhost:3031";
@@ -71,6 +76,7 @@ const HELPER_BASE = "http://localhost:3031";
 export async function printViaHelper(
   printerName: string,
   htmlContent: string,
+  options: PrintOptions = {},
 ): Promise<PrintResult> {
   if (!printerName) {
     await printHtmlDocument(htmlContent);
@@ -85,12 +91,20 @@ export async function printViaHelper(
     const res = await fetch(`${HELPER_BASE}/print`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ printerName, content: htmlContent }),
+      body: JSON.stringify({ printerName, content: htmlContent, ...options }),
     });
     if (!res.ok) throw new Error(`Helper HTTP ${res.status}`);
     const data = await res.json();
+    if (data.ok !== true) {
+      await printHtmlDocument(htmlContent);
+      return {
+        ok: true,
+        message: `เปิดหน้าต่างพิมพ์สำรองแล้ว — ${data.message || "เครื่องพิมพ์ไม่รับงานจาก Local Printer Helper"}`,
+        usedFallback: true,
+      };
+    }
     return {
-      ok: data.ok ?? false,
+      ok: true,
       message: data.message ?? "ส่งงานพิมพ์แล้ว",
       usedFallback: false,
     };
@@ -136,7 +150,10 @@ export function printElementDocument(targetId: string, widthMm?: number): Promis
   const heightMm = Math.max(60, Math.ceil(source.scrollHeight * (widthMm ?? 210) / Math.max(1, source.offsetWidth)) + 10);
   const pageSize = widthMm ? `${widthMm}mm ${heightMm}mm` : "A4";
   const html = `<!doctype html><html><head><meta charset="utf-8"><base href="${location.origin}/">${styles}<style>@page{size:${pageSize};margin:${widthMm ? 0 : 8}mm}html,body{margin:0;padding:0;background:white}body>*{display:block!important;visibility:visible!important}#${targetId}{position:static!important;transform:none!important;box-shadow:none!important;height:auto!important;max-height:none!important;overflow:visible!important}</style></head><body>${clone.outerHTML}</body></html>`;
-  return printViaHelper(getPrinterName(widthMm ? "receipt" : "report"), html);
+  return printViaHelper(getPrinterName(widthMm ? "receipt" : "report"), html, {
+    paperWidthMm: widthMm,
+    paperHeightMm: widthMm ? heightMm : undefined,
+  });
 }
 
 /**

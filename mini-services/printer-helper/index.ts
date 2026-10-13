@@ -16,10 +16,13 @@
  */
 import { exec } from "node:child_process";
 import { promisify } from "node:util";
-import { platform } from "node:os";
+import { platform, tmpdir } from "node:os";
+import { join } from "node:path";
+import puppeteer from "puppeteer";
 
 const execAsync = promisify(exec);
 const PORT = 3031;
+const DRY_RUN = process.env.PRINTER_HELPER_DRY_RUN === "1";
 
 const CORS_HEADERS: Record<string, string> = {
   "Access-Control-Allow-Origin": "*",
@@ -168,10 +171,16 @@ async function enumeratePrinters(): Promise<PrinterListResult> {
 
 /**
  * สั่งพิมพ์ไปยัง printer ที่เลือก — รับ HTML content แล้วส่งไป OS print spooler
- * - Windows: สร้าง temp HTML file แล้วสั่งพิมพ์ด้วย PowerShell `Out-Printer` หรือ `Start-Process -Verb PrintTo`
+ * - Windows: Chromium render HTML เป็น PNG ตามขนาดกระดาษจริง แล้ว PowerShell
+ *   System.Drawing.Printing.PrintDocument ส่งภาพเข้า spooler โดยตรง
  * - macOS/Linux: ใช้ `lp -d <printer>` ส่ง HTML file
  */
-async function printToPrinter(printerName: string, content: string): Promise<{ ok: boolean; message: string }> {
+async function printToPrinter(
+  printerName: string,
+  content: string,
+  paperWidthMm = 80,
+  paperHeightMm = 120,
+): Promise<{ ok: boolean; message: string }> {
   const os = platform();
 
   // Sanitize printer name (security: กัน command injection)
@@ -180,8 +189,10 @@ async function printToPrinter(printerName: string, content: string): Promise<{ o
     return { ok: false, message: "ชื่อเครื่องพิมพ์ว่างหรือมีอักขระต้องห้าม" };
   }
 
-  // Create temp file
-  const tmpFile = `/tmp/print-job-${Date.now()}.html`;
+  const jobId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const tmpFile = join(tmpdir(), `print-job-${jobId}.html`);
+  const imageFile = join(tmpdir(), `print-job-${jobId}.png`);
+  const scriptFile = join(tmpdir(), `print-job-${jobId}.ps1`);
   try {
     await Bun.write(tmpFile, content);
   } catch (err) {
@@ -190,18 +201,80 @@ async function printToPrinter(printerName: string, content: string): Promise<{ o
 
   try {
     if (os === "win32") {
-      // Windows: PowerShell สั่งพิมพ์ผ่าน Default printer หรือใช้ rundll32 printui
-      // สำหรับ specific printer: ใช้ `Start-Process -FilePath <file> -Verb PrintTo -ArgumentList "<printer>"`
-      const winTmp = tmpFile.replace(/\//g, "\\\\"); // Convert to Windows path
-      const ps = `powershell -NoProfile -Command "Start-Process -FilePath '${winTmp}' -Verb PrintTo -ArgumentList '${safeName}'"`;
-      const { stderr } = await execAsync(ps, { timeout: 15000 });
-      if (stderr && stderr.length > 0) {
-        // PowerShell may emit warnings — check if it's a real error
-        if (stderr.toLowerCase().includes("error") || stderr.toLowerCase().includes("fail")) {
-          return { ok: false, message: `PowerShell error: ${stderr.slice(0, 200)}` };
-        }
+      const widthMm = Math.min(210, Math.max(40, Number(paperWidthMm) || 80));
+      const heightMm = Math.min(1000, Math.max(30, Number(paperHeightMm) || 120));
+      const cssPxPerMm = 96 / 25.4;
+      const outputPxPerMm = 203 / 25.4;
+      const viewportWidth = Math.ceil(widthMm * cssPxPerMm);
+      const viewportHeight = Math.ceil(heightMm * cssPxPerMm);
+      const browser = await puppeteer.launch({ headless: true, args: ["--no-sandbox", "--disable-gpu"] });
+      try {
+        const page = await browser.newPage();
+        await page.setViewport({
+          width: viewportWidth,
+          height: viewportHeight,
+          deviceScaleFactor: outputPxPerMm / cssPxPerMm,
+        });
+        await page.emulateMediaType("print");
+        await page.goto(`file:///${tmpFile.replace(/\\/g, "/")}`, { waitUntil: "networkidle0", timeout: 20000 });
+        await page.evaluate(async () => {
+          await document.fonts.ready;
+          await Promise.all(Array.from(document.images, image => image.complete ? Promise.resolve() : new Promise<void>(done => {
+            image.onload = () => done();
+            image.onerror = () => done();
+          })));
+        });
+        await page.screenshot({
+          path: imageFile as `${string}.png`,
+          clip: { x: 0, y: 0, width: viewportWidth, height: viewportHeight },
+          omitBackground: false,
+        });
+      } finally {
+        await browser.close();
       }
-      return { ok: true, message: `ส่งงานพิมพ์ไปยัง '${safeName}' แล้ว` };
+
+      const printScript = `
+param([string]$PrinterName, [string]$ImagePath, [double]$WidthMm, [double]$HeightMm, [switch]$DryRun)
+$ErrorActionPreference = 'Stop'
+Add-Type -AssemblyName System.Drawing
+$doc = New-Object System.Drawing.Printing.PrintDocument
+$doc.PrinterSettings.PrinterName = $PrinterName
+if (-not $doc.PrinterSettings.IsValid) { throw "Printer not found or unavailable: $PrinterName" }
+$doc.PrintController = New-Object System.Drawing.Printing.StandardPrintController
+$width = [Math]::Max(1, [Math]::Round($WidthMm / 25.4 * 100))
+$height = [Math]::Max(1, [Math]::Round($HeightMm / 25.4 * 100))
+$paper = New-Object System.Drawing.Printing.PaperSize('Receipt', $width, $height)
+$doc.DefaultPageSettings.PaperSize = $paper
+$doc.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0, 0, 0, 0)
+$doc.OriginAtMargins = $false
+$image = [System.Drawing.Image]::FromFile($ImagePath)
+$handler = [System.Drawing.Printing.PrintPageEventHandler]{
+  param($sender, $eventArgs)
+  $eventArgs.Graphics.DrawImage($image, 0, 0, $eventArgs.PageBounds.Width, $eventArgs.PageBounds.Height)
+  $eventArgs.HasMorePages = $false
+}
+$doc.add_PrintPage($handler)
+try { if (-not $DryRun) { $doc.Print() } } finally { $doc.remove_PrintPage($handler); $image.Dispose(); $doc.Dispose() }
+`;
+      await Bun.write(scriptFile, printScript);
+      const dryRunArg = DRY_RUN ? " -DryRun" : "";
+      const { stdout, stderr } = await execAsync(
+        `powershell -NoProfile -ExecutionPolicy Bypass -File "${scriptFile}" -PrinterName "${safeName}" -ImagePath "${imageFile}" -WidthMm ${widthMm} -HeightMm ${heightMm}${dryRunArg}`,
+        { timeout: 30000, maxBuffer: 1024 * 1024 },
+      );
+      const output = `${stdout}\n${stderr}`.trim();
+      if (/error|exception|failed|not found|unavailable/i.test(output)) {
+        return { ok: false, message: `Windows print error: ${output.slice(0, 240)}` };
+      }
+      if (DRY_RUN) {
+        return {
+          ok: true,
+          message: `ตรวจงานพิมพ์ ${widthMm} × ${heightMm} มม. แล้ว (dry run)`,
+          renderWidthPx: Math.ceil(widthMm * outputPxPerMm),
+          renderHeightPx: Math.ceil(heightMm * outputPxPerMm),
+        };
+      }
+      return { ok: true, message: `ส่งงาน ${widthMm} มม. ไปยัง '${safeName}' แล้ว` };
     }
 
     if (os === "darwin" || os === "linux") {
@@ -221,6 +294,8 @@ async function printToPrinter(printerName: string, content: string): Promise<{ o
   } finally {
     // Cleanup temp file
     try { await Bun.file(tmpFile).delete(); } catch { /* ignore */ }
+    try { await Bun.file(imageFile).delete(); } catch { /* ignore */ }
+    try { await Bun.file(scriptFile).delete(); } catch { /* ignore */ }
   }
 }
 
@@ -246,7 +321,7 @@ p { font-size: 12px; }
 <div class="test-line">─────────────────────</div>
 <p style="font-size:9px;color:#999;">⚡ Powered by PNG TEAM · Printer Helper @ port 3031</p>
 </body></html>`;
-  return printToPrinter(printerName, testContent);
+  return printToPrinter(printerName, testContent, 80, 120);
 }
 
 const server = Bun.serve({
@@ -275,6 +350,7 @@ const server = Bun.serve({
         {
           ok: true,
           service: "printer-helper",
+          version: "2.0-paper-size",
           port: PORT,
           platform: platform(),
           endpoints: ["/", "/printers", "/printers/test", "/printers/test (POST)", "/print (POST)"],
@@ -336,6 +412,8 @@ const server = Bun.serve({
         const body = await req.json();
         const printerName = String(body?.printerName ?? "").trim();
         const content = String(body?.content ?? "").trim();
+        const paperWidthMm = Number(body?.paperWidthMm ?? 80);
+        const paperHeightMm = Number(body?.paperHeightMm ?? 120);
         if (!printerName) {
           return Response.json({ ok: false, message: "กรุณาระบุ printerName" }, { headers: CORS_HEADERS });
         }
@@ -351,7 +429,7 @@ const server = Bun.serve({
             message: `ไม่พบเครื่องพิมพ์ '${printerName}' ในระบบ`,
           }, { headers: CORS_HEADERS });
         }
-        const result = await printToPrinter(printerName, content);
+        const result = await printToPrinter(printerName, content, paperWidthMm, paperHeightMm);
         return Response.json(result, { headers: CORS_HEADERS });
       } catch (err) {
         return Response.json({

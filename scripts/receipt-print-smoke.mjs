@@ -17,7 +17,9 @@ const db = new DatabaseSync(dbPath);
 const user = db.prepare("SELECT id FROM app_users WHERE active=1 AND role IN ('dev','admin','administrator','manager') LIMIT 1").get();
 assert.ok(user, 'need admin');
 const session = createAppSession(db, user.id);
-setSettings(db, { promptpayId: '0812345678', posRailHidden: '[]', posShortcutKeys: '{}', receiptPaperWidth: process.env.PRINT_TEST_WIDTH || '72' });
+const testWidth = Number(process.env.PRINT_TEST_WIDTH || 72);
+assert.ok([58, 72, 80].includes(testWidth), 'PRINT_TEST_WIDTH must be 58, 72, or 80');
+setSettings(db, { promptpayId: '0812345678', posRailHidden: '[]', posShortcutKeys: '{}', receiptPaperWidth: String(testWidth) });
 const product = db.prepare("SELECT * FROM products WHERE active=1 AND barcode IS NOT NULL AND barcode<>'' LIMIT 1").get();
 assert.ok(product);
 db.close();
@@ -78,14 +80,7 @@ try {
   await page.waitForSelector('#receipt-paper');
   console.log('RECEIPT_OPEN', productSku);
 
-  for (const width of [Number(process.env.PRINT_TEST_WIDTH || 72)]) {
-    dbCheckWidth: {
-      const store = new DatabaseSync(dbPath);
-      setSettings(store, { receiptPaperWidth: String(width) });
-      store.close();
-    }
-    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
-    await new Promise(r => setTimeout(r, 1200));
+  for (const width of [testWidth]) {
     await page.waitForSelector('.receipt-actions button.primary-button:not(:disabled)');
     const button = await page.evaluateHandle(() => [...document.querySelectorAll('.receipt-actions button')].find(n => n.getClientRects().length && n.textContent.includes('พิมพ์ใบเสร็จ')));
     await button.asElement().click();

@@ -8,6 +8,7 @@
     "start": "bun index.ts"
   },
   "dependencies": {
-    "@types/node": "^22.0.0"
+    "@types/node": "^22.0.0",
+    "puppeteer": "^25.12.0"
   }
 }
