@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 
 if (process.platform === 'win32') {
-  const cleanup = spawn('powershell', ['-NoProfile', '-Command', 'Get-NetTCPConnection -LocalPort 3031 -State Listen -ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force }']);
+  const cleanup = spawn('powershell', ['-NoProfile', '-Command', "$ErrorActionPreference='SilentlyContinue'; Get-NetTCPConnection -LocalPort 3031 -State Listen | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force }; exit 0"]);
   await new Promise((resolve, reject) => {
     cleanup.once('error', reject);
     cleanup.once('exit', code => code === 0 ? resolve() : reject(new Error(`Port cleanup exited ${code}`)));
@@ -57,5 +57,14 @@ try {
 
   console.log('PRINTER_HELPER_SMOKE_PASS', printerName);
 } finally {
-  helper.kill();
+  if (helper.exitCode === null && helper.signalCode === null) {
+    helper.kill();
+    await new Promise(resolve => {
+      const timeout = setTimeout(resolve, 2000);
+      helper.once('exit', () => {
+        clearTimeout(timeout);
+        resolve();
+      });
+    });
+  }
 }
