@@ -37,6 +37,26 @@ try {
   };
   await page.waitForSelector('[data-nav-item=settings]');
   await page.click('[data-nav-item=settings]');
+  await click('เลขสมาชิก');
+  await page.waitForSelector('.member-mode-segmented');
+  assert.ok(await page.$('.member-preview-card'), 'Automatic mode must show the next generated member number');
+  assert.ok(await page.$('.member-advanced-toggle'), 'Automatic mode must expose number-format settings in one place');
+  await click('กำหนดเอง');
+  await page.waitForSelector('.member-manual-guidance');
+  assert.equal(await page.$('.member-preview-card'), null, 'Manual mode must not imply that the system generates a number');
+  assert.equal(await page.$('.member-advanced-toggle'), null, 'Manual mode must hide automatic number-format settings');
+  assert.equal(await page.$('[aria-label="ทดลองกรอกหมายเลขสมาชิก"]'), null, 'Settings must not duplicate the real registration field');
+  assert.ok((await page.$eval('.member-manual-guidance', n => n.textContent)).includes('กรอกเลขสมาชิกเองตอนลงทะเบียน'));
+  for (const width of [1366, 390]) {
+    await page.setViewport({ width, height: 768 });
+    const overflow = await page.$eval('.settings-single .settings-card', n => n.scrollWidth > n.clientWidth + 1);
+    assert.equal(overflow, false, 'Member-number settings must fit available width');
+    await page.$eval('.member-manual-guidance', n => n.scrollIntoView({ block: 'center' }));
+    await page.screenshot({ path: path.join(dir, `member-number-manual-${width}.png`) });
+  }
+  await click('ลำดับรัน');
+  await page.waitForSelector('.member-preview-card');
+  await page.setViewport({ width: 1366, height: 768 });
   await click('การชำระเงิน');
   await page.waitForSelector('.bank-accounts-compact');
   assert.equal(await page.$('.promptpay-edit-panel'), null, 'PromptPay input must stay collapsed until edit is requested');

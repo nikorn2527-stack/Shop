@@ -665,11 +665,6 @@ export function Settings({
   const [hydrated, setHydrated] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
-  // UI-2 Issue 3 — sample input the admin can test-type in Settings when
-  // "manual" member-number mode is selected. Mirrors the cashier's field at
-  // POS (Pos.tsx registerForm.memberNumber) so the admin sees exactly what
-  // staff will see — with live validity feedback against existing members.
-  const [manualDemoNumber, setManualDemoNumber] = useState("");
   // UI-5 — advanced member-number fields hidden behind a disclosure by default
   const [memberAdvancedOpen, setMemberAdvancedOpen] = useState(false);
   // ROUND 36 (ข้อ 31) — จำนวนบัญชี dev + โมดัลยืนยันตอนเปิด Dev Access
@@ -1100,14 +1095,6 @@ export function Settings({
     nextMemberSequence(membersQuery.data ?? [], numberMode, numberFormat),
     numberFormat
   );
-  // UI-2 Issue 3 — live validation for the manual-mode demo input on the
-  // Settings → เลขสมาชิก tab. A valid sample is non-empty AND not already
-  // taken by an existing member (mirrors the cashier's register flow).
-  const manualDemoTrim = manualDemoNumber.trim();
-  const manualDemoTaken =
-    manualDemoTrim !== "" &&
-    (membersQuery.data ?? []).some(m => m.memberNumber === manualDemoTrim);
-  const manualDemoValid = manualDemoTrim !== "" && !manualDemoTaken;
   // Round 17 — dirty-state tracking: compare the working form against the
   // server settings field by field so the sticky save bar can tell the
   // user exactly what has changed and is still unsaved (the old UI only
@@ -2202,51 +2189,42 @@ export function Settings({
                     </button>
                   ))}
                 </div>
-                <div className="member-preview-card">
-                  <span className="label">สมาชิกใหม่คนถัดไปจะได้เลข</span>
-                  <b className="value">{nextNumber}</b>
-                </div>
-                {numberMode === "manual" && (
-                  <div className="member-manual-demo">
-                    <input
-                      className={`member-manual-demo-input${manualDemoTrim === "" ? "" : manualDemoValid ? " ok" : " err"}`}
-                      value={manualDemoNumber}
-                      onChange={event =>
-                        setManualDemoNumber(event.target.value)
-                      }
-                      placeholder="ตัวอย่าง: M-100001"
-                      aria-label="ทดลองกรอกหมายเลขสมาชิก"
-                      disabled={!form}
-                    />
-                    {manualDemoTrim !== "" &&
-                      (manualDemoValid ? (
-                        <span className="member-manual-status ok">
-                          <Check size={14} aria-hidden="true" /> ใช้ได้
-                        </span>
-                      ) : (
-                        <span className="member-manual-status err">
-                          <X size={14} aria-hidden="true" /> หมายเลขซ้ำ
-                        </span>
-                      ))}
+                {numberMode === "manual" ? (
+                  <div className="member-manual-guidance" role="status">
+                    <div>
+                      <span className="label">ระบบจะไม่สร้างเลขให้อัตโนมัติ</span>
+                      <b>กรอกเลขสมาชิกเองตอนลงทะเบียน</b>
+                    </div>
+                    <p>
+                      ช่องหมายเลขสมาชิกจะแสดงในฟอร์มลงทะเบียน ทั้งจากหน้า
+                      “สมาชิกและบัญชี” และ POS
+                    </p>
                   </div>
+                ) : (
+                  <>
+                    <div className="member-preview-card">
+                      <span className="label">สมาชิกใหม่คนถัดไปจะได้เลข</span>
+                      <b className="value">{nextNumber}</b>
+                    </div>
+                    <button
+                      type="button"
+                      className="member-advanced-toggle"
+                      onClick={() => setMemberAdvancedOpen(v => !v)}
+                      aria-expanded={memberAdvancedOpen}
+                    >
+                      <ChevronDown
+                        size={14}
+                        style={{
+                          transform: memberAdvancedOpen ? "rotate(180deg)" : "none",
+                        }}
+                      />
+                      {memberAdvancedOpen
+                        ? "ซ่อนการตั้งค่ารูปแบบเลข"
+                        : "ตั้งค่ารูปแบบเลข"}
+                    </button>
+                  </>
                 )}
-                <button
-                  type="button"
-                  className="member-advanced-toggle"
-                  onClick={() => setMemberAdvancedOpen(v => !v)}
-                  aria-expanded={memberAdvancedOpen}
-                >
-                  <ChevronDown
-                    size={14}
-                    style={{
-                      transform: memberAdvancedOpen ? "rotate(180deg)" : "none",
-                    }}
-                  />
-                  {memberAdvancedOpen
-                    ? "ซ่อนตัวเลือกขั้นสูง"
-                    : "แสดงตัวเลือกขั้นสูง"}
-                </button>
-                {memberAdvancedOpen && (
+                {numberMode !== "manual" && memberAdvancedOpen && (
                   <div className="member-advanced-wrap">
                     <div className="member-number-format-grid">
                       <label>
@@ -2260,7 +2238,7 @@ export function Settings({
                           }
                           maxLength={20}
                           placeholder="เช่น M หรือ WEL"
-                          disabled={!form || numberMode === "manual"}
+                          disabled={!form}
                         />
                       </label>
                       <label>
@@ -2274,7 +2252,7 @@ export function Settings({
                               ),
                             })
                           }
-                          disabled={!form || numberMode === "manual"}
+                          disabled={!form}
                         >
                           {[3, 4, 5, 6, 7, 8, 9, 10].map(digits => (
                             <option value={digits} key={digits}>
@@ -2293,7 +2271,7 @@ export function Settings({
                                 .value as SettingsForm["memberNumberYearMode"],
                             })
                           }
-                          disabled={!form || numberMode === "manual"}
+                          disabled={!form}
                         >
                           <option value="none">ไม่ใช้ปี</option>
                           <option value="buddhist">พ.ศ.</option>
