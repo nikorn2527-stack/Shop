@@ -67,10 +67,10 @@ type PrintOptions = {
   paperHeightMm?: number;
 };
 
-const HELPER_BASE = "http://localhost:3031";
+const HELPER_BASE = "http://127.0.0.1:3031";
 
 /**
- * สั่งพิมพ์ผ่าน Helper — ส่ง HTML content ไปยัง POST http://localhost:3031/print
+ * สั่งพิมพ์ผ่าน Helper — ส่ง HTML content ไปยัง POST http://127.0.0.1:3031/print
  * ถ้า Helper ไม่ตอบ → fallback window.print() แล้วแจ้งว่าใช้ fallback
  */
 export async function printViaHelper(

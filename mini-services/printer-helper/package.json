@@ -1,14 +1,18 @@
 {
   "name": "printer-helper",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "type": "module",
   "private": true,
   "scripts": {
     "dev": "bun --hot index.ts",
-    "start": "bun index.ts"
+    "start": "bun index.ts",
+    "check": "bun build index.ts --target=bun --packages=external --outfile dist/printer-helper.js",
+    "build": "bun run check"
   },
   "dependencies": {
-    "@types/node": "^22.0.0",
     "puppeteer": "^25.12.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0"
   }
 }

@@ -1,5 +1,5 @@
-// Helper URL — เชื่อมตรงไป localhost:3031 (ไม่ต้องผ่าน gateway)
-const HELPER_BASE = "http://localhost:3031";
+// Helper URL — เชื่อมตรงไป IPv4 loopback:3031 (ไม่ต้องผ่าน gateway)
+const HELPER_BASE = "http://127.0.0.1:3031";
 
 /**
  * PrinterPicker — Task A2 v2: รายชื่อเครื่องพิมพ์จริงจาก Windows
@@ -225,7 +225,7 @@ export function PrinterHelperStatus() {
           <button className="detect-btn" onClick={check}><RefreshCw size={12} /> เชื่อมต่อใหม่</button>
           <details className="printer-install-hint">
             <summary>วิธีติดตั้ง</summary>
-            <small>เปิด Terminal รัน: <code>cd mini-services/printer-helper && bun run dev</code></small>
+            <small>เปิด Terminal รัน: <code>cd mini-services/printer-helper &amp;&amp; bun install --frozen-lockfile &amp;&amp; bun run start</code></small>
           </details>
         </>
       )}

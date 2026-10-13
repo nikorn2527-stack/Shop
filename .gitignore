@@ -119,11 +119,13 @@ client/public/__manus__/version.json
 .zscripts/
 Caddyfile
 examples/
-mini-services/
+mini-services/*
 # FIX-10b — printer-helper เป็น feature จริงของ Shop (enumerate เครื่องพิมพ์ในเครื่อง POS)
 # ต้อง track ใน git ไม่ใช่ sandbox infrastructure → เพิ่ม exception
 !mini-services/printer-helper/
 !mini-services/printer-helper/**
+mini-services/printer-helper/node_modules/
+mini-services/printer-helper/dist/
 skills/
 tests/
 download/

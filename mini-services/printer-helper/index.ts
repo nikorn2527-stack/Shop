@@ -325,6 +325,7 @@ p { font-size: 12px; }
 }
 
 const server = Bun.serve({
+  hostname: "127.0.0.1",
   port: PORT,
   async fetch(req) {
     const url = new URL(req.url);
@@ -334,15 +335,6 @@ const server = Bun.serve({
     if (req.method === "OPTIONS") {
       return new Response(null, { headers: CORS_HEADERS });
     }
-
-    // Security: รับเฉพาะ localhost (กันเครื่องอื่นใน LAN สั่งพิมพ์)
-    const host = req.headers.get("host") || "";
-    const clientAddr = req.headers.get("x-forwarded-for") || "";
-    // อนุญาตทุก request (CORS *) แต่จริงๆ ต้องรันบน localhost เท่านั้น
-    // — หากต้องการ strict check ให้ uncomment:
-    // if (!host.includes("localhost") && !host.includes("127.0.0.1")) {
-    //   return Response.json({ error: "Forbidden: localhost only" }, { status: 403, headers: CORS_HEADERS });
-    // }
 
     // Health check
     if (path === "/" || path === "") {
@@ -446,7 +438,7 @@ const server = Bun.serve({
   },
 });
 
-console.log(`🖨️  Printer helper running on http://localhost:${PORT}/`);
+console.log(`🖨️  Printer helper running on http://127.0.0.1:${PORT}/`);
 console.log(`   GET  /printers           → enumerate printers`);
 console.log(`   POST /printers/test      → test print to selected printer`);
 console.log(`   POST /print              → print HTML to selected printer`);
