@@ -43,6 +43,7 @@ import {
   X,
 } from "@/lib/icons";
 import { pendingStockAlerts } from "@/lib/pendingAlerts";
+import { getPosShortcutKey, parsePosShortcutKeys } from "@/lib/posShortcuts";
 import { useEditionStatus } from "@/components/EditionUi";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { SharedSearchHost, SharedSearchProvider } from "@/components/SharedSearch";
@@ -267,9 +268,11 @@ export function AppShell({
       return new Set<string>();
     }
   }, [settingsQuery.data?.posRailHidden]);
-  const shortcutLabel = (action: string, fallback = "") => {
-    try { const keys = JSON.parse(settingsQuery.data?.posShortcutKeys || "{}"); return String(keys[action] ?? (action === "card" ? keys.limit : undefined) ?? fallback).trim().toUpperCase(); } catch { return fallback; }
-  };
+  const shortcutKeys = useMemo(
+    () => parsePosShortcutKeys(settingsQuery.data?.posShortcutKeys),
+    [settingsQuery.data?.posShortcutKeys]
+  );
+  const shortcutLabel = (action: string, fallback = "") => getPosShortcutKey(shortcutKeys, action, fallback);
   const safeView = canAccessView(role, activeView) ? activeView : "dashboard";
   const pageTitle =
     navItems.find(item => item.id === safeView)?.label ??
@@ -488,7 +491,7 @@ export function AppShell({
             <button
               type="button"
               className="rail-btn rail-scan"
-              title="โฟกัสช่องสแกนบาร์โค้ด — พร้อมรับค่าเสมอ (F8)"
+              title={`โฟกัสช่องสแกนบาร์โค้ด — พร้อมรับค่าเสมอ (${shortcutLabel("scan", "F8")})`}
               onClick={() =>
                 window.dispatchEvent(
                   new CustomEvent("pos-rail", { detail: "scan" })
@@ -504,7 +507,7 @@ export function AppShell({
             <button
               type="button"
               className="rail-btn rail-customer"
-              title="เลือกลูกค้า / สมาชิกสำหรับบิลนี้ (F1)"
+              title={`เลือกลูกค้า / สมาชิกสำหรับบิลนี้ (${shortcutLabel("customer", "F1")})`}
               onClick={() =>
                 window.dispatchEvent(
                   new CustomEvent("pos-rail", { detail: "member" })
@@ -520,7 +523,7 @@ export function AppShell({
             <button
               type="button"
               className="rail-btn rail-hold"
-              title="พักบิลปัจจุบันไว้ แล้วเริ่มบิลใหม่ — เรียกคืนได้จากแถบใต้ช่องสแกน (F5)"
+              title={`พักบิลปัจจุบันไว้ แล้วเริ่มบิลใหม่ — เรียกคืนได้จากแถบใต้ช่องสแกน (${shortcutLabel("hold", "F5")})`}
               onClick={() =>
                 window.dispatchEvent(
                   new CustomEvent("pos-rail", { detail: "hold" })
@@ -542,7 +545,7 @@ export function AppShell({
             <button
               type="button"
               className={`rail-btn rail-deposit${posShortcut === "เติมเงิน" ? " active" : ""}`}
-              title="เติมเงินเข้าบัญชีสมาชิก (F2)"
+              title={`เติมเงินเข้าบัญชีสมาชิก (${shortcutLabel("deposit", "F2")})`}
               onClick={() =>
                 setPosShortcut(posShortcut === "เติมเงิน" ? "" : "เติมเงิน")
               }
@@ -556,7 +559,7 @@ export function AppShell({
             <button
               type="button"
               className={`rail-btn rail-withdraw${posShortcut === "ถอนเงิน" ? " active" : ""}`}
-              title="ถอนเงินจากบัญชีสมาชิก (F3)"
+              title={`ถอนเงินจากบัญชีสมาชิก (${shortcutLabel("withdraw", "F3")})`}
               onClick={() =>
                 setPosShortcut(posShortcut === "ถอนเงิน" ? "" : "ถอนเงิน")
               }
@@ -570,7 +573,7 @@ export function AppShell({
             <button
               type="button"
               className="rail-btn rail-register"
-              title="ลงทะเบียนสมาชิกใหม่ + พิมพ์บัตร — ทำที่นี่ที่เดียว (F6)"
+              title={`ลงทะเบียนสมาชิกใหม่ + พิมพ์บัตร — ทำที่นี่ที่เดียว (${shortcutLabel("register", "F6")})`}
               onClick={() =>
                 window.dispatchEvent(
                   new CustomEvent("pos-rail", { detail: "register" })
@@ -589,7 +592,7 @@ export function AppShell({
             <button
               type="button"
               className={`rail-btn rail-special${posShortcut === "สินค้าไม่ระบุตายตัว" ? " active" : ""}`}
-              title="เพิ่มรายการพิเศษ — ของสั่ง ค่าบริการ (F4)"
+              title={`เพิ่มรายการพิเศษ — ของสั่ง ค่าบริการ (${shortcutLabel("special", "F4")})`}
               onClick={() => {
                 if (edition.status?.has("specialOrders"))
                   setPosShortcut(
@@ -918,7 +921,7 @@ export function AppShell({
           }}
         />
         {/* QA-FEAT-2 — discoverable keyboard shortcuts overlay. Press ? anywhere. */}
-        <KeyboardShortcutsOverlay />
+        <KeyboardShortcutsOverlay posShortcutKeys={settingsQuery.data?.posShortcutKeys} />
         {/* FEAT-4 — Floating Action Button to trigger shortcuts overlay. Bottom-right. */}
         {safeView !== "pos" && <ShortcutsFab />}
       </main>

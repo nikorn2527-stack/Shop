@@ -34,6 +34,7 @@ import { trpc } from "@/lib/trpc";
 import { Stock } from "./Stock";
 import { SharedSearch } from "@/components/SharedSearch";
 import { posCategories } from "@/lib/posCategories";
+import { getPosShortcutKey, matchesPosShortcut, parsePosShortcutKeys } from "@/lib/posShortcuts";
 import { normalizeProductCategory } from "@shared/productCategories";
 
 /** Product row straight from trpc.product.list (backend SqliteProduct). */
@@ -123,17 +124,10 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
     }
   }, [settingsQuery.data?.posRailHidden]);
   const shortcutKeys = useMemo(() => {
-    try {
-      const parsed: unknown = JSON.parse(settingsQuery.data?.posShortcutKeys || "{}");
-      return parsed && typeof parsed === "object" ? parsed as Record<string, string> : {};
-    } catch {
-      return {};
-    }
+    return parsePosShortcutKeys(settingsQuery.data?.posShortcutKeys);
   }, [settingsQuery.data?.posShortcutKeys]);
-  const isShortcut = (event: KeyboardEvent, action: string, fallback: string) => {
-    const assigned = (shortcutKeys[action] || fallback).trim().toUpperCase();
-    return assigned !== "ESC" && (event.key.toUpperCase() === assigned || event.code.toUpperCase() === assigned);
-  };
+  const shortcutLabel = (action: string, fallback = "") => getPosShortcutKey(shortcutKeys, action, fallback);
+  const isShortcut = (event: KeyboardEvent, action: string, fallback: string) => matchesPosShortcut(event, shortcutKeys, action, fallback);
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("ทั้งหมด");
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -710,7 +704,7 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
     if (cart.length === 0) return;
     if (method === "หักบัญชีสมาชิก" && !selectedMember) {
       setError("เลือกสมาชิกก่อนชำระแบบหักบัญชี");
-      blocker.warning("ยังไม่ได้เลือกสมาชิก", "ชำระแบบหักบัญชีสมาชิก ต้องมีสมาชิกในบิลก่อน\nยิงบัตรสมาชิกที่ช่องสแกน หรือกด F1 เพื่อเลือกสมาชิก");
+      blocker.warning("ยังไม่ได้เลือกสมาชิก", `ชำระแบบหักบัญชีสมาชิก ต้องมีสมาชิกในบิลก่อน\nยิงบัตรสมาชิกที่ช่องสแกน หรือกด ${shortcutLabel("customer", "F1")} เพื่อเลือกสมาชิก`);
       return;
     }
     if (discountValue > subtotal) {
@@ -855,7 +849,7 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
   const holdBill = () => {
     if (cart.length === 0) {
       if (heldBills.length > 0) { setMessage(`มีบิลที่ถูกพักอยู่ ${heldBills.length} บิล · เรียกคืนได้จากแถบใต้ช่องสแกน`); toast.info(`มีบิลที่พักอยู่ ${heldBills.length} บิล`, { description: "เรียกคืนได้จากแถบใต้ช่องสแกน" }); }
-      else { setError("ยังไม่มีรายการในบิลปัจจุบันที่จะพักไว้"); blocker.warning("ยังไม่มีรายการในบิลที่จะพักไว้", "เพิ่มสินค้าเข้าบิลก่อน แล้วกดพักบิล (F5)"); }
+      else { setError("ยังไม่มีรายการในบิลปัจจุบันที่จะพักไว้"); blocker.warning("ยังไม่มีรายการในบิลที่จะพักไว้", `เพิ่มสินค้าเข้าบิลก่อน แล้วกดพักบิล (${shortcutLabel("hold", "F5")})`); }
       return;
     }
     if (heldBills.length >= HELD_BILLS_LIMIT) {
@@ -932,10 +926,10 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
         ? { tone: "held", label: `กำลังขาย · ${cart.length} รายการ · ${cartPieces} ชิ้น`, sub: `พักบิลแล้ว ${heldBills.length} รายการ · ยอดต้องชำระ ${money(payable)}` }
         : { tone: "active", label: `กำลังขาย · ${cart.length} รายการ · ${cartPieces} ชิ้น`, sub: `ยอดต้องชำระ ${money(payable)}${selectedMember ? ` · ${selectedMember.memberNumber}` : " · ลูกค้าทั่วไป"}` };
   const idleStatus = cart.length === 0
-    ? "พร้อมสแกนสินค้า · F8 โฟกัสช่องสแกน · Esc เมนูหลัก"
+    ? `พร้อมสแกนสินค้า · ${shortcutLabel("scan", "F8")} โฟกัสช่องสแกน · Esc เมนูหลัก`
     : selectedMember
-      ? "ตรวจรายการแล้วกดชำระเงินด้านล่าง · F2 เติมเงิน · F3 ถอนเงิน · F4 รายการพิเศษ · F5 พักบิล · F8 สแกน · Esc เมนูหลัก"
-      : "บิลนี้เป็นลูกค้าทั่วไป (ไม่ใช่สมาชิก) · ชำระด้วยเงินสดหรือ QR ได้เลย · F4 รายการพิเศษ · F5 พักบิล · Esc เมนูหลัก";
+      ? `ตรวจรายการแล้วกดชำระเงินด้านล่าง · ${shortcutLabel("deposit", "F2")} เติมเงิน · ${shortcutLabel("withdraw", "F3")} ถอนเงิน · ${shortcutLabel("special", "F4")} รายการพิเศษ · ${shortcutLabel("hold", "F5")} พักบิล · ${shortcutLabel("scan", "F8")} สแกน · Esc เมนูหลัก`
+      : `บิลนี้เป็นลูกค้าทั่วไป (ไม่ใช่สมาชิก) · ชำระด้วยเงินสดหรือ QR ได้เลย · ${shortcutLabel("special", "F4")} รายการพิเศษ · ${shortcutLabel("hold", "F5")} พักบิล · Esc เมนูหลัก`;
   // Parked bills persist on this device; announce the count so the Home rail
   // badge (⏸️) stays in sync with what POS is holding.
   useEffect(() => {
@@ -1093,7 +1087,7 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
         <div className="pos-customer-row">
           <span className="pos-customer-label"><UserRound size={18} /> ลูกค้า</span>
           {selectedMember ? <MemberScanPicker members={members} selectedNumber={selectedMemberNumber} onSelect={(member) => { setSelectedMemberNumber(member ? member.memberNumber : null); clearNotices(); focusScan(); }} requireConfirm confirmContext="บิลนี้" inputId="pos-member-input" /> : <strong>ทั่วไป</strong>}
-          <button type="button" className="outline-button pos-select-member" onClick={focusScan} title="ค้นหาชื่อหรือเลขสมาชิกในช่องสแกน (F1)">{selectedMember ? "เปลี่ยนสมาชิก" : "เลือกสมาชิก"}<kbd>F1</kbd></button>
+          <button type="button" className="outline-button pos-select-member" onClick={focusScan} title={`ค้นหาชื่อหรือเลขสมาชิกในช่องสแกน (${shortcutLabel("customer", "F1")})`}>{selectedMember ? "เปลี่ยนสมาชิก" : "เลือกสมาชิก"}<kbd>{shortcutLabel("customer", "F1")}</kbd></button>
           {selectedMember && <button type="button" className="ghost-button" onClick={() => { setSelectedMemberNumber(null); clearNotices(); focusScan(); }}>ลูกค้าทั่วไป</button>}
         </div>
         </div>

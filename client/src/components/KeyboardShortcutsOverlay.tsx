@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Keyboard, X } from "@/lib/icons";
 import { INVENTORY_ACTION_LABELS } from "@/lib/inventoryActions";
+import { getPosShortcutKey, parsePosShortcutKeys } from "@/lib/posShortcuts";
 
 /**
  * KeyboardShortcutsOverlay — discoverable in-app help overlay listing all
@@ -26,23 +27,23 @@ import { INVENTORY_ACTION_LABELS } from "@/lib/inventoryActions";
  */
 type ShortcutGroup = {
   label: string;
-  items: { keys: string; desc: string; tag?: "POS" | "Global" | "Modals" }[];
+  items: { keys: string; action?: string; desc: string; tag?: "POS" | "Global" | "Modals" }[];
 };
 
 const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     label: "หน้าร้าน / POS",
     items: [
-      { keys: "F1", desc: "เลือกสมาชิกสำหรับบิลนี้", tag: "POS" },
-      { keys: "F2", desc: "เติมเงินเข้าบัญชีสมาชิก", tag: "POS" },
-      { keys: "F3", desc: "ถอนเงินจากบัญชีสมาชิก", tag: "POS" },
-      { keys: "F4", desc: "เพิ่มรายการพิเศษ (ของสั่ง / ค่าบริการ)", tag: "POS" },
-      { keys: "F5", desc: "พักบิลปัจจุบัน + เริ่มบิลใหม่", tag: "POS" },
-      { keys: "F6", desc: "ลงทะเบียนสมาชิกใหม่ + พิมพ์บัตร", tag: "POS" },
-      { keys: "F7", desc: "จัดแผงลัดหน้าร้าน (เลือกสินค้าที่หยิบบ่อย)", tag: "POS" },
-      { keys: "F8", desc: "โฟกัสช่องสแกนบาร์โค้ด", tag: "POS" },
-      { keys: "F9", desc: `${INVENTORY_ACTION_LABELS.receive}จาก POS โดยตรง`, tag: "POS" },
-      { keys: "F10", desc: `${INVENTORY_ACTION_LABELS.add}จาก POS โดยตรง`, tag: "POS" },
+      { keys: "F1", action: "customer", desc: "เลือกสมาชิกสำหรับบิลนี้", tag: "POS" },
+      { keys: "F2", action: "deposit", desc: "เติมเงินเข้าบัญชีสมาชิก", tag: "POS" },
+      { keys: "F3", action: "withdraw", desc: "ถอนเงินจากบัญชีสมาชิก", tag: "POS" },
+      { keys: "F4", action: "special", desc: "เพิ่มรายการพิเศษ (ของสั่ง / ค่าบริการ)", tag: "POS" },
+      { keys: "F5", action: "hold", desc: "พักบิลปัจจุบัน + เริ่มบิลใหม่", tag: "POS" },
+      { keys: "F6", action: "register", desc: "ลงทะเบียนสมาชิกใหม่ + พิมพ์บัตร", tag: "POS" },
+      { keys: "F7", action: "manage", desc: "จัดแผงลัดหน้าร้าน (เลือกสินค้าที่หยิบบ่อย)", tag: "POS" },
+      { keys: "F8", action: "scan", desc: "โฟกัสช่องสแกนบาร์โค้ด", tag: "POS" },
+      { keys: "F9", action: "receive", desc: `${INVENTORY_ACTION_LABELS.receive}จาก POS โดยตรง`, tag: "POS" },
+      { keys: "F10", action: "add", desc: `${INVENTORY_ACTION_LABELS.add}จาก POS โดยตรง`, tag: "POS" },
       { keys: "F9", desc: "ที่หน้าภาพรวม — เปิดเมนูหลัก", tag: "Global" },
     ],
   },
@@ -64,8 +65,9 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
   },
 ];
 
-export function KeyboardShortcutsOverlay() {
+export function KeyboardShortcutsOverlay({ posShortcutKeys }: { posShortcutKeys?: string | null }) {
   const [open, setOpen] = useState(false);
+  const shortcutKeys = parsePosShortcutKeys(posShortcutKeys);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -130,7 +132,7 @@ export function KeyboardShortcutsOverlay() {
                 {group.items.map((item, idx) => (
                   <li key={`${group.label}-${idx}`}>
                     <span className="shortcut-keys">
-                      {item.keys.split(" + ").map((k, i, arr) => (
+                      {(item.action ? getPosShortcutKey(shortcutKeys, item.action, item.keys) : item.keys).split(" + ").map((k, i, arr) => (
                         <span key={i} className="shortcut-key-seq">
                           <kbd className="kbd">{k}</kbd>
                           {i < arr.length - 1 && <span className="plus">+</span>}
@@ -151,7 +153,7 @@ export function KeyboardShortcutsOverlay() {
         </div>
         <div className="shortcuts-footer">
           <Keyboard size={15} />
-          <span>เคล็ดลับ: ฝึกใช้คีย์ลัดบ่อยๆ จะช่วยให้ขายของเร็วขึ้นมาก · พนักงานใหม่ควรเริ่มจาก F8 (สแกน) → F1 (เลือกสมาชิก) → F2 (เติมเงิน)</span>
+          <span>เคล็ดลับ: ฝึกใช้คีย์ลัดบ่อยๆ จะช่วยให้ขายของเร็วขึ้นมาก · พนักงานใหม่ควรเริ่มจาก {getPosShortcutKey(shortcutKeys, "scan", "F8")} (สแกน) → {getPosShortcutKey(shortcutKeys, "customer", "F1")} (เลือกสมาชิก) → {getPosShortcutKey(shortcutKeys, "deposit", "F2")} (เติมเงิน)</span>
         </div>
       </div>
     </div>
