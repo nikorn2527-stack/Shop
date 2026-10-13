@@ -24,7 +24,7 @@ try {
   for (let attempt = 0; attempt < 40; attempt++) {
     try {
       const health = await fetch('http://127.0.0.1:3031/');
-      if (health.ok && (await health.json()).version === '2.0-paper-size') break;
+      if (health.ok && (await health.json()).version === '2.1-driver-paper') break;
     } catch {}
     if (attempt === 39) throw new Error(`Printer Helper startup timeout\n${output}`);
     await new Promise(resolve => setTimeout(resolve, 250));
@@ -52,6 +52,8 @@ try {
     assert.match(result.message, new RegExp(`${width} × 90 มม\\.`));
     assert.equal(result.renderWidthPx, Math.ceil(width * 203 / 25.4));
     assert.equal(result.renderHeightPx, Math.ceil(90 * 203 / 25.4));
+    assert.ok(['driver', 'custom'].includes(result.paperSource), `Unexpected paper source: ${result.paperSource}`);
+    assert.ok(result.paperWidth > 0 && result.paperHeight > 0, 'Print profile must report paper dimensions');
     console.log('HELPER_RENDER_PASS', width);
   }
 

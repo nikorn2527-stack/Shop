@@ -243,18 +243,33 @@ if (-not $doc.PrinterSettings.IsValid) { throw "Printer not found or unavailable
 $doc.PrintController = New-Object System.Drawing.Printing.StandardPrintController
 $width = [Math]::Max(1, [Math]::Round($WidthMm / 25.4 * 100))
 $height = [Math]::Max(1, [Math]::Round($HeightMm / 25.4 * 100))
-$paper = New-Object System.Drawing.Printing.PaperSize('Receipt', $width, $height)
+$paper = $doc.PrinterSettings.PaperSizes |
+  Where-Object { [Math]::Abs($_.Width - $width) -le 2 -and $_.Height -ge $height } |
+  Sort-Object Height |
+  Select-Object -First 1
+$paperSource = 'driver'
+if ($null -eq $paper) {
+  $paper = New-Object System.Drawing.Printing.PaperSize('Receipt', $width, $height)
+  $paperSource = 'custom'
+}
 $doc.DefaultPageSettings.PaperSize = $paper
 $doc.DefaultPageSettings.Margins = New-Object System.Drawing.Printing.Margins(0, 0, 0, 0)
 $doc.OriginAtMargins = $false
 $image = [System.Drawing.Image]::FromFile($ImagePath)
 $handler = [System.Drawing.Printing.PrintPageEventHandler]{
   param($sender, $eventArgs)
-  $eventArgs.Graphics.DrawImage($image, 0, 0, $eventArgs.PageBounds.Width, $eventArgs.PageBounds.Height)
+  $bounds = $eventArgs.PageBounds
+  $scale = [Math]::Min($bounds.Width / $image.Width, $bounds.Height / $image.Height)
+  $drawWidth = [Math]::Max(1, [Math]::Round($image.Width * $scale))
+  $drawHeight = [Math]::Max(1, [Math]::Round($image.Height * $scale))
+  $eventArgs.Graphics.DrawImage($image, $bounds.Left, $bounds.Top, $drawWidth, $drawHeight)
   $eventArgs.HasMorePages = $false
 }
 $doc.add_PrintPage($handler)
-try { if (-not $DryRun) { $doc.Print() } } finally { $doc.remove_PrintPage($handler); $image.Dispose(); $doc.Dispose() }
+try {
+  Write-Output ("PRINT_PROFILE|{0}|{1}|{2}|{3}" -f $paperSource, $paper.PaperName, $paper.Width, $paper.Height)
+  if (-not $DryRun) { $doc.Print() }
+} finally { $doc.remove_PrintPage($handler); $image.Dispose(); $doc.Dispose() }
 `;
       await Bun.write(scriptFile, printScript);
       const dryRunArg = DRY_RUN ? " -DryRun" : "";
@@ -267,11 +282,16 @@ try { if (-not $DryRun) { $doc.Print() } } finally { $doc.remove_PrintPage($hand
         return { ok: false, message: `Windows print error: ${output.slice(0, 240)}` };
       }
       if (DRY_RUN) {
+        const profile = output.match(/PRINT_PROFILE\|([^|\r\n]+)\|([^|\r\n]+)\|(\d+)\|(\d+)/);
         return {
           ok: true,
           message: `ตรวจงานพิมพ์ ${widthMm} × ${heightMm} มม. แล้ว (dry run)`,
           renderWidthPx: Math.ceil(widthMm * outputPxPerMm),
           renderHeightPx: Math.ceil(heightMm * outputPxPerMm),
+          paperSource: profile?.[1] ?? "unknown",
+          paperName: profile?.[2] ?? "unknown",
+          paperWidth: Number(profile?.[3] ?? 0),
+          paperHeight: Number(profile?.[4] ?? 0),
         };
       }
       return { ok: true, message: `ส่งงาน ${widthMm} มม. ไปยัง '${safeName}' แล้ว` };
@@ -342,7 +362,7 @@ const server = Bun.serve({
         {
           ok: true,
           service: "printer-helper",
-          version: "2.0-paper-size",
+          version: "2.1-driver-paper",
           port: PORT,
           platform: platform(),
           endpoints: ["/", "/printers", "/printers/test", "/printers/test (POST)", "/print (POST)"],
