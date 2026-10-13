@@ -679,10 +679,8 @@
   :root .pos-premium-bill .payment-actions { display: flex; flex-direction: column; gap: 12px; width: min(100%, 240px); align-self: center; }
   :root .pos-premium-bill .pay-button { order: 2; }
   :root .pos-premium-bill .pay-split button { border: 1px solid var(--teal-soft); border-radius: 999px; background: var(--teal-mist); color: var(--teal-dark); box-shadow: none; }
-  :root .pos-premium-bill .pay-button,
-  :root .pay-confirm-modal .pay-confirm-button { background: var(--teal); background-image: none; color: #fff; border: 0; border-radius: 16px; box-shadow: 0 2px 5px rgb(15 23 42 / 10%); }
-  :root .pos-premium-bill .pay-button:hover:not(:disabled),
-  :root .pay-confirm-modal .pay-confirm-button:hover:not(:disabled) { background: var(--teal-dark); }
+  :root .pos-premium-bill .pay-button { background: var(--teal); background-image: none; color: #fff; border: 0; border-radius: 16px; box-shadow: 0 2px 5px rgb(15 23 42 / 10%); }
+  :root .pos-premium-bill .pay-button:hover:not(:disabled) { background: var(--teal-dark); }
   :root .pos-premium-bill .pay-button:disabled { opacity: .5; box-shadow: none; }
   :root .pos-premium-bill .cart-status-line { height: auto; min-height: 32px; white-space: normal; width: 100%; margin-top: 6px; flex: 0 0 auto; }
   :root .app-shell .pos-premium-layout .quick-pick-panel {

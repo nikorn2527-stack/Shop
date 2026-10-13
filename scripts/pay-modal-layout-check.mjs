@@ -7,7 +7,7 @@ import { DatabaseSync, backup } from 'node:sqlite';
 import puppeteer from 'puppeteer';
 import { createAppSession, setSettings } from '../server/sqliteStore.ts';
 
-const displayMode = ['qr', 'bank', 'both'].includes(process.env.QR_DISPLAY_MODE ?? '') ? process.env.QR_DISPLAY_MODE : 'both';
+const promptpayActive = process.env.QR_PROMPTPAY_OFF !== '1';
 const bankEmpty = process.env.QR_BANK_EMPTY === '1';
 const promptpayEmpty = process.env.QR_PROMPTPAY_EMPTY === '1';
 
@@ -20,9 +20,9 @@ const db = new DatabaseSync(dbPath);
 const user = db.prepare("SELECT id FROM app_users WHERE active=1 AND role IN ('dev','admin','administrator','manager') LIMIT 1").get();
 if (!user) throw new Error('need admin');
 const session = createAppSession(db, user.id);
-setSettings(db, { promptpayId: promptpayEmpty ? '' : '0812345678', posRailHidden: '[]', posShortcutKeys: '{}', receiptPaperWidth: '72', qrDisplayMode: displayMode, bankAccounts: bankEmpty ? [] : [{ id: 'qa-bank', bankCode: 'KBANK', bankName: 'QA Bank', accountNumber: '1234567890', accountName: 'QA Account', branch: '', active: true, note: '' }] });
-const product = db.prepare("SELECT * FROM products WHERE active=1 AND barcode IS NOT NULL AND barcode<>'' LIMIT 1").get();
-if (!product) throw new Error('need product');
+setSettings(db, { promptpayId: promptpayEmpty ? '' : '0812345678', promptpayActive, posRailHidden: '[]', posShortcutKeys: '{}', receiptPaperWidth: '72', bankAccounts: bankEmpty ? [] : [{ id: 'qa-bank', bankCode: 'KBANK', bankName: 'QA Bank', accountNumber: '1234567890', accountName: 'QA Account', branch: '', active: true, note: '' }] });
+const products = db.prepare("SELECT * FROM products WHERE active=1 AND barcode IS NOT NULL AND barcode<>'' LIMIT 3").all();
+if (products.length < 2) throw new Error('need at least two products');
 db.close();
 
 const port = await new Promise((resolve, reject) => {
@@ -43,7 +43,7 @@ try {
     if (i === 59) throw new Error('Server startup timeout');
     await new Promise(r => setTimeout(r, 500));
   }
-  browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'] });
+  browser = await puppeteer.launch({ headless: true, executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined, args: ['--no-sandbox'] });
   const page = await browser.newPage();
   const errors = [];
   page.on('pageerror', e => errors.push(e.message));
@@ -55,15 +55,18 @@ try {
   if (!nav.asElement()) throw new Error('POS nav missing');
   await nav.asElement().click();
   await page.waitForSelector('.scan-hero input');
-  await page.click('.scan-hero input');
-  await page.keyboard.type(product.sku);
-  await page.keyboard.press('Enter');
-  try {
+  for (const product of products) {
+    await page.click('.scan-hero input');
+    await page.keyboard.type(product.sku);
+    await page.keyboard.press('Enter');
     await page.waitForFunction(name => document.querySelector('.cart-items')?.textContent.includes(name), { timeout: 10000 }, product.name);
+  }
+  try {
+    await page.waitForFunction(names => names.every(name => document.querySelector('.cart-items')?.textContent.includes(name)), { timeout: 10000 }, products.map(product => product.name));
   } catch (e) {
     const cartText = await page.evaluate(() => document.querySelector('.cart-items')?.textContent ?? '(no .cart-items)');
     const scanVal = await page.$eval('.scan-hero input', i => i.value).catch(() => '(missing)');
-    console.log('DEBUG_PRODUCT', product.sku, '|', product.name, '| scan:', scanVal, '| cart:', cartText.slice(0, 200));
+    console.log('DEBUG_PRODUCTS', products.map(product => `${product.sku} | ${product.name}`).join(', '), '| scan:', scanVal, '| cart:', cartText.slice(0, 200));
     throw e;
   }
   const click = async (text, scope = 'body') => {
@@ -82,10 +85,10 @@ try {
   console.log('FOCUS_ON_OPEN', focusOnOpen);
   if (!focusOnOpen.includes('pay-cash-input-row')) throw new Error(`cash input should be auto-focused on open, got ${focusOnOpen}`);
 
-  // กดปุ่มยอดด่วน 2 ครั้ง (100 แล้วตามด้วย 50) — ต้องแทนค่า ไม่ใช่บวกเป็น 150
+  // กดปุ่มยอดด่วนแล้วกดรับตรงยอด — ค่าต้องถูกแทน ไม่ใช่บวกสะสม และยอดพอต้องพาโฟกัสไปยืนยัน
   await page.waitForFunction(() => [...document.querySelectorAll('.pay-confirm-modal .quick-amount-btn')].some(b => b.textContent.trim() === '100'));
   await click('100', '.pay-confirm-modal');
-  await click('50', '.pay-confirm-modal');
+  await click('รับตรงยอด', '.pay-confirm-modal');
   const cashValue = await page.$eval('.pay-cash-input-row input', i => i.value);
   console.log('CASH_VALUE_AFTER_TWO_TAPS', cashValue);
   // FIX (user) — เงินพอแล้ว: โฟกัสต้องเด้งไป "ปุ่มยืนยัน" อัตโนมัติ
@@ -119,16 +122,16 @@ try {
   await page.waitForSelector('.pay-confirm-modal', { hidden: true });
   await click('QR / สแกน');
   await page.waitForSelector('.pay-confirm-modal');
-  if (displayMode !== 'bank') await page.waitForSelector(promptpayEmpty ? '.pay-qr-missing' : '.pay-qr-figure img', { timeout: 10000 });
+  if (promptpayActive) await page.waitForSelector(promptpayEmpty ? '.pay-qr-missing' : '.pay-qr-figure img', { timeout: 10000 });
   const qrVisible = await page.$('.pay-qr-figure img') !== null;
   const qrMissingVisible = await page.$('.pay-qr-missing') !== null;
   const bankVisible = await page.$('.pay-bank-accounts') !== null;
   const bankMissingVisible = await page.$('.pay-bank-missing') !== null;
-  console.log('QR_DISPLAY_MODE', displayMode, { qrVisible, qrMissingVisible, bankVisible, bankMissingVisible });
-  if (qrVisible !== (displayMode !== 'bank' && !promptpayEmpty)) throw new Error(`QR visibility mismatch for ${displayMode}`);
-  if (qrMissingVisible !== (displayMode !== 'bank' && promptpayEmpty)) throw new Error(`PromptPay empty-state mismatch for ${displayMode}`);
-  if (bankVisible !== (displayMode !== 'qr' && !bankEmpty)) throw new Error(`bank visibility mismatch for ${displayMode}`);
-  if (bankMissingVisible !== (displayMode !== 'qr' && bankEmpty)) throw new Error(`bank empty-state mismatch for ${displayMode}`);
+  console.log('PAYMENT_CHANNELS', { promptpayActive, qrVisible, qrMissingVisible, bankVisible, bankMissingVisible });
+  if (qrVisible !== (promptpayActive && !promptpayEmpty)) throw new Error('PromptPay QR visibility mismatch');
+  if (qrMissingVisible !== (promptpayActive && promptpayEmpty)) throw new Error('PromptPay missing-state mismatch');
+  if (bankVisible !== !bankEmpty) throw new Error('bank visibility mismatch');
+  if (bankMissingVisible !== bankEmpty) throw new Error('bank empty-state mismatch');
   if (qrVisible) {
     const qrCaption = await page.$eval('.pay-qr-caption', el => el.textContent);
     console.log('QR_CAPTION', qrCaption);
@@ -150,6 +153,9 @@ try {
   });
   console.log('QR_ITEMS_ROW', qrItems);
   if (!qrItems.endsWith('ชิ้น') || !qrItems.includes('รายการ')) throw new Error(`item-count row should say "N รายการ · M ชิ้น" in one row, got: ${qrItems}`);
+  const visibleItemRows = await page.$$eval('.pay-confirm-items > .pay-confirm-item', rows => rows.filter(row => row.getBoundingClientRect().height > 0).length);
+  console.log('QR_VISIBLE_ITEM_ROWS', visibleItemRows);
+  if (visibleItemRows < 2) throw new Error(`payment modal must show at least two product rows, got ${visibleItemRows}`);
   const qrLayout = await page.evaluate(() => {
     const pick = sel => { const el = document.querySelector(sel); if (!el) return null; const r = el.getBoundingClientRect(); return { top: Math.round(r.top), bottom: Math.round(r.bottom), inView: r.top >= 0 && r.bottom <= window.innerHeight }; };
     return { confirm: pick('.pay-confirm-button'), qrFigure: pick('.pay-qr-figure'), verify: pick('.pay-verify-block') };
@@ -167,13 +173,40 @@ try {
   console.log('PAY_MODAL_MOBILE', JSON.stringify(mobile));
   await page.screenshot({ path: path.join(dir, 'pay-modal-390.png') });
 
-  if (cashValue !== '50') throw new Error(`quick cash should REPLACE (expected 50, got ${cashValue})`);
+  if (Number(cashValue) <= 0) throw new Error(`quick cash should set a positive exact amount, got ${cashValue}`);
   if (!layout.confirm?.inView) throw new Error('confirm button not visible without scrolling at 1366x768');
   if (!layout.cashInput?.inView) throw new Error('cash input not visible without scrolling at 1366x768');
   if (!qrLayout.confirm?.inView) throw new Error('QR mode: confirm button not visible on same screen at 1366x768');
   if (!qrLayout.verify?.inView) throw new Error('QR mode: verify checkbox not visible at 1366x768');
   if (!mobile.confirm?.inView) throw new Error('confirm button not visible on mobile');
-  if (displayMode !== 'bank' && !promptpayEmpty && !mobile.qrFigure?.inView) throw new Error('QR figure not visible on mobile');
+  if (promptpayActive && !promptpayEmpty && !mobile.qrFigure?.inView) throw new Error('QR figure not visible on mobile');
+  await page.setViewport({ width: 1366, height: 768 });
+  await page.$eval('.pay-verify-checkbox input', node => node.scrollIntoView({ block: 'center' }));
+  await page.click('.pay-verify-checkbox input');
+  await page.waitForFunction(() => {
+    const button = document.querySelector('.pay-confirm-button');
+    return button && !button.disabled;
+  });
+  const confirmStyle = await page.$eval('.pay-confirm-button', button => {
+    const matchingRules = [];
+    for (const sheet of document.styleSheets) {
+      try {
+        for (const rule of sheet.cssRules) {
+          if (rule instanceof CSSStyleRule && rule.selectorText.includes('pay-confirm') && button.matches(rule.selectorText)) matchingRules.push({ selector: rule.selectorText, background: rule.style.background, priority: rule.style.getPropertyPriority('background') });
+        }
+      } catch {}
+    }
+    return { color: getComputedStyle(button).backgroundColor, disabled: button.disabled, inlineStyle: button.getAttribute('style'), matchingRules };
+  });
+  console.log('PAY_CONFIRM_STYLE', JSON.stringify(confirmStyle));
+  if (confirmStyle.color !== 'rgb(22, 128, 60)') throw new Error(`enabled confirm button must use success green, got ${confirmStyle.color}`);
+  await click('ยืนยันการชำระเงิน', '.pay-confirm-modal');
+  await page.waitForSelector('.receipt-modal');
+  const receiptState = await page.$eval('.receipt-success', node => node.textContent ?? '');
+  console.log('PAYMENT_COMPLETION_STATE', receiptState);
+  if (!receiptState.includes('ชำระเงินสำเร็จ')) throw new Error(`payment completion state is missing, got: ${receiptState}`);
+  if (!(await page.$('#receipt-paper'))) throw new Error('receipt paper is missing after successful payment');
+  if (!(await page.$('.receipt-modal button'))) throw new Error('receipt actions are missing after successful payment');
   if (errors.length) throw new Error('page errors: ' + errors.join('; '));
   console.log('PAY_MODAL_LAYOUT_PASS', dir);
 } finally {

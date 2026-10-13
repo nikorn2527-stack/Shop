@@ -196,10 +196,10 @@ type SettingsForm = {
   goliveChecks: string;
   /** ROUND 63 (user) — บัญชีพร้อมเพย์ร้าน: เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก */
   promptpayId: string;
+  /** เปิด/ปิดพร้อมเพย์โดยไม่ลบหมายเลขที่เคยตั้ง */
+  promptpayActive: boolean;
   /** FIX-5 (user) — บัญชีธนาคารร้าน (รับเงินโอน) หลายบัญชีได้ · แสดงที่หน้า POS + ใบเสร็จ */
   bankAccounts: BankAccount[];
-  /** FIX (user) — หน้า QR/ยืนยันชำระ แสดงช่องทางไหน: qr = QR อย่างเดียว · bank = บัญชีอย่างเดียว · both = ทั้งคู่ */
-  qrDisplayMode: "qr" | "bank" | "both";
   /** ROUND 68 (user) — เบอร์โทรศูนย์ช่วยเหลือ แสดงท้ายหน้าจอ (footer) · ว่าง = ไม่แสดง */
   helpPhone: string;
 };
@@ -231,7 +231,7 @@ const SETTINGS_FIELD_LABELS: [keyof SettingsForm, string][] = [
   ["dailyCutOffMode", "โหมดตัดยอดรายวัน"],
   ["dailyCutOffTime", "เวลาตัดยอดรายวัน"],
   ["promptpayId", "บัญชีพร้อมเพย์ร้าน"],
-  ["qrDisplayMode", "ช่องทางหน้า QR"],
+  ["promptpayActive", "เปิดใช้พร้อมเพย์"],
   ["bankAccounts", "บัญชีธนาคารร้าน"],
   ["helpPhone", "เบอร์ศูนย์ช่วยเหลือ"],
   ["devAccess", "การเข้าใช้งานสำหรับผู้พัฒนา"],
@@ -1206,6 +1206,22 @@ export function Settings({
     if (!form) return;
     setSaved(false);
     saveMutation.mutate({ ...form, appStyle: "shop" });
+  };
+  const savePromptPay = () => {
+    if (!form) return;
+    const promptpayId = form.promptpayId.trim();
+    if (promptpayId && !isValidPromptPayId(promptpayId)) {
+      toast.error("เลขพร้อมเพย์ไม่ถูกต้อง", { description: "ใช้เบอร์โทร 9–10 หลัก หรือเลขประจำตัวประชาชน 13 หลัก" });
+      return;
+    }
+    updateForm({ promptpayId });
+    saveMutation.mutate({ promptpayId });
+  };
+  const togglePromptPay = () => {
+    if (!form) return;
+    const promptpayActive = !form.promptpayActive;
+    updateForm({ promptpayActive });
+    saveMutation.mutate({ promptpayActive });
   };
   const chooseFontScale = (id: FontScaleId) => {
     setFontScale(id);
@@ -2354,8 +2370,9 @@ export function Settings({
                 <div className="settings-heading">
                   <div>
                     <h2>พร้อมเพย์รับเงิน</h2>
+                    <p>เปิดหรือปิดได้ทันที โดยไม่ต้องลบเลขพร้อมเพย์</p>
                   </div>
-                  <QrCode size={20} className="muted-icon" />
+                  <button type="button" className={`toggle ${form?.promptpayActive !== false ? "on" : ""}`} onClick={togglePromptPay} disabled={!form || saveMutation.isPending} aria-pressed={form?.promptpayActive !== false} aria-label={form?.promptpayActive !== false ? "ปิดรับเงินผ่านพร้อมเพย์" : "เปิดรับเงินผ่านพร้อมเพย์"} title={form?.promptpayActive !== false ? "ปิดรับเงินผ่านพร้อมเพย์" : "เปิดรับเงินผ่านพร้อมเพย์"}><span /></button>
                 </div>
                 <div className="form-grid">
                   <label className="wide">
@@ -2365,6 +2382,7 @@ export function Settings({
                       onChange={event =>
                         updateForm({ promptpayId: event.target.value })
                       }
+                      onBlur={savePromptPay}
                       placeholder="เช่น 0812345678 หรือ 1234567890123"
                       disabled={!form}
                       maxLength={20}
@@ -2373,7 +2391,12 @@ export function Settings({
                     />
                   </label>
                 </div>
-                {(form?.promptpayId ?? "").trim() === "" ? (
+                {form?.promptpayActive === false ? (
+                  <div className="settings-inline-note amber">
+                    <CircleAlert size={16} />
+                    <span>ปิดรับเงินผ่านพร้อมเพย์อยู่</span>
+                  </div>
+                ) : (form?.promptpayId ?? "").trim() === "" ? (
                   <div className="settings-inline-note amber">
                     <CircleAlert size={16} />
                     <span>
@@ -2392,42 +2415,6 @@ export function Settings({
                     </span>
                   </div>
                 )}
-              </section>
-              <section className="panel settings-card">
-                <div className="settings-heading">
-                  <div>
-                    <h2>หน้า QR ให้ลูกค้าเห็นอะไร</h2>
-                    <p>เลือกแล้วบันทึกทันที ไม่ต้องกดบันทึกท้ายหน้า</p>
-                  </div>
-                  <QrCode size={20} className="muted-icon" />
-                </div>
-                <div className="number-mode-grid">
-                  {([
-                    ["qr", "QR พร้อมเพย์อย่างเดียว", "เหมาะกับร้านที่ใช้ QR เป็นหลัก"],
-                    ["bank", "บัญชีธนาคารอย่างเดียว", "เหมาะกับร้านที่รับโอนเข้าบัญชี"],
-                    ["both", "โชว์ทั้งคู่", "ลูกค้าเลือกสแกนหรือโอนก็ได้"],
-                  ] as const).map(([value, title, detail]) => (
-                    <button
-                      className={(form?.qrDisplayMode ?? "both") === value ? "selected" : ""}
-                      key={value}
-                      onClick={() => {
-                        if (!form) return;
-                        updateForm({ qrDisplayMode: value });
-                        saveMutation.mutate({ qrDisplayMode: value });
-                      }}
-                      disabled={!form || saveMutation.isPending}
-                      type="button"
-                    >
-                      <span className="number-radio">
-                        {(form?.qrDisplayMode ?? "both") === value && <i />}
-                      </span>
-                      <span>
-                        <b>{title}</b>
-                        <small>{detail}</small>
-                      </span>
-                    </button>
-                  ))}
-                </div>
               </section>
               <BankAccountsPanel
                 value={form?.bankAccounts ?? []}

@@ -354,11 +354,9 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
   // ROUND 63 (user) — QR พร้อมเพย์ที่หน้ายืนยันการชำระ: สร้างภาพ QR ยอดตามบิล
   // (บัญชีร้านมาจาก ตั้งค่า → การชำระเงิน) ให้ลูกค้าเปิดแอปธนาคารสแกนจ่ายได้เลย
   const promptpayId = settingsQuery.data?.promptpayId ?? "";
-  // FIX (user) — หน้า QR แสดงช่องทางไหน: qr = QR อย่างเดียว · bank = บัญชีอย่างเดียว · both = ทั้งคู่
-  // (ค่าเดิม both — ร้านที่ตั้งไว้แล้วไม่เปลี่ยนพฤติกรรม)
-  const qrDisplayMode = settingsQuery.data?.qrDisplayMode === "qr" ? "qr" as const : settingsQuery.data?.qrDisplayMode === "bank" ? "bank" as const : "both" as const;
-  const showQrFigure = qrDisplayMode !== "bank";
-  const showBankAccounts = qrDisplayMode !== "qr";
+  // พร้อมเพย์กับบัญชีธนาคารเป็นช่องทางรับเงินคนละรายการ: ปิด PromptPay ได้โดยไม่กระทบบัญชีธนาคาร
+  const showQrFigure = settingsQuery.data?.promptpayActive !== false;
+  const showBankAccounts = true;
   useEffect(() => {
     let cancelled = false;
     if (payConfirm !== "QR / สแกน" || !isValidPromptPayId(promptpayId) || !(payable > 0)) {

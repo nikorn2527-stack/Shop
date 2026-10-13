@@ -5118,6 +5118,10 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .pay-confirm-modal .modal-actions .outline-button { align-self: center; }
 .pay-confirm-button { flex: 1; justify-content: center; min-height: 42px; font-size: 12.5px; font-weight: 700; }
 .pay-confirm-button:disabled { opacity: .55; }
+/* สีปุ่มตามความหมาย ไม่ผูกกับสีธีม: เขียว = ยืนยัน/ปิดบิลสำเร็จ */
+.pay-confirm-modal .primary-button.pay-confirm-button:not(:disabled) { background: #16803c !important; color: #fff; border-color: #16803c !important; }
+.pay-confirm-modal .primary-button.pay-confirm-button:not(:disabled):hover { background: #0f6430 !important; border-color: #0f6430 !important; }
+.pay-confirm-modal .pay-confirm-button:focus-visible { outline: 3px solid rgba(22, 128, 60, .3); outline-offset: 2px; }
 /* บิลยาว: รายการเลื่อนภายใน ไม่ดันโมดัลสูงเกินจอ (กระชับลงจาก 236px ให้หัว+สรุป+ช่องเงินสดอยู่หน้าจอเดียวกัน) */
 .pay-confirm-items { max-height: 168px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #c3d6cc transparent; }
 .pay-confirm-items::-webkit-scrollbar { width: 6px; }
@@ -5536,7 +5540,7 @@ body:has(.pay-confirm-modal) [data-sonner-toaster] { z-index: 40; }
 /* FIX (user) — โหมด QR ยาวเกิน 768px จนช่องติ๊กหลุดจอ: ย่อรายการ+สรุปบิลเฉพาะโหมด QR ให้หัว+QR+ช่องติ๊ก+ปุ่มอยู่จอเดียว */
 /* FIX (user) — QR mode ยังยาวเกินจอ (รายการ+บัญชี+สลิป) → ตัดรายการเป็น 2 แถว, สรุปบิลบางลง, บัญชีสูงจำกัด
    เพื่อให้ช่องติ๊ก "ตรวจสอบการชำระเงิน" + ปุ่มยืนยัน ขึ้นจอเดียวทั้ง 1366x768 และมือถือ */
-.pay-confirm-modal:has(.pay-qr-block) .pay-confirm-items { max-height: 54px; }
+.pay-confirm-modal:has(.pay-qr-block) .pay-confirm-items { max-height: 128px; }
 .pay-confirm-modal:has(.pay-qr-block) .pay-confirm-rows > div { padding: 4px 12px; font-size: 11px; }
 .pay-confirm-modal:has(.pay-qr-block) .pay-confirm-items-head, .pay-confirm-modal:has(.pay-qr-block) .pay-confirm-item { padding-top: 5px; padding-bottom: 5px; }
 .pay-confirm-modal:has(.pay-qr-block) .pay-confirm-total b { font-size: 15px; }
@@ -5544,7 +5548,6 @@ body:has(.pay-confirm-modal) [data-sonner-toaster] { z-index: 40; }
 .pay-confirm-modal:has(.pay-qr-block) .pay-slip-actions .outline-button { min-height: 32px; padding: 5px 10px; font-size: 11px; }
 /* FIX (user) — โหมด QR แต่ละบัญชีธนาคารกิน ~60px: ย่อแถว+ซ่อน hint ให้ช่องติ๊กขึ้นจอ */
 .pay-confirm-modal:has(.pay-qr-block) .pay-bank-row { padding: 5px 8px; }
-.pay-confirm-modal:has(.pay-qr-block) .pay-bank-hint { display: none; }
 .pay-confirm-modal:has(.pay-qr-block) .pay-confirm-body { gap: 8px; margin-top: 0; }
 /* FIX (user) — โหมด QR ยาวปริ่มจอ 768px: แถบเตือนท้ายซ้ำกับหัวโมดัล ซ่อนเฉพาะโหมด QR ให้ช่องติ๊ก+ปุ่มอยู่จอเดียว */
 .pay-confirm-modal:has(.pay-qr-block) .wallet-confirm-warning { display: none; }
