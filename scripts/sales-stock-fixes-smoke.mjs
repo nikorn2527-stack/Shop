@@ -10,6 +10,7 @@ import { createAppSession, checkout, createSqliteStore, receiveStockLines, setSe
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sales-stock-fixes-'));
 const dbPath = path.join(dir, 'test.sqlite');
+let auditItem;
 const source = new DatabaseSync(path.resolve('data/welfare-store.sqlite'), { readOnly: true });
 await backup(source, dbPath);
 source.close();
@@ -25,8 +26,11 @@ db.close();
 // instead of assuming historical test bills exist or altering report expectations.
 const fixture = createSqliteStore(dbPath);
 try {
-  const item = fixture.prepare("SELECT id, price FROM products WHERE active=1 AND price>0 LIMIT 1").get();
+  const item = fixture.prepare("SELECT id, name, price, barcode FROM products WHERE active=1 AND price>0 ORDER BY CASE WHEN NULLIF(TRIM(barcode),'') IS NULL THEN 1 ELSE 0 END, id LIMIT 1").get();
   assert.ok(item);
+  const barcode = item.barcode || `299${String(Date.now()).slice(-10)}`;
+  if (!item.barcode) fixture.prepare("UPDATE products SET barcode=? WHERE id=?").run(barcode, item.id);
+  auditItem = { ...item, barcode };
   receiveStockLines(fixture, { productId: item.id, lot: 'COST-AUDIT-FIXTURE', lines: [{ qty: 3, cost: 5 }], actor: 'Isolated report audit' });
   checkout(fixture, { items: [{ productId: item.id, qty: 1 }], paymentMethod: 'เงินสด', cashier: 'Isolated report audit', receivedCash: item.price, changeDue: 0 });
 } finally { fixture.close(); }
@@ -92,6 +96,29 @@ try {
   await page.waitForFunction(() => document.querySelector('.cost-profit-products').getAttribute('aria-busy') === 'false');
   const actualProducts = await page.$$eval('.cost-profit-products tbody tr', nodes => nodes.length);
   assert.ok(actualProducts >= expectedProducts && actualProducts > 0, 'Product details must appear for a period with sales');
+  const productTableAudit = await page.$eval('.cost-profit-products', (node, expectedItem) => {
+    const headers = [...node.querySelectorAll('thead th')];
+    const rows = [...node.querySelectorAll('tbody tr')];
+    const fixtureRow = rows.find(row => row.children[1]?.textContent?.trim() === expectedItem.name);
+    return {
+      firstHeader: headers[0]?.textContent?.trim(),
+      textHeaderAlignments: headers.slice(0, 3).map(cell => getComputedStyle(cell).textAlign),
+      numericHeaderAlignments: headers.slice(3).map(cell => getComputedStyle(cell).textAlign),
+      fixtureBarcode: fixtureRow?.children[0]?.textContent?.trim(),
+      fixtureTextAlignments: fixtureRow ? [...fixtureRow.children].slice(0, 3).map(cell => getComputedStyle(cell).textAlign) : [],
+      fixtureNumericAlignments: fixtureRow ? [...fixtureRow.children].slice(3).map(cell => getComputedStyle(cell).textAlign) : [],
+      totalLabelAlignment: getComputedStyle(node.querySelector('tfoot th')).textAlign,
+      totalValueAlignments: [...node.querySelectorAll('tfoot td')].map(cell => getComputedStyle(cell).textAlign),
+    };
+  }, auditItem);
+  assert.equal(productTableAudit.firstHeader, 'บาร์โค้ดสินค้า');
+  assert.equal(productTableAudit.fixtureBarcode, auditItem.barcode, 'Product report must display the actual barcode, not the internal SKU');
+  assert.deepEqual(productTableAudit.textHeaderAlignments, ['left', 'left', 'left']);
+  assert.ok(productTableAudit.numericHeaderAlignments.every(value => value === 'right'));
+  assert.deepEqual(productTableAudit.fixtureTextAlignments, ['left', 'left', 'left']);
+  assert.ok(productTableAudit.fixtureNumericAlignments.every(value => value === 'right'));
+  assert.equal(productTableAudit.totalLabelAlignment, 'left');
+  assert.ok(productTableAudit.totalValueAlignments.every(value => value === 'right'));
   console.log('COST_PROFIT_RECONCILED', JSON.stringify({ date, todayBills: dayBills, expected, expectedCost, displayed, actualProducts }));
   checkDb.close();
   const tables = await page.$$eval('.cost-profit-table', nodes => nodes.map(node => {
