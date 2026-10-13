@@ -91,8 +91,10 @@
 .bank-accounts-compact .bank-draft-actions { margin-top: 10px; }
 .bank-accounts-compact .bank-row { display: flex; align-items: center; gap: 10px; }
 .bank-accounts-compact .bank-row-info { flex: 1; }
+.bank-accounts-compact .bank-row-status { display: flex; align-items: center; flex-shrink: 0; }
 .bank-accounts-compact .bank-row-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 @media (max-width: 720px) {
   .bank-accounts-compact .bank-row { flex-wrap: wrap; }
-  .bank-accounts-compact .bank-row-actions { margin-left: auto; }
+  .bank-accounts-compact .bank-row-status { margin-left: auto; }
+  .bank-accounts-compact .bank-row-actions { margin-left: 0; }
 }

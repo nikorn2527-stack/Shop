@@ -215,6 +215,19 @@ export function BankAccountsPanel({
                 {account.note ? ` · ${account.note}` : ""}
               </small>
             </div>
+            <div className="bank-row-status">
+              <button
+                type="button"
+                className={`toggle ${account.active ? "on" : ""}`}
+                onClick={() => toggleActive(account.id)}
+                title={account.active ? "ปิดรับเงินเข้าบัญชีนี้ชั่วคราว" : "เปิดรับเงินเข้าบัญชีนี้"}
+                aria-pressed={account.active}
+                aria-label={account.active ? `ปิดรับเงินเข้าบัญชี ${account.bankName}` : `เปิดรับเงินเข้าบัญชี ${account.bankName}`}
+                disabled={disabled}
+              >
+                <span />
+              </button>
+            </div>
             <div className="bank-row-actions">
               <button
                 type="button"
@@ -234,17 +247,6 @@ export function BankAccountsPanel({
                 disabled={disabled}
               >
                 <Pencil size={15} />
-              </button>
-              <button
-                type="button"
-                className={`toggle ${account.active ? "on" : ""}`}
-                onClick={() => toggleActive(account.id)}
-                title={account.active ? "ปิดใช้งานบัญชีชั่วคราว" : "เปิดใช้งานบัญชีนี้"}
-                aria-pressed={account.active}
-                aria-label={account.active ? "ปิดใช้งานบัญชี" : "เปิดใช้งานบัญชี"}
-                disabled={disabled}
-              >
-                <span />
               </button>
               <button
                 type="button"
