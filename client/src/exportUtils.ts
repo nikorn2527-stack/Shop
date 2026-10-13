@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
+import { getThermalPrintProfile, thermalContentLeftMm } from "@/lib/thermalPrint";
 
 /**
  * ROUND 48 (user) — ชุดเครื่องมือส่งออกไฟล์กลางทาง ใช้ร่วมกันทุกจุด export
@@ -102,7 +103,7 @@ export function downloadXlsxFile(fileName: string, sheetName: string, rows: stri
 
 /**
  * ROUND 77 (user) — สลิปเติม/ถอน/คืนบัตร: ดาวน์โหลดรูป หรือ PDF จาก DOM สลิปบนหน้าจอ
- * (จับภาพ element แล้วยึดความกว้างกระดาษต่อเนื่อง 80 มม. เหมือนใบเสร็จ POS — ใช้ร่วมกันทุกจุด)
+ * จับภาพ element แล้วสร้าง PDF ตามม้วนกระดาษและพื้นที่พิมพ์จริงของเครื่องนี้
  */
 export async function downloadSlipFile(elementId: string, fileName: string, format: "pdf" | "image"): Promise<void> {
   const element = document.getElementById(elementId);
@@ -116,10 +117,10 @@ export async function downloadSlipFile(elementId: string, fileName: string, form
     link.click();
     return;
   }
-  // กระดาษต่อเนื่อง 80 มม. — สลิปออกมาพอดีหัวระบาย 58–80 มม. ที่ร้านใช้ (เหมือนใบเสร็จ)
-  const WIDTH_MM = 80;
-  const pageHeightMm = (canvas.height / canvas.width) * WIDTH_MM;
-  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: [WIDTH_MM, pageHeightMm] });
-  pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, WIDTH_MM, pageHeightMm);
+  const profile = getThermalPrintProfile();
+  const contentHeightMm = (canvas.height / canvas.width) * profile.printableWidthMm;
+  const pageHeightMm = contentHeightMm + profile.bottomFeedMm;
+  const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: [profile.paperWidthMm, pageHeightMm] });
+  pdf.addImage(canvas.toDataURL("image/png"), "PNG", thermalContentLeftMm(profile), 0, profile.printableWidthMm, contentHeightMm);
   pdf.save(`${baseName}.pdf`);
 }

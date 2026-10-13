@@ -1,3 +1,5 @@
+import { buildThermalPageCss, getThermalPrintProfile } from "./thermalPrint";
+
 /**
  * printHelper — Task A3: สั่งพิมพ์ผ่าน Local Printer Helper
  *
@@ -144,18 +146,24 @@ export async function printHtmlDocument(html: string): Promise<void> {
 export function printElementDocument(targetId: string, widthMm?: number, measuredHeightMm?: number): Promise<PrintResult> {
   const source = document.getElementById(targetId);
   if (!source) return Promise.reject(new Error("ไม่พบเอกสารสำหรับพิมพ์"));
+  const thermalProfile = widthMm ? getThermalPrintProfile(widthMm) : null;
   const clone = source.cloneNode(true) as HTMLElement;
-  clone.style.cssText = widthMm ? `width:${widthMm}mm;box-sizing:border-box;margin:0;padding:3mm;height:auto;max-height:none;overflow:visible` : "";
+  clone.style.cssText = thermalProfile ? `width:${thermalProfile.printableWidthMm}mm;box-sizing:border-box;margin:0;height:auto;max-height:none;overflow:visible` : "";
   const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'), el => el.outerHTML).join("");
   // เอกสารบางชนิดซ่อนต้นฉบับบนหน้าจอด้วย display:none ทำให้ขนาดที่อ่านได้เป็น 0
   // รับความสูงจาก clone ในพรีวิวเพื่อไม่ให้ browser ใช้หน้ากระดาษสั้นแล้วแบ่งเอกสาร
-  const measuredSourceHeightMm = Math.ceil(source.scrollHeight * (widthMm ?? 210) / Math.max(1, source.offsetWidth));
-  const heightMm = Math.max(60, Math.ceil(measuredHeightMm ?? measuredSourceHeightMm) + 6);
-  const pageSize = widthMm ? `${widthMm}mm ${heightMm}mm` : "A4";
-  const html = `<!doctype html><html><head><meta charset="utf-8"><base href="${location.origin}/">${styles}<style>@page{size:${pageSize};margin:${widthMm ? 0 : 8}mm}html,body{margin:0;padding:0;background:white}body>*{display:block!important;visibility:visible!important}#${targetId}{position:static!important;transform:none!important;box-shadow:none!important;height:auto!important;max-height:none!important;overflow:visible!important}</style></head><body>${clone.outerHTML}</body></html>`;
+  const contentWidthMm = thermalProfile?.printableWidthMm ?? 210;
+  const measuredSourceHeightMm = Math.ceil(source.scrollHeight * contentWidthMm / Math.max(1, source.offsetWidth));
+  const heightMm = thermalProfile
+    ? Math.max(30, Math.ceil(measuredHeightMm ?? measuredSourceHeightMm) + thermalProfile.bottomFeedMm)
+    : 297;
+  const runtimeCss = thermalProfile
+    ? buildThermalPageCss(thermalProfile, heightMm, targetId)
+    : `@page{size:A4;margin:8mm}html,body{margin:0;padding:0;background:white}#${targetId}{position:static!important;transform:none!important;box-shadow:none!important;height:auto!important;max-height:none!important;overflow:visible!important}`;
+  const html = `<!doctype html><html><head><meta charset="utf-8"><base href="${location.origin}/">${styles}<style>${runtimeCss}body>*{display:block!important;visibility:visible!important}</style></head><body>${clone.outerHTML}</body></html>`;
   return printViaHelper(getPrinterName(widthMm ? "receipt" : "report"), html, {
-    paperWidthMm: widthMm,
-    paperHeightMm: widthMm ? heightMm : undefined,
+    paperWidthMm: thermalProfile?.paperWidthMm,
+    paperHeightMm: thermalProfile ? heightMm : undefined,
   });
 }
 

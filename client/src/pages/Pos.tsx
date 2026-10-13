@@ -36,6 +36,7 @@ import { SharedSearch } from "@/components/SharedSearch";
 import { posCategories } from "@/lib/posCategories";
 import { getPosShortcutKey, matchesPosShortcut, parsePosShortcutKeys } from "@/lib/posShortcuts";
 import { normalizeProductCategory } from "@shared/productCategories";
+import { resolveThermalPaperWidth } from "@/lib/thermalPrint";
 
 /** Product row straight from trpc.product.list (backend SqliteProduct). */
 type StoreProduct = Product & {
@@ -167,7 +168,7 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
   const [payQrUrl, setPayQrUrl] = useState("");
   const [paymentNoticeOpen, setPaymentNoticeOpen] = useState(false);
   // FIX (user) — ใบแจ้งชำระกว้างตามตั้งค่า (58/72/80) เส้นเดียวกับใบเสร็จ
-  const noticePaperWidth = settingsQuery.data?.receiptPaperWidth === "58" ? "58" as const : settingsQuery.data?.receiptPaperWidth === "80" ? "80" as const : "72" as const;
+  const noticePaperWidth = resolveThermalPaperWidth(settingsQuery.data?.receiptPaperWidth);
   // รูปหลักฐานการชำระที่แนบไปกับบิล QR / สแกน (ถ่ายจากกล้อง หรือเลือกจากไฟล์)
   const [paySlip, setPaySlip] = useState<{ dataUrl: string; name: string } | null>(null);
   const [paySlipCameraOpen, setPaySlipCameraOpen] = useState(false);
@@ -806,7 +807,7 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
     setSlipDataUrl("");
     focusScan();
   };
-  // ROUND 77 — ดาวน์โหลดสลิปเติม/ถอนเป็น PDF 80มม. หรือรูป PNG (ชื่อไฟล์ตามรายการ)
+  // ROUND 77 — ดาวน์โหลดสลิปเติม/ถอนเป็น PDF ตาม profile เครื่องนี้ หรือรูป PNG
   const downloadWalletSlip = async (format: "pdf" | "image") => {
     if (!walletResult) return;
     setWalletSlipBusy(format);

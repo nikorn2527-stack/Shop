@@ -4,6 +4,7 @@ import { Printer, X } from "@/lib/icons";
 import { toast } from "sonner";
 import { HelpDisclosure } from "./HelpDisclosure";
 import { A4DocumentPreview } from "./A4DocumentPreview";
+import { getThermalPrintProfile } from "@/lib/thermalPrint";
 
 /**
  * ROUND 51 (user) — "ทุกหน้าที่มีการสั่งพิมพ์ ควรมีการพรีวิวเหมือนกัน"
@@ -32,12 +33,6 @@ const PAPER_LABEL: Record<PrintPreviewPaper, string> = {
   a4: "กระดาษ A4 · 210 × 297 มม.",
   card: "บัตรสมาชิก · นามบัตรไทย 90 × 55 มม.",
 };
-
-/** ความกว้างกระดาษสลิป (มม.) ตามที่ตั้งใน ตั้งค่า → ใบเสร็จ */
-function thermalPaperWidthMm(): number {
-  const width = document.documentElement.dataset.paperWidth;
-  return width === "58" ? 58 : width === "80" ? 80 : 72;
-}
 
 export function PrintPreviewModal({
   targetId,
@@ -69,6 +64,7 @@ export function PrintPreviewModal({
   // ROUND 80 — ความสูงเนื้อหาจริง (มม.) เพื่อบอกความยาวสลิป + ใส่ @page size
   const [contentMm, setContentMm] = useState<number | null>(null);
   const paperRef = useRef<HTMLDivElement | null>(null);
+  const thermalProfile = getThermalPrintProfile();
 
   // Clone the live document — always reflects the current render (photos,
   // barcodes are data-URL <img> so cloneNode keeps them perfectly).
@@ -97,13 +93,13 @@ export function PrintPreviewModal({
       const doc = holder.firstElementChild as HTMLElement | null;
       if (!stage || !doc) return;
       const documentPx = doc.getBoundingClientRect().width || stage.clientWidth || 1;
-      const widthMm = paper === "a4" ? 210 : paper === "card" ? 90 : thermalPaperWidthMm();
+      const widthMm = paper === "a4" ? 210 : paper === "card" ? 90 : thermalProfile.printableWidthMm;
       const heightMm = Math.round((doc.scrollHeight / documentPx) * widthMm);
       if (heightMm > 0 && !Number.isNaN(heightMm)) setContentMm(heightMm);
     };
     const frame = window.requestAnimationFrame(() => { measure(); });
     return () => { cancelled = true; window.cancelAnimationFrame(frame); };
-  }, [ready, paper]);
+  }, [ready, paper, thermalProfile.printableWidthMm]);
 
   // Esc closes — same affordance as the export preview modal.
   useEffect(() => {
@@ -119,7 +115,7 @@ export function PrintPreviewModal({
     try {
       await printElementDocument(
         targetId,
-        paper === "thermal" ? thermalPaperWidthMm() : undefined,
+        paper === "thermal" ? thermalProfile.paperWidthMm : undefined,
         paper === "thermal" ? contentMm ?? undefined : undefined,
       );
       onPrint?.();
@@ -158,7 +154,7 @@ export function PrintPreviewModal({
           </A4DocumentPreview>
         ) : (
         <div className={`print-preview-stage paper-${paper}`}>
-          <div className="print-preview-paper" ref={paperRef} />
+          <div className="print-preview-paper" ref={paperRef} style={paper === "thermal" ? { width: `${thermalProfile.printableWidthMm * 3.78}px` } : undefined} />
           {!ready && <div className="print-preview-empty">กำลังเตรียมตัวอย่างเอกสาร…</div>}
         </div>
         )}
@@ -188,7 +184,7 @@ export function PrintPreviewModal({
               <p><b>ถ้ากระดาษยาวหรือขาด ให้ตรวจการตั้งค่าก่อนพิมพ์</b></p>
               <ol>
                 <li>เลือกขอบกระดาษ <b>ไม่มี</b> และปิด <b>หัวและท้ายกระดาษ</b></li>
-                <li>เลือกความกว้างกระดาษให้ตรงกับเครื่องพิมพ์</li>
+                <li>เลือกม้วนกระดาษ <b>{thermalProfile.paperWidthMm} มม.</b> และพื้นที่พิมพ์จริง <b>{thermalProfile.printableWidthMm} มม.</b></li>
               </ol>
             </div>
           ) : (

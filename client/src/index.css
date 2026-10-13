@@ -3464,7 +3464,7 @@ th { font-weight: 600; }
   body:has(#cutoff-report) .cutoff-widget { border: 0; padding: 0; margin: 0; }
   body:has(#cutoff-report) .cutoff-widget-main, body:has(#cutoff-report) .cutoff-widget-actions,
   body:has(#cutoff-report) .cutoff-widget .notice-bar { display: none !important; }
-  body:has(#cutoff-report) .cutoff-report { display: block; width: 300px; margin: 0 auto; border: 0; box-shadow: none; break-inside: avoid; page-break-inside: avoid; }
+  body:has(#cutoff-report) .cutoff-report { display: block; width: var(--thermal-printable-width, 68mm); margin: 0 auto; border: 0; box-shadow: none; break-inside: avoid; page-break-inside: avoid; }
 }
 
 /* --- ROUND 31-7 : เครื่องพิมพ์หน้าร้าน (settings → receipt tab) -------- */
@@ -3488,7 +3488,43 @@ th { font-weight: 600; }
   body:has(#printer-test-slip) .main-shell { min-width: 0; }
   body:has(#printer-test-slip) .page-content { max-width: none; margin: 0; padding: 0; animation: none; }
   body:has(#printer-test-slip) { min-height: 0 !important; height: auto !important; }
-  body:has(#printer-test-slip) .printer-test-slip { display: block; width: 300px; margin: 0 auto; border: 1px dashed #b8bdaa; box-shadow: none; }
+  body:has(#printer-test-slip) .printer-test-slip { display: block; width: var(--thermal-printable-width, 68mm); margin: 0 auto; border: 1px dashed #b8bdaa; box-shadow: none; }
+}
+
+.thermal-paper-settings { margin: 12px 0; padding: 14px; border: 1px solid #dfeae5; border-radius: 11px; background: #f9fcfa; }
+.thermal-setting-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 11px; }
+.thermal-setting-head b, .thermal-setting-head small { display: block; }
+.thermal-setting-head b { color: #30483c; font-size: 12px; }
+.thermal-setting-head small { color: #7b8171; font-size: 10px; margin-top: 3px; line-height: 1.5; }
+.thermal-setting-head > span { flex: 0 0 auto; border-radius: 999px; padding: 4px 10px; background: #eaf6f1; color: #2f785c; font-size: 10px; font-weight: 700; }
+.thermal-preset-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.thermal-preset-grid > button { display: flex; align-items: flex-start; gap: 8px; min-width: 0; padding: 10px; border: 1px solid #dfe9e5; border-radius: 9px; background: #fff; color: #657064; text-align: left; }
+.thermal-preset-grid > button:hover, .thermal-preset-grid > button.selected { border-color: #8fc5b0; background: #f1faf6; }
+.thermal-preset-grid > button > span:last-child { min-width: 0; }
+.thermal-preset-grid b, .thermal-preset-grid small { display: block; }
+.thermal-preset-grid b { color: #385247; font-size: 11px; }
+.thermal-preset-grid small { margin-top: 3px; color: #7f8575; font-size: 9.5px; line-height: 1.45; }
+.thermal-calibration-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+.thermal-calibration-grid label { min-width: 0; padding: 10px; border: 1px solid #e4ece8; border-radius: 9px; background: #fff; }
+.thermal-calibration-grid label > span, .thermal-calibration-grid label > small { display: block; }
+.thermal-calibration-grid label > span { color: #40574c; font-size: 10.5px; font-weight: 700; }
+.thermal-calibration-grid label > small { min-height: 30px; margin: 3px 0 7px; color: #858a7a; font-size: 9px; line-height: 1.45; }
+.thermal-calibration-grid label > div { display: flex; align-items: center; gap: 6px; }
+.thermal-calibration-grid input { width: 100%; min-width: 0; height: 34px; border: 1px solid #dbe6e1; border-radius: 7px; padding: 0 8px; color: #354c41; background: #fff; font-variant-numeric: tabular-nums; }
+.thermal-calibration-grid em { color: #7e8475; font-size: 10px; font-style: normal; }
+.thermal-calibration-actions { display: flex; justify-content: flex-end; gap: 7px; margin-top: 10px; flex-wrap: wrap; }
+.thermal-local-note { margin: 8px 0 0; color: #6e7e74; font-size: 9.5px; line-height: 1.5; }
+.printer-test-title { display: flex; flex-direction: column; align-items: center; gap: 5px; margin-bottom: 8px; text-align: center; }
+.printer-test-slip > p { margin: 3px 0; text-align: center; font-size: 10px; }
+.printer-test-ruler { display: flex; align-items: center; justify-content: space-between; gap: 5px; margin: 10px 0 6px; padding-bottom: 4px; border-bottom: 1px solid #222; font-size: 9px; }
+.printer-test-border { display: flex; flex-direction: column; gap: 7px; border: 1px solid #111; padding: 8px 5px; text-align: center; }
+.printer-test-border b { font-size: 9px; line-height: 1.45; }
+.printer-test-border strong { font-size: 15px; }
+.printer-test-border code { overflow-wrap: anywhere; color: #111; font-size: 10px; letter-spacing: 1px; }
+.printer-test-cut { margin-top: 12px; padding-top: 5px; border-top: 1px dashed #111; text-align: center; font-size: 9px; }
+@media (max-width: 720px) {
+  .thermal-preset-grid, .thermal-calibration-grid { grid-template-columns: 1fr; }
+  .thermal-calibration-grid label > small { min-height: 0; }
 }
 
 /* --- ROUND 31-12 : แผงลัดหน้าร้าน + สินค้าขายเป็นราคา (น้ำแข็ง) -------- */
@@ -4436,20 +4472,16 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
       58 มม.: ใบเสร็จ 54 มม. + ขอบหน้า 2 มม. = เต็มความกว้างกระดาษ 58 มม.
       80 มม.: ใบเสร็จ 76 มม. + ขอบหน้า 2 มม. = เต็มความกว้างกระดาษ 80 มม. */
 @media print {
-  html[data-paper-width="58"]:has(#receipt-paper) .receipt-modal { width: 54mm; }
+  html:has(#receipt-paper) .receipt-modal { width: var(--thermal-printable-width, 68mm); }
   html[data-paper-width="58"]:has(#receipt-paper) .receipt-paper { font-size: 10px; }
-  html[data-paper-width="80"]:has(#receipt-paper) .receipt-modal { width: 76mm; }
   html[data-paper-width="80"]:has(#receipt-paper) .receipt-paper { font-size: 12.5px; }
-  /* สลิปเติม/ถอนเงิน (พิมพ์จาก modal ผลลัพธ์) — px ใกล้เคียง: 58≈200px · 72≈270px · 80≈300px */
-  html[data-paper-width="58"]:has(#wallet-slip) .wallet-slip { width: 200px; }
-  html[data-paper-width="72"]:has(#wallet-slip) .wallet-slip { width: 270px; }
-  html[data-paper-width="80"]:has(#wallet-slip) .wallet-slip { width: 300px; }
+  /* สลิปเติม/ถอนเงินใช้พื้นที่พิมพ์จริงจาก profile ของเครื่องนี้ */
+  html:has(#wallet-slip) .wallet-slip,
+  html:has(#member-wallet-slip) .wallet-slip { width: var(--thermal-printable-width, 68mm); }
   /* ROUND 75 — หัวสลิปเติม/ถอน โทนกลาง: วงกลมไอคอนเทาเข้ม พิมพ์ขาว-ดำเหมือนพิมพ์สีเป๊ะ */
   .wallet-slip .receipt-success > span { background: #2f2f2c !important; }
   /* สลิปทดสอบเครื่องพิมพ์ (ตั้งค่า → ใบเสร็จ) */
-  html[data-paper-width="58"]:has(#printer-test-slip) .printer-test-slip { width: 200px; }
-  html[data-paper-width="72"]:has(#printer-test-slip) .printer-test-slip { width: 270px; }
-  html[data-paper-width="80"]:has(#printer-test-slip) .printer-test-slip { width: 300px; }
+  html:has(#printer-test-slip) .printer-test-slip { width: var(--thermal-printable-width, 68mm); }
 }
 
 /* ============================================================
@@ -4718,10 +4750,10 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .print-preview-a4 > .export-preview-summary,
 .print-preview-a4 > .export-preview-actions { flex: 0 0 auto; }
 .print-preview-stage .print-preview-paper { min-height: 40px; }
-.print-preview-stage.paper-thermal .print-preview-paper { width: 300px; max-width: 100%; }
+.print-preview-stage.paper-thermal .print-preview-paper { width: min(300px, 100%); max-width: 100%; }
 .print-preview-stage.paper-card .print-preview-paper { width: 323px; }
 /* เอกสารที่ปกติซ่อนบนหน้าจอ (โผล่เฉพาะตอนพิมพ์) ต้องแสดงในพรีวิว */
-.print-preview-paper .cutoff-report, .print-preview-paper .printer-test-slip { display: block !important; width: 300px; max-width: 100%; margin: 0 auto; }
+.print-preview-paper .cutoff-report, .print-preview-paper .printer-test-slip { display: block !important; width: 100%; max-width: 100%; margin: 0 auto; }
 .print-preview-paper .statement-paper { width: 100%; max-width: none; box-shadow: none; }
 .print-preview-paper .receipt-paper, .print-preview-paper .wallet-slip { box-shadow: 0 6px 18px rgba(35, 62, 52, .12); }
 .print-preview-paper .member-card { box-shadow: 0 8px 20px rgba(40, 70, 58, .16); }

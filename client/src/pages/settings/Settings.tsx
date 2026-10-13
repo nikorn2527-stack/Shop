@@ -117,6 +117,13 @@ import { PrintPreviewModal } from "@/components/PrintPreviewModal";
 import { BankAccountsPanel } from "@/components/BankAccountsPanel";
 import { PrinterPicker, PrinterHelperStatus } from "@/components/PrinterPicker";
 import { getLocalPrinterSettings, updateLocalPrinterSetting, getWorkstationId } from "@/lib/printHelper";
+import {
+  applyThermalPrintProfile,
+  getThermalPrintProfile,
+  resetThermalPrintProfile,
+  saveThermalPrintProfile,
+  type ThermalPrintProfile,
+} from "@/lib/thermalPrint";
 import { trpc } from "@/lib/trpc";
 // V2-B — SettingsTab shared between Settings (this file) and AppShell (layouts/).
 import { SettingsTab } from "../shared";
@@ -596,7 +603,7 @@ const GO_LIVE_CHECKLIST: {
 ];
 
 /** LocalPrinterSettings — 3 แถว dropdown + ปุ่มพิมพ์ทดสอบ บันทึก localStorage */
-function LocalPrinterSettings() {
+function LocalPrinterSettings({ onReceiptPrinterChange }: { onReceiptPrinterChange?: (name: string) => void }) {
   const [settings, setSettings] = useState(() => getLocalPrinterSettings());
   const docs: { type: "receipt" | "report" | "card"; label: string; hint: string }[] = [
     { type: "receipt", label: "ใบเสร็จ", hint: "พิมพ์ใบเสร็จจากหน้า POS" },
@@ -615,6 +622,7 @@ function LocalPrinterSettings() {
             value={settings[doc.type]}
             onChange={(name) => {
               updateLocalPrinterSetting(doc.type, name);
+              if (doc.type === "receipt") onReceiptPrinterChange?.(name);
               setSettings(getLocalPrinterSettings());
             }}
           />
@@ -1194,9 +1202,38 @@ export function Settings({
     setForm(current => (current ? { ...current, ...patch } : current));
   // ROUND 42 — พรีวิวขนาดกระดาษสลิปแบบสด: เลือกแล้วลอง “พิมพ์ทดสอบ” ได้เลยก่อนบันทึก
   const paperWidth = resolvePaperWidth(form?.receiptPaperWidth);
+  const [receiptPrinterName, setReceiptPrinterName] = useState(() => getLocalPrinterSettings().receipt);
+  const [thermalProfile, setThermalProfile] = useState<ThermalPrintProfile>(() => getThermalPrintProfile("72", getLocalPrinterSettings().receipt));
+  const [thermalDraft, setThermalDraft] = useState(() => ({ printableWidthMm: "68", horizontalOffsetMm: "0", bottomFeedMm: "4" }));
   useEffect(() => {
     applyPaperWidth(form?.receiptPaperWidth);
-  }, [form?.receiptPaperWidth]);
+    const profile = getThermalPrintProfile(form?.receiptPaperWidth, receiptPrinterName);
+    setThermalProfile(profile);
+    setThermalDraft({
+      printableWidthMm: String(profile.printableWidthMm),
+      horizontalOffsetMm: String(profile.horizontalOffsetMm),
+      bottomFeedMm: String(profile.bottomFeedMm),
+    });
+  }, [form?.receiptPaperWidth, receiptPrinterName]);
+  const updateThermalProfile = (patch: Partial<ThermalPrintProfile>) => {
+    const savedProfile = saveThermalPrintProfile({ ...thermalProfile, ...patch, printerName: receiptPrinterName, paperWidthMm: Number(paperWidth) as 58 | 72 | 80 });
+    setThermalProfile(savedProfile);
+    setThermalDraft({
+      printableWidthMm: String(savedProfile.printableWidthMm),
+      horizontalOffsetMm: String(savedProfile.horizontalOffsetMm),
+      bottomFeedMm: String(savedProfile.bottomFeedMm),
+    });
+  };
+  const resetCurrentThermalProfile = () => {
+    const profile = resetThermalPrintProfile(paperWidth, receiptPrinterName);
+    setThermalProfile(profile);
+    setThermalDraft({ printableWidthMm: String(profile.printableWidthMm), horizontalOffsetMm: String(profile.horizontalOffsetMm), bottomFeedMm: String(profile.bottomFeedMm) });
+    toast.success("คืนค่ามาตรฐานของกระดาษขนาดนี้แล้ว");
+  };
+  const commitThermalDraft = (key: keyof typeof thermalDraft) => {
+    const value = Number(thermalDraft[key]);
+    updateThermalProfile({ [key]: Number.isFinite(value) ? value : thermalProfile[key] });
+  };
   const saveSettings = () => {
     if (!form) return;
     setSaved(false);
@@ -2141,12 +2178,61 @@ export function Settings({
                 </div>
                 {/* สถานะ Helper แสดงครั้งเดียวด้านบน */}
                 <PrinterHelperStatus />
+                <div className="thermal-paper-settings">
+                  <div className="thermal-setting-head">
+                    <div>
+                      <b>ขนาดม้วนกระดาษ</b>
+                      <small>เลือกค่าหลักของร้าน แล้วปรับพื้นที่พิมพ์จริงให้ตรงกับเครื่องนี้</small>
+                    </div>
+                    <span>{thermalProfile.printableWidthMm} / {thermalProfile.paperWidthMm} มม.</span>
+                  </div>
+                  <div className="thermal-preset-grid" role="radiogroup" aria-label="ขนาดม้วนกระดาษสลิป">
+                    {PAPER_WIDTHS.map(option => (
+                      <button
+                        type="button"
+                        key={option.id}
+                        role="radio"
+                        aria-checked={paperWidth === option.id}
+                        className={paperWidth === option.id ? "selected" : ""}
+                        onClick={() => updateForm({ receiptPaperWidth: option.id })}
+                        disabled={!form}
+                      >
+                        <span className="number-radio">{paperWidth === option.id && <i />}</span>
+                        <span><b>กระดาษ {option.label}</b><small>{option.detail}</small></span>
+                      </button>
+                    ))}
+                  </div>
+                  <HelpDisclosure id="thermal-calibration" label="ปรับให้ตรงกับเครื่องพิมพ์นี้">
+                    <div className="thermal-calibration-grid">
+                      <label>
+                        <span>พื้นที่พิมพ์จริง</span>
+                        <small>ลดค่านี้เมื่อขอบซ้ายหรือขวาถูกตัด</small>
+                        <div><input type="number" min="40" max={thermalProfile.paperWidthMm} step="0.5" value={thermalDraft.printableWidthMm} onChange={event => setThermalDraft(current => ({ ...current, printableWidthMm: event.target.value }))} onBlur={() => commitThermalDraft("printableWidthMm")} onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur(); }} /><em>มม.</em></div>
+                      </label>
+                      <label>
+                        <span>เลื่อนซ้าย–ขวา</span>
+                        <small>ค่าบวกเลื่อนไปทางขวา ค่าลบเลื่อนไปทางซ้าย</small>
+                        <div><input type="number" min="-5" max="5" step="0.5" value={thermalDraft.horizontalOffsetMm} onChange={event => setThermalDraft(current => ({ ...current, horizontalOffsetMm: event.target.value }))} onBlur={() => commitThermalDraft("horizontalOffsetMm")} onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur(); }} /><em>มม.</em></div>
+                      </label>
+                      <label>
+                        <span>เว้นท้ายก่อนตัด</span>
+                        <small>เพิ่มเมื่อข้อความบรรทัดสุดท้ายอยู่ชิดใบมีดเกินไป</small>
+                        <div><input type="number" min="0" max="20" step="0.5" value={thermalDraft.bottomFeedMm} onChange={event => setThermalDraft(current => ({ ...current, bottomFeedMm: event.target.value }))} onBlur={() => commitThermalDraft("bottomFeedMm")} onKeyDown={event => { if (event.key === "Enter") event.currentTarget.blur(); }} /><em>มม.</em></div>
+                      </label>
+                    </div>
+                    <div className="thermal-calibration-actions">
+                      <button type="button" className="outline-button compact" onClick={resetCurrentThermalProfile}><RotateCcw size={14} /> คืนค่ามาตรฐาน</button>
+                      <button type="button" className="primary-button compact" onClick={testPrintReceipt}><Printer size={14} /> พิมพ์แผ่นทดสอบ</button>
+                    </div>
+                    <p className="thermal-local-note">บันทึกค่าปรับละเอียดสำหรับ {receiptPrinterName ? `“${receiptPrinterName}”` : "เครื่องนี้ (ยังไม่ได้เลือกเครื่องพิมพ์)"} ทันที ไม่กระทบจุดขายหรือเครื่องพิมพ์ตัวอื่น</p>
+                  </HelpDisclosure>
+                </div>
                 <div className="printer-workstation-note">
                   <small>💻 คอมพิวเตอร์เครื่องนี้: <b>{getWorkstationId()}</b> — การตั้งค่านี้ใช้กับเครื่องนี้เท่านั้น</small>
                 </div>
-                <LocalPrinterSettings />
+                <LocalPrinterSettings onReceiptPrinterChange={setReceiptPrinterName} />
                 <div className="settings-inline-note">
-                  <b>ขนาดสลิปใช้ค่าที่ตั้งในระบบ</b> — รองรับ 58, 72 และ 80 มม. ระบบจะจัดความกว้างและเนื้อหาให้ตรงค่านี้ ส่วน Windows/ไดรเวอร์เครื่องพิมพ์ต้องเลือกกระดาษกว้างเท่ากัน และตั้งการตัดกระดาษตามรุ่นเครื่อง หากเปลี่ยนเครื่องหรือเปลี่ยนม้วน ให้ปรับทั้งสองจุดให้ตรงกัน
+                  <b>ตั้งค่าไดรเวอร์ให้ตรงกันด้วย</b> — ในหน้าต่างพิมพ์ของ Windows ให้เลือกม้วน {paperWidth} มม. และตั้งขอบเป็น “ไม่มี” หากเปลี่ยนเครื่องหรือเปลี่ยนม้วน ให้พิมพ์แผ่นทดสอบอีกครั้ง
                 </div>
               </section>
 
@@ -4145,6 +4231,36 @@ export function Settings({
                 </div>
               </section>
             </>
+          )}
+          {printerTestOpen && (
+            <div
+              id="printer-test-slip"
+              className="receipt-paper printer-test-slip"
+              style={{ width: `${thermalProfile.printableWidthMm}mm` }}
+            >
+              <div className="printer-test-title"><Printer size={22} /><b>ทดสอบเครื่องพิมพ์สลิป</b></div>
+              <p>ม้วน {thermalProfile.paperWidthMm} มม. · พื้นที่พิมพ์ {thermalProfile.printableWidthMm} มม.</p>
+              <p>ตำแหน่ง {thermalProfile.horizontalOffsetMm > 0 ? `ขวา ${thermalProfile.horizontalOffsetMm}` : thermalProfile.horizontalOffsetMm < 0 ? `ซ้าย ${Math.abs(thermalProfile.horizontalOffsetMm)}` : "กึ่งกลาง"} · เว้นท้าย {thermalProfile.bottomFeedMm} มม.</p>
+              <div className="printer-test-ruler"><span>ซ้าย</span><b>{thermalProfile.printableWidthMm} มม.</b><span>ขวา</span></div>
+              <div className="printer-test-border">
+                <b>ถ้าเห็นกรอบนี้ครบทั้ง 4 ด้าน แสดงว่าความกว้างพอดี</b>
+                <span>ข้อความไทย 1234567890</span>
+                <strong>ยอดรวม 1,234.50 บาท</strong>
+                <code>||| |||| | ||| 8850123456789</code>
+              </div>
+              <div className="printer-test-cut">✂ แนวตัดกระดาษ</div>
+            </div>
+          )}
+          {printerPreviewOpen && printerTestOpen && (
+            <PrintPreviewModal
+              targetId="printer-test-slip"
+              title="แผ่นทดสอบเครื่องพิมพ์สลิป"
+              subtitle={`ม้วน ${thermalProfile.paperWidthMm} มม. · พื้นที่พิมพ์ ${thermalProfile.printableWidthMm} มม.`}
+              paper="thermal"
+              showContentLength={false}
+              onPrint={() => { setPrinterPreviewOpen(false); setPrinterTestOpen(false); }}
+              onClose={() => { setPrinterPreviewOpen(false); setPrinterTestOpen(false); }}
+            />
           )}
           {dirtyCount > 0 && form && (
             <div className="settings-save-bar" role="status" aria-live="polite">

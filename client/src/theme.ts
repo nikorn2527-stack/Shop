@@ -1,3 +1,5 @@
+import { applyThermalPrintProfile, resolveThermalPaperWidth, type ThermalPaperWidthId } from "./lib/thermalPrint";
+
 /**
  * ROUND 25 — ปรับแต่งแอป (แบรนด์ + ธีมสี)
  * สีธีมทั้งแอปควบคุมด้วย CSS variables (--teal กลุ่ม) — ไฟล์นี้เปลี่ยนค่า
@@ -178,36 +180,23 @@ export function brandInitial(appName: string | undefined | null): string {
  * ROUND 42 (ข้อ 32 ตอนที่ 3 — ข้อ 4 เครื่องพิมพ์สลิป) — ความกว้างกระดาษ
  * สลิปที่เลือกใน ตั้งค่า → ใบเสร็จและการขาย: "58" | "72" | "80"
  *
- * ทำสองอย่าง:
- * ① เขียน data-paper-width ลง <html> — ให้ CSS ปรับความกว้างใบเสร็จ/
- *   สลิปเติม-ถอน/สลิปทดสอบ ตอนพิมพ์ตามขนาดที่เลือก
- * ② ฉีด <style> ท้าย <head> ที่กำหนด @page margin ให้เหมาะกับแต่ละขนาด
- *   (58 มม. → ขอบ 2 มม. · 72 มม. → ขอบ 8 มม. เหมือนเดิม · 80 มม. → ขอบ 2 มม.)
- *   สไตล์ที่ฉีดช้ากว่าไฟล์หลักจึงชนะกฎเดิมเสมอ ไม่ต้องแตะ @page ในไฟล์ CSS
+ * เขียน data attribute และ CSS variables ของ thermal profile ลง <html>
+ * ส่วน @page size/พื้นที่พิมพ์จริง/offset/ระยะท้าย สร้างโดย printHelper กลาง
  */
-export type PaperWidthId = "58" | "72" | "80";
+export type PaperWidthId = ThermalPaperWidthId;
 export const PAPER_WIDTHS: { id: PaperWidthId; label: string; detail: string }[] = [
   { id: "58", label: "58 มม.", detail: "สลิปเล็ก — เครื่องพิมพ์มินิทั่วไป" },
   { id: "72", label: "72 มม.", detail: "มาตรฐานของระบบ (ค่าเริ่มต้น)" },
   { id: "80", label: "80 มม.", detail: "สลิปใหญ่ — ตัวอักษรใหญ่ขึ้น อ่านง่าย" },
 ];
-const PAPER_PAGE_MARGIN: Record<PaperWidthId, string> = { "58": "2mm", "72": "8mm", "80": "2mm" };
-
 /** ค่าที่รับรองจาก settings (กันค่าเพี้ยน) — อะไรที่ไม่รู้จัก = 72 มาตรฐาน */
 export function resolvePaperWidth(width: string | undefined | null): PaperWidthId {
-  return width === "58" || width === "80" ? width : "72";
+  return resolveThermalPaperWidth(width);
 }
 
 /** ใช้ขนาดกระดาษจริงตอนพิมพ์ — เรียกทุกครั้งที่ settings โหลด/เปลี่ยน */
 export function applyPaperWidth(width: string | undefined | null): PaperWidthId {
   const resolved = resolvePaperWidth(width);
-  document.documentElement.dataset.paperWidth = resolved;
-  let styleEl = document.getElementById("paper-width-page") as HTMLStyleElement | null;
-  if (!styleEl) {
-    styleEl = document.createElement("style");
-    styleEl.id = "paper-width-page";
-    document.head.appendChild(styleEl);
-  }
-  styleEl.textContent = `@media print { @page { margin: ${PAPER_PAGE_MARGIN[resolved]}; } }`;
+  applyThermalPrintProfile(resolved);
   return resolved;
 }

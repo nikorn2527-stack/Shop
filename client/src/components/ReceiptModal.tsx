@@ -9,6 +9,7 @@ import { PrintPreviewModal } from "./PrintPreviewModal";
 import { printElementDocument } from "@/lib/printHelper";
 import { parseBangkokDate, STORE_TIME_ZONE } from "../../../shared/storeTime";
 import { toast } from "sonner";
+import { getThermalPrintProfile, thermalContentLeftMm } from "@/lib/thermalPrint";
 
 /** "2026-09-18 14:42:33" → "18 ก.ย. 2569 · 14:42 น." */
 function formatReceiptDateTime(value: string) {
@@ -54,11 +55,11 @@ export function ReceiptModal({ receipt, onClose, onNewSale, onPrinted, mode = "n
   // (พรีวิวก่อนพิมพ์ใน PrintPreviewModal ฉีดกฎนี้อยู่แล้ว — เส้นทางตรงนี้เคยขาด)
   const printReceipt = async () => {
     setReceiptBusy("printing");
-    const widthMm = settingsQuery.data?.receiptPaperWidth === "58" ? 58 : settingsQuery.data?.receiptPaperWidth === "80" ? 80 : 72;
+    const profile = getThermalPrintProfile(settingsQuery.data?.receiptPaperWidth);
     try {
-      const result = await printElementDocument("receipt-paper", widthMm);
+      const result = await printElementDocument("receipt-paper", profile.paperWidthMm);
       if (result.usedFallback) {
-        toast.info("เปิดหน้าต่างพิมพ์แล้ว", { description: `เลือกเครื่องพิมพ์และกระดาษ ${widthMm} มม. ก่อนกดพิมพ์` });
+        toast.info("เปิดหน้าต่างพิมพ์แล้ว", { description: `เลือกเครื่องพิมพ์และกระดาษ ${profile.paperWidthMm} มม. ก่อนกดพิมพ์` });
       } else {
         toast.success("ส่งสลิปเข้าเครื่องพิมพ์แล้ว", { description: result.message });
       }
@@ -118,14 +119,13 @@ export function ReceiptModal({ receipt, onClose, onNewSale, onPrinted, mode = "n
         link.href = canvas.toDataURL("image/png");
         link.click();
       } else {
-        // ใช้ความกว้างกระดาษจาก settings (58/72/80 มม.) แทนค่าตายตัว 80
-        const paperWidth = settingsQuery.data?.receiptPaperWidth ?? "72";
-        const WIDTH_MM = paperWidth === "58" ? 58 : paperWidth === "80" ? 80 : 72;
-        const pageHeightMm = (canvas.height / canvas.width) * WIDTH_MM;
-        const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: [WIDTH_MM, pageHeightMm] });
+        const profile = getThermalPrintProfile(settingsQuery.data?.receiptPaperWidth);
+        const contentHeightMm = (canvas.height / canvas.width) * profile.printableWidthMm;
+        const pageHeightMm = contentHeightMm + profile.bottomFeedMm;
+        const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: [profile.paperWidthMm, pageHeightMm] });
         // ใช้ JPEG quality สูงแทน PNG ลดขนาดไฟล์ + ไม่เพี้ยนสี
         const imgData = canvas.toDataURL("image/jpeg", 0.92);
-        pdf.addImage(imgData, "JPEG", 0, 0, WIDTH_MM, pageHeightMm);
+        pdf.addImage(imgData, "JPEG", thermalContentLeftMm(profile), 0, profile.printableWidthMm, contentHeightMm);
         pdf.save(filename);
       }
     } finally { setReceiptBusy(""); }
