@@ -3825,46 +3825,12 @@ th { font-weight: 600; }
 .printer-card .printer-tips { margin-top: 8px; }
 .printer-card .printer-test-row { margin-top: 8px; padding: 9px 13px; }
 
-/* ═══ ROUND 34 — limit requests: การขอลดวงเงินซื้อสินค้าต่อวัน (req 23.2) ═══ */
-/* (1) การ์ดสรุปธุรกรรม 4 คอลัมน์ — มือถือ 2×2 (แทนที่ 3 คอลัมน์/1 แถวเดิม) */
+/* Multi-value report summaries: four columns on desktop, two on mobile. */
 .tx-summary-cards { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 @media (max-width: 860px) {
   .tx-summary-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
-.purple-text { color: #8870af; }
 
-/* (2) แถวคำขอลดวงเงินใช้พื้นเดียวกับธุรกรรมอื่น แต่คงแถบซ้าย/ป้ายสถานะสีม่วง */
-.tx-table tr.tx-limit td:first-child { box-shadow: inset 3px 0 0 0 #b3a1d1; }
-.tx-table .tx-limit-amount { display: block; color: #6f7562; font-family: "IBM Plex Mono", monospace; font-size: 11px; }
-.tx-table .tx-limit-amount small { font-family: inherit; font-size: 9px; color: #9a92b3; margin-top: 2px; }
-.tx-type-cell { display: flex; flex-direction: column; align-items: flex-start; gap: 3px; }
-.tx-type-cell .status-pill { font-size: 9.5px; padding: 3px 7px; }
-
-/* (3) ปุ่มพิจารณาคำขอ (ผู้บริหาร) — pill เขียว/แดงกะทัดรัด */
-.limit-act-row { display: flex; gap: 5px; }
-.limit-act { display: inline-flex; align-items: center; gap: 4px; border-radius: 20px; padding: 5px 10px; font-size: 10.5px; font-weight: 600; cursor: pointer; border: 1px solid; transition: .14s ease; white-space: nowrap; }
-.limit-act-approve { color: #3f8a6d; background: #edf8f3; border-color: #bfe3d4; }
-.limit-act-approve:hover { background: #ddf2e8; }
-.limit-act-reject { color: #bd6c65; background: #fff0f0; border-color: #efc4bf; }
-.limit-act-reject:hover { background: #ffe9e8; }
-.limit-act:disabled { opacity: .55; cursor: wait; }
-.limit-decide-modal { width: min(430px, 100%); }
-.limit-decide-modal .confirm-icon { color: #8870af; background: #f3edfb; }
-.limit-decide-modal .wallet-confirm-rows { margin-bottom: 11px; }
-.limit-decide-note { display: flex; align-items: flex-start; gap: 7px; color: #6f7562; background: #fafcfb; border: 1px solid #edf2f0; border-radius: 8px; margin-top: 2px; padding: 9px 10px; font-size: 10.5px; line-height: 1.55; }
-.limit-decide-modal .notice-bar { margin-top: 10px; }
-
-/* (4) ชิปวงเงินบนหัวรายละเอียดสมาชิก */
-.member-limit-chip { display: inline-flex; align-items: center; gap: 4px; margin-left: 7px; padding: 3px 8px; border-radius: 20px; background: #f3edfb; color: #8870af; font-size: 10px; font-weight: 600; white-space: nowrap; vertical-align: middle; }
-
-/* (5) โมดัลขอลดวงเงิน (หน้ารายละเอียดสมาชิก) — ใช้โครง form-modal เดิม */
-.limit-dialog .member-number-preview { margin-top: 12px; }
-.limit-dialog .wallet-confirm-rows { margin-top: 12px; }
-
-/* (6) แถววงเงินบนการ์ดยืนยันสมาชิกที่ POS (ก่อนหักบัญชี) */
-.member-confirm-info small.member-limit-line { display: flex; align-items: center; gap: 4px; color: #8870af; font-weight: 600; cursor: help; }
-
-/* ═══ ROUND 35 — ข้อ 29-30 จากผู้ใช้: หัวตาราง/ข้อมูลเยื้องคนละฝั่ง + ไอเท็บารายเมนูที่เลือกอ่านไม่เห็น ═══ */
 
 /* ── 35-29: หัวตารางเอนทิตีต้องชิดฝั่งเดียวกับข้อมูลในคอลัมน์เดียวกัน
    เดิมกฎมีแค่ .entity-table td.num { text-align: right } — หัว (th.num)
@@ -12302,30 +12268,6 @@ body:has(.modal-backdrop) .shortcuts-fab { display: none; }
 
   .size-preset-chips button:hover:not(.print-preview-paper *, .receipt-paper *, .member-card-document *, .stock-count-sheet *) {
     background: var(--teal-mist);
-  }
-
-
-  .tx-table .tx-limit-amount:not(.print-preview-paper *, .receipt-paper *, .member-card-document *, .stock-count-sheet *) {
-    color: #424b65;
-  }
-
-
-  .limit-act-approve:not(.print-preview-paper *, .receipt-paper *, .member-card-document *, .stock-count-sheet *) {
-    color: #424b65;
-    background: var(--teal-mist);
-    border-color: var(--teal-soft);
-  }
-
-
-  .limit-act-approve:hover:not(.print-preview-paper *, .receipt-paper *, .member-card-document *, .stock-count-sheet *) {
-    background: var(--teal-mist);
-  }
-
-
-  .limit-decide-note:not(.print-preview-paper *, .receipt-paper *, .member-card-document *, .stock-count-sheet *) {
-    color: #424b65;
-    background: var(--teal-mist);
-    border: 1px solid var(--teal-mist);
   }
 
 

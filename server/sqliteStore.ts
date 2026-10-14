@@ -529,19 +529,6 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
       created_by TEXT,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
-    CREATE TABLE IF NOT EXISTS limit_requests (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      member_number TEXT NOT NULL,
-      current_limit REAL,
-      requested_limit REAL NOT NULL,
-      reason TEXT,
-      status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
-      requested_by TEXT NOT NULL,
-      decided_by TEXT,
-      decided_at TEXT,
-      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-      FOREIGN KEY (member_number) REFERENCES members(member_number)
-    );
     CREATE TABLE IF NOT EXISTS physical_cards (
       card_number TEXT PRIMARY KEY,
       status TEXT NOT NULL DEFAULT 'blank' CHECK (status IN ('blank','assigned','returned_vacant','lost','damaged')),
@@ -623,8 +610,6 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
   ensureColumn(db, "members", "gender", "TEXT");
   // Round 43 — คำนำหน้าชื่อสมาชิก (นาย/นาง/นางสาว/ด.ช./... ) NULL = ไม่มี
   ensureColumn(db, "members", "prename", "TEXT");
-  // Req 23.2 — วงเงินซื้อสินค้าต่อวันของสมาชิก (NULL = ไม่จำกัด)
-  ensureColumn(db, "members", "credit_limit", "REAL");
   ensureColumn(db, "members", "account_closed", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn(db, "member_transactions", "actor", "TEXT");
   // Backfill the new actor column from audit_logs (round 30): every wallet /
@@ -2953,163 +2938,6 @@ export function deleteMember(db: SqliteDb, input: DeleteMemberInput): { memberNu
   return { memberNumber: member.memberNumber, memberName: displayName };
 }
 
-// --- member credit limit (req 23.2): วงเงินซื้อสินค้าต่อวัน + การขอลดวงเงิน ---
-
-/** คำขอลดวงเงินของสมาชิก 1 รายการ (status: pending → approved / rejected) */
-export type LimitRequestRow = {
-  id: number;
-  memberNumber: string;
-  memberName: string | null;
-  /** วงเงิน ณ ตอนยื่นคำขอ (null = เดิมไม่จำกัด) */
-  currentLimit: number | null;
-  requestedLimit: number;
-  reason: string | null;
-  status: "pending" | "approved" | "rejected";
-  requestedBy: string;
-  decidedBy: string | null;
-  decidedAt: string | null;
-  createdAt: string;
-};
-
-const LIMIT_REQUEST_SELECT = `SELECT r.id, r.member_number AS memberNumber, NULLIF(TRIM(m.first_name || ' ' || m.last_name), '') AS memberName, r.current_limit AS currentLimit, r.requested_limit AS requestedLimit, r.reason, r.status, r.requested_by AS requestedBy, r.decided_by AS decidedBy, r.decided_at AS decidedAt, r.created_at AS createdAt FROM limit_requests r LEFT JOIN members m ON m.member_number = r.member_number`;
-
-function getLimitRequestById(db: SqliteDb, requestId: number): LimitRequestRow | undefined {
-  return db.prepare(`${LIMIT_REQUEST_SELECT} WHERE r.id = ?`).get(requestId) as LimitRequestRow | undefined;
-}
-
-export type RequestLimitReductionInput = {
-  memberNumber: string;
-  requestedLimit: number;
-  reason?: string;
-  actor?: string;
-  actorRole?: string;
-};
-
-/** Thai text of a limit for log details — null (unlimited) becomes "ไม่จำกัด". */
-function limitText(limit: number | null) {
-  return limit != null ? money(limit) : "ไม่จำกัด";
-}
-
-/**
- * ยื่นคำขอลดวงเงินซื้อสินค้าต่อวันของสมาชิก (staff files it, admin decides).
- * The member's live limit is NOT touched until the request is approved.
- */
-export function requestLimitReduction(db: SqliteDb, input: RequestLimitReductionInput): LimitRequestRow {
-  const member = getMemberByNumber(db, input.memberNumber?.trim() ?? "");
-  if (!member) throw new StoreError(`ไม่พบสมาชิก ${input.memberNumber} ในระบบ`);
-  if (typeof input.requestedLimit !== "number" || !(input.requestedLimit > 0)) {
-    throw new StoreError("วงเงินที่ขอต้องมากกว่า 0");
-  }
-  if (input.requestedLimit > 1_000_000) {
-    throw new StoreError(`วงเงินที่ขอต้องไม่เกิน ${money(1_000_000)}`);
-  }
-  // It is a REDUCTION request: the target must be strictly below the current
-  // limit when one is set (a member without a limit may request any value).
-  if (member.creditLimit != null && input.requestedLimit >= member.creditLimit) {
-    throw new StoreError(`วงเงินที่ขอต้องน้อยกว่าวงเงินปัจจุบัน · วงเงินปัจจุบัน ${money(member.creditLimit)}`);
-  }
-  const existing = db.prepare(`SELECT id FROM limit_requests WHERE member_number = ? AND status = 'pending'`).get(member.memberNumber);
-  if (existing) throw new StoreError("มีคำขอลดวงเงินที่รอพิจารณาอยู่แล้ว");
-
-  const actor = input.actor?.trim() || "เจ้าหน้าที่ร้านค้า";
-  const reason = input.reason?.trim() || null;
-  const createdAt = formatDateTime();
-  const displayName = `${member.firstName} ${member.lastName}`.trim();
-  return runInTransaction(db, () => {
-    const result = db.prepare(`INSERT INTO limit_requests (member_number, current_limit, requested_limit, reason, status, requested_by, created_at) VALUES (?, ?, ?, ?, 'pending', ?, ?)`).run(
-      member.memberNumber,
-      member.creditLimit,
-      round2(input.requestedLimit),
-      reason,
-      actor,
-      createdAt,
-    );
-    logAction(
-      db,
-      "ขอลดวงเงิน",
-      actor,
-      `${member.memberNumber} · ${displayName} · จาก ${limitText(member.creditLimit)} เหลือ ${money(round2(input.requestedLimit))}${reason ? ` · เหตุผล: ${reason}` : ""}`,
-      "amber",
-      input.actorRole ?? null,
-      createdAt,
-    );
-    return getLimitRequestById(db, Number(result.lastInsertRowid))!;
-  });
-}
-
-export type DecideLimitRequestInput = {
-  requestId: number;
-  decision: "approve" | "reject";
-  actor?: string;
-  actorRole?: string;
-};
-
-/**
- * พิจารณาคำขอลดวงเงิน (ผู้บริหารเท่านั้นที่เรียกผ่าน tRPC) — approve applies the
- * requested limit to the member; reject keeps the member's current limit.
- */
-export function decideLimitRequest(db: SqliteDb, input: DecideLimitRequestInput): LimitRequestRow {
-  const request = getLimitRequestById(db, input.requestId);
-  if (!request) throw new StoreError(`ไม่พบคำขอลดวงเงินรหัส ${input.requestId}`);
-  if (request.status !== "pending") throw new StoreError("คำขอลดวงเงินนี้ได้รับการพิจารณาไปแล้ว");
-
-  const actor = input.actor?.trim() || "ผู้บริหาร";
-  const decidedAt = formatDateTime();
-  // Prefer the member's LIVE values for the audit trail (the request row only
-  // keeps a snapshot of the limit back when it was filed).
-  const member = getMemberByNumber(db, request.memberNumber);
-  const displayName = member ? `${member.firstName} ${member.lastName}`.trim() : null;
-  const liveLimit = member?.creditLimit ?? request.currentLimit;
-  const namePart = displayName ? ` · ${displayName}` : "";
-
-  runInTransaction(db, () => {
-    if (input.decision === "approve") {
-      db.prepare(`UPDATE members SET credit_limit = ? WHERE member_number = ?`).run(request.requestedLimit, request.memberNumber);
-      db.prepare(`UPDATE limit_requests SET status = 'approved', decided_by = ?, decided_at = ? WHERE id = ?`).run(actor, decidedAt, request.id);
-      logAction(
-        db,
-        "อนุมัติลดวงเงิน",
-        actor,
-        `${request.memberNumber}${namePart} · ${limitText(liveLimit)} → ${money(request.requestedLimit)}`,
-        "green",
-        input.actorRole ?? null,
-        decidedAt,
-      );
-    } else {
-      db.prepare(`UPDATE limit_requests SET status = 'rejected', decided_by = ?, decided_at = ? WHERE id = ?`).run(actor, decidedAt, request.id);
-      logAction(
-        db,
-        "ปฏิเสธคำขอลดวงเงิน",
-        actor,
-        `${request.memberNumber}${namePart} · คงวงเงินเดิม ${limitText(liveLimit)}`,
-        "red",
-        input.actorRole ?? null,
-        decidedAt,
-      );
-    }
-  });
-  return getLimitRequestById(db, request.id)!;
-}
-
-export type ListLimitRequestsInput = {
-  status?: "pending" | "approved" | "rejected";
-  limit?: number;
-};
-
-/** คำขอลดวงเงินทั้งหมด — รายการที่รอพิจารณาขึ้นก่อน แล้วเรียงจากใหม่ไปเก่า */
-export function listLimitRequests(db: SqliteDb, input: ListLimitRequestsInput = {}): LimitRequestRow[] {
-  const limit = Math.max(1, Math.min(200, Math.floor(input.limit ?? 50)));
-  const where = input.status ? ` WHERE r.status = ?` : "";
-  const params = input.status ? ([input.status, limit] as (string | number)[]) : ([limit] as (string | number)[]);
-  return db.prepare(`${LIMIT_REQUEST_SELECT}${where} ORDER BY (r.status = 'pending') DESC, r.created_at DESC, r.id DESC LIMIT ?`).all(...params) as unknown as LimitRequestRow[];
-}
-
-/** จำนวนคำขอที่รอพิจารณา (ไม่สนใจ filter อื่น) — สำหรับ badge บนหน้ารายงาน */
-export function countPendingLimitRequests(db: SqliteDb): number {
-  const row = db.prepare(`SELECT COUNT(*) AS count FROM limit_requests WHERE status = 'pending'`).get() as { count: number };
-  return row.count;
-}
-
 // --- reports ----------------------------------------------------------------
 
 const ISO_DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
@@ -3958,7 +3786,7 @@ export type PermissionKey =
   | "POS.SELL" | "POS.VOID" | "POS.REFUND" | "POS.DISCOUNT" | "POS.SPECIAL"
   | "STOCK.VIEW" | "STOCK.RECEIVE" | "STOCK.ADJUST" | "STOCK.COUNT" | "STOCK.TRANSFER"
   | "REPORT.SALES" | "REPORT.PROFIT" | "REPORT.INVENTORY" | "REPORT.AUDIT" | "REPORT.ADVANCED"
-  | "MEMBER.VIEW" | "MEMBER.EDIT" | "MEMBER.WALLET" | "MEMBER.DELETE" | "MEMBER.LIMIT_APPROVE"
+  | "MEMBER.VIEW" | "MEMBER.EDIT" | "MEMBER.WALLET" | "MEMBER.DELETE"
   | "SYSTEM.USER_MANAGE" | "SYSTEM.ROLE_MANAGE" | "SYSTEM.BACKUP" | "SYSTEM.RESTORE"
   | "SYSTEM.SETTING" | "SYSTEM.LICENSE" | "SYSTEM.UPDATE" | "SYSTEM.SESSION_REVOKE";
 
@@ -3982,7 +3810,6 @@ export const PERMISSION_CATALOG: { key: PermissionKey; group: string; descriptio
   { key: "MEMBER.EDIT", group: "MEMBER", description: "แก้ข้อมูลสมาชิก" },
   { key: "MEMBER.WALLET", group: "MEMBER", description: "เติม/ถอนเงินสมาชิก" },
   { key: "MEMBER.DELETE", group: "MEMBER", description: "ลบสมาชิก" },
-  { key: "MEMBER.LIMIT_APPROVE", group: "MEMBER", description: "พิจารณาคำขอลดวงเงินสมาชิก" },
   { key: "SYSTEM.USER_MANAGE", group: "SYSTEM", description: "จัดการบัญชีผู้ใช้" },
   { key: "SYSTEM.ROLE_MANAGE", group: "SYSTEM", description: "จัดการ Role/Permission" },
   { key: "SYSTEM.BACKUP", group: "SYSTEM", description: "สำรองข้อมูล" },
@@ -4018,13 +3845,13 @@ export const SYSTEM_ROLES: RoleDef[] = [
     name: "supervisor", label: "หัวหน้างาน",
     description: "ดูแลหน้าร้าน + อนุมัติการเงินสำคัญ",
     isSystem: true,
-    permissions: ["POS.SELL", "POS.VOID", "POS.REFUND", "POS.DISCOUNT", "POS.SPECIAL", "STOCK.VIEW", "STOCK.RECEIVE", "STOCK.ADJUST", "STOCK.COUNT", "REPORT.SALES", "REPORT.INVENTORY", "MEMBER.VIEW", "MEMBER.EDIT", "MEMBER.WALLET", "MEMBER.LIMIT_APPROVE"],
+    permissions: ["POS.SELL", "POS.VOID", "POS.REFUND", "POS.DISCOUNT", "POS.SPECIAL", "STOCK.VIEW", "STOCK.RECEIVE", "STOCK.ADJUST", "STOCK.COUNT", "REPORT.SALES", "REPORT.INVENTORY", "MEMBER.VIEW", "MEMBER.EDIT", "MEMBER.WALLET"],
   },
   {
     name: "manager", label: "ผู้จัดการ",
-    description: "ดูรายงานครบ + อนุมัติคำขอลดวงเงิน + จัดการผู้ใช้บางส่วน",
+    description: "??????????? + ????????????????????????????",
     isSystem: true,
-    permissions: ["POS.SELL", "POS.VOID", "POS.REFUND", "POS.DISCOUNT", "POS.SPECIAL", "STOCK.VIEW", "STOCK.RECEIVE", "STOCK.ADJUST", "STOCK.COUNT", "STOCK.TRANSFER", "REPORT.SALES", "REPORT.PROFIT", "REPORT.INVENTORY", "REPORT.AUDIT", "MEMBER.VIEW", "MEMBER.EDIT", "MEMBER.WALLET", "MEMBER.DELETE", "MEMBER.LIMIT_APPROVE", "SYSTEM.USER_MANAGE", "SYSTEM.BACKUP"],
+    permissions: ["POS.SELL", "POS.VOID", "POS.REFUND", "POS.DISCOUNT", "POS.SPECIAL", "STOCK.VIEW", "STOCK.RECEIVE", "STOCK.ADJUST", "STOCK.COUNT", "STOCK.TRANSFER", "REPORT.SALES", "REPORT.PROFIT", "REPORT.INVENTORY", "REPORT.AUDIT", "MEMBER.VIEW", "MEMBER.EDIT", "MEMBER.WALLET", "MEMBER.DELETE", "SYSTEM.USER_MANAGE", "SYSTEM.BACKUP"],
   },
   {
     name: "auditor", label: "ผู้ตรวจสอบ",
@@ -4042,6 +3869,8 @@ export const SYSTEM_ROLES: RoleDef[] = [
 
 /** Seed roles + permissions into the DB (idempotent). */
 export function ensureRbacSeed(db: SqliteDb): void {
+  // Remove the retired permission and its role assignments from upgraded databases.
+  db.prepare(`DELETE FROM permissions WHERE key = 'MEMBER.LIMIT_APPROVE'`).run();
   // Insert all permissions
   for (const p of PERMISSION_CATALOG) {
     db.prepare(`INSERT OR IGNORE INTO permissions (key, group_name, description) VALUES (?, ?, ?)`).run(p.key, p.group, p.description);

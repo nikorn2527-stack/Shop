@@ -31,7 +31,6 @@ import {
   ArrowDownToLine,
   ArrowRight,
   ArrowUpFromLine,
-  TrendingDown,
   Bank,
   Bell,
   CalendarClock,
@@ -296,7 +295,7 @@ const POS_RAIL_BUTTONS: {
     key: "card",
     label: "จัดการบัตร",
     kbd: "",
-    detail: "ขอลดวงเงิน คืนบัตร หรือจ่ายบัตรให้สมาชิกเดิม",
+    detail: "คืนบัตร หรือจ่ายบัตรให้สมาชิกเดิม",
     icon: UsersRound,
   },
 
@@ -388,7 +387,6 @@ const MEMBER_IMPORT_FIELDS: {
     label: "ยอดเงินคงเหลือ (บาท)",
     hint: "บันทึกเป็นรายการ “ยอดยกมา · นำเข้าข้อมูล” ในประวัติสมาชิก",
   },
-  { key: "creditLimit", label: "วงเงิน (บาท)", hint: "เว้นว่าง = ไม่จำกัด" },
   {
     key: "status",
     label: "สถานะ",
@@ -1037,7 +1035,6 @@ export function Settings({
       memberNumber: importMapping.memberNumber ?? -1,
       lastName: importMapping.lastName ?? -1,
       balance: importMapping.balance ?? -1,
-      creditLimit: importMapping.creditLimit ?? -1,
       status: importMapping.status ?? -1,
       phone: importMapping.phone ?? -1,
       idCard: importMapping.idCard ?? -1,

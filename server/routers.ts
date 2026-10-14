@@ -1695,7 +1695,6 @@ export const appRouter = router({
               memberNumber: z.number().int().min(-1).max(99).optional(),
               lastName: z.number().int().min(-1).max(99).optional(),
               balance: z.number().int().min(-1).max(99).optional(),
-              creditLimit: z.number().int().min(-1).max(99).optional(),
               status: z.number().int().min(-1).max(99).optional(),
               phone: z.number().int().min(-1).max(99).optional(),
               idCard: z.number().int().min(-1).max(99).optional(),

@@ -25,7 +25,6 @@ export type MemberFieldMapping = {
   memberNumber?: number;
   lastName?: number;
   balance?: number;
-  creditLimit?: number;
   status?: number;
   phone?: number;
   idCard?: number;
@@ -68,7 +67,7 @@ export type ParsedSheet = {
   sampleRows: string[][];
   /** จำนวนแถวข้อมูลหลังหัวตาราง (ไม่นับแถวว่าง) */
   totalRows: number;
-  suggestedMapping: { memberNumber?: number; prename?: number; firstName?: number; lastName?: number; balance?: number; creditLimit?: number; status?: number; phone?: number; idCard?: number; type?: number; gender?: number } | { name?: number; barcode?: number; sku?: number; category?: number; unit?: number; price?: number; cost?: number; stock?: number; reorderPoint?: number; size?: number } | Record<string, never>;
+  suggestedMapping: { memberNumber?: number; prename?: number; firstName?: number; lastName?: number; balance?: number; status?: number; phone?: number; idCard?: number; type?: number; gender?: number } | { name?: number; barcode?: number; sku?: number; category?: number; unit?: number; price?: number; cost?: number; stock?: number; reorderPoint?: number; size?: number } | Record<string, never>;
 };
 
 const cellToText = (value: unknown): string => {
@@ -187,7 +186,6 @@ const MEMBER_ALIASES: Record<keyof Omit<MemberFieldMapping, "firstName">, string
   memberNumber: ["เลขสมาชิก", "หมายเลขสมาชิก", "รหัสสมาชิก", "เลขที่สมาชิก", "เลขบัญชีสมาชิก", "memberno", "membernumber", "memberid", "member"],
   lastName: ["นามสกุล", "สกุล", "surname", "lastname", "familyname"],
   balance: ["ยอดคงเหลือ", "ยอดเงินคงเหลือ", "เงินคงเหลือ", "คงเหลือ", "ยอดเงิน", "balance", "remaining", "remain", "ยอด"],
-  creditLimit: ["วงเงิน", "วงเงินซื้อ", "วงเงินสินเชื่อ", "creditlimit", "limit"],
   status: ["สถานะ", "status"],
   phone: ["เบอร์โทร", "เบอร์โทรศัพท์", "โทรศัพท์", "เบอร์", "โทร", "phone", "tel", "mobile"],
   idCard: ["บัตรประชาชน", "เลขบัตรประชาชน", "รหัสบัตรประชาชน", "เลขประจำตัวประชาชน", "เลขประจำตัว", "citizenid", "idcard", "nationalid"],
@@ -272,11 +270,6 @@ function parseStatusCell(text: string): "active" | "suspended" | null {
   return "active";
 }
 
-function parseCreditLimitCell(text: string): number | null {
-  if (["", "ไม่จำกัด", "ไม่กำหนด", "none", "null", "-"].includes(text.trim())) return null;
-  return parseNumberCell(text);
-}
-
 // ---------------------------------------------------------------------------
 // import สมาชิก
 // ---------------------------------------------------------------------------
@@ -321,12 +314,7 @@ export function importMembers(db: SqliteDb, options: ImportMembersOptions): Impo
       const lastName = pick(row, mapping.lastName);
       const prename = pick(row, mapping.prename) || null;
       validateNumericCells(row, [[mapping.balance, "ยอดเงิน", false, false]]);
-      const rawLimit = pick(row, mapping.creditLimit);
-      if (!["", "ไม่จำกัด", "ไม่กำหนด", "none", "null", "-"].includes(rawLimit)) {
-        validateNumericCells(row, [[mapping.creditLimit, "วงเงิน", false, true]]);
-      }
       const balance = mapping.balance !== undefined ? (parseNumberCell(pick(row, mapping.balance)) ?? 0) : 0;
-      const creditLimit = mapping.creditLimit !== undefined ? parseCreditLimitCell(pick(row, mapping.creditLimit)) : null;
       const status = mapping.status !== undefined ? (parseStatusCell(pick(row, mapping.status)) ?? "active") : "active";
       const phone = pick(row, mapping.phone) || null;
       const idCard = pick(row, mapping.idCard) || null;
@@ -343,8 +331,8 @@ export function importMembers(db: SqliteDb, options: ImportMembersOptions): Impo
         }
         runInTransaction(db, () => {
           db.prepare(
-            `UPDATE members SET prename = ?, first_name = ?, last_name = ?, phone = ?, id_card = ?, type = ?, status = ?, credit_limit = ? WHERE member_number = ?`,
-          ).run(prename, firstName, lastName, phone, idCard, type, status, creditLimit, memberNumber);
+            `UPDATE members SET prename = ?, first_name = ?, last_name = ?, phone = ?, id_card = ?, type = ?, status = ? WHERE member_number = ?`,
+          ).run(prename, firstName, lastName, phone, idCard, type, status, memberNumber);
           if (round2(balance) !== round2(existing.balance)) {
             db.prepare(`UPDATE members SET balance = ? WHERE member_number = ?`).run(round2(balance), memberNumber);
             recordBalanceTransaction(db, memberNumber, round2(balance) - round2(existing.balance), round2(balance), `ปรับยอดตามการนำเข้าข้อมูล · เดิม ${money(existing.balance)} → ${money(round2(balance))}`);
@@ -360,8 +348,8 @@ export function importMembers(db: SqliteDb, options: ImportMembersOptions): Impo
       }
       runInTransaction(db, () => {
         db.prepare(
-          `INSERT INTO members (member_number, prename, first_name, last_name, id_card, phone, type, balance, status, created_at, photo_url, gender, credit_limit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
-        ).run(memberNumber, prename, firstName, lastName, idCard, phone, type, round2(balance), status, createdAt, gender, creditLimit);
+          `INSERT INTO members (member_number, prename, first_name, last_name, id_card, phone, type, balance, status, created_at, photo_url, gender) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)`,
+        ).run(memberNumber, prename, firstName, lastName, idCard, phone, type, round2(balance), status, createdAt, gender);
         if (round2(balance) !== 0) {
           recordBalanceTransaction(db, memberNumber, round2(balance), round2(balance), `ยอดยกมา · นำเข้าข้อมูล ${round2(balance) >= 0 ? "" : "(ยอดติดลบ) "}${money(round2(balance))}`);
         }
@@ -514,11 +502,11 @@ export function importProducts(db: SqliteDb, options: ImportProductsOptions): Im
 // เทมเพลต
 // ---------------------------------------------------------------------------
 
-const MEMBER_TEMPLATE_HEADERS = ["เลขสมาชิก", "คำนำหน้า", "ชื่อ", "นามสกุล", "ยอดคงเหลือ", "วงเงิน", "สถานะ", "เบอร์โทร", "บัตรประชาชน", "ประเภท", "เพศ"];
+const MEMBER_TEMPLATE_HEADERS = ["?????????", "????????", "????", "???????", "??????????", "?????", "????????", "???????????", "??????", "???"];
 const MEMBER_TEMPLATE_ROWS = [
-  ["M-000001", "นาย", "สมชาย", "ใจดี", "1500", "", "ปกติ", "0812345678", "3101234567890", "สมาชิก", "ชาย"],
-  ["M-000002", "นางสาว", "สมหญิง", "มั่นคง", "320.50", "500", "ปกติ", "0898765432", "", "สมาชิก", "หญิง"],
-  ["", "", "อนันต์", "ศรีสุข", "0", "", "ระงับ", "", "", "สมาชิกพิเศษ", ""],
+  ["M-000001", "???", "?????", "????", "1500", "????", "0812345678", "3101234567890", "??????", "???"],
+  ["M-000002", "??????", "??????", "??????", "320.50", "????", "0898765432", "", "??????", "????"],
+  ["", "", "??????", "??????", "0", "?????", "", "", "???????????", ""],
 ];
 
 const PRODUCT_TEMPLATE_HEADERS = ["บาร์โค้ด", "ชื่อสินค้า", "หมวด", "หน่วย", "ราคาขาย", "ต้นทุน", "สต็อกคงเหลือ", "จุดสั่งซื้อ"];

@@ -49,7 +49,7 @@ const requiredTables = [
   "stock_movements", "cashier_shifts", "refunds",
   "members", "member_transactions", "products", "stock_lots",
   "sales", "sale_items", "day_closures", "audit_logs",
-  "store_settings", "order_list_items", "limit_requests",
+  "store_settings", "order_list_items",
 ];
 
 console.log("═══════════════════════════════════════════════");

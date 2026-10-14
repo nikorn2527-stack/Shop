@@ -130,7 +130,6 @@ async function main() {
 
   // ขั้น 2 — ล้างข้อมูลการขายเดิม (เก็บ app_users + app_sessions + store_settings)
   // ROUND 67 (user): เครื่องร้าน (Windows) เคยพังตรงนี้ด้วย "FOREIGN KEY constraint failed"
-  // เพราะตาราง limit_requests อ้างอิง FK → members แต่ถูกสั่งลบที่หลัง — พอมีประวัติคำขอปรับวงเงินค้างอยู่
   // DELETE FROM members จึงตายกลางทาง (บิล/ธุรกรรมถูกลบไปแล้วบางส่วน เหลือข้อมูลครึ่ง ๆ) — แก้ 3 ชั้นให้ทนทาน:
   //   (1) ปิด foreign_keys ชั่วคราวขณะล้าง (2) ลบตารางลูกก่อนพ่อตามลำดับ
   //   (3) ห่อทั้งบล็อกไว้ในธุรกรรมเดียว พังตรงไหน ROLLBACK ย้อนกลับทั้งหมด ฐานข้อมูลอยู่ครบเสมอ
@@ -142,7 +141,6 @@ async function main() {
       DELETE FROM sale_items;
       DELETE FROM sales;
       DELETE FROM member_transactions;
-      DELETE FROM limit_requests;
       DELETE FROM members;
       DELETE FROM order_list_items;
       DELETE FROM stock_lots;
@@ -150,7 +148,6 @@ async function main() {
       DELETE FROM day_closures;
       DELETE FROM audit_logs;
     `);
-    const knownTables = new Set(["members", "member_transactions", "store_settings", "products", "stock_lots", "sales", "sale_items", "day_closures", "audit_logs", "app_users", "app_sessions", "order_list_items", "limit_requests"]);
     const unknownTables = (db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'`).all() as { name: string }[])
       .map((row) => row.name)
       .filter((name) => !knownTables.has(name));
