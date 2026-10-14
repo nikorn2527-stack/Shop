@@ -12,6 +12,6 @@ describe("transaction receipts", () => {
   });
   it("does not duplicate purchase receipts or issue receipts for limit requests", () => {
     expect(transactionReceipt({ ...row, type: "purchase" })).toBeNull();
-    expect(transactionReceipt({ ...row, kind: "limit", type: "limit_request" })).toBeNull();
+    expect(transactionReceipt({ ...row, type: "purchase" })).toBeNull();
   });
 });

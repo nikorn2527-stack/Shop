@@ -32,4 +32,15 @@ describe("member card workflow UI", () => {
     expect(detailSource).toContain("ขอปรับวงเงินซื้อ/วัน");
     expect(limitSource).toContain("รายการนี้ปรับวงเงินซื้อสินค้าเท่านั้น ไม่ได้ถอนเงินคงเหลือ");
   });
+
+  it("keeps purchase-limit requests out of money history and adds card numbers to reports", () => {
+    const reportSource = readSource("./pages/reports/Reports.tsx");
+    const serverSource = readSource("../../server/sqliteStore.ts");
+
+    expect(reportSource).not.toContain('["limit_request", "ขอลดวงเงิน"]');
+    expect(reportSource).toContain('"เลขบัตร"');
+    expect(reportSource).toContain("รายการนี้ไม่ใช่การถอนเงิน จึงแยกออกจากประวัติธุรกรรม");
+    expect(serverSource).toContain("Credit-limit requests are deliberately excluded because they do not move money.");
+    expect(serverSource).toContain("s.card_number AS cardNumber");
+  });
 });

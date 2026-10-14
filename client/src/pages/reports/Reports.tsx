@@ -46,7 +46,7 @@ import {
 import { type EditionFeatureKey } from "@shared/editions";
 import { EditionUpgradeModal, useEditionStatus } from "@/components/EditionUi";
 import type { MemberLite, Role } from "../pageData";
-import type { MemberTransactionRow, SaleHistoryEntry } from "../../../../server/sqliteStore";
+import type { LimitRequestRow, MemberTransactionRow, SaleHistoryEntry } from "../../../../server/sqliteStore";
 import {
   isAdminRole,
   memberFullName,
@@ -101,8 +101,7 @@ const TX_TYPE_LABEL: Record<
   | "deposit"
   | "withdrawal"
   | "activation"
-  | "refund"
-  | "limit_request",
+  | "refund",
   string
 > = {
   purchase: "ใช้จ่าย",
@@ -110,15 +109,13 @@ const TX_TYPE_LABEL: Record<
   withdrawal: "ถอนเงิน",
   activation: "เปิดใช้บัตร",
   refund: "คืนบัตรเงินสด",
-  limit_request: "ขอลดวงเงิน",
 };
 const TX_TYPE_TONE: Record<
   | "purchase"
   | "deposit"
   | "withdrawal"
   | "activation"
-  | "refund"
-  | "limit_request",
+  | "refund",
   "blue" | "green" | "amber" | "purple" | "red"
 > = {
   purchase: "blue",
@@ -126,7 +123,6 @@ const TX_TYPE_TONE: Record<
   withdrawal: "amber",
   activation: "green",
   refund: "red",
-  limit_request: "purple",
 };
 
 type HospitalReportPreset = "standard" | "sales" | "balances" | "deposit" | "withdrawal" | "refund" | "activation" | "stock";
@@ -136,26 +132,11 @@ const HOSPITAL_REPORT_PRESETS: { value: HospitalReportPreset; label: string }[] 
   { value: "sales", label: "รพ. 1 · รายงานการขายสินค้า" },
   { value: "balances", label: "รพ. 2 · ยอดเงินในบัตร" },
   { value: "deposit", label: "รพ. 3 · เติมเงินบัตร" },
-  { value: "withdrawal", label: "รพ. 4 · ลดยอดเงินบัตร" },
+  { value: "withdrawal", label: "รพ. 4 · ถอนเงินจากบัตร" },
   { value: "refund", label: "รพ. 5 · คืนบัตรเงินสด" },
   { value: "activation", label: "รพ. 6 · เปิดใช้บัตร" },
   { value: "stock", label: "รพ. 7 · สินค้าคงคลัง" },
 ];
-
-/** ROUND 34 (req 23.2) — สถานะคำขอลดวงเงิน → ป้ายสี (แถว kind "limit" ในตารางธุรกรรม) */
-const LIMIT_STATUS_META: Record<
-  "pending" | "approved" | "rejected",
-  { label: string; tone: string }
-> = {
-  pending: { label: "รอพิจารณา", tone: "amber" },
-  approved: { label: "อนุมัติ", tone: "green" },
-  rejected: { label: "ปฏิเสธ", tone: "red" },
-};
-
-/** memberTransactions merges limit rows with ids offset by 1,000,000 so they stay
- *  unique next to member_transactions ids — reverse the offset to get the real
- *  limit_requests.id needed by member.decideLimitRequest. */
-const LIMIT_ROW_ID_OFFSET = 1_000_000;
 
 /** ROUND 48 — แถวสรุปตามช่วงเวลา พร้อมช่วงวันที่จริงของแถว (date → end) สำหรับกดขยายดูรายการสินค้า */
 type TimelineRow = {
@@ -240,7 +221,6 @@ export function Reports({
       | "withdrawal"
       | "activation"
       | "refund"
-      | "limit_request"
     )[]
   >([]);
   const toggleTxType = (
@@ -250,7 +230,6 @@ export function Reports({
       | "withdrawal"
       | "activation"
       | "refund"
-      | "limit_request"
   ) => {
     setTxTypes(current =>
       current.includes(value)
@@ -310,9 +289,9 @@ export function Reports({
   const [debouncedBalanceSearch, setDebouncedBalanceSearch] = useState("");
   const [stockSearch, setStockSearch] = useState("");
   const [debouncedStockSearch, setDebouncedStockSearch] = useState("");
-  // ROUND 34 (req 23.2) — การพิจารณาคำขอลดวงเงิน: ผู้บริหารกดอนุมัติ/ปฏิเสธที่แถวรอพิจารณา
+  // คำขอปรับวงเงินซื้อ/วันแยกจากประวัติธุรกรรมเงินจริง
   const [limitDecision, setLimitDecision] = useState<{
-    row: MemberTransactionRow;
+    row: LimitRequestRow;
     decision: "approve" | "reject";
   } | null>(null);
   const [limitError, setLimitError] = useState("");
@@ -576,10 +555,9 @@ export function Reports({
       setLimitError("");
       setNotice(
         result.status === "approved"
-          ? `อนุมัติคำขอลดวงเงิน ${name} แล้ว · วงเงินใหม่ ${money(result.requestedLimit)}`
-          : `ปฏิเสธคำขอลดวงเงิน ${name} แล้ว · วงเงินคงเดิม ${result.currentLimit != null ? money(result.currentLimit) : "ไม่จำกัด"}`
+          ? `อนุมัติคำขอปรับวงเงินซื้อ/วันของ ${name} แล้ว · วงเงินใหม่ ${money(result.requestedLimit)}`
+          : `ปฏิเสธคำขอปรับวงเงินซื้อ/วันของ ${name} แล้ว · วงเงินคงเดิม ${result.currentLimit != null ? money(result.currentLimit) : "ไม่จำกัด"}`
       );
-      void utils.reports.memberTransactions.invalidate();
       void utils.reports.limitRequests.invalidate();
       void utils.member.list.invalidate();
     },
@@ -588,7 +566,7 @@ export function Reports({
   const confirmLimitDecision = () => {
     if (!limitDecision) return;
     decideLimitMutation.mutate({
-      requestId: limitDecision.row.id - LIMIT_ROW_ID_OFFSET,
+      requestId: limitDecision.row.id,
       decision: limitDecision.decision,
       actor: userName || "ผู้ใช้ระบบ",
       actorRole: role === "admin" ? "ผู้บริหาร" : "เจ้าหน้าที่",
@@ -810,8 +788,6 @@ export function Reports({
       .filter(row => row.type === "refund")
       .reduce((sum, row) => sum + row.amount, 0),
     refundCount: txRows.filter(row => row.type === "refund").length,
-    // ROUND 34 — แถวคำขอลดวงเงินตามตัวกรองปัจจุบัน
-    limitCount: txRows.filter(row => row.kind === "limit").length,
   };
   const dailySalesRows = [
     [
@@ -1286,7 +1262,7 @@ export function Reports({
   const hospitalTxPreset = hospitalPreset === "deposit" || hospitalPreset === "withdrawal" || hospitalPreset === "refund" || hospitalPreset === "activation";
   const hospitalTxTitle: Record<Exclude<HospitalReportPreset, "standard" | "sales" | "balances" | "stock">, string> = {
     deposit: "รายงานการเติมเงินบัตรเงินสด",
-    withdrawal: "รายงานการลดยอดเงินบัตร",
+    withdrawal: "รายงานการถอนเงินจากบัตร",
     refund: "รายงานการคืนบัตรเงินสด",
     activation: "รายงานการเปิดใช้บัตรเงินสด",
   };
@@ -1299,6 +1275,7 @@ export function Reports({
   const txExportRows = () => [
     [
       "วันที่ · เวลา",
+      "เลขบัตร",
       "เลขสมาชิก",
       "ชื่อสมาชิก",
       ...(hospitalTxPreset ? [] : ["รายการ"]),
@@ -1308,6 +1285,7 @@ export function Reports({
     ],
     ...txRows.map(row => [
       formatLogDateTime(row.createdAt),
+      row.cardNumber ?? "—",
       row.memberNumber,
       row.memberName ?? "—",
       ...(hospitalTxPreset ? [] : [transactionDescription(row)]),
@@ -1341,11 +1319,12 @@ export function Reports({
       ["จำนวนรายการ", `${txRows.length} รายการ`],
     ],
     columns: hospitalTxPreset
-      ? ["วันที่ · เวลา", "เลขสมาชิก", "ชื่อสมาชิก", "ยอด (บาท)", "ผู้ทำรายการ"]
-      : ["วันที่ · เวลา", "เลขสมาชิก", "ชื่อสมาชิก", "รายการ", "ยอด (บาท)", "คงเหลือ(บาท)", "ผู้ทำรายการ"],
-    numericCols: hospitalTxPreset ? [3] : [4, 5],
+      ? ["วันที่ · เวลา", "เลขบัตร", "เลขสมาชิก", "ชื่อสมาชิก", "ยอด (บาท)", "ผู้ทำรายการ"]
+      : ["วันที่ · เวลา", "เลขบัตร", "เลขสมาชิก", "ชื่อสมาชิก", "รายการ", "ยอด (บาท)", "คงเหลือ(บาท)", "ผู้ทำรายการ"],
+    numericCols: hospitalTxPreset ? [4] : [5, 6],
     rows: txRows.map(row => [
       formatLogDateTime(row.createdAt),
+      row.cardNumber ?? "—",
       row.memberNumber,
       row.memberName ?? "—",
       ...(hospitalTxPreset ? [] : [transactionDescription(row)]),
@@ -1381,8 +1360,8 @@ export function Reports({
       ],
     ],
     totalsRow: hospitalTxPreset
-      ? [`รวม ${exportCount(txRows.length)} รายการ`, "", "", exportNumber(txRows.reduce((sum, row) => sum + Math.abs(row.amount), 0)), ""]
-      : [`รวมทั้งหมด ${txRows.length} รายการ`, "", "", "", exportNumber(txRows.reduce((sum, row) => sum + row.amount, 0)), "", ""],
+      ? [`รวม ${exportCount(txRows.length)} รายการ`, "", "", "", exportNumber(txRows.reduce((sum, row) => sum + Math.abs(row.amount), 0)), ""]
+      : [`รวมทั้งหมด ${txRows.length} รายการ`, "", "", "", "", exportNumber(txRows.reduce((sum, row) => sum + row.amount, 0)), "", ""],
     brandName: "ร้านค้าสวัสดิการ",
     compact: true, // ตาราง 10 คอลัมน์ — ลดขนาดตามฟอร์มให้อยู่บรรทัดเดียว
   });
@@ -2868,7 +2847,6 @@ export function Reports({
                         ["withdrawal", "ถอนเงิน"],
                         ["activation", "เปิดใช้บัตร"],
                         ["refund", "คืนบัตรเงินสด"],
-                        ["limit_request", "ขอลดวงเงิน"],
                       ] as const
                     ).map(([value, label]) => (
                       <button
@@ -2961,23 +2939,20 @@ export function Reports({
                     <thead>
                       <tr>
                         <th>วันที่ · เวลา</th>
+                        <th>เลขบัตร</th>
                         <th>สมาชิก / เลขสมาชิก</th>
                         <th>รายการ</th>
                         <th className="num">ยอดเคลื่อน</th>
                         <th className="num hide-sm">คงเหลือ(บาท)</th>
                         <th className="hide-sm">ผู้ทำรายการ</th>
-                        {isAdminRole(role) && <th>พิจารณา</th>}
                       </tr>
                     </thead>
                     <tbody>
                       {txRows.map(row => {
-                        const isLimit = row.kind === "limit";
-                        const limitStatus =
-                          LIMIT_STATUS_META[row.status ?? "pending"];
                         return (
                           <tr
                             key={row.id}
-                            className={isLimit ? "tx-limit" : `tx-${row.type}`}
+                            className={`tx-${row.type}`}
                           >
                             <td>
                               <small
@@ -2988,6 +2963,7 @@ export function Reports({
                               </small>
                               {transactionReceipt(row) && <button type="button" className="outline-button compact" onClick={() => setViewedTransaction(row)}><ReceiptText size={14} /> ใบเสร็จ</button>}
                             </td>
+                            <td><small className="cell-mono">{row.cardNumber ?? "—"}</small></td>
                             <td>
                               <span className="cell-strong">
                                 {row.memberName ?? "—"}
@@ -2998,16 +2974,9 @@ export function Reports({
                             </td>
                             <td>
                               <span className="tx-detail">{transactionDescription(row)}</span>
-                              {isLimit && <StatusPill tone={limitStatus.tone}>{limitStatus.label}</StatusPill>}
                             </td>
                             <td className="num">
-                              {isLimit ? (
-                                <span className="tx-limit-amount">
-                                  {money(row.amount)}
-                                  <small>วงเงินใหม่ที่ขอ</small>
-                                </span>
-                              ) : (
-                                <span
+                              <span
                                   className={
                                     row.amount >= 0
                                       ? "profit-pos"
@@ -3016,8 +2985,7 @@ export function Reports({
                                 >
                                   {row.amount >= 0 ? "+" : "−"}
                                   {money(Math.abs(row.amount))}
-                                </span>
-                              )}
+                              </span>
                             </td>
                             <td className="num hide-sm">
                               {row.balanceAfter !== null
@@ -3032,49 +3000,6 @@ export function Reports({
                                 {row.actor ?? "ไม่ระบุ"}
                               </small>
                             </td>
-                            {isAdminRole(role) && (
-                              <td>
-                                {isLimit && row.status === "pending" ? (
-                                  <span className="limit-act-row">
-                                    <button
-                                      type="button"
-                                      className="limit-act limit-act-approve"
-                                      disabled={decideLimitMutation.isPending}
-                                      onClick={() => {
-                                        setLimitError("");
-                                        setLimitDecision({
-                                          row,
-                                          decision: "approve",
-                                        });
-                                      }}
-                                    >
-                                      <Check size={12} /> อนุมัติ
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="limit-act limit-act-reject"
-                                      disabled={decideLimitMutation.isPending}
-                                      onClick={() => {
-                                        setLimitError("");
-                                        setLimitDecision({
-                                          row,
-                                          decision: "reject",
-                                        });
-                                      }}
-                                    >
-                                      <X size={12} /> ปฏิเสธ
-                                    </button>
-                                  </span>
-                                ) : (
-                                  <small
-                                    className="cell-sub"
-                                    style={{ marginTop: 0 }}
-                                  >
-                                    —
-                                  </small>
-                                )}
-                              </td>
-                            )}
                           </tr>
                         );
                       })}
@@ -3118,16 +3043,32 @@ export function Reports({
                   </strong>
                   <span>{txTotals.refundCount} รายการ</span>
                 </div>
-                <div>
-                  <small>ขอลดวงเงิน</small>
-                  <strong className="purple-text">{txTotals.limitCount}</strong>
-                  <span>
-                    {limitRequestsQuery.isLoading
-                      ? "…"
-                      : `รอพิจารณา ${pendingLimitCount} รายการ`}
-                  </span>
-                </div>
               </div>
+              {isAdminRole(role) && pendingLimitCount > 0 && (
+                <div className="table-wrap limit-request-panel">
+                  <div className="table-toolbar">
+                    <div>
+                      <h3>คำขอปรับวงเงินซื้อ/วัน</h3>
+                      <p>รายการนี้ไม่ใช่การถอนเงิน จึงแยกออกจากประวัติธุรกรรม</p>
+                    </div>
+                  </div>
+                  <table className="entity-table" aria-label="คำขอปรับวงเงินซื้อรายวัน">
+                    <thead><tr><th>วันที่ · เวลา</th><th>สมาชิก</th><th>วงเงินปัจจุบัน</th><th>วงเงินที่ขอ</th><th>ผู้ยื่นคำขอ</th><th>พิจารณา</th></tr></thead>
+                    <tbody>
+                      {limitRequestsQuery.data?.items.map(row => (
+                        <tr key={row.id}>
+                          <td><small className="cell-mono">{formatLogDateTime(row.createdAt)}</small></td>
+                          <td><b>{row.memberName ?? "—"}</b><small className="cell-sub">{row.memberNumber}</small></td>
+                          <td>{row.currentLimit == null ? "ไม่จำกัด" : money(row.currentLimit)}</td>
+                          <td><b>{money(row.requestedLimit)}</b></td>
+                          <td>{row.requestedBy}</td>
+                          <td><span className="limit-act-row"><button type="button" className="limit-act limit-act-approve" disabled={decideLimitMutation.isPending} onClick={() => { setLimitError(""); setLimitDecision({ row, decision: "approve" }); }}><Check size={12} /> อนุมัติ</button><button type="button" className="limit-act limit-act-reject" disabled={decideLimitMutation.isPending} onClick={() => { setLimitError(""); setLimitDecision({ row, decision: "reject" }); }}><X size={12} /> ปฏิเสธ</button></span></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
 
             </section>
           )}
@@ -3601,7 +3542,7 @@ export function Reports({
             className="confirm-modal limit-decide-modal"
             role="dialog"
             aria-modal="true"
-            aria-label="ยืนยันการพิจารณาคำขอลดวงเงิน"
+            aria-label="ยืนยันการพิจารณาคำขอปรับวงเงินซื้อรายวัน"
             onClick={event => event.stopPropagation()}
           >
             <div className="confirm-icon">
@@ -3611,8 +3552,8 @@ export function Reports({
               <div>
                 <h2>
                   {limitDecision.decision === "approve"
-                    ? "ยืนยันการอนุมัติคำขอลดวงเงิน?"
-                    : "ยืนยันการปฏิเสธคำขอลดวงเงิน?"}
+                    ? "ยืนยันอนุมัติการปรับวงเงินซื้อ/วัน?"
+                    : "ยืนยันปฏิเสธการปรับวงเงินซื้อ/วัน?"}
                 </h2>
                 <p>ผู้พิจารณา: {userName || "ผู้ใช้ระบบ"} · ผู้บริหาร</p>
               </div>
@@ -3642,7 +3583,7 @@ export function Reports({
               </div>
               <div>
                 <span>วงเงินใหม่ที่ขอ</span>
-                <b className="purple-text">{money(limitDecision.row.amount)}</b>
+                <b className="purple-text">{money(limitDecision.row.requestedLimit)}</b>
               </div>
               {limitDecision.row.reason && (
                 <div>
@@ -3652,13 +3593,13 @@ export function Reports({
               )}
               <div>
                 <span>ผู้ยื่นคำขอ</span>
-                <b>{limitDecision.row.actor ?? "ไม่ระบุ"}</b>
+                <b>{limitDecision.row.requestedBy || "ไม่ระบุ"}</b>
               </div>
             </div>
             <div className="limit-decide-note">
               <ShieldCheck size={15} />{" "}
               {limitDecision.decision === "approve"
-                ? `อนุมัติแล้ว วงเงินซื้อสินค้าต่อวันของสมาชิกจะถูกตั้งเป็น ${money(limitDecision.row.amount)} ทันที และบันทึกลง Log`
+                ? `อนุมัติแล้ว วงเงินซื้อสินค้าต่อวันของสมาชิกจะถูกตั้งเป็น ${money(limitDecision.row.requestedLimit)} ทันที และบันทึกลง Log`
                 : `ปฏิเสธแล้ว วงเงินของสมาชิกคงเดิม (${limitDecision.row.currentLimit != null ? money(limitDecision.row.currentLimit) : "ไม่จำกัด"}) · สมาชิกยื่นคำขอใหม่ได้`}
             </div>
             {limitError && (

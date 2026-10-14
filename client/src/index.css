@@ -2890,6 +2890,10 @@ th { font-weight: 600; }
   .settings-nav button { padding: 9px 13px; }
   .dash-tab { padding: 9px 13px; }
   .report-workbench .dash-tabbar { gap: 4px; }
+  .report-workbench { flex: none; min-height: auto; display: block; overflow: visible; }
+  .report-workbench .dash-tab-body { min-height: auto; display: block; overflow: visible; }
+  .report-workbench .dash-tab-body > .panel { min-height: auto; display: flex; overflow: visible; }
+  .report-workbench .dash-tab-body > section.panel:has(> .table-wrap) > .table-wrap { min-height: 240px; }
   .settings-content { max-width: none; }
 }
 

@@ -424,28 +424,17 @@ describe("member credit limit / การขอลดวงเงิน (req 23.
     expect(cash.total).toBe(200);
   });
 
-  it("merges limit requests into the member transaction history", () => {
+  it("keeps limit requests separate from the member money transaction history", () => {
     db = createSqliteStore();
     seedSqliteDemoData(db);
     requestLimitReduction(db, { memberNumber: "M-000218", requestedLimit: 600, reason: "ทดสอบรวมประวัติ" });
 
     const all = memberTransactions(db, {});
-    const limitRows = all.filter((row) => row.kind === "limit");
-    expect(limitRows).toHaveLength(1);
-    expect(limitRows[0].type).toBe("limit_request");
-    expect(limitRows[0].status).toBe("pending");
-    expect(limitRows[0].amount).toBe(600);
-    expect(limitRows[0].memberName).toContain("อรทัย");
-    expect(all.every((row) => row.kind === "tx" || row.kind === "limit")).toBe(true);
+    expect(all.every((row) => row.kind === "tx")).toBe(true);
+    expect(all.some((row) => row.detail.includes("ทดสอบรวมประวัติ"))).toBe(false);
     for (let index = 1; index < all.length; index += 1) {
       expect(all[index - 1].createdAt >= all[index].createdAt).toBe(true);
     }
-
-    const onlyLimit = memberTransactions(db, { type: "limit_request" });
-    expect(onlyLimit).toHaveLength(1);
-    expect(onlyLimit[0].kind).toBe("limit");
-    expect(onlyLimit[0].detail).toContain("ขอลดวงเงิน");
-    expect(onlyLimit[0].detail).toContain("ทดสอบรวมประวัติ");
 
     const deposits = memberTransactions(db, { type: "deposit" });
     expect(deposits.length).toBeGreaterThan(0);

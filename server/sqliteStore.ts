@@ -61,6 +61,8 @@ export type SqliteTransaction = {
   paymentMethod: string | null;
   balanceAfter: number | null;
   createdAt: string;
+  /** เลขบัตร ณ รอบที่ทำรายการ ไม่เปลี่ยนตามบัตรปัจจุบันของสมาชิก */
+  cardNumber: string | null;
   /** ROUND 63 — รายการนี้มีรูปหลักฐานแนบไหม (ตัวรูปดึงแยกที่ member.transactionSlip) */
   hasSlip?: number;
 };
@@ -741,6 +743,42 @@ function initializeCardUsageSessions(db: SqliteDb) {
       UPDATE sales SET card_usage_session_id = (SELECT id FROM card_usage_sessions WHERE member_number = NEW.member_number AND ended_at IS NULL)
       WHERE id = NEW.id AND NEW.card_usage_session_id IS NULL;
     END;`);
+  // Link legacy rows to the physical-card round that covered their timestamp.
+  // Imported installations commonly have one synthetic legacy round created
+  // after their historical ledger; that round intentionally represents those
+  // earlier rows until the first real return/reassignment closes it.
+  db.prepare(`UPDATE member_transactions AS t
+    SET card_usage_session_id = (
+      SELECT s.id FROM card_usage_sessions s
+      WHERE s.member_number = t.member_number
+        AND (
+          (t.created_at >= s.started_at AND (s.ended_at IS NULL OR t.created_at <= s.ended_at))
+          OR (s.legacy = 1 AND NOT EXISTS (
+            SELECT 1 FROM card_usage_sessions exact
+            WHERE exact.member_number = t.member_number
+              AND t.created_at >= exact.started_at
+              AND (exact.ended_at IS NULL OR t.created_at <= exact.ended_at)
+          ))
+        )
+      ORDER BY CASE WHEN t.created_at >= s.started_at THEN 0 ELSE 1 END, s.id DESC
+      LIMIT 1
+    )
+    WHERE t.card_usage_session_id IS NULL`).run();
+  // If a member has exactly one card in their entire assignment history, that
+  // card is an unambiguous fallback for imported ledger rows whose timestamps
+  // predate the synthetic legacy session created during migration.
+  db.prepare(`UPDATE member_transactions AS t
+    SET card_usage_session_id = (
+      SELECT s.id FROM card_usage_sessions s
+      WHERE s.member_number = t.member_number
+        AND s.card_number = (
+          SELECT MIN(a.card_number) FROM card_assignments a
+          WHERE a.member_number = t.member_number
+          HAVING COUNT(DISTINCT a.card_number) = 1
+        )
+      ORDER BY s.legacy DESC, s.id ASC LIMIT 1
+    )
+    WHERE t.card_usage_session_id IS NULL`).run();
 }
 
 export function cardUsageHistory(db: SqliteDb, cardNumber: string) {
@@ -1062,7 +1100,12 @@ export function getMemberDetail(db: SqliteDb, memberNumber: string, transactionL
     ) THEN 1 ELSE 0 END AS cardUsable
     FROM members m WHERE m.member_number = ?`).get(memberNumber) as SqliteMember | undefined;
   if (!member) return undefined;
-  const transactions = db.prepare(`SELECT id, member_number as memberNumber, type, detail, amount, payment_method as paymentMethod, balance_after as balanceAfter, created_at as createdAt, slip_url IS NOT NULL AS hasSlip FROM member_transactions WHERE member_number = ? ORDER BY created_at DESC, id DESC LIMIT ?`).all(memberNumber, transactionLimit) as unknown as SqliteTransaction[];
+  const transactions = db.prepare(`SELECT t.id, t.member_number as memberNumber, t.type, t.detail, t.amount,
+    t.payment_method as paymentMethod, t.balance_after as balanceAfter, t.created_at as createdAt,
+    t.slip_url IS NOT NULL AS hasSlip, s.card_number AS cardNumber
+    FROM member_transactions t
+    LEFT JOIN card_usage_sessions s ON s.id = t.card_usage_session_id
+    WHERE t.member_number = ? ORDER BY t.created_at DESC, t.id DESC LIMIT ?`).all(memberNumber, transactionLimit) as unknown as SqliteTransaction[];
   return { member, transactions };
 }
 
@@ -3283,30 +3326,24 @@ export type MemberTransactionRow = {
   id: number;
   memberNumber: string;
   memberName: string | null;
-  /** ROUND 65 — รหัสบัตรเงินสด/รหัสผู้ป่วยของสมาชิก (จากตาราง members) */
+  /** เลขบัตร ณ รอบที่ทำรายการ (จาก card_usage_sessions) */
   cardNumber: string | null;
   patientCode: string | null;
-  type: "purchase" | "deposit" | "withdrawal" | "activation" | "refund" | "limit_request";
-  /** "tx" = รายการกระเงินเดิม · "limit" = คำขอลดวงเงิน (req 23.2) */
-  kind: "tx" | "limit";
+  type: "purchase" | "deposit" | "withdrawal" | "activation" | "refund";
+  kind: "tx";
   detail: string;
   amount: number;
   paymentMethod: string | null;
   balanceAfter: number | null;
   actor: string | null;
   createdAt: string;
-  /** limit rows only — สถานะคำขอ / เหตุผล / วงเงินเดิม / ผู้พิจารณา */
-  status?: "pending" | "approved" | "rejected" | null;
-  reason?: string | null;
-  currentLimit?: number | null;
-  decidedBy?: string | null;
 };
 
 export type MemberTransactionsInput = {
   memberNumber?: string;
-  type?: "purchase" | "deposit" | "withdrawal" | "activation" | "refund" | "limit_request";
+  type?: "purchase" | "deposit" | "withdrawal" | "activation" | "refund";
   /** ROUND 77 (user) — เลือกหลายประเภทพร้อมกัน (รวมกับ type เดี่ยว ถ้าส่งทั้งคู่) */
-  types?: ("purchase" | "deposit" | "withdrawal" | "activation" | "refund" | "limit_request")[];
+  types?: ("purchase" | "deposit" | "withdrawal" | "activation" | "refund")[];
   from?: string;
   to?: string;
   limit?: number;
@@ -3314,39 +3351,27 @@ export type MemberTransactionsInput = {
 
 /**
  * Member wallet ledger with the staff member (actor) who performed each entry.
- * Req 23.2 — คำขอลดวงเงินถูกรวมเข้ามาในประวัติเดียวกัน (kind "limit", type
- * "limit_request") เมื่อไม่กรองชนิด หรือกรองเฉพาะ limit_request เท่านั้น
- * ผลลัพธ์เรียงใหม่-เก่า แล้วค่อยตัดตาม limit
+ * Credit-limit requests are deliberately excluded because they do not move money.
  */
 export function memberTransactions(db: SqliteDb, input: MemberTransactionsInput = {}): MemberTransactionRow[] {
   const memberNumber = input.memberNumber?.trim();
   const limit = Math.max(1, Math.min(1000, Math.floor(input.limit ?? 300)));
-  const rows: MemberTransactionRow[] = [];
-  // ROUND 77 (user) — เลือกหลายประเภทพร้อมกัน: รวม type เดี่ยวกับ types เป็นชุดเดียว
-  // (ไม่ซ้ำค่า) · ชุดว่าง = ทุกประเภท (พฤติกรรมเดิม)
+  // ROUND 77 — เลือกหลายประเภทพร้อมกัน; ชุดว่าง = ทุกประเภทธุรกรรมเงินจริง
   const typeSet = new Set<string>([...(input.types ?? []), ...(input.type ? [input.type] : [])]);
-
-  // Regular wallet entries (purchase / deposit / withdrawal).
-  if (!typeSet.has("limit_request") || typeSet.size > 1 || typeSet.size === 0) {
-    const conditions: string[] = [];
-    const params: (string | number)[] = [];
-    if (memberNumber) {
-      conditions.push("t.member_number LIKE ?");
-      params.push(`%${memberNumber}%`);
-    }
-    const txTypes = Array.from(typeSet).filter((type) => type !== "limit_request");
-    if (typeSet.size > 0 && txTypes.length > 0) {
-      if (txTypes.length === 1) {
-        conditions.push("t.type = ?");
-        params.push(txTypes[0]);
-      } else {
-        conditions.push(`t.type IN (${txTypes.map(() => "?").join(", ")})`);
-        params.push(...txTypes);
-      }
-    } else if (typeSet.size > 0 && txTypes.length === 0) {
-      // เลือกเฉพาะ limit_request — ไม่ต้องดึงธุรกรรมกระเป๋าเงินเลย
-      conditions.push("1 = 0");
-    }
+  const conditions: string[] = [];
+  const params: (string | number)[] = [];
+  if (memberNumber) {
+    conditions.push("t.member_number LIKE ?");
+    params.push(`%${memberNumber}%`);
+  }
+  const txTypes = Array.from(typeSet);
+  if (txTypes.length === 1) {
+    conditions.push("t.type = ?");
+    params.push(txTypes[0]);
+  } else if (txTypes.length > 1) {
+    conditions.push(`t.type IN (${txTypes.map(() => "?").join(", ")})`);
+    params.push(...txTypes);
+  }
     if (input.from && ISO_DATE_ONLY.test(input.from)) {
       conditions.push("t.created_at >= ?");
       params.push(`${input.from} 00:00:00`);
@@ -3355,54 +3380,17 @@ export function memberTransactions(db: SqliteDb, input: MemberTransactionsInput 
       conditions.push("t.created_at <= ?");
       params.push(`${input.to} 23:59:59`);
     }
-    const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
-    const txRows = db.prepare(`SELECT t.id, t.member_number AS memberNumber, NULLIF(TRIM(m.first_name || ' ' || m.last_name), '') AS memberName, m.card_number AS cardNumber, m.patient_code AS patientCode, t.type, t.detail, t.amount, t.payment_method AS paymentMethod, t.balance_after AS balanceAfter, t.actor, t.created_at AS createdAt FROM member_transactions t LEFT JOIN members m ON m.member_number = t.member_number${where} ORDER BY t.created_at DESC, t.id DESC`).all(...params) as unknown as MemberTransactionRow[];
-    rows.push(...txRows.map((row) => ({ ...row, kind: "tx" as const })));
-  }
-
-  // การขอลดวงเงิน — merged into the same history (same member/date filters).
-  if (typeSet.size === 0 || typeSet.has("limit_request")) {
-    const conditions: string[] = [];
-    const params: (string | number)[] = [];
-    if (memberNumber) {
-      conditions.push("r.member_number LIKE ?");
-      params.push(`%${memberNumber}%`);
-    }
-    if (input.from && ISO_DATE_ONLY.test(input.from)) {
-      conditions.push("r.created_at >= ?");
-      params.push(`${input.from} 00:00:00`);
-    }
-    if (input.to && ISO_DATE_ONLY.test(input.to)) {
-      conditions.push("r.created_at <= ?");
-      params.push(`${input.to} 23:59:59`);
-    }
-    const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
-    const requestRows = db.prepare(`${LIMIT_REQUEST_SELECT}${where}`).all(...params) as unknown as LimitRequestRow[];
-    rows.push(
-      ...requestRows.map((request) => ({
-        // Offset keeps ids unique next to member_transactions ids (React keys).
-        id: 1_000_000 + request.id,
-        memberNumber: request.memberNumber,
-        memberName: request.memberName,
-        cardNumber: null as null,
-        patientCode: null as null,
-        type: "limit_request" as const,
-        kind: "limit" as const,
-        detail: `ขอลดวงเงิน ${request.currentLimit != null ? `จาก ${money(request.currentLimit)}` : "จากไม่จำกัด"} เหลือ ${money(request.requestedLimit)}${request.reason ? ` · เหตุผล: ${request.reason}` : ""}`,
-        amount: request.requestedLimit,
-        paymentMethod: null,
-        balanceAfter: null,
-        actor: request.requestedBy,
-        createdAt: request.createdAt,
-        status: request.status,
-        reason: request.reason,
-        currentLimit: request.currentLimit,
-        decidedBy: request.decidedBy,
-      })),
-    );
-  }
-  rows.sort((a, b) => (a.createdAt === b.createdAt ? b.id - a.id : a.createdAt < b.createdAt ? 1 : -1));
-  return rows.slice(0, limit);
+  const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
+  const txRows = db.prepare(`SELECT t.id, t.member_number AS memberNumber,
+    NULLIF(TRIM(m.first_name || ' ' || m.last_name), '') AS memberName,
+    s.card_number AS cardNumber, m.patient_code AS patientCode, t.type, t.detail,
+    t.amount, t.payment_method AS paymentMethod, t.balance_after AS balanceAfter,
+    t.actor, t.created_at AS createdAt
+    FROM member_transactions t
+    LEFT JOIN members m ON m.member_number = t.member_number
+    LEFT JOIN card_usage_sessions s ON s.id = t.card_usage_session_id
+    ${where} ORDER BY t.created_at DESC, t.id DESC LIMIT ?`).all(...params, limit) as unknown as MemberTransactionRow[];
+  return txRows.map((row) => ({ ...row, kind: "tx" as const }));
 }
 
 // --- ROUND 65 (user): รายงานยอดเงินในบัตรสมาชิก --------------------------------
@@ -5032,27 +5020,6 @@ export function seedWelfareStoreData(db: SqliteDb) {
     const insertTransaction = db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, actor, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
     for (const transaction of SEED_MEMBER_TRANSACTIONS) {
       insertTransaction.run(transaction.memberNumber, transaction.type, transaction.detail, transaction.amount, transaction.paymentMethod, transaction.balanceAfter, transaction.actor, transaction.createdAt);
-    }
-  }
-  // Req 23.2 — ตัวอย่างวงเงินซื้อสินค้าต่อวัน + คำขอลดวงเงิน (idempotent):
-  // หยิบสมาชิกจริง 3 รายแรกจากฐานข้อมูล ตั้งวงเงินกว้างๆ ที่ไม่กระทบการซื้อปกติ
-  // แล้วใส่คำขอรอพิจารณา 2 รายการ + อนุมัติแล้ว 1 รายการ (ไม่เขียน audit log
-  // เพื่อไม่ให้เกินจำนวน seed ที่เทสตรวจ)
-  if (countRows(db, "limit_requests") === 0) {
-    const demoMembers = db.prepare(`SELECT member_number AS memberNumber FROM members WHERE status = 'active' ORDER BY member_number LIMIT 3`).all() as unknown as { memberNumber: string }[];
-    if (demoMembers.length >= 3) {
-      const [memberA, memberB, memberC] = demoMembers;
-      const daysAgoStamp = (days: number, time: string) => `${formatDate(addDays(new Date(), -days))} ${time}`;
-      const setLimit = db.prepare(`UPDATE members SET credit_limit = ? WHERE member_number = ?`);
-      setLimit.run(5000, memberA.memberNumber);
-      setLimit.run(3000, memberB.memberNumber);
-      setLimit.run(10000, memberC.memberNumber);
-      const insertRequest = db.prepare(`INSERT INTO limit_requests (member_number, current_limit, requested_limit, reason, status, requested_by, decided_by, decided_at, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
-      insertRequest.run(memberA.memberNumber, 5000, 3000, "ขอควบคุมการใช้จ่ายของตนเอง", "pending", "กัญญาณัฐ ส.", null, null, daysAgoStamp(2, "09:24:00"));
-      insertRequest.run(memberB.memberNumber, 3000, 1000, "ลดวงเงินชั่วคราวตามคำขอของสมาชิก", "pending", "กัญญาณัฐ ส.", null, null, daysAgoStamp(1, "14:05:00"));
-      insertRequest.run(memberC.memberNumber, 10000, 4000, "ปรับวงเงินให้เหมาะกับการใช้จ่ายจริง", "approved", "วรพจน์ ด.", "วรพจน์ ด.", daysAgoStamp(3, "16:40:00"), daysAgoStamp(4, "10:12:00"));
-      // คำขอที่อนุมัติไปแล้ว → วงเงินจริงของสมาชิกต้องเป็นค่าที่ขอ
-      setLimit.run(4000, memberC.memberNumber);
     }
   }
   if (countRows(db, "products") === 0) {

@@ -121,6 +121,8 @@ describe("welfare store seeding", () => {
     expect(members.get("M-000218")).toBe(1240);
     expect(members.get("M-000119")).toBe(2180);
     expect(members.get("M-000092")).toBe(0);
+    expect(tableCount(database, "limit_requests")).toBe(0);
+    expect(database.prepare("SELECT COUNT(*) AS count FROM members WHERE credit_limit IS NOT NULL").get()).toMatchObject({ count: 0 });
   });
 
   it("is idempotent: re-seeding does not duplicate any rows", () => {

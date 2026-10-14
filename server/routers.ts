@@ -485,9 +485,9 @@ const memberTransactionsInput = z
   .object({
     memberNumber: z.string().optional(),
     // ROUND 65 — เพิ่ม activation (เปิดใช้บัตร) และ refund (คืนบัตรเงินสด)
-    type: z.enum(["purchase", "deposit", "withdrawal", "activation", "refund", "limit_request"]).optional(),
+    type: z.enum(["purchase", "deposit", "withdrawal", "activation", "refund"]).optional(),
     // ROUND 77 (user) — เลือกหลายประเภทพร้อมกันได้ (เช่น เติมเงิน+ถอนเงิน) · ว่าง/ไม่ส่ง = ทุกประเภท
-    types: z.array(z.enum(["purchase", "deposit", "withdrawal", "activation", "refund", "limit_request"])).optional(),
+    types: z.array(z.enum(["purchase", "deposit", "withdrawal", "activation", "refund"])).optional(),
     from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
     to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
     limit: z.number().int().min(1).max(1000).optional(),

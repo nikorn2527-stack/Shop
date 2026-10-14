@@ -238,7 +238,7 @@ function CutoffWidget({ role, userName }: { role: Role; userName: string }) {
         ["เติมเงินบัตร", closure.depositCount.toLocaleString("th-TH"), closure.depositAmount.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })],
         ["เปิดใช้บัตร", closure.activationCount.toLocaleString("th-TH"), closure.activationAmount.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })],
         ["ยอดรวมจ่าย", paymentCount.toLocaleString("th-TH"), money(paymentAmount)],
-        ["ลดยอดเงินบัตร", closure.withdrawalCount.toLocaleString("th-TH"), closure.withdrawalAmount.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })],
+        ["ถอนเงินจากบัตร", closure.withdrawalCount.toLocaleString("th-TH"), closure.withdrawalAmount.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })],
         ["คืนบัตรเงินสด", closure.refundCount.toLocaleString("th-TH"), closure.refundAmount.toLocaleString("th-TH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })],
       ],
       brandName: (settingsQuery.data?.storeName ?? settingsQuery.data?.appName ?? "").trim() || "ร้านค้าสวัสดิการ",
@@ -302,7 +302,7 @@ function CutoffWidget({ role, userName }: { role: Role; userName: string }) {
       <section aria-label="ยอดรวมจ่าย" style={{ display: "block", gridColumn: "1 / -1", marginTop: "12px", padding: "10px 0", breakInside: "avoid" }}>
       <div className="receipt-total"><span>ยอดรวมจ่าย</span><b>{money(closed.withdrawalAmount + closed.refundAmount)}</b></div>
       <div className="receipt-line"><span>จำนวนรายการจ่าย</span><b>{closed.withdrawalCount + closed.refundCount} รายการ</b></div>
-      <div className="receipt-line"><span>ลดยอดเงินบัตร · {closed.withdrawalCount} รายการ</span><b>{money(closed.withdrawalAmount)}</b></div>
+      <div className="receipt-line"><span>ถอนเงินจากบัตร · {closed.withdrawalCount} รายการ</span><b>{money(closed.withdrawalAmount)}</b></div>
       <div className="receipt-line"><span>คืนบัตรเงินสด · {closed.refundCount} รายการ</span><b>{money(closed.refundAmount)}</b></div>
       </section>
       {closed.note && closed.note !== "ตัดยอดตามเวลาที่กำหนด" && <div className="receipt-line"><span>หมายเหตุ</span><b>{closed.note}</b></div>}

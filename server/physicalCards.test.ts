@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { assignMemberCard, checkout, createProduct, receiveStockLines, voidSale } from "./sqliteStore";
 import { generateBlankCards, previewGeneratedCards } from "./sqliteStore";
 import { returnMemberCard, closeMemberAccount } from "./sqliteStore";
-import { createSqliteStore, createBlankCards, registerMember, releasePhysicalCard, listPhysicalCards, listMembers, markPhysicalCard, getMemberDetail, setSettings, setMemberNumberMode, bindExistingMembersToDemoCards, cardUsageHistory, walletTx, setMemberStatus } from "./sqliteStore";
+import { createSqliteStore, createBlankCards, registerMember, releasePhysicalCard, listPhysicalCards, listMembers, markPhysicalCard, getMemberDetail, setSettings, setMemberNumberMode, bindExistingMembersToDemoCards, cardUsageHistory, memberTransactions, walletTx, setMemberStatus } from "./sqliteStore";
 
 describe("reusable physical cards", () => {
   it("closes the account before physical return without releasing the card or refunding twice", () => {
@@ -43,6 +43,20 @@ describe("reusable physical cards", () => {
       expect(cardUsageHistory(db, "TOPUP-NEXT").sessions[0].incoming).toBe(100);
       db.prepare("UPDATE physical_cards SET status = 'lost' WHERE card_number = 'TOPUP-NEXT'").run();
       expect(() => walletTx(db, { memberNumber: member.memberNumber, type: "deposit", amount: 5 })).toThrow("บัตรไม่พร้อมใช้งาน");
+    } finally { db.close(); }
+  });
+  it("reports the card used by each transaction after a card replacement", () => {
+    const db = createSqliteStore();
+    try {
+      createBlankCards(db, ["REPORT-OLD", "REPORT-NEW"]);
+      const member = registerMember(db, { firstName: "Report", lastName: "Card", cardNumber: "REPORT-OLD", initialDeposit: 40 }).member;
+      const oldSession = cardUsageHistory(db, "REPORT-OLD").sessions[0];
+      assignMemberCard(db, { memberNumber: member.memberNumber, cardNumber: "REPORT-NEW", expectedCardNumber: "REPORT-OLD", expectedSessionId: oldSession.id });
+      walletTx(db, { memberNumber: member.memberNumber, type: "deposit", amount: 10 });
+
+      const rows = memberTransactions(db, { memberNumber: member.memberNumber });
+      expect(rows.find(row => row.type === "activation")?.cardNumber).toBe("REPORT-OLD");
+      expect(rows.find(row => row.type === "deposit")?.cardNumber).toBe("REPORT-NEW");
     } finally { db.close(); }
   });
   it("reports card usability from the same member list used by POS", () => {

@@ -15,6 +15,7 @@ export type StatementTx = {
   amount: number;
   balanceAfter: number | null;
   createdAt: string;
+  cardNumber: string | null;
 };
 
 /** Member fields the statement document renders. */
@@ -29,6 +30,7 @@ export type StatementMember = {
   createdAt: string;
   phone?: string | null;
   idCard?: string | null;
+  cardNumber?: string | null;
 };
 
 const TX_LIMIT = 50;
@@ -79,6 +81,7 @@ export function StatementModal({ member, transactions, onClose }: { member: Stat
     meta: [
       ["สมาชิก", displayName],
       ["หมายเลขสมาชิก", member.memberNumber],
+      ["เลขบัตรปัจจุบัน", member.cardNumber?.trim() || "—"],
       ["ประเภทสมาชิก", member.type],
       ["สมาชิกตั้งแต่", formatFullThaiDate(member.createdAt)],
       ["สถานะ", member.status === "active" ? "ใช้งานอยู่" : "ระงับการใช้งาน"],
@@ -92,10 +95,11 @@ export function StatementModal({ member, transactions, onClose }: { member: Stat
       ["จำนวนรายการ", `${totals.count} รายการ`],
       ["มูลค่าสุทธิ", `${totals.net >= 0 ? "+" : "−"}${money(Math.abs(totals.net))}`],
     ],
-    columns: ["วันและเวลา", "ประเภท", "รายละเอียด", "จำนวนเงิน", "ยอดคงเหลือ"],
-    numericCols: [3, 4],
+    columns: ["วันและเวลา", "เลขบัตร", "ประเภท", "รายละเอียด", "จำนวนเงิน", "ยอดคงเหลือ"],
+    numericCols: [4, 5],
     rows: ordered.map((tx) => [
       formatStatementTime(tx.createdAt),
+      tx.cardNumber ?? "—",
       WALLET_TX_META[tx.type]?.label ?? tx.type,
       tx.detail || "—",
       `${tx.amount > 0 ? "+" : "−"}${money(Math.abs(tx.amount))}`,
@@ -103,6 +107,7 @@ export function StatementModal({ member, transactions, onClose }: { member: Stat
     ]),
     totalsRow: [
       `รวมทั้งหมด ${totals.count} รายการ`,
+      "",
       "",
       "",
       `${totals.net >= 0 ? "+" : "−"}${money(Math.abs(totals.net))}`,
