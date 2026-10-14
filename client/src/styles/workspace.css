@@ -33,6 +33,13 @@
   :root:root :is(.app-shell, .modal-backdrop, [role="dialog"]) .outline-button:not(:disabled):hover {
     background: #cbd5e1; color: #0f172a; border-color: #334155;
   }
+  /* Separate file downloads from print on wider report toolbars. */
+  @media (min-width: 641px) {
+    :root:root .app-shell .report-export-actions .export-print { position: relative; margin-left: 5px; }
+    :root:root .app-shell .report-export-actions .export-print::before {
+      content: ""; position: absolute; left: -7px; width: 1px; height: 20px; background: #cbd5e1;
+    }
+  }
   :root:root .card-inventory-status { border: 1px solid #64748b; font-weight: 700; }
   :root:root :is(.card-inventory-status.is-blank, .card-inventory-status.is-returned_vacant) {
     background: #bbf7d0; color: #14532d; border-color: #16a34a;

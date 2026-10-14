@@ -1798,35 +1798,35 @@ export function Reports({
                   aria-label="พรีวิวข้อมูลก่อนส่งออกรายงานตามมุมมองที่เลือก"
                 >
                   <button
-                    className="outline-button compact"
+                    className="outline-button compact export-btn export-csv"
                     onClick={() => void openSalesExportPreview("csv", true)}
                     title="ดาวน์โหลด CSV ตามมุมมองปัจจุบัน — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <Download size={15} /> CSV
                   </button>
                   <button
-                    className="outline-button compact"
+                    className="outline-button compact export-btn export-excel"
                     onClick={() => void openSalesExportPreview("xlsx", true)}
                     title="ดาวน์โหลด Excel ตามมุมมองปัจจุบัน — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <FileBarChart size={15} /> Excel
                   </button>
                   <button
-                    className="outline-button compact"
+                    className="outline-button compact export-btn export-pdf"
                     onClick={() => void openSalesExportPreview("pdf", true)}
                     title="ดาวน์โหลด PDF (vector) ตามมุมมองปัจจุบัน — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <FileText size={15} /> PDF
                   </button>
                   <button
-                    className="outline-button compact"
+                    className="outline-button compact export-btn export-print"
                     onClick={() => void openSalesExportPreview("print", true)}
                     title="สั่งพิมพ์รายงานยอดขาย A4 ทันที — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <Printer size={15} /> พิมพ์
                   </button>
                   <button
-                    className="outline-button compact preview-btn"
+                    className="outline-button compact export-btn preview-btn"
                     onClick={() => void openSalesExportPreview()}
                     title="ดูตัวอย่างเอกสาร A4 + ตารางข้อมูลก่อนส่งออก"
                   >
@@ -2535,35 +2535,35 @@ export function Reports({
                   aria-label="พรีวิวข้อมูลก่อนส่งออกประวัติบิล"
                 >
                   <button
-                    className="outline-button compact"
+                    className="outline-button compact export-btn export-csv"
                     onClick={() => void openBillsExportPreview("csv", true)}
                     title="ดาวน์โหลด CSV — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <Download size={15} /> CSV
                   </button>
                   <button
-                    className="outline-button compact"
+                    className="outline-button compact export-btn export-excel"
                     onClick={() => void openBillsExportPreview("xlsx", true)}
                     title="ดาวน์โหลด Excel — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <FileBarChart size={15} /> Excel
                   </button>
                   <button
-                    className="outline-button compact"
+                    className="outline-button compact export-btn export-pdf"
                     onClick={() => void openBillsExportPreview("pdf", true)}
                     title="ดาวน์โหลด PDF (vector) แบบเอกสาร A4 — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <FileText size={15} /> PDF
                   </button>
                   <button
-                    className="outline-button compact"
+                    className="outline-button compact export-btn export-print"
                     onClick={() => void openBillsExportPreview("print", true)}
                     title="สั่งพิมพ์ประวัติบิล A4 ทันที — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <Printer size={15} /> พิมพ์
                   </button>
                   <button
-                    className="outline-button compact preview-btn"
+                    className="outline-button compact export-btn preview-btn"
                     onClick={() => void openBillsExportPreview()}
                     title="ดูตัวอย่างเอกสาร A4 + ตารางข้อมูลก่อนส่งออก"
                   >
@@ -2838,35 +2838,35 @@ export function Reports({
                   aria-label="พรีวิวข้อมูลก่อนส่งออกประวัติธุรกรรม"
                 >
                   <button
-                    className="outline-button compact"
+                    className="outline-button compact export-btn export-csv"
                     onClick={() => void openTxExportPreview("csv", true)}
                     title="ดาวน์โหลด CSV — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <Download size={15} /> CSV
                   </button>
                   <button
-                    className="outline-button compact"
+                    className="outline-button compact export-btn export-excel"
                     onClick={() => void openTxExportPreview("xlsx", true)}
                     title="ดาวน์โหลด Excel — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <FileBarChart size={15} /> Excel
                   </button>
                   <button
-                    className="outline-button compact"
+                    className="outline-button compact export-btn export-pdf"
                     onClick={() => void openTxExportPreview("pdf", true)}
                     title="ดาวน์โหลด PDF (vector) แบบเอกสาร A4 — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <FileText size={15} /> PDF
                   </button>
                   <button
-                    className="outline-button compact"
+                    className="outline-button compact export-btn export-print"
                     onClick={() => void openTxExportPreview("print", true)}
                     title="สั่งพิมพ์ประวัติธุรกรรม A4 ทันที — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <Printer size={15} /> พิมพ์
                   </button>
                   <button
-                    className="outline-button compact preview-btn"
+                    className="outline-button compact export-btn preview-btn"
                     onClick={() => void openTxExportPreview()}
                     title="ดูตัวอย่างเอกสาร A4 + ตารางข้อมูลก่อนส่งออก"
                   >
@@ -3064,35 +3064,35 @@ export function Reports({
                   aria-label="พรีวิวข้อมูลก่อนส่งออกรายงานสินค้าคงคลัง"
                 >
                   <button
-                    className="outline-button compact"
+                    className="outline-button compact export-btn export-csv"
                     onClick={() => void openStockBalanceExportPreview("csv", true)}
                     title="ดาวน์โหลด CSV — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <Download size={15} /> CSV
                   </button>
                   <button
-                    className="outline-button compact"
+                    className="outline-button compact export-btn export-excel"
                     onClick={() => void openStockBalanceExportPreview("xlsx", true)}
                     title="ดาวน์โหลด Excel — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <FileSpreadsheet size={15} /> Excel
                   </button>
                   <button
-                    className="outline-button compact"
+                    className="outline-button compact export-btn export-pdf"
                     onClick={() => void openStockBalanceExportPreview("pdf", true)}
                     title="ดาวน์โหลด PDF (vector) แบบเอกสาร A4 — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <FileText size={15} /> PDF
                   </button>
                   <button
-                    className="outline-button compact"
+                    className="outline-button compact export-btn export-print"
                     onClick={() => void openStockBalanceExportPreview("print", true)}
                     title="สั่งพิมพ์รายงานสินค้าคงคลัง A4 ทันที — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <Printer size={15} /> พิมพ์
                   </button>
                   <button
-                    className="outline-button compact preview-btn"
+                    className="outline-button compact export-btn preview-btn"
                     onClick={() => void openStockBalanceExportPreview()}
                     title="ดูตัวอย่างเอกสาร A4 + ตารางข้อมูลก่อนส่งออก"
                   >
@@ -3289,35 +3289,35 @@ export function Reports({
                   aria-label="พรีวิวข้อมูลก่อนส่งออกรายงานยอดเงินในบัตร"
                 >
                   <button
-                    className="outline-button compact"
+                    className="outline-button compact export-btn export-csv"
                     onClick={() => void openBalancesExportPreview("csv", true)}
                     title="ดาวน์โหลด CSV — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <Download size={15} /> CSV
                   </button>
                   <button
-                    className="outline-button compact"
+                    className="outline-button compact export-btn export-excel"
                     onClick={() => void openBalancesExportPreview("xlsx", true)}
                     title="ดาวน์โหลด Excel — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <FileSpreadsheet size={15} /> Excel
                   </button>
                   <button
-                    className="outline-button compact"
+                    className="outline-button compact export-btn export-pdf"
                     onClick={() => void openBalancesExportPreview("pdf", true)}
                     title="ดาวน์โหลด PDF (vector) แบบเอกสาร A4 — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <FileText size={15} /> PDF
                   </button>
                   <button
-                    className="outline-button compact"
+                    className="outline-button compact export-btn export-print"
                     onClick={() => void openBalancesExportPreview("print", true)}
                     title="สั่งพิมพ์รายงานยอดเงินในบัตร A4 ทันที — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
                     <Printer size={15} /> พิมพ์
                   </button>
                   <button
-                    className="outline-button compact preview-btn"
+                    className="outline-button compact export-btn preview-btn"
                     onClick={() => void openBalancesExportPreview()}
                     title="ดูตัวอย่างเอกสาร A4 + ตารางข้อมูลก่อนส่งออก"
                   >

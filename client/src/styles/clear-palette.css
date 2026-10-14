@@ -131,6 +131,41 @@
   :root:root .pos-rail .rail-btn.active { background: #DCE3EA; border-color: #29435F; color: #1F2B38; box-shadow: inset 3px 0 0 #29435F, 0 2px 4px rgb(31 43 56 / 12%); }
   :root:root :is(.scan-hero:focus-within, .member-scan-field:focus-within) { border-color: #29435F; box-shadow: 0 0 0 3px rgb(41 67 95 / 14%); }
   :root:root :is(.cart-total strong, .cart-totals .total-line strong, .cost-profit-page a) { color: #17283D; }
+  /* Report exports keep the screen palette restrained, but remain recognizable by file type. */
+  :root:root .app-shell .report-export-actions .export-btn:not(:disabled) {
+    font-weight: 700; box-shadow: 0 1px 2px rgb(15 23 42 / 6%);
+  }
+  :root:root .app-shell .report-export-actions .export-csv:not(:disabled) {
+    background: #ecfeff; background-image: none; color: #155e75; border-color: #67e8f9;
+  }
+  :root:root .app-shell .report-export-actions .export-csv:not(:disabled):hover {
+    background: #cffafe; background-image: none; color: #164e63; border-color: #0891b2;
+  }
+  :root:root .app-shell .report-export-actions .export-excel:not(:disabled) {
+    background: #ecfdf5; background-image: none; color: #166534; border-color: #86efac;
+  }
+  :root:root .app-shell .report-export-actions .export-excel:not(:disabled):hover {
+    background: #dcfce7; background-image: none; color: #14532d; border-color: #16a34a;
+  }
+  :root:root .app-shell .report-export-actions .export-pdf:not(:disabled) {
+    background: #fef2f2; background-image: none; color: #991b1b; border-color: #fca5a5;
+  }
+  :root:root .app-shell .report-export-actions .export-pdf:not(:disabled):hover {
+    background: #fee2e2; background-image: none; color: #7f1d1d; border-color: #dc2626;
+  }
+  :root:root .app-shell .report-export-actions .export-print:not(:disabled) {
+    background: #f8fafc; background-image: none; color: #334155; border-color: #94a3b8;
+  }
+  :root:root .app-shell .report-export-actions .export-print:not(:disabled):hover {
+    background: #e2e8f0; background-image: none; color: #0f172a; border-color: #475569;
+  }
+  :root:root .app-shell .report-export-actions .preview-btn:not(:disabled) {
+    background: #29435f; background-image: none; color: #ffffff; border-color: #29435f;
+    box-shadow: 0 3px 8px rgb(41 67 95 / 18%);
+  }
+  :root:root .app-shell .report-export-actions .preview-btn:not(:disabled):hover {
+    background: #17283d; background-image: none; color: #ffffff; border-color: #17283d;
+  }
   :root:root :is(.status-pill, .status-badge, .card-inventory-status) {
     background: transparent !important; border: 0 !important;
     color: var(--status-color, #475569) !important;
