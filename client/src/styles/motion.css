@@ -1,0 +1,160 @@
+/* Shared motion system — quick enough for POS work, consistent across legacy CSS and Radix UI. */
+:root {
+  --motion-duration-instant: 80ms;
+  --motion-duration-fast: 120ms;
+  --motion-duration-base: 180ms;
+  --motion-duration-slow: 240ms;
+  --motion-ease-standard: cubic-bezier(.2, 0, 0, 1);
+  --motion-ease-enter: cubic-bezier(.16, 1, .3, 1);
+  --motion-ease-exit: cubic-bezier(.4, 0, 1, 1);
+  --motion-distance-xs: 2px;
+  --motion-distance-sm: 5px;
+}
+
+@keyframes motion-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes motion-dialog-in {
+  from { opacity: 0; transform: translateY(var(--motion-distance-sm)) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes motion-page-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes motion-notice-in {
+  from { opacity: 0; transform: translateY(-3px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* View changes remount .page-content via key={safeView}; inner POS updates do not replay this. */
+@media screen {
+  .app-shell .page-content {
+    animation: motion-page-in var(--motion-duration-base) var(--motion-ease-enter) both;
+  }
+
+  .modal-backdrop,
+  .command-palette-backdrop {
+    animation: motion-fade-in var(--motion-duration-fast) var(--motion-ease-standard) both;
+  }
+
+  .modal-backdrop > :is(.form-modal, .scanner-modal, .confirm-modal, .edition-modal, .shortcuts-modal, .member-card-modal),
+  .command-palette {
+    animation: motion-dialog-in var(--motion-duration-base) var(--motion-ease-enter) both;
+    transform-origin: center;
+  }
+
+  [data-slot="dialog-overlay"],
+  [data-slot="alert-dialog-overlay"] {
+    animation-duration: var(--motion-duration-fast) !important;
+    animation-timing-function: var(--motion-ease-standard) !important;
+  }
+
+  [data-slot="dialog-content"],
+  [data-slot="alert-dialog-content"] {
+    animation-duration: var(--motion-duration-base) !important;
+    animation-timing-function: var(--motion-ease-enter) !important;
+  }
+
+  :is(.notice-bar, .inline-message, [data-sonner-toast]) {
+    animation-duration: var(--motion-duration-base) !important;
+    animation-timing-function: var(--motion-ease-enter) !important;
+  }
+
+  :is(.notice-bar, .inline-message) {
+    animation-name: motion-notice-in;
+  }
+
+  :is(
+    .primary-button,
+    .outline-button,
+    .danger-button,
+    .danger-outline-button,
+    .ghost-button,
+    .icon-button,
+    .mini-button,
+    .scan-button,
+    .top-icon,
+    .rail-btn,
+    .settings-nav button,
+    .filter-pills button,
+    [data-slot="button"]
+  ) {
+    transition-duration: var(--motion-duration-fast);
+    transition-timing-function: var(--motion-ease-standard);
+  }
+
+  :is(
+    .primary-button,
+    .outline-button,
+    .danger-button,
+    .danger-outline-button,
+    .ghost-button,
+    .icon-button,
+    .mini-button,
+    .scan-button,
+    .top-icon,
+    .rail-btn,
+    .settings-nav button,
+    .filter-pills button,
+    [data-slot="button"]
+  ):active:not(:disabled) {
+    transform: translateY(1px) scale(.985);
+    transition-duration: var(--motion-duration-instant);
+  }
+
+  :is(.sidebar nav button, .dash-tab, .settings-nav button, .rail-btn) {
+    transition-property: color, background-color, border-color, box-shadow, transform;
+    transition-duration: var(--motion-duration-fast);
+    transition-timing-function: var(--motion-ease-standard);
+  }
+
+  :is(.table-wrap tbody tr, .member-mini-card, .stock-stat, .metric-card, .product-card) {
+    transition-duration: var(--motion-duration-fast);
+    transition-timing-function: var(--motion-ease-standard);
+  }
+
+  .blocker-backdrop,
+  .blocker-modal {
+    animation: none;
+  }
+
+  .blocker-icon.error,
+  .blocker-icon.warning {
+    animation-duration: 1.25s;
+    animation-iteration-count: 1;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  :is(.primary-button, .scan-button, .danger-button, [data-slot="button"]):hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
+
+  :is(.outline-button, .ghost-button, .icon-button, .mini-button, .top-icon):hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
+}
+
+/* Accessibility: keep state changes immediate and remove decorative movement. */
+@media (prefers-reduced-motion: reduce) {
+  html:focus-within { scroll-behavior: auto !important; }
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    transition-delay: 0ms !important;
+  }
+}
+
+@media print {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

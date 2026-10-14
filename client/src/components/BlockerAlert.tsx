@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { CircleAlert, TriangleAlert, Info, Check } from "@/lib/icons";
 
 /**
@@ -61,12 +62,14 @@ const LEVEL_META: Record<BlockerLevel, { Icon: typeof CircleAlert; label: string
  * z-index 1300 อยู่เหนือทุกหน้าต่าง (command palette 1200 · modal 50)
  */
 export function BlockerAlert() {
-  const [current, setCurrent] = useState<BlockerOptions | null>(null);
+  const [current, setCurrent] = useState<(BlockerOptions & { id: number }) | null>(null);
   const acknowledgeRef = useRef<HTMLButtonElement | null>(null);
+  const alertIdRef = useRef(0);
+  const reduceMotion = useReducedMotion();
 
   useEffect(() => {
     const listener: BlockerListener = (options) => {
-      setCurrent(options);
+      setCurrent({ ...options, id: ++alertIdRef.current });
       // โฟกัสปุ่มรับทราบทันที — พนักงานกด Enter ปิดได้เลย (มือไม่ต้องไปหาเมาส์)
       window.requestAnimationFrame(() => acknowledgeRef.current?.focus());
     };
@@ -91,43 +94,68 @@ export function BlockerAlert() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current]);
 
-  if (!current) return null;
-
   const close = () => {
+    if (!current) return;
     current.onAcknowledge?.();
     setCurrent(null);
   };
 
-  const level = current.level ?? "error";
-  const { Icon, label } = LEVEL_META[level];
-
   return (
-    <div className="blocker-backdrop" onClick={close} role="presentation">
-      <div
-        className={`blocker-modal${level === "error" ? " shake" : ""}`}
-        role="alertdialog"
-        aria-modal="true"
-        aria-label={`${label}: ${current.title}`}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <span className={`blocker-icon ${level}`} aria-hidden="true">
-          <Icon size={30} strokeWidth={2.2} />
-        </span>
-        <h3>{current.title}</h3>
-        {current.description && <p>{current.description}</p>}
-        {current.hint && <span className="blocker-hint">{current.hint}</span>}
-        <button
-          ref={acknowledgeRef}
-          type="button"
-          className={`blocker-button ${level}`}
-          onClick={close}
-        >
-          <Check size={17} /> {current.confirmLabel ?? "รับทราบ"}
-        </button>
-        <span className="blocker-kbd">
-          กด <kbd>Enter</kbd> หรือ <kbd>Esc</kbd> เพื่อปิดหน้าต่างนี้
-        </span>
-      </div>
-    </div>
+    <AnimatePresence>
+      {current && (() => {
+        const level = current.level ?? "error";
+        const { Icon, label } = LEVEL_META[level];
+        return (
+          <motion.div
+            key={current.id}
+            className="blocker-backdrop"
+            role="presentation"
+            initial={reduceMotion ? false : { opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={reduceMotion ? { opacity: 0 } : { opacity: 0 }}
+            transition={{ duration: reduceMotion ? 0.01 : 0.14, ease: "easeOut" }}
+            onClick={close}
+          >
+            <motion.div
+              className="blocker-modal"
+              role="alertdialog"
+              aria-modal="true"
+              aria-label={`${label}: ${current.title}`}
+              initial={reduceMotion ? false : { opacity: 0, y: 8, scale: 0.97 }}
+              animate={reduceMotion
+                ? { opacity: 1 }
+                : level === "error"
+                  ? { opacity: 1, y: 0, scale: 1, x: [0, -3, 3, -2, 0] }
+                  : { opacity: 1, y: 0, scale: 1 }}
+              exit={reduceMotion ? { opacity: 0 } : { opacity: 0, y: 4, scale: 0.985 }}
+              transition={{
+                duration: reduceMotion ? 0.01 : 0.2,
+                ease: [0.16, 1, 0.3, 1],
+                x: { duration: 0.22, delay: 0.04 },
+              }}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <span className={`blocker-icon ${level}`} aria-hidden="true">
+                <Icon size={30} strokeWidth={2.2} />
+              </span>
+              <h3>{current.title}</h3>
+              {current.description && <p>{current.description}</p>}
+              {current.hint && <span className="blocker-hint">{current.hint}</span>}
+              <button
+                ref={acknowledgeRef}
+                type="button"
+                className={`blocker-button ${level}`}
+                onClick={close}
+              >
+                <Check size={17} /> {current.confirmLabel ?? "รับทราบ"}
+              </button>
+              <span className="blocker-kbd">
+                กด <kbd>Enter</kbd> หรือ <kbd>Esc</kbd> เพื่อปิดหน้าต่างนี้
+              </span>
+            </motion.div>
+          </motion.div>
+        );
+      })()}
+    </AnimatePresence>
   );
 }
