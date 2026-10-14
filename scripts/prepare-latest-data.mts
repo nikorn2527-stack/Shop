@@ -25,7 +25,7 @@ assert.equal(members.length, 100);
 const counts = new Map<string, number>();
 for (const row of rows) counts.set(row.barcode, (counts.get(row.barcode) || 0) + 1);
 const oldProducts = source.prepare('SELECT * FROM products').all() as any[];
-const clear = ['sale_lot_allocations', 'lot_value_adjustments', 'refunds', 'sale_items', 'sales', 'member_transactions', 'card_assignments', 'card_usage_sessions', 'physical_cards', 'limit_requests', 'stock_movements', 'stock_lots', 'order_list_items', 'products', 'members', 'day_closures', 'cashier_shifts', 'audit_logs'];
+const clear = ['sale_lot_allocations', 'lot_value_adjustments', 'refunds', 'sale_items', 'sales', 'member_transactions', 'card_assignments', 'card_usage_sessions', 'physical_cards', 'stock_movements', 'stock_lots', 'order_list_items', 'products', 'members', 'day_closures', 'cashier_shifts', 'audit_logs'];
 const classify = (name: string) => /ไอศกรีม|ไอติม|แพดเดิล|Paddle|ท๊อปเทน|คอร์นเนตโต|เอเชียนดีไลท์/.test(name) ? 'ไอศกรีม' : /ขนม|เลย์|โปเต้|ปาปริก้า|คอนเน่|ฮานามิ|สแน็ค|สแนค|ฟันโอ|โอรีโอ|เบง|แจ๊กซ์|ทิวลี่|ปาร์ตี้|ปาตี้/.test(name) ? 'ขนม' : /นม|ดีน่า|ดัช|แลคตาซอย|แลตตาซอย|โค้ก|เป๊ปซี่|มิริน|ลิปตัน|ชาอู่หลง|สิงห์|น้ำดื่ม|กาแฟ|โอวัลติน|เนสวีต้า|สปอนเซอร์|M 150|สติงค์/.test(name) ? 'เครื่องดื่ม' : /มาม่า|ยำยำ|ควิก|โจ๊ก|ข้าว|ปลากระป๋อง|ซอส|เฮลซ์/.test(name) ? 'อาหาร' : /ปากกา|สมุด|แสตมป์|ซองจดหมาย/.test(name) ? 'เครื่องเขียน' : 'ของใช้';
 function rebuild(db: DatabaseSync) {
   db.exec('PRAGMA foreign_keys=ON; BEGIN IMMEDIATE; PRAGMA defer_foreign_keys=ON;');

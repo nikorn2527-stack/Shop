@@ -31,9 +31,8 @@ describe("importTool — เทมเพลต + parse วนกลับ", () =
         expect(mapping.prename).toBe(1);
         expect(mapping.lastName).toBe(3);
         expect(mapping.balance).toBe(4);
-        expect(mapping.creditLimit).toBe(5);
-        expect(mapping.status).toBe(6);
-        expect(mapping.phone).toBe(7);
+        expect(mapping.status).toBe(5);
+        expect(mapping.phone).toBe(6);
       } else {
         const mapping = sheet.suggestedMapping as Record<string, number>;
         expect(mapping.name).toBe(1);
@@ -119,10 +118,10 @@ describe("importTool — importMembers", () => {
     const db = createSqliteStore(":memory:");
     const summary = importMembers(db, {
       rows: [
-        ["M-900001", "สมชาย", "ใจดี", "1,500.50", "", "ปกติ", "0812345678"],
-        ["", "สมหญิง", "มั่นคง", "-200", "500", "ระงับ", ""],
+        ["M-900001", "สมชาย", "ใจดี", "1,500.50", "ปกติ", "0812345678"],
+        ["", "สมหญิง", "มั่นคง", "-200", "ระงับ", ""],
       ],
-      mapping: { memberNumber: 0, firstName: 1, lastName: 2, balance: 3, creditLimit: 4, status: 5, phone: 6 },
+      mapping: { memberNumber: 0, firstName: 1, lastName: 2, balance: 3, status: 4, phone: 5 },
       duplicateMode: "skip",
     });
     expect(summary.inserted).toBe(2);
@@ -135,7 +134,6 @@ describe("importTool — importMembers", () => {
     expect(second?.memberNumber).toMatch(/^M-\d{6}$/); // สร้างเลขให้อัตโนมัติ
     expect(second?.balance).toBe(-200);
     expect(second?.status).toBe("suspended");
-    expect(second?.creditLimit).toBe(500);
   });
 
   it("โหมดข้าม: เลขสมาชิกซ้ำ = ข้าม · โหมดทับ: อัปเดต + ปรับยอดเป็นธุรกรรม", () => {
@@ -197,15 +195,13 @@ describe("importTool — importProducts", () => {
     } finally { db.close(); }
   });
 
-  it("rejects invalid member balances and limits without creating members", () => {
+  it("rejects invalid member balances without creating members", () => {
     const db = createSqliteStore(":memory:");
     try {
-      for (const row of [["Audit member", "invalid", "100"], ["Audit member", "10", "-1"]]) {
-        const result = importMembers(db, { rows: [row], mapping: { firstName: 0, balance: 1, creditLimit: 2 }, duplicateMode: "skip" });
-        expect(result.errors).toHaveLength(1);
-        expect(result.inserted).toBe(0);
-        expect(listMembers(db)).toHaveLength(0);
-      }
+      const result = importMembers(db, { rows: [["Audit member", "invalid"]], mapping: { firstName: 0, balance: 1 }, duplicateMode: "skip" });
+      expect(result.errors).toHaveLength(1);
+      expect(result.inserted).toBe(0);
+      expect(listMembers(db)).toHaveLength(0);
     } finally { db.close(); }
   });
 

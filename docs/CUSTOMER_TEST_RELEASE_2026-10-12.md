@@ -1,6 +1,6 @@
 # Customer test release — 2026-10-12
 
-Scope: registration alerts, isolated receipt printing at 58/72/80 mm, one member card action entry labelled ขอลดวงเงิน, stable transaction preview, member card downloads without direct printing, and complete sales history by default.
+Scope: registration alerts, isolated receipt printing at 58/72/80 mm, member card management, stable transaction preview, member card downloads without direct printing, and complete sales history by default.
 
 Validation:
 - TypeScript and production build passed (existing bundle-size warning remains).

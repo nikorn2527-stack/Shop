@@ -444,7 +444,6 @@
   :root .app-shell .member-balance-card .balance-orb svg {
     display: block; color: #315c80; opacity: 1;
   }
-  :root .app-shell .rail-limit svg { color: #7c3aed; background: #f5f3ff; }
   :root .app-shell .settings-content:has(.settings-save-bar) { padding-bottom: 140px; }
   :root .app-shell .settings-save-bar {
     position: fixed; right: 24px; bottom: 24px; z-index: 8;

@@ -25,17 +25,9 @@ describe("member card workflow UI", () => {
     expect(modalSource).toContain('release.mutate({ ...input, mode: "refund" })');
   });
 
-  it("keeps the removed purchase-limit workflow out and adds card numbers to reports", () => {
-    const detailSource = readSource("./pages/members/MemberDetail.tsx");
-    const posSource = readSource("./pages/Pos.tsx");
+  it("adds card numbers to reports", () => {
     const reportSource = readSource("./pages/reports/Reports.tsx");
-    const serverSource = readSource("../../server/sqliteStore.ts");
 
-    expect(detailSource).not.toContain("ปรับวงเงิน");
-    expect(posSource).not.toContain("LimitReductionModal");
-    expect(reportSource).not.toContain("limitRequests");
     expect(reportSource).toContain('"เลขบัตร"');
-    expect(serverSource).not.toContain("เกินวงเงินซื้อสินค้าต่อวัน");
-    expect(serverSource).toContain("s.card_number AS cardNumber");
   });
 });

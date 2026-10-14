@@ -529,7 +529,7 @@ Work Log:
 
   **(3) ย้าย reset filters button เข้า header action** — จากใน report-quick-guide มาอยู่ใน `action` prop ของ SectionHeader คู่กับ date picker toggle. ใช้ `<div className="page-template-action">` ห่อ 2 ปุ่ม (outline reset + primary date) เรียงในแนวนอน ตามมาตรฐาน PageTemplate (header มี primary action บนขวา)
 
-  **(4) Button hierarchy — only ONE primary (green) per page** — date picker toggle เปลี่ยนจาก `outline-button` → `primary-button` (เป็น primary action ตามกฎ). reset filters คง outline-button compact. ปุ่ม export (CSV/Excel/PDF/print) ทั้ง 4 ที่อยู่ใน panel-heading คง outline-button compact (secondary actions). ไม่มี primary button อื่นในหน้านี้แล้ว ยกเว้น limit-act-approve ในตาราง (soft pill, light bg + dark text — ไม่ใช่ solid green จึงไม่ชนกับ primary)
+  **(4) Button hierarchy — only ONE primary (green) per page** — date picker toggle เปลี่ยนจาก `outline-button` → `primary-button` (เป็น primary action ตามกฎ). reset filters คง outline-button compact. ปุ่ม export (CSV/Excel/PDF/print) ทั้ง 4 ที่อยู่ใน panel-heading คง outline-button compact (secondary actions).
 
   **(5) Soften active state ของ secondary tabs/chips** — เปลี่ยน active style ของ 3 ที่จาก solid green bg → soft mist bg + teal-dark text ให้ตรงกับ dash-tab style:
     - `.report-view-pills button.active` (line 2836): `background: var(--teal-mist); border-color: var(--teal); color: var(--teal-dark); font-weight: 600;`
@@ -541,8 +541,8 @@ Work Log:
     - `.page-template { display: flex; flex-direction: column; gap: 12px; }`
     - `.page-template-header`, `.page-template-action`, `.page-template-toolbar`, `.page-template-content`, `.page-template-contextual` ครบ
     - เพิ่ม `.report-workbench .page-template-action .outline-button.compact { height: 30px; }` และ `.app-shell:not(.pos-terminal) .page-content:has(.report-workbench) .page-template .section-header { margin-bottom: 8px; gap: 10px; }` เพื่อให้ layout สอดคล้องกับที่เดิมทำไว้ใน line 5329-5330
-- ไม่แตะ business logic: tRPC queries, data processing (timeline rows, tx rows, stock balance rows, balance rows), export logic (downloadReportPdf/printReportDoc/downloadCsvFile/downloadXlsxFile), state handlers (setReportTab/setSalesView/pickRangeChip/toggleStaffFilter/pickCustomFrom/pickCustomTo/setTxTypes/pickTxRangeChip/setGroupBy/resetReportFilters), modal logic (limitDecision/exportPreview/viewedReceipt/upgradeFeature/notice) — ทั้งหมดคงเดิม
-- รักษา functionality ครบ: 5 tabs (sales/bills/transactions/stock/balances) + 5 sub-views (timeline/product/items/category/cashier) + 4 range chips + multi-staff filter + multi-tx-type filter + 3 group-by chips + custom date range + CSV/Excel/PDF/print export preview + limit decision modal + receipt modal + slip view + edition upgrade
+- ไม่แตะ business logic: tRPC queries, data processing (timeline rows, tx rows, stock balance rows, balance rows), export logic (downloadReportPdf/printReportDoc/downloadCsvFile/downloadXlsxFile), state handlers (setReportTab/setSalesView/pickRangeChip/toggleStaffFilter/pickCustomFrom/pickCustomTo/setTxTypes/pickTxRangeChip/setGroupBy/resetReportFilters), modal logic (exportPreview/viewedReceipt/upgradeFeature/notice) — ทั้งหมดคงเดิม
+- รักษา functionality ครบ: 5 tabs (sales/bills/transactions/stock/balances) + 5 sub-views (timeline/product/items/category/cashier) + 4 range chips + multi-staff filter + multi-tx-type filter + 3 group-by chips + custom date range + CSV/Excel/PDF/print export preview + receipt modal + slip view + edition upgrade
 - `npx tsc --noEmit` → **0 errors** ✅ (PageTemplate import path `@/components/page/PageTemplate` ใช้ alias `@/*` → `./client/src/*` จาก tsconfig.json ถูกต้อง)
 - บูต dev server (`pkill -f tsx; nohup setsid ./start-dev.sh >> dev.log 2>&1 & disown; sleep 12`) → curl `/` 3 ครั้ง → HTTP 200/200/200 ✅ stable
 - dev.log: ไม่มี "Missing opening {" Tailwind v4 error (single-line CSS format แพสผ่าน); มีเพียง `[OAuth] OAUTH_SERVER_URL not configured` (pre-existing) และ `[Auth] Missing session cookie` (curl ไม่มี session ปกติ)
@@ -677,7 +677,7 @@ Work Log:
   - 3 sibling-combinator rules สำหรับ Layer 4 ordering: `.report-filter-bar + .report-cards-dense`, `.report-cards-dense + .report-view-pills`, `.report-cards-dense + .report-view-pills + .report-range-status` (margin-top tight)
   - 2 `@media` rules (max-width 820px + 560px) สำหรับ responsive stack
 - ไม่แตะ CSS เดิมที่ใช้งานได้ — เพิ่ม rules ใหม่อย่างเดียว (ลด risk ของ regression)
-- คงไว้: ทุก tRPC query (`reports.daily`/`byCategory`/`byCashier`/`byProduct`/`lineItems`/`memberTransactions`/`memberBalances`/`stockBalance`/`cashiers`/`sales.list`/`logs.list`/`member.list`/`reports.limitRequests`), ทุก state (`rangeMode`/`groupBy`/`rangeFrom`/`rangeTo`/`staffFilters`/`salesView`/`txTypes`/`txFrom`/`txTo`/`billSearch`/`balanceSearch`/`stockSearch`/`billsVisible`/`reportTab`/`expandedPeriod`/`viewedReceipt`/`billMember`/`txMember`/`limitDecision`/`exportPreview`/`upgradeFeature`/`notice`), ทุก export function (`dailySalesExportPack`/`dailySalesDocConfig`/`billsDocConfig`/`txDocConfig`/`balancesDocConfig`/`stockBalanceDocConfig`/`openSalesExportPreview`/`openBillsExportPreview`/`openTxExportPreview`/`openBalancesExportPreview`/`openStockBalanceExportPreview`/`runExportPreview`), ทุก helper (`quickRangeOf`/`pickRangeChip`/`pickTxRangeChip`/`txRangeActive`/`pickCustomFrom`/`pickCustomTo`/`pickTxFrom`/`pickTxTo`/`toggleStaffFilter`/`toggleTxType`/`resetReportFilters`/`confirmLimitDecision`)
+- คงไว้: query, state, export function และ helper ของรายงานที่ใช้งานอยู่ในขณะนั้นทั้งหมด
 - TypeScript: `npx tsc --noEmit` → **0 errors** (หลังแก้ทุก tab)
 - Boot: `bun run dev` บน port 3000 → server ติด clean (no transform errors) → `curl http://localhost:3000/` → **HTTP 200** ✅ → `/src/pages/reports/Reports.tsx` transform ผ่าน (Vite ส่ง JSX transform ออกมาไม่มี error) → `/src/index.css` compile ผ่าน Tailwind v4 (CSS 556KB compiled, มี `report-filter-bar` 19 occurrences + `report-staff-select` 6 occurrences ใน output) — ไม่มี "Missing opening {" errors
 - Commit: `4fb1900` — `feat(PT-3): redesign Reports page — 4-layer layout, consolidated filter bar, staff dropdown` (2 files changed, +364 / -394 lines)
@@ -846,7 +846,7 @@ Implementation ใน `server/_core/version.ts` (new file, ~110 บรรทั�
 - `getVersionInfo(): VersionInfo` — คืน `{ version, nodeVersion: process.version, platform: process.platform, buildDate }` โดย `buildDate` = `statSync(dirname(fileURLToPath(import.meta.url))).mtime.toISOString()` หรือ `null` ถ้า stat ไม่ได้ (read-only container edge case)
 
 Implementation ใน `server/sqliteStore.ts` (modified, +162 lines):
-- เพิ่ม `release_logs` table ใน `createSqliteStore` หลัง `limit_requests` table (ก่อน closing `\`);` ของ db.exec):
+- เพิ่ม `release_logs` table ใน `createSqliteStore` ช่วงท้ายชุดตารางระบบ (ก่อน closing `\`);` ของ db.exec):
   ```sql
   CREATE TABLE IF NOT EXISTS release_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

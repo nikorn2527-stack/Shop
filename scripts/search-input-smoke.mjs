@@ -161,9 +161,7 @@ try {
   assert.equal(buttonStyle.disabled, false);
   await page.screenshot({ path: path.join(dir, 'member-confirm-button.png') });
   await confirmButton.click();
-  await page.waitForSelector('[aria-label="ขอลดวงเงิน / คืนบัตร"]', { timeout: 3000 }).catch(async () => {
-    await page.waitForSelector('[aria-label="จัดการบัตรสมาชิก"]');
-  });
+  await page.waitForSelector('[aria-label="จัดการบัตรสมาชิก"]');
   assert.deepEqual(errors, []);
   console.log('SEARCH_INPUT_PASS', dir);
 } finally {

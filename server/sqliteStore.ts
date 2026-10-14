@@ -3849,7 +3849,7 @@ export const SYSTEM_ROLES: RoleDef[] = [
   },
   {
     name: "manager", label: "ผู้จัดการ",
-    description: "??????????? + ????????????????????????????",
+    description: "ดูรายงานครบ + จัดการสมาชิกและผู้ใช้บางส่วน",
     isSystem: true,
     permissions: ["POS.SELL", "POS.VOID", "POS.REFUND", "POS.DISCOUNT", "POS.SPECIAL", "STOCK.VIEW", "STOCK.RECEIVE", "STOCK.ADJUST", "STOCK.COUNT", "STOCK.TRANSFER", "REPORT.SALES", "REPORT.PROFIT", "REPORT.INVENTORY", "REPORT.AUDIT", "MEMBER.VIEW", "MEMBER.EDIT", "MEMBER.WALLET", "MEMBER.DELETE", "SYSTEM.USER_MANAGE", "SYSTEM.BACKUP"],
   },
