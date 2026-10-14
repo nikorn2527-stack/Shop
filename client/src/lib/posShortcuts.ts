@@ -13,7 +13,7 @@ export function parsePosShortcutKeys(serialized: string | null | undefined): Pos
 }
 
 export function getPosShortcutKey(keys: PosShortcutKeys, action: string, fallback = ""): string {
-  const configured = keys[action] || (action === "card" ? keys.limit : "");
+  const configured = keys[action] || "";
   return (configured || fallback).trim().toUpperCase();
 }
 

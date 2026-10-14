@@ -292,14 +292,6 @@ const POS_RAIL_BUTTONS: {
     icon: ArrowUpFromLine,
   },
   {
-    key: "card",
-    label: "จัดการบัตร",
-    kbd: "",
-    detail: "คืนบัตร หรือจ่ายบัตรให้สมาชิกเดิม",
-    icon: UsersRound,
-  },
-
-  {
     key: "special",
     label: "รายการพิเศษ",
     kbd: "F4",

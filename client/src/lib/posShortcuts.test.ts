@@ -16,7 +16,7 @@ describe("POS shortcut settings", () => {
     expect(parsePosShortcutKeys("[]")).toEqual({});
   });
 
-  it("keeps the legacy limit key compatible with the card action", () => {
-    expect(getPosShortcutKey(parsePosShortcutKeys('{"limit":"home"}'), "card")).toBe("HOME");
+  it("ignores the removed legacy limit key", () => {
+    expect(getPosShortcutKey(parsePosShortcutKeys('{"limit":"home"}'), "deposit", "F2")).toBe("F2");
   });
 });

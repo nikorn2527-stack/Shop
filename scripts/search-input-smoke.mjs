@@ -107,61 +107,7 @@ try {
   if (discard.asElement()) await discard.asElement().click();
   await discard.dispose();
   await page.waitForFunction(() => !document.querySelector('.stock-receive-modal'));
-  await page.evaluate(() => window.dispatchEvent(new CustomEvent('pos-rail', { detail: 'card' })));
-  const memberInput = '#pos-card-member';
-  await page.waitForSelector(memberInput);
-  await page.waitForFunction(() => document.activeElement?.id === 'pos-card-member', { timeout: 2000 });
-  for (const term of [member.first_name, member.member_number, member.card_number]) {
-    await page.$eval(memberInput, n => n.select());
-    await page.keyboard.press('Backspace');
-    await page.type(memberInput, term);
-    await page.waitForFunction(number => [...document.querySelectorAll('.member-scan-list')].some(n => n.textContent.includes(number)), {}, member.member_number);
-    console.log('PASS member search', term);
-  }
-  assert.equal(await page.$eval(memberInput, n => n.inputMode), 'text');
-  for (const viewport of [{ width: 1139, height: 334 }, { width: 390, height: 844 }]) {
-    await page.setViewport(viewport);
-    await page.$eval(memberInput, n => n.select());
-    await page.keyboard.press('Backspace');
-    await page.type(memberInput, member.member_number.slice(0, 1));
-    await page.waitForSelector('.member-selection-modal .member-option');
-    const layout = await page.$eval('.member-selection-modal .member-scan-list', n => {
-      const r = n.getBoundingClientRect();
-      const dialog = n.closest('.member-selection-modal');
-      return { position: getComputedStyle(n).position, height: r.height, scrollHeight: n.scrollHeight, clientHeight: n.clientHeight, overflow: getComputedStyle(n).overflowY, dialogOverflow: getComputedStyle(dialog).overflowY };
-    });
-    assert.equal(layout.position, 'relative');
-    assert.ok(layout.height > 50, 'Search results must not collapse');
-    assert.equal(layout.overflow, 'auto');
-    assert.equal(layout.dialogOverflow, 'auto');
-    await page.hover('.member-selection-modal .member-scan-list');
-    await page.mouse.wheel({ deltaY: 600 });
-    await new Promise(resolve => setTimeout(resolve, 250));
-    if (layout.scrollHeight > layout.clientHeight) {
-      assert.ok(await page.$eval('.member-selection-modal .member-scan-list', n => n.scrollTop > 0), 'Mouse wheel must scroll results');
-    }
-    await page.screenshot({ path: path.join(dir, `member-picker-${viewport.width}.png`) });
-    console.log('PASS member picker visible and scrollable', viewport.width);
-  }
-  await page.setViewport({ width: 1139, height: 334 });
-  await page.$eval(memberInput, n => n.select());
-  await page.keyboard.press('Backspace');
-  await page.type(memberInput, member.card_number);
-  await page.waitForFunction(number => [...document.querySelectorAll('.member-selection-modal .member-option')].some(n => n.textContent.includes(number)), {}, member.member_number);
-  const option = await page.evaluateHandle(number => [...document.querySelectorAll('.member-selection-modal .member-option')].find(n => n.textContent.includes(number)), member.member_number);
-  assert.ok(option.asElement());
-  await option.asElement().click();
-  await page.waitForFunction(number => [...document.querySelectorAll('.member-card-modal.confirm-mode')].some(n => n.textContent.includes(number)), {}, member.member_number);
-  const confirmButton = await page.$('.member-card-modal.confirm-mode .modal-actions .primary-button');
-  assert.ok(confirmButton);
-  const buttonStyle = await confirmButton.evaluate(n => ({ text: n.textContent.trim(), color: getComputedStyle(n).color, background: getComputedStyle(n).backgroundColor, disabled: n.disabled }));
-  assert.ok(buttonStyle.text.length > 0);
-  assert.equal(buttonStyle.color, 'rgb(255, 255, 255)');
-  assert.equal(buttonStyle.background, 'rgb(198, 83, 0)');
-  assert.equal(buttonStyle.disabled, false);
-  await page.screenshot({ path: path.join(dir, 'member-confirm-button.png') });
-  await confirmButton.click();
-  await page.waitForSelector('[aria-label="จัดการบัตรสมาชิก"]');
+  assert.equal(await page.evaluate(() => [...document.querySelectorAll('.pos-rail button')].some(button => button.textContent.includes('จัดการบัตร'))), false, 'POS rail must not show the redundant card-management shortcut');
   assert.deepEqual(errors, []);
   console.log('SEARCH_INPUT_PASS', dir);
 } finally {

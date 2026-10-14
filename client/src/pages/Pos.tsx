@@ -1012,7 +1012,6 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
       if (action === "scan") focusScan();
       else if (action === "member") focusScan();
       else if (action === "hold") holdBill();
-      else if (action === "card" && !railHidden.has("card")) { setCardActionMember(selectedMember); setCardIntent(null); setCardActionsOpen(true); }
       else if (action === "register") openRegister();
       else if (action === "quickmanage") { setQuickManageOpen(true); setQuickManageSearch(""); setQuickManageNotice(""); setQuickManageShowAll(false); }
       else if (action === "receive" || action === "add") { setInventoryQuickAction(action); setInventoryQuickOpen(true); }
@@ -1024,7 +1023,6 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
   // สมาชิกใหม่/จัดแผง/สแกน — Esc ค่อยๆ ถอยทีละขั้น
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (isShortcut(event, "card", "") && !railHidden.has("card")) { event.preventDefault(); setCardActionMember(selectedMember); setCardIntent(null); setCardActionsOpen(true); return; }
       if (isShortcut(event, "deposit", "F2") && !railHidden.has("deposit")) { event.preventDefault(); setShortcut(shortcut === "เติมเงิน" ? "" : "เติมเงิน"); return; }
       if (isShortcut(event, "withdraw", "F3") && !railHidden.has("withdraw")) { event.preventDefault(); setShortcut(shortcut === "ถอนเงิน" ? "" : "ถอนเงิน"); return; }
       if (isShortcut(event, "special", "F4") && !railHidden.has("special")) { event.preventDefault(); toggleSpecial(); return; }
