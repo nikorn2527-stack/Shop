@@ -15,7 +15,7 @@ export function MemberCardActionsModal({ memberNumber, onClose, onSuccess, initi
   const history = trpc.card.history.useQuery({ cardNumber: member?.cardNumber || "" }, { enabled: Boolean(member?.cardNumber) });
   const session = history.data?.sessions.find(s => !s.endedAt && s.memberNumber === memberNumber);
   const [choice, setChoice] = useState<"return" | "close" | "replace">(initialAction || "return");
-  const action = member?.cardNumber ? (member.accountClosed ? "return" : choice) : "assign";
+  const action = initialAction === "return" ? "return" : member?.cardNumber ? (member.accountClosed ? "return" : choice) : "assign";
   const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [confirm, setConfirm] = useState(false);

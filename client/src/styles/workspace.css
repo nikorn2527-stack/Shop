@@ -541,6 +541,7 @@
   :root .app-shell .pos-rail .rail-btn.rail-hold { --task-ink: #7e22ce; --task-tint: #f3e8ff; }
   :root .app-shell .pos-rail .rail-btn.rail-deposit { --task-ink: #047857; --task-tint: #d1fae5; }
   :root .app-shell .pos-rail .rail-btn.rail-withdraw { --task-ink: #c2410c; --task-tint: #ffedd5; }
+  :root .app-shell .pos-rail .rail-btn.rail-card { --task-ink: #b45309; --task-tint: #fef3c7; }
   :root .app-shell .pos-rail .rail-btn.rail-register { --task-ink: #0f766e; --task-tint: #ccfbf1; }
   :root .app-shell .pos-rail .rail-btn.rail-special { --task-ink: #a16207; --task-tint: #fef3c7; }
   :root .app-shell .pos-rail .rail-btn.rail-manage { --task-ink: #475569; --task-tint: #e2e8f0; }

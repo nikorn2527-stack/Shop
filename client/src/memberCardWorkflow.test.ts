@@ -7,11 +7,21 @@ const readSource = (relativePath: string) =>
 describe("member card workflow UI", () => {
   it("opens the shared card modal directly in return-card mode", () => {
     const detailSource = readSource("./pages/members/MemberDetail.tsx");
+    const posSource = readSource("./pages/Pos.tsx");
+    const shellSource = readSource("./layouts/AppShell.tsx");
+    const settingsSource = readSource("./pages/settings/Settings.tsx");
     const modalSource = readSource("./components/MemberCardActionsModal.tsx");
 
     expect(detailSource).toContain('setCardAction("return")');
     expect(detailSource).toContain('initialAction={cardAction === "return" ? "return" : undefined}');
+    expect(settingsSource).toContain('key: "card"');
+    expect(settingsSource).toContain('label: "คืนบัตร"');
+    expect(shellSource).toContain('new CustomEvent("pos-rail", { detail: "card" })');
+    expect(posSource).toContain('setCardInitialAction("return")');
+    expect(posSource).toContain('initialAction={cardInitialAction}');
+    expect(posSource).toContain('confirmContext="คืนบัตร"');
     expect(modalSource).toContain('export type InitialMemberCardAction = "return" | "close"');
+    expect(modalSource).toContain('initialAction === "return" ? "return"');
   });
 
   it("keeps partial withdrawal separate from full-balance card return", () => {

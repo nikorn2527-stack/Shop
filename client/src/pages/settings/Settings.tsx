@@ -292,6 +292,13 @@ const POS_RAIL_BUTTONS: {
     icon: ArrowUpFromLine,
   },
   {
+    key: "card",
+    label: "คืนบัตร",
+    kbd: "",
+    detail: "รับบัตรคืนจากสมาชิกและคืนเงินคงเหลือทั้งหมด",
+    icon: RotateCcw,
+  },
+  {
     key: "special",
     label: "รายการพิเศษ",
     kbd: "F4",
@@ -2560,7 +2567,7 @@ export function Settings({
                         </span>
                         <div>
                           <b>
-                            {button.label} <kbd>{shortcutKeyMap[button.key] ?? button.kbd}</kbd>
+                            {button.label} {(shortcutKeyMap[button.key] ?? button.kbd) && <kbd>{shortcutKeyMap[button.key] ?? button.kbd}</kbd>}
                           </b>
                           <small>{button.detail}</small>
                         </div>
@@ -2575,7 +2582,7 @@ export function Settings({
                             disabled={!form || hidden}
                             title="กดปุ่มนี้ แล้วกดคีย์บนคีย์บอร์ดที่ต้องการ"
                           >
-                            {shortcutKeyMap[button.key] ?? button.kbd}
+                            {(shortcutKeyMap[button.key] ?? button.kbd) || "ตั้งปุ่ม"}
                           </button>
                           <button
                             className={`toggle ${!hidden ? "on" : ""}`}

@@ -108,6 +108,28 @@ try {
   await discard.dispose();
   await page.waitForFunction(() => !document.querySelector('.stock-receive-modal'));
   assert.equal(await page.evaluate(() => [...document.querySelectorAll('.pos-rail button')].some(button => button.textContent.includes('จัดการบัตร'))), false, 'POS rail must not show the redundant card-management shortcut');
+  assert.equal(await page.evaluate(() => [...document.querySelectorAll('.pos-rail button')].some(button => button.textContent.includes('คืนบัตร'))), true, 'POS rail must show the return-card shortcut');
+  await page.click('.rail-card');
+  await page.waitForSelector('.member-selection-modal');
+  assert.ok((await page.$eval('.member-selection-modal', node => node.textContent)).includes('เลือกสมาชิกเพื่อคืนบัตร'));
+  await page.click('.member-selection-modal .modal-heading button');
+  await page.waitForFunction(() => !document.querySelector('.member-selection-modal'));
+  await page.click('.rail-exit');
+  await page.waitForSelector('button[data-nav-item="settings"]', { visible: true });
+  const settings = await page.evaluateHandle(() => [...document.querySelectorAll('button[data-nav-item="settings"]')].find(button => button.getClientRects().length));
+  assert.ok(settings.asElement(), 'Visible settings navigation must be available');
+  await settings.asElement().click();
+  await settings.dispose();
+  await page.waitForSelector('.settings-layout');
+  await page.evaluate(() => [...document.querySelectorAll('.settings-nav button')].find(button => button.textContent.includes('เมนูลัดหน้าร้าน')).click());
+  await page.waitForFunction(() => [...document.querySelectorAll('.pos-rail-manage-row')].some(row => row.textContent.includes('คืนบัตร')));
+  const returnCardSetting = await page.evaluate(() => {
+    const row = [...document.querySelectorAll('.pos-rail-manage-row')].find(node => node.textContent.includes('คืนบัตร'));
+    const keyControl = row?.querySelector('.pos-rail-key-input');
+    return row ? { text: row.textContent, keyText: keyControl?.textContent?.trim() ?? '', width: row.getBoundingClientRect().width, scrollWidth: row.scrollWidth } : null;
+  });
+  assert.ok(returnCardSetting?.keyText, 'Return-card setting must include a keyboard shortcut control');
+  assert.ok(returnCardSetting.scrollWidth <= returnCardSetting.width + 1, 'Return-card setting row must not overflow');
   assert.deepEqual(errors, []);
   console.log('SEARCH_INPUT_PASS', dir);
 } finally {

@@ -31,6 +31,7 @@ import {
   StockReceive,
   Pause,
   Plus,
+  RotateCcw,
   ScanLine,
   Search,
   Settings2,
@@ -538,7 +539,7 @@ export function AppShell({
             </button>
           )}
           </div> : null}
-          {!railHidden.has("deposit") || !railHidden.has("withdraw") || !railHidden.has("register") ? <div className="pos-rail-group"><span className="pos-rail-group-label">งานสมาชิก</span>
+          {!railHidden.has("deposit") || !railHidden.has("withdraw") || !railHidden.has("card") || !railHidden.has("register") ? <div className="pos-rail-group"><span className="pos-rail-group-label">งานสมาชิก</span>
           {!railHidden.has("deposit") && (
             <button
               type="button"
@@ -565,6 +566,22 @@ export function AppShell({
               <ArrowUpFromLine size={20} />
               <b>ถอนเงิน</b>
               <kbd>{shortcutLabel("withdraw", "F3")}</kbd>
+            </button>
+          )}
+          {!railHidden.has("card") && (
+            <button
+              type="button"
+              className="rail-btn rail-card"
+              title={`รับบัตรคืนจากสมาชิกและคืนเงินคงเหลือทั้งหมด${shortcutLabel("card") ? ` (${shortcutLabel("card")})` : ""}`}
+              onClick={() =>
+                window.dispatchEvent(
+                  new CustomEvent("pos-rail", { detail: "card" })
+                )
+              }
+            >
+              <RotateCcw size={20} />
+              <b>คืนบัตร</b>
+              {shortcutLabel("card") && <kbd>{shortcutLabel("card")}</kbd>}
             </button>
           )}
           {!railHidden.has("register") && (
