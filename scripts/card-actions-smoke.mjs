@@ -121,16 +121,16 @@ try {
   assert.equal(inventoryDb.prepare('SELECT status FROM physical_cards WHERE card_number=?').get('EXTERNAL-123456').status, 'blank');
   inventoryDb.close();
   await page.screenshot({ path: path.join(dir, 'card-inventory.png'), fullPage: true });
-  const openMember = async () => {
+  const openMember = async (action = 'คืนบัตร') => {
     await page.click('[data-nav-item=members]');
     await click('รายการสมาชิก');
     await page.waitForSelector('[aria-label="รายการสมาชิก"]');
     await page.waitForFunction(number => [...document.querySelectorAll('[aria-label="รายการสมาชิก"] tbody tr')].some(r => r.textContent.includes(number)), {}, member.memberNumber);
     const row = await page.evaluateHandle(number => [...document.querySelectorAll('[aria-label="รายการสมาชิก"] tbody tr')].find(r => r.textContent.includes(number)), member.memberNumber);
     await row.asElement().click(); await row.dispose();
-    await click('ขอลดวงเงิน');
+    await click('จัดการบัตร');
     await page.waitForSelector(dialog);
-    if (await page.evaluate(scope => [...document.querySelectorAll(scope + ' button')].some(b => b.textContent.trim() === 'คืนบัตร'), dialog)) await click('คืนบัตร', dialog);
+    if (await page.evaluate((scope, action) => [...document.querySelectorAll(scope + ' button')].some(b => b.textContent.trim() === action), dialog, action)) await click(action, dialog);
   };
   const submit = async () => {
     await page.waitForFunction(scope => ![...document.querySelector(scope).querySelectorAll('button')].find(b => b.textContent.trim() === 'ตรวจสอบ')?.disabled, {}, dialog);
@@ -138,12 +138,20 @@ try {
     await click('ยืนยัน', dialog);
     await page.waitForFunction(scope => !document.querySelector(scope), {}, dialog);
   };
-  await openMember();
+  await openMember('เปลี่ยนบัตร');
   assert.equal(await page.evaluate(scope => document.querySelector(scope).textContent.includes('???????????'), dialog), false);
+  await page.type(dialog + ' input', codes[1]);
   await submit();
   let check = new DatabaseSync(target, { readOnly: true });
-  assert.deepEqual({ ...check.prepare('SELECT balance, card_number FROM members WHERE member_number=?').get(member.memberNumber) }, { balance: 0, card_number: null });
+  assert.deepEqual({ ...check.prepare('SELECT balance, card_number FROM members WHERE member_number=?').get(member.memberNumber) }, { balance: 45, card_number: codes[1] });
+  assert.equal(check.prepare('SELECT status FROM physical_cards WHERE card_number=?').get(codes[0]).status, 'returned_vacant');
   assert.ok(check.prepare('SELECT ended_at FROM card_usage_sessions WHERE id=?').get(initialRound).ended_at);
+  check.close();
+  await page.reload({ waitUntil: 'networkidle2' });
+  await openMember();
+  await submit();
+  check = new DatabaseSync(target, { readOnly: true });
+  assert.deepEqual({ ...check.prepare('SELECT balance, card_number FROM members WHERE member_number=?').get(member.memberNumber) }, { balance: 0, card_number: null });
   check.close();
   await page.reload({ waitUntil: 'networkidle2' });
   await openMember();
@@ -163,7 +171,7 @@ try {
   check.close();
   assert.deepEqual(errors, []);
   await page.screenshot({ path: path.join(dir, 'card-actions.png'), fullPage: true });
-  fs.writeFileSync(path.join(dir, 'results.json'), JSON.stringify({ passed: true, memberNumber: member.memberNumber, cases: ['generate two batches with continuous numbering', 'register external card code', 'generated card status and creator', 'full refund before releasing card', 'assign generated card to existing member', 'reload persistence', 'refund and return', 'integrity check'], errors }, null, 2));
+  fs.writeFileSync(path.join(dir, 'results.json'), JSON.stringify({ passed: true, memberNumber: member.memberNumber, cases: ['generate two batches with continuous numbering', 'register external card code', 'generated card status and creator', 'replace card while preserving balance', 'full refund before releasing card', 'assign generated card to existing member', 'reload persistence', 'refund and return', 'integrity check'], errors }, null, 2));
   console.log('PASS: browser submissions and database reconciliation; evidence: ' + dir);
 } finally {
   if (browser) await browser.close();

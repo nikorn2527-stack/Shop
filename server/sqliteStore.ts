@@ -81,6 +81,8 @@ export type SqliteMemberSummary = {
   creditLimit: number | null;
   /** ROUND 65 — รหัสบัตรเงินสด / รหัสผู้ป่วย (แสดงในรายการและรายงานยอดเงินในบัตร) */
   cardNumber: string | null;
+  /** 1 เมื่อบัตรยัง assigned ให้สมาชิกรายนี้และมีรอบใช้งานที่ยังไม่ปิด */
+  cardUsable: number;
   patientCode: string | null;
 };
 
@@ -916,7 +918,6 @@ export function assignMemberCard(db: SqliteDb, input: {
     if (!member) throw new StoreError("ไม่พบสมาชิก");
     if (member.status !== "active") throw new StoreError("สมาชิกถูกระงับการใช้งาน");
     if ((member.cardNumber || null) !== input.expectedCardNumber) throw new StoreError("บัตรสมาชิกมีการเปลี่ยนแปลง กรุณาโหลดข้อมูลใหม่");
-    if (member.cardNumber) throw new StoreError("กรุณาคืนเงินและคืนบัตรเดิมก่อนจ่ายบัตรใหม่");
     if (member.cardNumber === input.cardNumber.trim()) throw new StoreError("กรุณาเลือกบัตรใบใหม่");
     if (member.cardNumber) {
       const session = db.prepare(`SELECT id FROM card_usage_sessions WHERE card_number = ? AND member_number = ? AND ended_at IS NULL`).get(member.cardNumber, input.memberNumber) as { id: number } | undefined;
@@ -2515,7 +2516,16 @@ export function listMembers(db: SqliteDb, search?: string, status?: "active" | "
     params.push(status);
   }
   const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
-  return db.prepare(`SELECT m.id, m.member_number AS memberNumber, m.prename AS prename, m.first_name AS firstName, m.last_name AS lastName, m.type, m.balance, m.status, m.created_at AS createdAt, m.photo_url AS photoUrl, m.gender, m.credit_limit AS creditLimit, m.card_number AS cardNumber, m.patient_code AS patientCode, (SELECT MAX(t.created_at) FROM member_transactions t WHERE t.member_number = m.member_number) AS lastTransactionAt FROM members m${where} ORDER BY m.member_number`).all(...params) as unknown as SqliteMemberSummary[];
+  return db.prepare(`SELECT m.id, m.member_number AS memberNumber, m.prename AS prename, m.first_name AS firstName, m.last_name AS lastName, m.type, m.balance, m.status, m.created_at AS createdAt, m.photo_url AS photoUrl, m.gender, m.credit_limit AS creditLimit, m.card_number AS cardNumber, m.patient_code AS patientCode,
+    CASE WHEN m.status = 'active' AND m.account_closed = 0 AND EXISTS (
+      SELECT 1 FROM physical_cards pc
+      JOIN card_usage_sessions cs ON cs.card_number = pc.card_number
+        AND cs.member_number = m.member_number AND cs.ended_at IS NULL
+      WHERE pc.card_number = m.card_number AND pc.archived_at IS NULL
+        AND pc.status = 'assigned' AND pc.assigned_member_number = m.member_number
+    ) THEN 1 ELSE 0 END AS cardUsable,
+    (SELECT MAX(t.created_at) FROM member_transactions t WHERE t.member_number = m.member_number) AS lastTransactionAt
+    FROM members m${where} ORDER BY m.member_number`).all(...params) as unknown as SqliteMemberSummary[];
 }
 
 function nextMemberSequence(db: SqliteDb, prefix: string) {

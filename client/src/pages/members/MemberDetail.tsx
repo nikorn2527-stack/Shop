@@ -9,6 +9,7 @@ import {
   Camera,
   Check,
   CircleHelp,
+  CreditCard,
   Download,
   FileImage,
   FileText,
@@ -493,9 +494,17 @@ export function MemberDetail({
           <button
             className="outline-button"
             onClick={openLimitDialog}
-            title="คืนเงินทั้งหมดโดยยังไม่รับบัตรคืน"
+            title="ส่งคำขอลดวงเงินซื้อสินค้าต่อวัน"
           >
             <TrendingDown size={15} /> ขอลดวงเงิน
+          </button>
+          <button
+            className="outline-button"
+            disabled={profile.status !== "active"}
+            onClick={() => setCardActionsOpen(true)}
+            title="จ่าย เปลี่ยน คืนบัตร หรือปิดรอบบัญชี"
+          >
+            <CreditCard size={15} /> จัดการบัตร
           </button>
           {profile.status === "active" ? (
             <button

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { assignMemberCard, checkout, createProduct, receiveStockLines, voidSale } from "./sqliteStore";
 import { generateBlankCards, previewGeneratedCards } from "./sqliteStore";
 import { returnMemberCard, closeMemberAccount } from "./sqliteStore";
-import { createSqliteStore, createBlankCards, registerMember, releasePhysicalCard, listPhysicalCards, markPhysicalCard, getMemberDetail, setSettings, setMemberNumberMode, bindExistingMembersToDemoCards, cardUsageHistory, walletTx, setMemberStatus } from "./sqliteStore";
+import { createSqliteStore, createBlankCards, registerMember, releasePhysicalCard, listPhysicalCards, listMembers, markPhysicalCard, getMemberDetail, setSettings, setMemberNumberMode, bindExistingMembersToDemoCards, cardUsageHistory, walletTx, setMemberStatus } from "./sqliteStore";
 
 describe("reusable physical cards", () => {
   it("closes the account before physical return without releasing the card or refunding twice", () => {
@@ -43,6 +43,21 @@ describe("reusable physical cards", () => {
       expect(cardUsageHistory(db, "TOPUP-NEXT").sessions[0].incoming).toBe(100);
       db.prepare("UPDATE physical_cards SET status = 'lost' WHERE card_number = 'TOPUP-NEXT'").run();
       expect(() => walletTx(db, { memberNumber: member.memberNumber, type: "deposit", amount: 5 })).toThrow("บัตรไม่พร้อมใช้งาน");
+    } finally { db.close(); }
+  });
+  it("reports card usability from the same member list used by POS", () => {
+    const db = createSqliteStore();
+    try {
+      createBlankCards(db, ["SUMMARY-CARD"]);
+      const member = registerMember(db, { firstName: "Summary", lastName: "Card", cardNumber: "SUMMARY-CARD" }).member;
+      expect(listMembers(db).find(row => row.memberNumber === member.memberNumber)?.cardUsable).toBe(1);
+
+      db.prepare("UPDATE physical_cards SET status = 'lost' WHERE card_number = ?").run("SUMMARY-CARD");
+      expect(listMembers(db).find(row => row.memberNumber === member.memberNumber)?.cardUsable).toBe(0);
+
+      db.prepare("UPDATE physical_cards SET status = 'assigned' WHERE card_number = ?").run("SUMMARY-CARD");
+      db.prepare("UPDATE card_usage_sessions SET ended_at = CURRENT_TIMESTAMP WHERE card_number = ? AND ended_at IS NULL").run("SUMMARY-CARD");
+      expect(listMembers(db).find(row => row.memberNumber === member.memberNumber)?.cardUsable).toBe(0);
     } finally { db.close(); }
   });
   it("requires a usable assigned card for member transactions but keeps refund recovery available", () => {
@@ -157,11 +172,12 @@ describe("reusable physical cards", () => {
       expect(() => assignMemberCard(db, { ...input, cardNumber: "BUSY" })).toThrow();
       expect(getMemberDetail(db, member.memberNumber)?.member.cardNumber).toBe("OLD");
       expect(cardUsageHistory(db, "OLD").sessions[0].endedAt).toBeNull();
-      expect(() => assignMemberCard(db, { ...input, cardNumber: "NEW", previousCardStatus: "lost" })).toThrow();
-      expect(getMemberDetail(db, member.memberNumber)?.member).toMatchObject({ balance: 100, cardNumber: "OLD" });
-      returnMemberCard(db, { memberNumber: member.memberNumber, cardNumber: "OLD", expectedSessionId: session.id, mode: "refund", actor: "Staff" });
-      assignMemberCard(db, { memberNumber: member.memberNumber, expectedCardNumber: null, cardNumber: "NEW", actor: "Staff" });
-      expect(getMemberDetail(db, member.memberNumber)?.member).toMatchObject({ balance: 0, cardNumber: "NEW" });
+      assignMemberCard(db, { ...input, cardNumber: "NEW" });
+      expect(getMemberDetail(db, member.memberNumber)?.member).toMatchObject({ balance: 100, cardNumber: "NEW" });
+      expect(listPhysicalCards(db).find(card => card.cardNumber === "OLD")).toMatchObject({ status: "returned_vacant", assignedMemberNumber: null });
+      expect(cardUsageHistory(db, "OLD").sessions[0].endedAt).not.toBeNull();
+      expect(cardUsageHistory(db, "NEW").sessions[0]).toMatchObject({ memberNumber: member.memberNumber, endedAt: null });
+      expect(() => assignMemberCard(db, { ...input, cardNumber: "OLD" })).toThrow("เปลี่ยนแปลง");
     } finally { db.close(); }
   });
   it("simulates suspension, withdrawal, full refund, retry and reuse without mixing rounds", () => {

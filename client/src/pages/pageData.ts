@@ -44,6 +44,8 @@ export type MemberLite = {
   lastTransactionAt: string | null;
   /** ROUND 65 — รหัสบัตรเงินสด / รหัสผู้ป่วย (HN) · null/undefined = ยังไม่ผูก */
   cardNumber?: string | null;
+  /** true/1 เมื่อบัตรยังผูกกับสมาชิกและมีรอบใช้งานที่เปิดอยู่ */
+  cardUsable?: boolean | number;
   patientCode?: string | null;
   /** วันที่ลงทะเบียน (วันที่เปิดใช้บัตร) — มีเฉพาะข้อมูลจาก member.detail */
   createdAt?: string | null;

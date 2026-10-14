@@ -475,9 +475,10 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
       focusScan();
       return;
     }
-    if (!member.cardNumber) {
-      setError(`สมาชิก ${member.memberNumber} ยังไม่มีบัตรที่พร้อมใช้งาน`);
-      blocker.warning("สมาชิกยังไม่มีบัตร", `${memberFullName(member)} ต้องได้รับบัตรก่อนผูกกับบิลหรือทำธุรกรรมสมาชิก`);
+    if (!member.cardNumber || !member.cardUsable) {
+      const hasCardNumber = Boolean(member.cardNumber);
+      setError(hasCardNumber ? `บัตรของสมาชิก ${member.memberNumber} ไม่พร้อมใช้งาน` : `สมาชิก ${member.memberNumber} ยังไม่มีบัตรที่พร้อมใช้งาน`);
+      blocker.warning(hasCardNumber ? "บัตรสมาชิกไม่พร้อมใช้งาน" : "สมาชิกยังไม่มีบัตร", hasCardNumber ? `${memberFullName(member)} มีเลขบัตรอยู่ แต่สถานะบัตรหรือรอบใช้งานไม่ถูกต้อง กรุณาตรวจสอบและจ่ายบัตรใหม่` : `${memberFullName(member)} ต้องได้รับบัตรก่อนผูกกับบิลหรือทำธุรกรรมสมาชิก`);
       setCardActionMember(member);
       setCardIntent("bill");
       setCardActionsOpen(true);
@@ -491,11 +492,17 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
   };
   // หลังจ่ายบัตรให้สมาชิกเดิมสำเร็จ — เดินหน้าต่อจากจุดที่ค้างไว้ทันที
   // ไม่ให้พนักงานต้องมาคิดเองว่าต้องทำอะไรต่อ
-  const onCardActionSuccess = async () => {
+  const onCardActionSuccess = async (completedAction: "assign" | "replace" | "return" | "close") => {
     const memberNumber = cardActionMember?.memberNumber;
     const intent = cardIntent;
     setCardIntent(null);
     if (!memberNumber) { toast.success("จัดการบัตรเรียบร้อยแล้ว"); return; }
+    if (completedAction !== "assign" && completedAction !== "replace") {
+      setSelectedMemberNumber((current) => current === memberNumber ? null : current);
+      toast.success(completedAction === "return" ? "คืนบัตรเรียบร้อยแล้ว" : "ปิดรอบบัญชีและคืนเงินแล้ว");
+      focusScan();
+      return;
+    }
     await utils.member.list.invalidate();
     const freshList = await utils.member.list.fetch();
     const fresh = freshList.find((member) => member.memberNumber === memberNumber);
@@ -753,6 +760,14 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
       blocker.warning("เลือกสมาชิกก่อน", "สแกนบัตรหรือค้นหาสมาชิกที่ช่องด้านบน ตะกร้าปัจจุบันจะไม่หาย");
       return;
     }
+    if (method === "หักบัญชีสมาชิก" && selectedMember && !selectedMember.cardUsable) {
+      setError("บัตรสมาชิกไม่พร้อมใช้งาน กรุณาตรวจสอบหรือจ่ายบัตรใหม่ก่อนชำระ");
+      blocker.warning("บัตรสมาชิกไม่พร้อมใช้งาน", `${memberFullName(selectedMember)} ยังชำระแบบหักบัญชีไม่ได้ กรุณาตรวจสอบสถานะบัตรหรือจ่ายบัตรใหม่ ตะกร้าปัจจุบันจะไม่หาย`);
+      setCardActionMember(selectedMember);
+      setCardIntent("bill");
+      setCardActionsOpen(true);
+      return;
+    }
     if (discountValue > subtotal) {
       setError("ส่วนลดมากกว่ายอดรวมสินค้า");
       blocker.warning("ส่วนลดมากกว่ายอดรวมสินค้า", "ปรับส่วนลดให้ไม่เกินยอดรวม แล้วชำระเงินใหม่ได้เลย");
@@ -814,9 +829,10 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
     const memberNumber = walletMemberNumber || selectedMemberNumber;
     if (!memberNumber) { setError("เลือกสมาชิกก่อนบันทึกรายการ"); blocker.warning("ยังไม่ได้เลือกสมาชิก", "ยิงบัตรสมาชิกที่ช่องด้านบน หรือเลือกจากรายการก่อนบันทึกรายการ"); return; }
     const target = members.find(member => member.memberNumber === memberNumber);
-    if (!target?.cardNumber) {
-      setError("สมาชิกยังไม่มีบัตร กรุณาจ่ายบัตรก่อนทำรายการ");
-      blocker.warning("กรุณาจ่ายบัตรก่อน", "เติมหรือถอนเงินได้เมื่อสมาชิกมีบัตรที่ผูกและพร้อมใช้งานแล้ว");
+    if (!target?.cardNumber || !target.cardUsable) {
+      const hasCardNumber = Boolean(target?.cardNumber);
+      setError(hasCardNumber ? "บัตรสมาชิกไม่พร้อมใช้งาน กรุณาตรวจสอบหรือจ่ายบัตรใหม่" : "สมาชิกยังไม่มีบัตร กรุณาจ่ายบัตรก่อนทำรายการ");
+      blocker.warning(hasCardNumber ? "บัตรสมาชิกไม่พร้อมใช้งาน" : "กรุณาจ่ายบัตรก่อน", hasCardNumber ? "บัตรที่ผูกอยู่ไม่มีสถานะหรือรอบใช้งานที่พร้อมทำรายการ กรุณาตรวจสอบและจ่ายบัตรใหม่" : "เติมหรือถอนเงินได้เมื่อสมาชิกมีบัตรที่ผูกและพร้อมใช้งานแล้ว");
       if (target) { setCardActionMember(target); setCardIntent("wallet"); setCardActionsOpen(true); }
       return;
     }
