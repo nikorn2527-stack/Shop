@@ -25,9 +25,14 @@ describe("member card workflow UI", () => {
     expect(modalSource).toContain('release.mutate({ ...input, mode: "refund" })');
   });
 
-  it("adds card numbers to reports", () => {
+  it("uses the agreed card and wallet terminology in reports", () => {
     const reportSource = readSource("./pages/reports/Reports.tsx");
 
-    expect(reportSource).toContain('"เลขบัตร"');
+    expect(reportSource).toContain('"เลขที่บัตร"');
+    expect(reportSource).toContain('withdrawal: "รายงานยอดแสดงการถอนเงิน"');
+    expect(reportSource).toContain('deposit: "รายงานยอดแสดงการเติมเงิน"');
+    expect(reportSource).toContain('refund: "รายงานยอดแสดงการคืนบัตรเงินสด"');
+    expect(reportSource).toContain('activation: "รายงานยอดแสดงการเปิดใช้บัตรเงินสด"');
+    expect(reportSource).not.toContain("ทุกสมาชิก · แสดง 300 รายการล่าสุด");
   });
 });

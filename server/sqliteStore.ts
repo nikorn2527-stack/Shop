@@ -3159,7 +3159,9 @@ export type MemberTransactionsInput = {
  */
 export function memberTransactions(db: SqliteDb, input: MemberTransactionsInput = {}): MemberTransactionRow[] {
   const memberNumber = input.memberNumber?.trim();
-  const limit = Math.max(1, Math.min(1000, Math.floor(input.limit ?? 300)));
+  const limit = input.limit === undefined
+    ? null
+    : Math.max(1, Math.min(1000, Math.floor(input.limit)));
   // ROUND 77 — เลือกหลายประเภทพร้อมกัน; ชุดว่าง = ทุกประเภทธุรกรรมเงินจริง
   const typeSet = new Set<string>([...(input.types ?? []), ...(input.type ? [input.type] : [])]);
   const conditions: string[] = [];
@@ -3185,6 +3187,7 @@ export function memberTransactions(db: SqliteDb, input: MemberTransactionsInput 
       params.push(`${input.to} 23:59:59`);
     }
   const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
+  const limitSql = limit === null ? "" : " LIMIT ?";
   const txRows = db.prepare(`SELECT t.id, t.member_number AS memberNumber,
     NULLIF(TRIM(m.first_name || ' ' || m.last_name), '') AS memberName,
     s.card_number AS cardNumber, m.patient_code AS patientCode, t.type, t.detail,
@@ -3193,7 +3196,7 @@ export function memberTransactions(db: SqliteDb, input: MemberTransactionsInput 
     FROM member_transactions t
     LEFT JOIN members m ON m.member_number = t.member_number
     LEFT JOIN card_usage_sessions s ON s.id = t.card_usage_session_id
-    ${where} ORDER BY t.created_at DESC, t.id DESC LIMIT ?`).all(...params, limit) as unknown as MemberTransactionRow[];
+    ${where} ORDER BY t.created_at DESC, t.id DESC${limitSql}`).all(...params, ...(limit === null ? [] : [limit])) as unknown as MemberTransactionRow[];
   return txRows.map((row) => ({ ...row, kind: "tx" as const }));
 }
 

@@ -130,8 +130,8 @@ const HOSPITAL_REPORT_PRESETS: { value: HospitalReportPreset; label: string }[] 
   { value: "standard", label: "รายงานมาตรฐาน" },
   { value: "sales", label: "รพ. 1 · รายงานการขายสินค้า" },
   { value: "balances", label: "รพ. 2 · ยอดเงินในบัตร" },
-  { value: "deposit", label: "รพ. 3 · เติมเงินบัตร" },
-  { value: "withdrawal", label: "รพ. 4 · ถอนเงินจากบัตร" },
+  { value: "deposit", label: "รพ. 3 · เติมเงินเข้าบัตรสมาชิก" },
+  { value: "withdrawal", label: "รพ. 4 · ถอนเงิน" },
   { value: "refund", label: "รพ. 5 · คืนบัตรเงินสด" },
   { value: "activation", label: "รพ. 6 · เปิดใช้บัตร" },
   { value: "stock", label: "รพ. 7 · สินค้าคงคลัง" },
@@ -479,7 +479,6 @@ export function Reports({
     types: txTypes.length > 0 ? txTypes : undefined,
     from: txFrom || undefined,
     to: txTo || undefined,
-    limit: 300,
   });
   const txRows = txQuery.data ?? [];
   // ROUND 65 — รายงานใหม่: ยอดเงินในบัตรทุกใบ + สินค้าคงคลังตามช่วงเวลา (ยอดยกมา/ยอดขาย/คงเหลือ)
@@ -1223,10 +1222,10 @@ export function Reports({
   };
   const hospitalTxPreset = hospitalPreset === "deposit" || hospitalPreset === "withdrawal" || hospitalPreset === "refund" || hospitalPreset === "activation";
   const hospitalTxTitle: Record<Exclude<HospitalReportPreset, "standard" | "sales" | "balances" | "stock">, string> = {
-    deposit: "รายงานการเติมเงินบัตรเงินสด",
-    withdrawal: "รายงานการถอนเงินจากบัตร",
-    refund: "รายงานการคืนบัตรเงินสด",
-    activation: "รายงานการเปิดใช้บัตรเงินสด",
+    deposit: "รายงานยอดแสดงการเติมเงิน",
+    withdrawal: "รายงานยอดแสดงการถอนเงิน",
+    refund: "รายงานยอดแสดงการคืนบัตรเงินสด",
+    activation: "รายงานยอดแสดงการเปิดใช้บัตรเงินสด",
   };
   const transactionDescription = (row: typeof txRows[number]) => {
     const label = TX_TYPE_LABEL[row.type];
@@ -1235,26 +1234,28 @@ export function Reports({
   };
   const txAmountForReport = (row: typeof txRows[number]) => hospitalTxPreset ? Math.abs(row.amount) : row.amount;
   const txExportRows = () => [
-    [
-      "วันที่ · เวลา",
-      "เลขบัตร",
-      "เลขสมาชิก",
-      "ชื่อสมาชิก",
-      ...(hospitalTxPreset ? [] : ["รายการ"]),
-      "ยอด (บาท)",
-      ...(hospitalTxPreset ? [] : ["คงเหลือ(บาท)"]),
-      "ผู้ทำรายการ",
-    ],
-    ...txRows.map(row => [
-      formatLogDateTime(row.createdAt),
-      row.cardNumber ?? "—",
-      row.memberNumber,
-      row.memberName ?? "—",
-      ...(hospitalTxPreset ? [] : [transactionDescription(row)]),
-      exportNumber(txAmountForReport(row)),
-      ...(hospitalTxPreset ? [] : [row.balanceAfter !== null ? exportNumber(row.balanceAfter) : "—"]),
-      row.actor ?? "ไม่ระบุ",
-    ]),
+    ...(hospitalTxPreset
+      ? [["วันที่ · เวลา", "เลขที่บัตร", "จำนวนเงิน (บาท)", "เลขสมาชิก", "ชื่อสมาชิก", "ผู้ทำรายการ"]]
+      : [["วันที่ · เวลา", "เลขที่บัตร", "เลขสมาชิก", "ชื่อสมาชิก", "รายการ", "ยอด (บาท)", "คงเหลือ (บาท)", "ผู้ทำรายการ"]]),
+    ...txRows.map(row => hospitalTxPreset
+      ? [
+          formatLogDateTime(row.createdAt),
+          row.cardNumber ?? "—",
+          exportNumber(txAmountForReport(row)),
+          row.memberNumber,
+          row.memberName ?? "—",
+          row.actor ?? "ไม่ระบุ",
+        ]
+      : [
+          formatLogDateTime(row.createdAt),
+          row.cardNumber ?? "—",
+          row.memberNumber,
+          row.memberName ?? "—",
+          transactionDescription(row),
+          exportNumber(txAmountForReport(row)),
+          row.balanceAfter !== null ? exportNumber(row.balanceAfter) : "—",
+          row.actor ?? "ไม่ระบุ",
+        ]),
   ];
   const txExportBase = txMember
     ? `member-transactions-${txMember.memberNumber}`
@@ -1264,7 +1265,7 @@ export function Reports({
     title: hospitalTxPreset ? hospitalTxTitle[hospitalPreset] : "รายงานประวัติธุรกรรมสมาชิก",
     periodLabel: txMember
       ? `สมาชิก ${txMember.memberNumber} · สมาชิก${txMember.firstName} ${txMember.lastName}`
-      : "ทุกสมาชิก · แสดง 300 รายการล่าสุด",
+      : "ทุกสมาชิก",
     meta: [
       [
         "ชนิดธุรกรรม",
@@ -1281,19 +1282,28 @@ export function Reports({
       ["จำนวนรายการ", `${txRows.length} รายการ`],
     ],
     columns: hospitalTxPreset
-      ? ["วันที่ · เวลา", "เลขบัตร", "เลขสมาชิก", "ชื่อสมาชิก", "ยอด (บาท)", "ผู้ทำรายการ"]
-      : ["วันที่ · เวลา", "เลขบัตร", "เลขสมาชิก", "ชื่อสมาชิก", "รายการ", "ยอด (บาท)", "คงเหลือ(บาท)", "ผู้ทำรายการ"],
-    numericCols: hospitalTxPreset ? [4] : [5, 6],
-    rows: txRows.map(row => [
-      formatLogDateTime(row.createdAt),
-      row.cardNumber ?? "—",
-      row.memberNumber,
-      row.memberName ?? "—",
-      ...(hospitalTxPreset ? [] : [transactionDescription(row)]),
-      exportNumber(txAmountForReport(row)),
-      ...(hospitalTxPreset ? [] : [row.balanceAfter !== null ? exportNumber(row.balanceAfter) : "—"]),
-      row.actor ?? "ไม่ระบุ",
-    ]),
+      ? ["วันที่ · เวลา", "เลขที่บัตร", "จำนวนเงิน (บาท)", "เลขสมาชิก", "ชื่อสมาชิก", "ผู้ทำรายการ"]
+      : ["วันที่ · เวลา", "เลขที่บัตร", "เลขสมาชิก", "ชื่อสมาชิก", "รายการ", "ยอด (บาท)", "คงเหลือ (บาท)", "ผู้ทำรายการ"],
+    numericCols: hospitalTxPreset ? [2] : [5, 6],
+    rows: txRows.map(row => hospitalTxPreset
+      ? [
+          formatLogDateTime(row.createdAt),
+          row.cardNumber ?? "—",
+          exportNumber(txAmountForReport(row)),
+          row.memberNumber,
+          row.memberName ?? "—",
+          row.actor ?? "ไม่ระบุ",
+        ]
+      : [
+          formatLogDateTime(row.createdAt),
+          row.cardNumber ?? "—",
+          row.memberNumber,
+          row.memberName ?? "—",
+          transactionDescription(row),
+          exportNumber(txAmountForReport(row)),
+          row.balanceAfter !== null ? exportNumber(row.balanceAfter) : "—",
+          row.actor ?? "ไม่ระบุ",
+        ]),
     // Summarize the filtered transactions below the document table.
     summaryBlocks: hospitalTxPreset ? [["จำนวนรายการ", `${exportCount(txRows.length)} รายการ`], ["ยอดรวม", exportNumber(txRows.reduce((sum, row) => sum + Math.abs(row.amount), 0))]] : [
       [
@@ -1322,10 +1332,10 @@ export function Reports({
       ],
     ],
     totalsRow: hospitalTxPreset
-      ? [`รวม ${exportCount(txRows.length)} รายการ`, "", "", "", exportNumber(txRows.reduce((sum, row) => sum + Math.abs(row.amount), 0)), ""]
+      ? [`รวม ${exportCount(txRows.length)} รายการ`, "", exportNumber(txRows.reduce((sum, row) => sum + Math.abs(row.amount), 0)), "", "", ""]
       : [`รวมทั้งหมด ${txRows.length} รายการ`, "", "", "", "", exportNumber(txRows.reduce((sum, row) => sum + row.amount, 0)), "", ""],
     brandName: "ร้านค้าสวัสดิการ",
-    compact: true, // ตาราง 10 คอลัมน์ — ลดขนาดตามฟอร์มให้อยู่บรรทัดเดียว
+    compact: !hospitalTxPreset,
   });
   const openTxExportPreview = async (preferred?: ExportFormat, direct = false) => {
     if (txRows.length === 0) {
@@ -2899,18 +2909,41 @@ export function Reports({
                     aria-label="ประวัติธุรกรรมสมาชิก"
                   >
                     <thead>
-                      <tr>
-                        <th>วันที่ · เวลา</th>
-                        <th>เลขบัตร</th>
-                        <th>สมาชิก / เลขสมาชิก</th>
-                        <th>รายการ</th>
-                        <th className="num">ยอดเคลื่อน</th>
-                        <th className="num hide-sm">คงเหลือ(บาท)</th>
-                        <th className="hide-sm">ผู้ทำรายการ</th>
-                      </tr>
+                      {hospitalTxPreset ? (
+                        <tr>
+                          <th>วันที่ · เวลา</th>
+                          <th>เลขที่บัตร</th>
+                          <th className="num">จำนวนเงิน</th>
+                          <th>เลขสมาชิก</th>
+                          <th>ชื่อสมาชิก</th>
+                          <th>ผู้ทำรายการ</th>
+                        </tr>
+                      ) : (
+                        <tr>
+                          <th>วันที่ · เวลา</th>
+                          <th>เลขที่บัตร</th>
+                          <th>สมาชิก / เลขสมาชิก</th>
+                          <th>รายการ</th>
+                          <th className="num">ยอดเคลื่อน</th>
+                          <th className="num hide-sm">คงเหลือ (บาท)</th>
+                          <th className="hide-sm">ผู้ทำรายการ</th>
+                        </tr>
+                      )}
                     </thead>
                     <tbody>
                       {txRows.map(row => {
+                        if (hospitalTxPreset) {
+                          return (
+                            <tr key={row.id}>
+                              <td><small className="cell-sub" style={{ marginTop: 0 }}>{formatLogDateTime(row.createdAt)}</small></td>
+                              <td><small className="cell-mono" style={{ marginTop: 0 }}>{row.cardNumber ?? "—"}</small></td>
+                              <td className="num cell-mono"><strong>{money(Math.abs(row.amount))}</strong></td>
+                              <td><small className="cell-mono" style={{ marginTop: 0 }}>{row.memberNumber}</small></td>
+                              <td><span className="cell-strong">{row.memberName ?? "—"}</span></td>
+                              <td><small className="cell-sub" style={{ marginTop: 0 }}>{row.actor ?? "ไม่ระบุ"}</small></td>
+                            </tr>
+                          );
+                        }
                         return (
                           <tr
                             key={row.id}

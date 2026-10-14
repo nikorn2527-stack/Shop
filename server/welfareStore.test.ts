@@ -32,6 +32,7 @@ import {
   listStockRows,
   loginLockRemainingMinutes,
   memberBalances,
+  memberTransactions,
   memberSpendingStats,
   stockBalanceReport,
   walletTx,
@@ -591,6 +592,18 @@ describe("member registration numbering", () => {
     expect(other.totalIn).toBe(300);
     expect(other.totalOut).toBe(0);
     expect(other.balance).toBe(300);
+  });
+
+  it("returns the complete member transaction log unless a caller explicitly sets a limit", () => {
+    const database = freshDb();
+    const detail = registerMember(database, { firstName: "ทดสอบ", lastName: "รายการย้อนหลัง" });
+    const insert = database.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, actor, created_at) VALUES (?, 'deposit', 'เติมเงิน', 1, 'เงินสด', 1, 'เจ้าหน้าที่ทดสอบ', ?)`);
+    for (let index = 0; index < 305; index += 1) {
+      insert.run(detail.member.memberNumber, `2026-10-14 10:${String(Math.floor(index / 60)).padStart(2, "0")}:${String(index % 60).padStart(2, "0")}`);
+    }
+
+    expect(memberTransactions(database, { memberNumber: detail.member.memberNumber })).toHaveLength(305);
+    expect(memberTransactions(database, { memberNumber: detail.member.memberNumber, limit: 25 })).toHaveLength(25);
   });
 
   it("ROUND 65 — รายงานสินค้าคงคลัง: ยอดยกมา = คงเหลือ + ขายในช่วง − รับเข้าในช่วง", () => {
