@@ -1227,12 +1227,16 @@ export function Reports({
     refund: "รายงานยอดแสดงการคืนบัตรเงินสด",
     activation: "รายงานยอดแสดงการเปิดใช้บัตรเงินสด",
   };
-  const transactionDescription = (row: typeof txRows[number]) => {
-    const label = TX_TYPE_LABEL[row.type];
-    const detail = (row.detail || "").trim();
-    return !detail || detail === label ? label : detail.startsWith(label) ? detail : `${label} · ${detail}`;
-  };
+  const transactionLabel = (row: typeof txRows[number]) => TX_TYPE_LABEL[row.type];
   const txAmountForReport = (row: typeof txRows[number]) => hospitalTxPreset ? Math.abs(row.amount) : row.amount;
+  const txSummaryByType = [
+    { type: "deposit" as const, label: "เติมเงิน", amount: Math.abs(txTotals.deposit), count: txTotals.depositCount, sign: "+" as const },
+    { type: "withdrawal" as const, label: "ถอนเงิน", amount: Math.abs(txTotals.withdraw), count: txTotals.withdrawCount, sign: "-" as const },
+    { type: "purchase" as const, label: "ใช้จ่าย", amount: Math.abs(txTotals.spend), count: txTotals.spendCount, sign: "-" as const },
+    { type: "activation" as const, label: "เปิดใช้บัตร", amount: Math.abs(txTotals.activation), count: txTotals.activationCount, sign: "+" as const },
+    { type: "refund" as const, label: "คืนบัตรเงินสด", amount: Math.abs(txTotals.refund), count: txTotals.refundCount, sign: "-" as const },
+  ];
+  const visibleTxSummary = txSummaryByType.filter(item => txTypes.length === 0 || txTypes.includes(item.type));
   const txExportRows = () => [
     ...(hospitalTxPreset
       ? [["วันที่ · เวลา", "เลขที่บัตร", "จำนวนเงิน (บาท)", "เลขสมาชิก", "ชื่อสมาชิก", "ผู้ทำรายการ"]]
@@ -1251,7 +1255,7 @@ export function Reports({
           row.cardNumber ?? "—",
           row.memberNumber,
           row.memberName ?? "—",
-          transactionDescription(row),
+          transactionLabel(row),
           exportNumber(txAmountForReport(row)),
           row.balanceAfter !== null ? exportNumber(row.balanceAfter) : "—",
           row.actor ?? "ไม่ระบุ",
@@ -1284,6 +1288,10 @@ export function Reports({
     columns: hospitalTxPreset
       ? ["วันที่ · เวลา", "เลขที่บัตร", "จำนวนเงิน (บาท)", "เลขสมาชิก", "ชื่อสมาชิก", "ผู้ทำรายการ"]
       : ["วันที่ · เวลา", "เลขที่บัตร", "เลขสมาชิก", "ชื่อสมาชิก", "รายการ", "ยอด (บาท)", "คงเหลือ (บาท)", "ผู้ทำรายการ"],
+    columnWidths: hospitalTxPreset
+      ? ["16%", "16%", "15%", "15%", "19%", "19%"]
+      : ["14%", "13%", "12%", "14%", "9%", "10%", "12%", "16%"],
+    nowrapCols: hospitalTxPreset ? [0, 1, 2, 3] : [0, 1, 2, 4, 5, 6],
     numericCols: hospitalTxPreset ? [2] : [5, 6],
     rows: txRows.map(row => hospitalTxPreset
       ? [
@@ -1299,33 +1307,14 @@ export function Reports({
           row.cardNumber ?? "—",
           row.memberNumber,
           row.memberName ?? "—",
-          transactionDescription(row),
+          transactionLabel(row),
           exportNumber(txAmountForReport(row)),
           row.balanceAfter !== null ? exportNumber(row.balanceAfter) : "—",
           row.actor ?? "ไม่ระบุ",
         ]),
     // Summarize the filtered transactions below the document table.
     summaryBlocks: hospitalTxPreset ? [["จำนวนรายการ", `${exportCount(txRows.length)} รายการ`], ["ยอดรวม", exportNumber(txRows.reduce((sum, row) => sum + Math.abs(row.amount), 0))]] : [
-      [
-        "เติมเงิน",
-        `+${exportNumber(txTotals.deposit)} · ${exportCount(txTotals.depositCount)} รายการ`,
-      ],
-      [
-        "ถอนเงิน",
-        `-${exportNumber(txTotals.withdraw)} · ${exportCount(txTotals.withdrawCount)} รายการ`,
-      ],
-      [
-        "ซื้อสินค้า",
-        `-${exportNumber(txTotals.spend)} · ${exportCount(txTotals.spendCount)} รายการ`,
-      ],
-      [
-        "เปิดใช้บัตร",
-        `+${exportNumber(txTotals.activation)} · ${exportCount(txTotals.activationCount)} รายการ`,
-      ],
-      [
-        "คืนเงิน",
-        `+${exportNumber(txTotals.refund)} · ${exportCount(txTotals.refundCount)} รายการ`,
-      ],
+      ...visibleTxSummary.map(item => [item.label, `${item.sign}${exportNumber(item.amount)} · ${exportCount(item.count)} รายการ`] as [string, string]),
       [
         "ยอดสุทธิ",
         exportNumber(txRows.reduce((sum, row) => sum + row.amount, 0)),
@@ -2968,7 +2957,7 @@ export function Reports({
                               </small>
                             </td>
                             <td>
-                              <span className="tx-detail">{transactionDescription(row)}</span>
+                              <span className="tx-detail">{transactionLabel(row)}</span>
                             </td>
                             <td className="num">
                               <span
@@ -3003,41 +2992,15 @@ export function Reports({
                 )}
               </div>
               <div className="report-summary-footer">
-                <div>
-                  <small>ใช้จ่ายรวม</small>
-                  <strong className="red-text">
-                    −{money(Math.abs(txTotals.spend))}
-                  </strong>
-                  <span>{txTotals.spendCount} รายการ</span>
-                </div>
-                <div>
-                  <small>เติมเงินรวม</small>
-                  <strong className="green-text">
-                    +{money(txTotals.deposit)}
-                  </strong>
-                  <span>{txTotals.depositCount} รายการ</span>
-                </div>
-                <div>
-                  <small>ถอนเงินรวม</small>
-                  <strong className="amber-text">
-                    −{money(Math.abs(txTotals.withdraw))}
-                  </strong>
-                  <span>{txTotals.withdrawCount} รายการ</span>
-                </div>
-                <div>
-                  <small>เปิดใช้บัตรรวม</small>
-                  <strong className="green-text">
-                    +{money(txTotals.activation)}
-                  </strong>
-                  <span>{txTotals.activationCount} รายการ</span>
-                </div>
-                <div>
-                  <small>คืนบัตรเงินสดรวม</small>
-                  <strong className="red-text">
-                    −{money(Math.abs(txTotals.refund))}
-                  </strong>
-                  <span>{txTotals.refundCount} รายการ</span>
-                </div>
+                {visibleTxSummary.map(item => (
+                  <div key={item.type}>
+                    <small>{item.label}รวม</small>
+                    <strong className={item.type === "deposit" || item.type === "activation" ? "green-text" : item.type === "withdrawal" ? "amber-text" : "red-text"}>
+                      {item.sign}{money(item.amount)}
+                    </strong>
+                    <span>{item.count} รายการ</span>
+                  </div>
+                ))}
               </div>
             </section>
           )}

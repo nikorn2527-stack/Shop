@@ -29,6 +29,7 @@ const REPORT_DOC_PDF_STAGE_CSS = `
 
 function buildPage(config: ReportDocConfig, rows: string[][], pageIndex: number, pageCount: number) {
   const numeric = new Set(config.numericCols ?? []);
+  const nowrap = new Set(config.nowrapCols ?? []);
   const page = document.createElement("div");
   page.className = `report-doc${config.compact ? " compact" : ""}${config.borderlessGroups ? " rd-borderless-groups" : ""}`;
   const head = document.createElement("div");
@@ -63,13 +64,23 @@ function buildPage(config: ReportDocConfig, rows: string[][], pageIndex: number,
     page.appendChild(summary);
   }
   const table = document.createElement("table");
-  table.className = "rd-table";
+  table.className = `rd-table${config.columnWidths?.length ? " rd-fixed-layout" : ""}`;
+  if (config.columnWidths?.length) {
+    const colgroup = document.createElement("colgroup");
+    config.columns.forEach((_, index) => {
+      const col = document.createElement("col");
+      const width = config.columnWidths?.[index]?.trim();
+      if (width && /^\d+(?:\.\d+)?(?:%|px|mm|cm|in|pt)$/.test(width)) col.style.width = width;
+      colgroup.appendChild(col);
+    });
+    table.appendChild(colgroup);
+  }
   const thead = document.createElement("thead");
   const headRow = document.createElement("tr");
   config.columns.forEach((column, index) => {
     const th = document.createElement("th");
     th.textContent = column;
-    if (numeric.has(index)) th.className = "num";
+    th.className = [numeric.has(index) ? "num" : "", nowrap.has(index) ? "nowrap" : ""].filter(Boolean).join(" ");
     headRow.appendChild(th);
   });
   thead.appendChild(headRow);
@@ -80,7 +91,7 @@ function buildPage(config: ReportDocConfig, rows: string[][], pageIndex: number,
     row.forEach((cell, index) => {
       const td = document.createElement("td");
       td.textContent = cell;
-      if (numeric.has(index)) td.className = "num";
+      td.className = [numeric.has(index) ? "num" : "", nowrap.has(index) ? "nowrap" : ""].filter(Boolean).join(" ");
       tr.appendChild(td);
     });
     tbody.appendChild(tr);
@@ -92,7 +103,7 @@ function buildPage(config: ReportDocConfig, rows: string[][], pageIndex: number,
     config.totalsRow.forEach((cell, index) => {
       const td = document.createElement("td");
       td.textContent = cell;
-      if (numeric.has(index)) td.className = "num";
+      td.className = [numeric.has(index) ? "num" : "", nowrap.has(index) ? "nowrap" : ""].filter(Boolean).join(" ");
       tr.appendChild(td);
     });
     tfoot.appendChild(tr);

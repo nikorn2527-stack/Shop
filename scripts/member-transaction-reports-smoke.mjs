@@ -24,7 +24,7 @@ const member = registerMember(fixture, {
   initialDeposit: 100,
   actor: 'เจ้าหน้าที่เปิดบัตร',
 }).member;
-walletTx(fixture, { memberNumber: member.memberNumber, type: 'deposit', amount: 40, actor: 'เจ้าหน้าที่เติมเงิน' });
+walletTx(fixture, { memberNumber: member.memberNumber, type: 'deposit', amount: 40, actor: 'เจ้าหน้าที่เติมเงิน', detail: 'เติมเงินพร้อมรายละเอียดที่ไม่ควรแสดงในคอลัมน์รายการ' });
 walletTx(fixture, { memberNumber: member.memberNumber, type: 'withdrawal', amount: 10, actor: 'เจ้าหน้าที่ถอนเงิน' });
 walletTx(fixture, { memberNumber: member.memberNumber, type: 'refund', amount: 5, actor: 'เจ้าหน้าที่คืนบัตร' });
 const admin = fixture.prepare("SELECT id FROM app_users WHERE active=1 AND role IN ('admin','administrator','manager','dev') ORDER BY id LIMIT 1").get();
@@ -93,6 +93,42 @@ try {
     await page.click('[aria-label="ปิดหน้าต่างพรีวิว"]');
     await page.waitForFunction(() => !document.querySelector('.export-preview-modal'));
   }
+
+  await page.select(preset, 'standard');
+  await page.waitForSelector('[aria-label="กรองตามประเภทธุรกรรม — กดได้หลายประเภทพร้อมกัน"]');
+  await page.click('[aria-label="กรองตามประเภทธุรกรรม — กดได้หลายประเภทพร้อมกัน"] button[title="แสดงทุกประเภทธุรกรรม"]');
+  await page.click('[aria-label="กรองตามประเภทธุรกรรม — กดได้หลายประเภทพร้อมกัน"] button[title^="เพิ่ม “เติมเงิน”"]');
+  await page.waitForSelector('.tx-table');
+  await page.waitForFunction(card => document.querySelector('.tx-table')?.innerText.includes(card), {}, cardNumber);
+  await page.waitForFunction(() => document.querySelector('.report-summary-footer')?.innerText.includes('เติมเงินรวม'));
+  const standardScreenText = await page.$eval('.tx-table', node => node.innerText);
+  assert.ok(standardScreenText.includes('เติมเงิน'), 'Standard report must show the transaction label');
+  assert.ok(!standardScreenText.includes('#RC-') && !standardScreenText.includes('พร้อมรายละเอียดที่ไม่ควรแสดง'), 'Standard report must not append transaction details');
+  const screenSummary = await page.$eval('.report-summary-footer', node => node.innerText);
+  assert.ok(screenSummary.includes('เติมเงินรวม'), 'Selected transaction summary must be visible');
+  for (const hidden of ['ใช้จ่ายรวม', 'ถอนเงินรวม', 'เปิดใช้บัตรรวม', 'คืนบัตรเงินสดรวม']) {
+    assert.ok(!screenSummary.includes(hidden), `Screen summary must hide ${hidden}`);
+  }
+  await page.click('[aria-label="พรีวิวข้อมูลก่อนส่งออกประวัติธุรกรรม"] .preview-btn');
+  await page.waitForSelector('.export-preview-modal iframe');
+  const standardFrame = await (await page.$('.export-preview-modal iframe')).contentFrame();
+  await standardFrame.waitForFunction(() => document.body.innerText.includes('รายงานประวัติธุรกรรมสมาชิก'));
+  const standardPreviewText = await standardFrame.$eval('body', node => node.innerText);
+  assert.ok(standardPreviewText.includes('\nเติมเงิน\n'), 'Preview must show only the transaction label in the item column');
+  assert.ok(!standardPreviewText.includes('#RC-') && !standardPreviewText.includes('พร้อมรายละเอียดที่ไม่ควรแสดง'), 'Preview must omit transaction details');
+  for (const hidden of ['ใช้จ่าย\n', 'ถอนเงิน\n', 'เปิดใช้บัตร\n', 'คืนบัตรเงินสด\n']) {
+    assert.ok(!standardPreviewText.includes(hidden), `Preview summary must hide ${hidden.trim()}`);
+  }
+  const standardLayout = await standardFrame.$eval('.rd-table', table => ({
+    fixed: table.classList.contains('rd-fixed-layout'),
+    widths: [...table.querySelectorAll('col')].map(col => getComputedStyle(col).width),
+    wrapped: [...table.querySelectorAll('tbody td.nowrap')].filter(cell => cell.scrollHeight > cell.clientHeight + 2).map(cell => cell.textContent),
+  }));
+  assert.equal(standardLayout.fixed, true, 'Standard preview must use fixed column proportions');
+  assert.equal(standardLayout.widths.length, 8, 'Standard preview must define all eight column widths');
+  assert.deepEqual(standardLayout.wrapped, [], 'Dates, references, labels, and amounts must stay on one line');
+  await page.click('[aria-label="ปิดหน้าต่างพรีวิว"]');
+  await page.waitForFunction(() => !document.querySelector('.export-preview-modal'));
 
   await page.setViewport({ width: 390, height: 844 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 2), false, 'Mobile page must not overflow');

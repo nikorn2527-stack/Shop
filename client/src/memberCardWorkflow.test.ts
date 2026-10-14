@@ -33,6 +33,10 @@ describe("member card workflow UI", () => {
     expect(reportSource).toContain('deposit: "รายงานยอดแสดงการเติมเงิน"');
     expect(reportSource).toContain('refund: "รายงานยอดแสดงการคืนบัตรเงินสด"');
     expect(reportSource).toContain('activation: "รายงานยอดแสดงการเปิดใช้บัตรเงินสด"');
+    expect(reportSource).toContain("const transactionLabel = (row: typeof txRows[number]) => TX_TYPE_LABEL[row.type]");
+    expect(reportSource).toContain("...visibleTxSummary.map(item => [item.label, `${item.sign}${exportNumber(item.amount)}");
+    expect(reportSource).toContain('columnWidths: hospitalTxPreset');
     expect(reportSource).not.toContain("ทุกสมาชิก · แสดง 300 รายการล่าสุด");
+    expect(reportSource).not.toContain("transactionDescription");
   });
 });

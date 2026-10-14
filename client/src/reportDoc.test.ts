@@ -33,4 +33,27 @@ describe("monochrome report document", () => {
     expect(html).not.toContain("preview-format-btn");
     expect(html).not.toContain("pagination");
   });
+
+  it("supports fixed column proportions and single-line reference fields", () => {
+    const html = buildReportDocumentHtml({
+      ...config,
+      columnWidths: ["70%", "30%"],
+      nowrapCols: [1],
+    }, { mode: "preview", stampText: "test" });
+
+    expect(html).toContain('class="rd-table rd-fixed-layout"');
+    expect(html).toContain('<col style="width:70%" />');
+    expect(html).toContain('<th class="num nowrap">จำนวน</th>');
+    expect(html).toContain('<td class="num nowrap">10</td>');
+  });
+
+  it("ignores unsafe column width values", () => {
+    const html = buildReportDocumentHtml({
+      ...config,
+      columnWidths: ['10%";color:red', "30%"],
+    }, { mode: "preview", stampText: "test" });
+
+    expect(html).toContain("<col />");
+    expect(html).not.toContain("color:red");
+  });
 });

@@ -21,6 +21,10 @@ export type ReportDocConfig = {
   /** คู่ [ป้าย, ค่า] แสดงเป็นแถวข้อมูลใต้หัวเรื่อง เช่น ["ผู้ทำรายการ", "วรพจน์"] */
   meta?: [string, string][];
   columns: string[];
+  /** สัดส่วนความกว้างคอลัมน์ เช่น ["14%", "12%"] — ใช้ colgroup เพื่อไม่ให้เนื้อหายาวแย่งพื้นที่คอลัมน์อื่น */
+  columnWidths?: string[];
+  /** คอลัมน์ (index) ที่ต้องอยู่บรรทัดเดียว เช่น วันที่ เลขอ้างอิง และจำนวนเงิน */
+  nowrapCols?: number[];
   /** คอลัมน์ (index) ที่ชิดขวา + ตัวเลข */
   numericCols?: number[];
   rows: string[][];
@@ -50,6 +54,11 @@ export function escapeHtml(value: string) {
   return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char] ?? char);
 }
 
+function safeColumnWidth(value: string | undefined) {
+  const width = value?.trim();
+  return width && /^\d+(?:\.\d+)?(?:%|px|mm|cm|in|pt)$/.test(width) ? width : "";
+}
+
 /** SINGLE SOURCE OF TRUTH สำหรับสไตล์เอกสารรายงาน (.rd-* classes) */
 export const REPORT_DOC_CSS = `
   .rd-summary-footer { margin-top: 12px; border-top: 2px solid #111; padding-top: 8px; break-inside: avoid; }
@@ -76,10 +85,12 @@ export const REPORT_DOC_CSS = `
   .rd-summary-grid span { color: #666666; font-size: 9px; text-transform: uppercase; letter-spacing: .3px; font-weight: 600; }
   .rd-summary-grid b { margin-top: 3px; color: #111111; font-size: 13px; font-weight: 800; font-variant-numeric: tabular-nums; }
   .rd-table { width: 100%; border-collapse: collapse; font-size: 13px; line-height: 1.4; page-break-inside: auto; }
+  .rd-table.rd-fixed-layout { table-layout: fixed; }
   .rd-table thead { display: table-header-group; }
   .rd-table tbody tr { break-inside: avoid; page-break-inside: avoid; }
   .rd-table th { background: #f0f0ee; color: #111111; font-weight: 700; text-align: left; padding: 7px 8px; border-top: 2px solid #111111; border-bottom: 1.5px solid #555555; white-space: nowrap; font-size: 11px; text-transform: uppercase; letter-spacing: .3px; }
   .rd-table th.num, .rd-table td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .rd-table th.nowrap, .rd-table td.nowrap { white-space: nowrap; overflow-wrap: normal; word-break: normal; }
   .rd-table td { padding: 6px 8px; font-weight: 500; border-bottom: 1px solid #e0e0dc; vertical-align: middle; }
   .rd-table tbody.rd-row-group + tbody.rd-row-group::before { content: ""; display: table-row; height: 16px; }
   .rd-table tr.rd-group-total td { font-weight: 800; padding-top: 10px; padding-bottom: 10px; border-top: 1px solid #000; border-bottom: 1px solid #000; }
@@ -146,6 +157,7 @@ export type BuildReportHtmlOptions = {
  */
 export function buildReportDocumentHtml(config: ReportDocConfig, opts: BuildReportHtmlOptions): string {
   const numeric = new Set(config.numericCols ?? []);
+  const nowrap = new Set(config.nowrapCols ?? []);
   const metaRows = (config.meta ?? []).map(([label, text]) => `<div><span>${escapeHtml(label)}</span><b>${escapeHtml(text)}</b></div>`).join("");
   const summaryRows = (config.summaryBlocks ?? []).map(([label, text]) => `<div><span>${escapeHtml(label)}</span><b>${escapeHtml(text)}</b></div>`).join("");
   const groupStarts = new Set(config.groupStartRows ?? []);
@@ -155,13 +167,28 @@ export function buildReportDocumentHtml(config: ReportDocConfig, opts: BuildRepo
       if (rowIndex > 0) bodyRows += "</tbody>";
       bodyRows += `<tbody${groupStarts.size ? ' class="rd-row-group"' : ""}>`;
     }
-    bodyRows += `<tr${groupStarts.has(rowIndex) ? ' class="rd-group-total"' : ""}>${row.map((cell, index) => `<td${numeric.has(index) ? ' class="num"' : ""}>${escapeHtml(cell)}</td>`).join("")}</tr>`;
+    bodyRows += `<tr${groupStarts.has(rowIndex) ? ' class="rd-group-total"' : ""}>${row.map((cell, index) => {
+      const classes = [numeric.has(index) ? "num" : "", nowrap.has(index) ? "nowrap" : ""].filter(Boolean).join(" ");
+      return `<td${classes ? ` class="${classes}"` : ""}>${escapeHtml(cell)}</td>`;
+    }).join("")}</tr>`;
   });
   bodyRows += config.rows.length ? "</tbody>" : "<tbody></tbody>";
   const totalsRow = config.totalsRow
-    ? `<tfoot><tr>${config.totalsRow.map((cell, index) => `<td${numeric.has(index) ? ' class="num"' : ""}>${escapeHtml(cell)}</td>`).join("")}</tr></tfoot>`
+    ? `<tfoot><tr>${config.totalsRow.map((cell, index) => {
+        const classes = [numeric.has(index) ? "num" : "", nowrap.has(index) ? "nowrap" : ""].filter(Boolean).join(" ");
+        return `<td${classes ? ` class="${classes}"` : ""}>${escapeHtml(cell)}</td>`;
+      }).join("")}</tr></tfoot>`
     : "";
-  const headCells = config.columns.map((column, index) => `<th${numeric.has(index) ? ' class="num"' : ""}>${escapeHtml(column)}</th>`).join("");
+  const headCells = config.columns.map((column, index) => {
+    const classes = [numeric.has(index) ? "num" : "", nowrap.has(index) ? "nowrap" : ""].filter(Boolean).join(" ");
+    return `<th${classes ? ` class="${classes}"` : ""}>${escapeHtml(column)}</th>`;
+  }).join("");
+  const colgroup = config.columnWidths?.length
+    ? `<colgroup>${config.columns.map((_, index) => {
+        const width = safeColumnWidth(config.columnWidths?.[index]);
+        return `<col${width ? ` style="width:${width}"` : ""} />`;
+      }).join("")}</colgroup>`
+    : "";
   const autoPrintScript = opts.mode === "print"
     ? `<script>window.addEventListener("load", () => { const go = () => window.setTimeout(() => window.print(), 120); if (document.fonts && document.fonts.ready) { document.fonts.ready.then(go); } else { go(); } });</script>`
     : "";
@@ -189,7 +216,7 @@ export function buildReportDocumentHtml(config: ReportDocConfig, opts: BuildRepo
     </div>
     <div class="rd-title"><h1>${escapeHtml(config.title)}</h1>${config.periodLabel ? `<p>${escapeHtml(config.periodLabel)}</p>` : ""}</div>
     ${metaRows ? `<div class="rd-meta">${metaRows}</div>` : ""}
-    <table class="rd-table"><thead><tr>${headCells}</tr></thead>${bodyRows}${totalsRow}</table>
+    <table class="rd-table${colgroup ? " rd-fixed-layout" : ""}">${colgroup}<thead><tr>${headCells}</tr></thead>${bodyRows}${totalsRow}</table>
     ${summaryRows ? `<div class="rd-summary-footer">${summaryRows}</div>` : ""}
     ${config.footnote ? `<div class="rd-note">${escapeHtml(config.footnote)}</div>` : ""}
   </div>
