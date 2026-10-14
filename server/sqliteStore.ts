@@ -41,8 +41,6 @@ export type SqliteMember = {
   createdAt: string;
   photoUrl: string | null;
   gender: string | null;
-  /** วงเงินซื้อสินค้าต่อวัน (req 23.2) — null = ไม่จำกัด */
-  creditLimit: number | null;
   /** ROUND 65 (user) — รหัสบัตรเงินสดของสมาชิก (เช่น 2395100201) · null = ยังไม่ผูกบัตร */
   cardNumber: string | null;
   accountClosed?: number;
@@ -81,8 +79,6 @@ export type SqliteMemberSummary = {
   lastTransactionAt: string | null;
   photoUrl: string | null;
   gender: string | null;
-  /** วงเงินซื้อสินค้าต่อวัน — null = ไม่จำกัด */
-  creditLimit: number | null;
   /** ROUND 65 — รหัสบัตรเงินสด / รหัสผู้ป่วย (แสดงในรายการและรายงานยอดเงินในบัตร) */
   cardNumber: string | null;
   /** 1 เมื่อบัตรยัง assigned ให้สมาชิกรายนี้และมีรอบใช้งานที่ยังไม่ปิด */
@@ -812,7 +808,7 @@ function seedPhysicalCardsFromMembers(db: SqliteDb) {
 
 /** Require a live physical-card round before any normal member transaction. */
 function requireUsableMemberCard(db: SqliteDb, memberNumber: string): SqliteMember {
-  const member = db.prepare(`SELECT id, member_number AS memberNumber, prename, first_name AS firstName, last_name AS lastName, id_card AS idCard, phone, type, balance, status, created_at AS createdAt, photo_url AS photoUrl, gender, credit_limit AS creditLimit, card_number AS cardNumber, account_closed AS accountClosed, patient_code AS patientCode FROM members WHERE member_number = ?`).get(memberNumber.trim()) as SqliteMember | undefined;
+  const member = db.prepare(`SELECT id, member_number AS memberNumber, prename, first_name AS firstName, last_name AS lastName, id_card AS idCard, phone, type, balance, status, created_at AS createdAt, photo_url AS photoUrl, gender, card_number AS cardNumber, account_closed AS accountClosed, patient_code AS patientCode FROM members WHERE member_number = ?`).get(memberNumber.trim()) as SqliteMember | undefined;
   if (!member) throw new StoreError(`ไม่พบสมาชิก ${memberNumber} ในระบบ`);
   if (member.status !== "active") throw new StoreError(`สมาชิกถูกระงับการใช้งาน · ${member.memberNumber}`);
   if (member.accountClosed) throw new StoreError("บัญชีรอบนี้ปิดแล้ว ต้องรับคืนบัตรและจ่ายบัตรใหม่ก่อนทำรายการ");
@@ -1090,7 +1086,7 @@ export function seedSqliteDemoData(db: SqliteDb) {
 }
 
 export function getMemberDetail(db: SqliteDb, memberNumber: string, transactionLimit = 50) {
-  const member = db.prepare(`SELECT m.id, m.member_number as memberNumber, m.prename, m.first_name as firstName, m.last_name as lastName, m.id_card as idCard, m.phone, m.type, m.balance, m.status, m.created_at as createdAt, m.photo_url as photoUrl, m.gender, m.credit_limit as creditLimit, m.card_number as cardNumber, m.account_closed as accountClosed, m.patient_code as patientCode,
+  const member = db.prepare(`SELECT m.id, m.member_number as memberNumber, m.prename, m.first_name as firstName, m.last_name as lastName, m.id_card as idCard, m.phone, m.type, m.balance, m.status, m.created_at as createdAt, m.photo_url as photoUrl, m.gender, m.card_number as cardNumber, m.account_closed as accountClosed, m.patient_code as patientCode,
     CASE WHEN m.status = 'active' AND m.account_closed = 0 AND EXISTS (
       SELECT 1 FROM physical_cards pc
       JOIN card_usage_sessions cs ON cs.card_number = pc.card_number
@@ -2535,7 +2531,7 @@ export function getSaleSlip(db: SqliteDb, id: number): { slipUrl: string | null 
 
 // --- members & wallet -------------------------------------------------------
 
-const MEMBER_SELECT = `SELECT id, member_number as memberNumber, prename, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, photo_url as photoUrl, gender, credit_limit as creditLimit, card_number as cardNumber, patient_code as patientCode FROM members WHERE member_number = ?`;
+const MEMBER_SELECT = `SELECT id, member_number as memberNumber, prename, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, photo_url as photoUrl, gender, card_number as cardNumber, patient_code as patientCode FROM members WHERE member_number = ?`;
 
 function getMemberByNumber(db: SqliteDb, memberNumber: string): SqliteMember | undefined {
   return db.prepare(MEMBER_SELECT).get(memberNumber) as SqliteMember | undefined;
@@ -2554,7 +2550,7 @@ export function listMembers(db: SqliteDb, search?: string, status?: "active" | "
     params.push(status);
   }
   const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
-  return db.prepare(`SELECT m.id, m.member_number AS memberNumber, m.prename AS prename, m.first_name AS firstName, m.last_name AS lastName, m.type, m.balance, m.status, m.created_at AS createdAt, m.photo_url AS photoUrl, m.gender, m.credit_limit AS creditLimit, m.card_number AS cardNumber, m.patient_code AS patientCode,
+  return db.prepare(`SELECT m.id, m.member_number AS memberNumber, m.prename AS prename, m.first_name AS firstName, m.last_name AS lastName, m.type, m.balance, m.status, m.created_at AS createdAt, m.photo_url AS photoUrl, m.gender, m.card_number AS cardNumber, m.patient_code AS patientCode,
     CASE WHEN m.status = 'active' AND m.account_closed = 0 AND EXISTS (
       SELECT 1 FROM physical_cards pc
       JOIN card_usage_sessions cs ON cs.card_number = pc.card_number

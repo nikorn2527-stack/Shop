@@ -51,9 +51,6 @@ export type MemberLite = {
   createdAt?: string | null;
   photoUrl?: string | null;
   gender?: string | null;
-  /** ROUND 34 (req 23.2) — วงเงินซื้อสินค้าต่อวัน · null/undefined = ไม่จำกัด
-   *  present on member.list / member.detail rows from the server */
-  creditLimit?: number | null;
 };
 
 export function calculateCartSubtotal(items: CartItem[]) {
