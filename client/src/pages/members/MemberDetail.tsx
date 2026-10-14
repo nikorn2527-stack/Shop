@@ -8,7 +8,6 @@ import {
   Camera,
   Check,
   CircleHelp,
-  CreditCard,
   Download,
   FileImage,
   FileText,
@@ -145,7 +144,7 @@ export function MemberDetail({
   const [walletConfirm, setWalletConfirm] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [cardOpen, setCardOpen] = useState(false);
-  const [cardAction, setCardAction] = useState<"manage" | "return" | null>(null);
+  const [cardAction, setCardAction] = useState<"return" | null>(null);
   const [statementOpen, setStatementOpen] = useState(false);
   const actor = userName || "ผู้ใช้ระบบ";
   const actorRole = roleThaiLabel(role);
@@ -427,7 +426,7 @@ export function MemberDetail({
           </div>
         </div>
         <div className="member-detail-actions">
-          {cardAction && <MemberCardActionsModal memberNumber={member.memberNumber} initialAction={cardAction === "return" ? "return" : undefined} onClose={() => setCardAction(null)} onSuccess={(action) => { void detailQuery.refetch(); setNotice(action === "assign" ? "จ่ายบัตรเรียบร้อยแล้ว" : action === "replace" ? "เปลี่ยนบัตรเรียบร้อยแล้ว" : action === "return" ? "รับบัตรคืนและคืนเงินคงเหลือเรียบร้อยแล้ว" : "ปิดรอบบัญชีและคืนเงินแล้ว"); }} />}
+          {cardAction && <MemberCardActionsModal memberNumber={member.memberNumber} initialAction="return" onClose={() => setCardAction(null)} onSuccess={() => { void detailQuery.refetch(); setNotice("รับบัตรคืนและคืนเงินคงเหลือเรียบร้อยแล้ว"); }} />}
           <button
             className="primary-button"
             disabled={profile.status !== "active" || !cardReady}
@@ -461,14 +460,6 @@ export function MemberDetail({
             title={!profile.cardNumber ? "สมาชิกยังไม่มีบัตรที่ต้องคืน" : "รับบัตรคืน คืนยอดคงเหลือทั้งหมด และปิดรอบบัตร"}
           >
             <RotateCcw size={15} /> คืนบัตร
-          </button>
-          <button
-            className="outline-button"
-            disabled={profile.status !== "active"}
-            onClick={() => setCardAction("manage")}
-            title="จ่าย เปลี่ยน คืนบัตร หรือปิดรอบบัญชี"
-          >
-            <CreditCard size={15} /> จัดการบัตร
           </button>
           {profile.status === "active" ? (
             <button

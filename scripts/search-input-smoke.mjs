@@ -115,6 +115,17 @@ try {
   await page.click('.member-selection-modal .modal-heading button');
   await page.waitForFunction(() => !document.querySelector('.member-selection-modal'));
   await page.click('.rail-exit');
+  await page.waitForSelector('button[data-nav-item="members"]', { visible: true });
+  await page.click('button[data-nav-item="members"]');
+  await page.waitForSelector('[aria-label="รายการสมาชิก"]');
+  assert.equal(await page.evaluate(() => [...document.querySelectorAll('button')].some(button => button.getClientRects().length && button.textContent.trim() === 'จัดการบัตรเปล่า')), false, 'Members page must not show blank-card management');
+  const memberRow = await page.$('[aria-label="รายการสมาชิก"] tbody tr');
+  if (memberRow) {
+    await memberRow.click();
+    await page.waitForSelector('.member-detail-actions');
+    assert.equal(await page.evaluate(() => [...document.querySelectorAll('.member-detail-actions button')].some(button => button.textContent.trim() === 'จัดการบัตร')), false, 'Member account must not show the combined card-management action');
+    assert.equal(await page.evaluate(() => [...document.querySelectorAll('.member-detail-actions button')].some(button => button.textContent.trim() === 'คืนบัตร')), true, 'Member account must keep the direct return-card action');
+  }
   await page.waitForSelector('button[data-nav-item="settings"]', { visible: true });
   const settings = await page.evaluateHandle(() => [...document.querySelectorAll('button[data-nav-item="settings"]')].find(button => button.getClientRects().length));
   assert.ok(settings.asElement(), 'Visible settings navigation must be available');

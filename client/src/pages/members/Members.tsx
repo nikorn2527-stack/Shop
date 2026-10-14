@@ -35,7 +35,6 @@ import { SectionHeader, StatusPill } from "../PagePrimitives";
 // directly from "./MemberDetail". Safe at module-eval time and render time.
 import { MemberDetail } from "./MemberDetail";
 import { MemberRegistrationModal } from "@/components/MemberRegistrationModal";
-import { CardInventory } from "@/components/CardInventory";
 
 /**
  * Members — list view with search + status filter + per-row drilldown to
@@ -57,7 +56,6 @@ export function Members({
 }) {
   const [query, setQuery] = useState("");
   const [registrationOpen, setRegistrationOpen] = useState(false);
-  const [cardsOpen, setCardsOpen] = useState(false);
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ทั้งหมด");
   const [notice, setNotice] = useState("");
@@ -195,11 +193,6 @@ export function Members({
         title="จัดการสมาชิก"
         description=""
       />
-      <div className="report-tabs" role="tablist" aria-label="สมาชิกและบัตร">
-        <button role="tab" aria-selected={!cardsOpen} className={!cardsOpen ? "active" : ""} onClick={() => setCardsOpen(false)}>รายการสมาชิก</button>
-        <button role="tab" aria-selected={cardsOpen} className={cardsOpen ? "active" : ""} onClick={() => setCardsOpen(true)}>จัดการบัตรเปล่า</button>
-      </div>
-      {cardsOpen ? <CardInventory canManage={role === "admin" || role === "dev"} /> : <>
       <div className="member-top-grid">
         <div className="member-balance-card">
           <div>
@@ -432,7 +425,6 @@ export function Members({
           </div>
         )}
       </section>
-      </>}
       {batchCardOpen && batchCardMembers.length > 0 && (
         <MemberCardBatchModal
           members={batchCardMembers}
