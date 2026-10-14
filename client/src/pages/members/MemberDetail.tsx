@@ -150,7 +150,7 @@ export function MemberDetail({
   const [walletConfirm, setWalletConfirm] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [cardOpen, setCardOpen] = useState(false);
-  const [cardActionsOpen, setCardActionsOpen] = useState(false);
+  const [cardAction, setCardAction] = useState<"manage" | "return" | null>(null);
   const [statementOpen, setStatementOpen] = useState(false);
   // ROUND 34 (req 23.2) — ขอลดวงเงินซื้อสินค้าต่อวัน: 2 ขั้นเหมือนเติม/ถอน (กรอก → ยืนยัน → ส่ง)
   const [limitOpen, setLimitOpen] = useState(false);
@@ -466,7 +466,7 @@ export function MemberDetail({
           </div>
         </div>
         <div className="member-detail-actions">
-          {cardActionsOpen && <MemberCardActionsModal memberNumber={member.memberNumber} onClose={() => setCardActionsOpen(false)} onSuccess={(action) => { void detailQuery.refetch(); setNotice(action === "assign" ? "จ่ายบัตรเรียบร้อยแล้ว" : action === "replace" ? "เปลี่ยนบัตรเรียบร้อยแล้ว" : action === "return" ? "คืนบัตรเรียบร้อยแล้ว" : "ปิดรอบบัญชีและคืนเงินแล้ว"); }} />}
+          {cardAction && <MemberCardActionsModal memberNumber={member.memberNumber} initialAction={cardAction === "return" ? "return" : undefined} onClose={() => setCardAction(null)} onSuccess={(action) => { void detailQuery.refetch(); setNotice(action === "assign" ? "จ่ายบัตรเรียบร้อยแล้ว" : action === "replace" ? "เปลี่ยนบัตรเรียบร้อยแล้ว" : action === "return" ? "รับบัตรคืนและคืนเงินคงเหลือเรียบร้อยแล้ว" : "ปิดรอบบัญชีและคืนเงินแล้ว"); }} />}
           <button
             className="primary-button"
             disabled={profile.status !== "active" || !cardReady}
@@ -495,15 +495,23 @@ export function MemberDetail({
           </button>
           <button
             className="outline-button"
-            onClick={openLimitDialog}
-            title="ส่งคำขอลดวงเงินซื้อสินค้าต่อวัน"
+            disabled={profile.status !== "active" || !profile.cardNumber}
+            onClick={() => setCardAction("return")}
+            title={!profile.cardNumber ? "สมาชิกยังไม่มีบัตรที่ต้องคืน" : "รับบัตรคืน คืนยอดคงเหลือทั้งหมด และปิดรอบบัตร"}
           >
-            <TrendingDown size={15} /> ขอลดวงเงิน
+            <RotateCcw size={15} /> คืนบัตร
+          </button>
+          <button
+            className="outline-button"
+            onClick={openLimitDialog}
+            title="ส่งคำขอปรับวงเงินซื้อสินค้าต่อวัน ไม่ใช่การถอนเงินคงเหลือ"
+          >
+            <TrendingDown size={15} /> ขอปรับวงเงินซื้อ/วัน
           </button>
           <button
             className="outline-button"
             disabled={profile.status !== "active"}
-            onClick={() => setCardActionsOpen(true)}
+            onClick={() => setCardAction("manage")}
             title="จ่าย เปลี่ยน คืนบัตร หรือปิดรอบบัญชี"
           >
             <CreditCard size={15} /> จัดการบัตร

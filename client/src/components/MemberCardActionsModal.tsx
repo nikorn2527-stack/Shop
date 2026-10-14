@@ -4,9 +4,10 @@ import { getErrorMessage } from "@/pages/viewFormat";
 import { MEMBER_CARD_ACTION_LABELS as labels } from "../../../shared/memberCardActions";
 
 export type CompletedMemberCardAction = "assign" | "replace" | "return" | "close";
+export type InitialMemberCardAction = "return" | "close";
 
 export function MemberCardActionsModal({ memberNumber, onClose, onSuccess, initialAction }: {
-  memberNumber: string; onClose: () => void; onSuccess: (action: CompletedMemberCardAction) => void; initialAction?: "close";
+  memberNumber: string; onClose: () => void; onSuccess: (action: CompletedMemberCardAction) => void; initialAction?: InitialMemberCardAction;
 }) {
   const utils = trpc.useUtils();
   const detail = trpc.member.detail.useQuery({ memberNumber });
