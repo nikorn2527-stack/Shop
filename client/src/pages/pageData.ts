@@ -131,10 +131,10 @@ export function formatMemberNumber(mode: "running" | "year" | "manual", sequence
 export const navItems: { id: View; label: string; caption: string; icon: React.ComponentType<any>; tileColor: string }[] = [
   { id: "dashboard", label: "ภาพรวม", caption: "สรุปการดำเนินงาน", icon: SquaresFour, tileColor: "#007a55" },
   { id: "pos", label: "หน้าร้าน / POS", caption: "ขายสินค้าและรับชำระ", icon: ShoppingCart, tileColor: "#d97706" },
-  { id: "stock", label: "สต็อกสินค้า", caption: "รับเข้าและนับสต็อก", icon: Package, tileColor: "#2563eb" },
+  { id: "stock", label: "สต็อกสินค้า", caption: "รับเข้าและนับสต็อก", icon: Package, tileColor: "#526B84" },
   { id: "members", label: "สมาชิกและบัญชี", caption: "สมาชิกและเจ้าหน้าที่", icon: Users, tileColor: "#7c3aed" },
   { id: "reports", label: "รายงาน", caption: "เอกสารสรุปและส่งออก", icon: FileText, tileColor: "#0891b2" },
-  { id: "profit", label: "ต้นทุนและกำไร", caption: "ต้นทุนขายและกำไรขั้นต้น", icon: Coins, tileColor: "#537fa6" },
+  { id: "profit", label: "ต้นทุนและกำไร", caption: "ต้นทุนขายและกำไรขั้นต้น", icon: Coins, tileColor: "#526579" },
 ];
 
 // NOTE (OLD-2-b): mock exports `products` + `stockRows` were DELETED — Pos.tsx and

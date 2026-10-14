@@ -24,8 +24,8 @@ try {
   await page.waitForSelector('.pos-head');
   const accent = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--teal').trim());
   console.log('ACTIVE_ACCENT', accent);
-  assert.equal(accent, '#1d4ed8', 'Every saved theme must migrate to Government Blue');
-  assert.equal(await page.evaluate(() => document.documentElement.dataset.palette), 'government-blue');
+  assert.equal(accent, '#29435F', 'Every saved theme must migrate to Navy Slate');
+  assert.equal(await page.evaluate(() => document.documentElement.dataset.palette), 'navy-slate');
   const gradients = await page.evaluate(() => {
     const image = selector => getComputedStyle(document.querySelector(selector)).backgroundImage;
     return {
@@ -35,9 +35,9 @@ try {
       surface: image('.pos-premium-bill'),
     };
   });
-  assert.ok(gradients.shell.includes('linear-gradient'), 'Application canvas must use a blue gradient');
-  assert.ok(gradients.page.includes('linear-gradient'), 'Workspace must use a blue gradient');
-  assert.ok(gradients.sidebar.includes('linear-gradient'), 'Sidebar must use a blue gradient');
+  assert.ok(gradients.shell.includes('linear-gradient'), 'Application canvas must use the pastel gradient');
+  assert.ok(gradients.page.includes('linear-gradient'), 'Workspace must use the pastel gradient');
+  assert.ok(gradients.sidebar.includes('linear-gradient'), 'Sidebar must use the pastel gradient');
   assert.ok(gradients.surface.includes('linear-gradient'), 'Main surfaces must use a subtle gradient');
   await page.screenshot({ path: path.join(cfg.dir, 'iris-pos.png') });
   await page.evaluate(() => window.dispatchEvent(new CustomEvent('pos-rail', { detail: 'receive' })));

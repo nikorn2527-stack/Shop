@@ -51,9 +51,11 @@ describe("reusable physical cards", () => {
       createBlankCards(db, ["SUMMARY-CARD"]);
       const member = registerMember(db, { firstName: "Summary", lastName: "Card", cardNumber: "SUMMARY-CARD" }).member;
       expect(listMembers(db).find(row => row.memberNumber === member.memberNumber)?.cardUsable).toBe(1);
+      expect(getMemberDetail(db, member.memberNumber)?.member.cardUsable).toBe(1);
 
       db.prepare("UPDATE physical_cards SET status = 'lost' WHERE card_number = ?").run("SUMMARY-CARD");
       expect(listMembers(db).find(row => row.memberNumber === member.memberNumber)?.cardUsable).toBe(0);
+      expect(getMemberDetail(db, member.memberNumber)?.member.cardUsable).toBe(0);
 
       db.prepare("UPDATE physical_cards SET status = 'assigned' WHERE card_number = ?").run("SUMMARY-CARD");
       db.prepare("UPDATE card_usage_sessions SET ended_at = CURRENT_TIMESTAMP WHERE card_number = ? AND ended_at IS NULL").run("SUMMARY-CARD");

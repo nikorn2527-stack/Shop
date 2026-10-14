@@ -46,6 +46,8 @@ export type SqliteMember = {
   /** ROUND 65 (user) — รหัสบัตรเงินสดของสมาชิก (เช่น 2395100201) · null = ยังไม่ผูกบัตร */
   cardNumber: string | null;
   accountClosed?: number;
+  /** 1 when the current physical-card binding and usage round are both live. */
+  cardUsable?: number;
   /** ROUND 65 (user) — รหัสผู้ป่วย (HN) ที่ผูกกับบัตร · null = ไม่มี */
   patientCode: string | null;
 };
@@ -910,7 +912,7 @@ export function releasePhysicalCard(db: SqliteDb, cardNumber: string, actor?: st
 /** Assign or replace a physical card without changing the member identity or money. */
 export function assignMemberCard(db: SqliteDb, input: {
   memberNumber: string; cardNumber: string; expectedCardNumber: string | null;
-  expectedSessionId?: number; previousCardStatus?: "returned_vacant" | "lost" | "damaged";
+  expectedSessionId?: number;
   actor?: string; actorRole?: string;
 }) {
   return runInTransaction(db, () => {
@@ -922,12 +924,7 @@ export function assignMemberCard(db: SqliteDb, input: {
     if (member.cardNumber) {
       const session = db.prepare(`SELECT id FROM card_usage_sessions WHERE card_number = ? AND member_number = ? AND ended_at IS NULL`).get(member.cardNumber, input.memberNumber) as { id: number } | undefined;
       if (input.expectedSessionId === undefined || session?.id !== input.expectedSessionId) throw new StoreError("รอบบัตรมีการเปลี่ยนแปลง กรุณาโหลดข้อมูลใหม่");
-      const oldStatus = input.previousCardStatus ?? "returned_vacant";
       releasePhysicalCardTx(db, member.cardNumber, input.actor, input.actorRole, "เปลี่ยนบัตร · คงยอดเงินในบัญชีสมาชิก");
-      if (oldStatus !== "returned_vacant") {
-        db.prepare(`UPDATE physical_cards SET status = ? WHERE card_number = ?`).run(oldStatus, member.cardNumber);
-        db.prepare(`INSERT INTO card_assignments (card_number, member_number, action, actor, actor_role, created_at) VALUES (?, ?, ?, ?, ?, ?)`).run(member.cardNumber, input.memberNumber, oldStatus, input.actor ?? null, input.actorRole ?? null, formatDateTime());
-      }
     }
     assignPhysicalCardTx(db, input.cardNumber, input.memberNumber, input.actor, input.actorRole);
     db.prepare(`UPDATE members SET card_number = ?, account_closed = 0 WHERE member_number = ?`).run(input.cardNumber.trim(), input.memberNumber);
@@ -990,9 +987,9 @@ export function closeMemberAccount(db: SqliteDb, input: { memberNumber: string; 
     if (member.balance < 0) throw new StoreError("มียอดค้าง ต้องจัดการยอดก่อนปิดบัญชี");
     const closed = db.prepare(`SELECT account_closed FROM members WHERE member_number = ?`).get(input.memberNumber) as { account_closed: number };
     if (closed.account_closed) return getMemberDetail(db, input.memberNumber);
-    if (member.balance > 0) walletTx(db, { memberNumber: input.memberNumber, type: "refund", amount: member.balance, retainCard: true, note: "ขอลดวงเงิน · คืนเงินทั้งหมดและปิดบัญชี · ยังไม่ได้รับบัตรคืน", actor: input.actor, actorRole: input.actorRole, clientRequestId: input.clientRequestId });
+    if (member.balance > 0) walletTx(db, { memberNumber: input.memberNumber, type: "refund", amount: member.balance, retainCard: true, note: "คืนเงินทั้งหมดและปิดรอบบัญชี · ยังไม่ได้รับบัตรคืน", actor: input.actor, actorRole: input.actorRole, clientRequestId: input.clientRequestId });
     db.prepare(`UPDATE members SET account_closed = 1 WHERE member_number = ?`).run(input.memberNumber);
-    logAction(db, "ขอลดวงเงิน / ปิดบัญชี", input.actor || "เจ้าหน้าที่", `${input.memberNumber} · บัตร ${input.cardNumber} ยังไม่ได้รับคืน`, "amber", input.actorRole ?? null);
+    logAction(db, "ปิดรอบบัญชีสมาชิก", input.actor || "เจ้าหน้าที่", `${input.memberNumber} · คืนเงินแล้ว · บัตร ${input.cardNumber} ยังไม่ได้รับคืน`, "amber", input.actorRole ?? null);
     return getMemberDetail(db, input.memberNumber);
   });
 }
@@ -1055,7 +1052,15 @@ export function seedSqliteDemoData(db: SqliteDb) {
 }
 
 export function getMemberDetail(db: SqliteDb, memberNumber: string, transactionLimit = 50) {
-  const member = db.prepare(`SELECT id, member_number as memberNumber, prename, first_name as firstName, last_name as lastName, id_card as idCard, phone, type, balance, status, created_at as createdAt, photo_url as photoUrl, gender, credit_limit as creditLimit, card_number as cardNumber, account_closed as accountClosed, patient_code as patientCode FROM members WHERE member_number = ?`).get(memberNumber) as SqliteMember | undefined;
+  const member = db.prepare(`SELECT m.id, m.member_number as memberNumber, m.prename, m.first_name as firstName, m.last_name as lastName, m.id_card as idCard, m.phone, m.type, m.balance, m.status, m.created_at as createdAt, m.photo_url as photoUrl, m.gender, m.credit_limit as creditLimit, m.card_number as cardNumber, m.account_closed as accountClosed, m.patient_code as patientCode,
+    CASE WHEN m.status = 'active' AND m.account_closed = 0 AND EXISTS (
+      SELECT 1 FROM physical_cards pc
+      JOIN card_usage_sessions cs ON cs.card_number = pc.card_number
+        AND cs.member_number = m.member_number AND cs.ended_at IS NULL
+      WHERE pc.card_number = m.card_number AND pc.archived_at IS NULL
+        AND pc.status = 'assigned' AND pc.assigned_member_number = m.member_number
+    ) THEN 1 ELSE 0 END AS cardUsable
+    FROM members m WHERE m.member_number = ?`).get(memberNumber) as SqliteMember | undefined;
   if (!member) return undefined;
   const transactions = db.prepare(`SELECT id, member_number as memberNumber, type, detail, amount, payment_method as paymentMethod, balance_after as balanceAfter, created_at as createdAt, slip_url IS NOT NULL AS hasSlip FROM member_transactions WHERE member_number = ? ORDER BY created_at DESC, id DESC LIMIT ?`).all(memberNumber, transactionLimit) as unknown as SqliteTransaction[];
   return { member, transactions };

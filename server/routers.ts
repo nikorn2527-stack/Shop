@@ -1160,9 +1160,8 @@ export const appRouter = router({
       const { actor, actorRole } = resolveActor(ctx, {});
       return returnMemberCard(getWelfareDb(), { ...input, actor, actorRole });
     })),
-    assign: publicProcedure.input(z.object({ memberNumber: z.string().trim().min(1), cardNumber: z.string().trim().min(1).max(30), expectedCardNumber: z.string().nullable(), expectedSessionId: z.number().int().positive().optional(), previousCardStatus: z.enum(["returned_vacant", "lost", "damaged"]).optional() })).mutation(({ ctx, input }) => withStoreErrors(() => {
+    assign: publicProcedure.input(z.object({ memberNumber: z.string().trim().min(1), cardNumber: z.string().trim().min(1).max(30), expectedCardNumber: z.string().nullable(), expectedSessionId: z.number().int().positive().optional() })).mutation(({ ctx, input }) => withStoreErrors(() => {
       requireLogin(ctx);
-      if (input.previousCardStatus === "lost" || input.previousCardStatus === "damaged") requireAdmin(ctx);
       const { actor, actorRole } = resolveActor(ctx, {});
       return assignMemberCard(getWelfareDb(), { ...input, actor, actorRole });
     })),

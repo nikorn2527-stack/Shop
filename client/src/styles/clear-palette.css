@@ -1,30 +1,30 @@
-/* Government Blue screen palette. Status dots and alerts retain their semantic
+/* Navy Slate screen palette. Status dots and alerts retain their semantic
    colours. Print documents remain independent from the application theme. */
 @media screen {
   :root:root {
-    --ink: #10233f;
-    --muted: #52657f;
-    --canvas: #f3f6fa;
+    --ink: #1F2B38;
+    --muted: #526579;
+    --canvas: #F1F3F5;
     --surface: #ffffff;
-    --line: #c9d5e5;
+    --line: #CAD2DA;
     --red: #b91c1c;
     --amber: #a16207;
     --green: #15803d;
-    --teal: #1d4ed8;
-    --teal-dark: #163b73;
-    --teal-soft: #dbeafe;
-    --teal-mist: #eff6ff;
-    --teal-glow: rgb(29 78 216 / 22%);
-    --canvas-gradient: linear-gradient(135deg, #e7f0ff 0%, #f8fbff 46%, #dce9fb 100%);
-    --workspace-gradient: linear-gradient(135deg, rgb(231 240 255 / 96%) 0%, rgb(248 251 255 / 92%) 48%, rgb(220 233 251 / 94%) 100%);
-    --sidebar-gradient: linear-gradient(180deg, #f8fbff 0%, #edf4ff 52%, #dbe8fa 100%);
-    --topbar-gradient: linear-gradient(110deg, rgb(255 255 255 / 94%) 0%, rgb(231 240 255 / 92%) 100%);
-    --surface-gradient: linear-gradient(145deg, #ffffff 0%, #f8fbff 58%, #edf4ff 100%);
-    --accent-gradient: linear-gradient(135deg, #2563eb 0%, #1d4ed8 48%, #163b73 100%);
-    --rail-a: #163b73;
-    --rail-b: #0f2f5f;
-    --rail-solid: #123665;
-    --rail-edge: #0b2548;
+    --teal: #29435F;
+    --teal-dark: #17283D;
+    --teal-soft: #DCE3EA;
+    --teal-mist: #F3F5F7;
+    --teal-glow: rgb(41 67 95 / 22%);
+    --canvas-gradient: linear-gradient(135deg, #E5EAF0 0%, #F7F8FA 46%, #DDE3E8 100%);
+    --workspace-gradient: linear-gradient(135deg, rgb(229 234 240 / 96%) 0%, rgb(247 248 250 / 94%) 48%, rgb(221 227 232 / 95%) 100%);
+    --sidebar-gradient: linear-gradient(180deg, #F8FAFC 0%, #E9EEF2 52%, #DCE3E9 100%);
+    --topbar-gradient: linear-gradient(110deg, rgb(255 255 255 / 95%) 0%, rgb(229 234 240 / 92%) 100%);
+    --surface-gradient: linear-gradient(145deg, #FFFFFF 0%, #F7F9FA 58%, #E9EEF2 100%);
+    --accent-gradient: linear-gradient(135deg, #526B84 0%, #29435F 52%, #17283D 100%);
+    --rail-a: #22384F;
+    --rail-b: #17283D;
+    --rail-solid: #1D3248;
+    --rail-edge: #102235;
     --app-secondary: #0f766e;
     --app-secondary-soft: #ccfbf1;
     --app-health: #15803d;
@@ -36,10 +36,10 @@
     background: var(--teal); background-image: var(--accent-gradient); border-color: var(--teal); color: #ffffff;
   }
   :root:root :is(.primary-button, .scan-button, .login-submit):not(:disabled):hover {
-    background: var(--teal-dark); background-image: linear-gradient(135deg, #1d4ed8 0%, #163b73 72%, #0f2f5f 100%); border-color: var(--teal-dark);
+    background: var(--teal-dark); background-image: linear-gradient(135deg, #405B75 0%, #29435F 72%, #17283D 100%); border-color: var(--teal-dark);
   }
   :root:root :is(.status-pill.green, .status-badge.green, .card-inventory-status.is-blank, .card-inventory-status.is-returned_vacant) { --status-color: #15803d; }
-  :root:root :is(.status-pill.blue, .status-badge.blue, .card-inventory-status.is-assigned) { --status-color: #1d4ed8; }
+  :root:root :is(.status-pill.blue, .status-badge.blue, .card-inventory-status.is-assigned) { --status-color: #29435F; }
   :root:root :is(.status-pill.amber, .status-badge.amber) { --status-color: #a16207; }
   :root:root :is(.status-pill.red, .status-badge.red, .card-inventory-status.is-lost, .card-inventory-status.is-damaged) { --status-color: #dc2626; }
   :root:root :is(.notice-bar.success, .inline-message.success, [data-sonner-toast][data-type="success"]) {
@@ -60,8 +60,8 @@
   :root:root .blocker-button.success { background: #15803d; color: #ffffff; }
   :root:root .notif-badge { background: #dc2626; }
   :root:root .notif-bell.has-alert { color: #dc2626; }
-  :root:root .login-blob.teal { background: linear-gradient(135deg, #60a5fa, #1d4ed8); }
-  :root:root .login-blob.amber { background: linear-gradient(135deg, #dbeafe, #93c5fd); }
+  :root:root .login-blob.teal { background: linear-gradient(135deg, #8799AA, #29435F); }
+  :root:root .login-blob.amber { background: linear-gradient(135deg, #DCE3EA, #AAB7C4); }
   :root:root,
   :root:root body,
   :root:root #root,
@@ -79,12 +79,12 @@
     background-position: center;
     background-attachment: fixed;
   }
-  :root:root .sidebar { background-color: #edf4ff; background-image: var(--sidebar-gradient); }
+  :root:root .sidebar { background-color: #E9EEF2; background-image: var(--sidebar-gradient); }
   :root:root .topbar { background-color: rgb(255 255 255 / 92%); background-image: var(--topbar-gradient); }
   :root:root .login-card {
     background-color: #ffffff;
     background-image: var(--surface-gradient);
-    box-shadow: 0 24px 60px rgb(22 59 115 / 18%), 0 4px 14px rgb(29 78 216 / 9%);
+    box-shadow: 0 24px 60px rgb(23 40 61 / 18%), 0 4px 14px rgb(41 67 95 / 9%);
   }
   :root:root .app-shell :is(
     .panel,
@@ -104,33 +104,33 @@
   ) {
     background-color: #ffffff;
     background-image: var(--surface-gradient);
-    border-color: #d7e3f3;
+    border-color: #D8E0E7;
   }
-  :root:root .sidebar { border-color: #c9d5e5; }
-  :root:root :is(.sidebar, .login-brand) .brand-mark { background: #163b73; box-shadow: 0 5px 14px rgb(22 59 115 / 25%); }
-  :root:root .app-shell .sidebar nav button:hover:not(.active) { background: #f1f5fb; color: #163b73; }
+  :root:root .sidebar { border-color: #CAD2DA; }
+  :root:root :is(.sidebar, .login-brand) .brand-mark { background: #17283D; box-shadow: 0 5px 14px rgb(23 40 61 / 25%); }
+  :root:root .app-shell .sidebar nav button:hover:not(.active) { background: #F3F5F7; color: #17283D; }
   :root:root .app-shell .sidebar nav button.active {
-    background: #dbeafe; background-image: linear-gradient(110deg, #dbeafe 0%, #bfdbfe 58%, #eaf2ff 100%); color: #163b73; border-color: #93b4e6;
-    box-shadow: inset 3px 0 0 #1d4ed8, 0 4px 12px rgb(29 78 216 / 10%);
+    background: #DCE3EA; background-image: linear-gradient(110deg, #E7ECF1 0%, #D4DDE5 58%, #F1F4F6 100%); color: #17283D; border-color: #AAB7C4;
+    box-shadow: inset 3px 0 0 #29435F, 0 4px 12px rgb(41 67 95 / 10%);
   }
-  :root:root .app-shell .sidebar nav button.active :is(b, small, svg) { color: #163b73; }
+  :root:root .app-shell .sidebar nav button.active :is(b, small, svg) { color: #17283D; }
   :root:root .app-shell .pos-premium-layout .quick-pick-panel,
   :root:root .app-shell .pos-premium-bill :is(.pos-head, .cart-mid, .pos-payment-summary) {
     background-color: #ffffff;
     background-image: var(--surface-gradient);
-    border-color: #d7e3f3;
+    border-color: #D8E0E7;
   }
-  :root:root :is(.global-search, .scan-hero, .search-box, input, select, textarea):focus-within { border-color: #1d4ed8; }
-  :root:root :is(.onboarding-banner, .setup-banner, .dashboard-ready-card) { background: #eff6ff; background-image: linear-gradient(135deg, #eff6ff 0%, #dbeafe 62%, #f8fbff 100%); border-color: #93b4e6; }
-  :root:root :is(.dash-tab.active, .report-view-pills [aria-selected="true"], .cost-profit-ranges .primary-button) { background: #1d4ed8; background-image: var(--accent-gradient); border-color: #1d4ed8; color: #ffffff; }
-  :root:root .quick-pick-panel .product-card.in-bill { border-color: #1d4ed8; box-shadow: inset 0 0 0 1px #1d4ed8, 0 2px 4px rgb(15 23 42 / 8%); }
-  /* POS shortcuts use one restrained blue system; semantic green remains for success. */
-  :root:root .pos-rail .rail-btn { color: #10233f; --task-ink: #1d4ed8; --task-tint: #eff6ff; }
+  :root:root :is(.global-search, .scan-hero, .search-box, input, select, textarea):focus-within { border-color: #29435F; }
+  :root:root :is(.onboarding-banner, .setup-banner, .dashboard-ready-card) { background: #F3F5F7; background-image: linear-gradient(135deg, #F5F7F8 0%, #DCE3EA 62%, #FAFBFC 100%); border-color: #AAB7C4; }
+  :root:root :is(.dash-tab.active, .report-view-pills [aria-selected="true"], .cost-profit-ranges .primary-button) { background: #29435F; background-image: var(--accent-gradient); border-color: #29435F; color: #ffffff; }
+  :root:root .quick-pick-panel .product-card.in-bill { border-color: #29435F; box-shadow: inset 0 0 0 1px #29435F, 0 2px 4px rgb(31 43 56 / 8%); }
+  /* POS shortcuts use one restrained navy-slate system; semantic green remains for success. */
+  :root:root .pos-rail .rail-btn { color: #1F2B38; --task-ink: #29435F; --task-tint: #F3F5F7; }
   :root:root .pos-rail .rail-btn.rail-member { --task-ink: #0f766e; --task-tint: #ccfbf1; }
   :root:root .pos-rail .rail-btn > svg { background: var(--task-tint); color: var(--task-ink); }
-  :root:root .pos-rail .rail-btn.active { background: #dbeafe; border-color: #1d4ed8; color: #10233f; box-shadow: inset 3px 0 0 #1d4ed8, 0 2px 4px rgb(15 23 42 / 12%); }
-  :root:root :is(.scan-hero:focus-within, .member-scan-field:focus-within) { border-color: #1d4ed8; box-shadow: 0 0 0 3px rgb(29 78 216 / 14%); }
-  :root:root :is(.cart-total strong, .cart-totals .total-line strong, .cost-profit-page a) { color: #163b73; }
+  :root:root .pos-rail .rail-btn.active { background: #DCE3EA; border-color: #29435F; color: #1F2B38; box-shadow: inset 3px 0 0 #29435F, 0 2px 4px rgb(31 43 56 / 12%); }
+  :root:root :is(.scan-hero:focus-within, .member-scan-field:focus-within) { border-color: #29435F; box-shadow: 0 0 0 3px rgb(41 67 95 / 14%); }
+  :root:root :is(.cart-total strong, .cart-totals .total-line strong, .cost-profit-page a) { color: #17283D; }
   :root:root :is(.status-pill, .status-badge, .card-inventory-status) {
     background: transparent !important; border: 0 !important;
     color: var(--status-color, #475569) !important;

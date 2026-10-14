@@ -173,6 +173,7 @@ export function MemberDetail({
   );
   const displayName = memberFullName(profile);
   const statusMeta = MEMBER_STATUS_META[profile.status];
+  const cardReady = Boolean(profile.cardNumber && profile.cardUsable);
   const filtered = transactions.filter(
     tx => tab === "ทั้งหมด" || WALLET_TX_META[tx.type]?.label === tab
   );
@@ -465,11 +466,11 @@ export function MemberDetail({
           </div>
         </div>
         <div className="member-detail-actions">
-          {cardActionsOpen && <MemberCardActionsModal memberNumber={member.memberNumber} onClose={() => setCardActionsOpen(false)} onSuccess={() => { void detailQuery.refetch(); setNotice("จัดการบัตรเรียบร้อยแล้ว"); }} />}
+          {cardActionsOpen && <MemberCardActionsModal memberNumber={member.memberNumber} onClose={() => setCardActionsOpen(false)} onSuccess={(action) => { void detailQuery.refetch(); setNotice(action === "assign" ? "จ่ายบัตรเรียบร้อยแล้ว" : action === "replace" ? "เปลี่ยนบัตรเรียบร้อยแล้ว" : action === "return" ? "คืนบัตรเรียบร้อยแล้ว" : "ปิดรอบบัญชีและคืนเงินแล้ว"); }} />}
           <button
             className="primary-button"
-            disabled={profile.status !== "active" || !member.cardNumber}
-            title={!member.cardNumber ? "กรุณาจ่ายบัตรก่อนเติมเงิน" : undefined}
+            disabled={profile.status !== "active" || !cardReady}
+            title={!profile.cardNumber ? "กรุณาจ่ายบัตรก่อนเติมเงิน" : !cardReady ? "บัตรยังไม่พร้อมใช้งาน กรุณาตรวจสอบสถานะบัตร" : undefined}
             onClick={() => {
               setWalletOpen("deposit");
               setWalletConfirm(false);
@@ -481,7 +482,8 @@ export function MemberDetail({
           </button>
           <button
             className="outline-button"
-            disabled={profile.status !== "active"}
+            disabled={profile.status !== "active" || !cardReady}
+            title={!profile.cardNumber ? "กรุณาจ่ายบัตรก่อนถอนเงิน" : !cardReady ? "บัตรยังไม่พร้อมใช้งาน กรุณาตรวจสอบสถานะบัตร" : undefined}
             onClick={() => {
               setWalletOpen("withdrawal");
               setWalletConfirm(false);

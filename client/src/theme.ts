@@ -4,7 +4,7 @@ import { applyThermalPrintProfile, resolveThermalPaperWidth, type ThermalPaperWi
  * ROUND 25 — ปรับแต่งแอป (แบรนด์ + ธีมสี)
  * สีธีมทั้งแอปควบคุมด้วย CSS variables (--teal กลุ่ม) — ไฟล์นี้เปลี่ยนค่า
  * ตอน runtime พร้อมแคชชื่อ/โลโก้ไว้ใน localStorage โดยสีเดิมที่เคยบันทึก
- * จะถูกย้ายมาใช้ Government Blue เพื่อให้ทุกหน้ามีมาตรฐานเดียวกัน
+ * จะถูกย้ายมาใช้ Navy Slate เพื่อให้ทุกหน้ามีมาตรฐานเดียวกัน
  * เพื่อให้หน้า login ก็ได้ธีมเดียวกันทันทีในการเข้าใช้ครั้งถัดไป
  *
  * ROUND 38 (ข้อ 38) — สไตล์การแสดงผล (UI Style): นอกจากสีแบรนด์ ยังเลือก
@@ -17,21 +17,21 @@ import { applyThermalPrintProfile, resolveThermalPaperWidth, type ThermalPaperWi
 export type BrandSettings = { appName: string; appLogo: string; appTheme: string; appStyle?: string; appBackground?: string };
 
 /**
- * สีหลักมาตรฐานของระบบภาครัฐ — ใช้ชุดเดียวทั้งแอปเพื่อให้ทุกหน้าสม่ำเสมอ
- * ค่าเดิมที่บันทึกไว้ยังอ่านได้ แต่จะถูกย้ายมาใช้ Government Blue อัตโนมัติ
+ * สีหลักมาตรฐานของระบบ — กรมท่าหม่นผสมเทา ใช้ชุดเดียวทั้งแอป
+ * ค่าเดิมที่บันทึกไว้ยังอ่านได้ แต่จะถูกย้ายมาใช้พาเลตใหม่นี้อัตโนมัติ
  */
 export const THEME_PRESETS: { id: string; label: string; base: string }[] = [
-  { id: "government", label: "น้ำเงินกรมท่า · ภาครัฐ", base: "#1d4ed8" },
+  { id: "navy-slate", label: "กรมท่าหม่น · เทาสเลต", base: "#29435F" },
 ];
 
-export const DEFAULT_THEME = "government";
+export const DEFAULT_THEME = "navy-slate";
 const BRAND_CACHE_KEY = "png-brand-v1";
 
 /** ROUND 38 (ข้อ 38) — สไตล์การแสดงผลทั้งระบบ (บุคลิกการออกแบบ)
  *  id ใช้เป็น data-style บน <html> · accent = สีเน้นประจำแพลตฟอร์มที่จะใช้ตอนเลือกสไตล์ */
 export type UiStyleId = "shop" | "apple" | "microsoft" | "android";
 export const UI_STYLE_PRESETS: { id: UiStyleId; label: string; detail: string; accent: string; fontFamily: string }[] = [
-  { id: "shop", label: "ร้านค้า (มาตรฐาน)", detail: "แถบน้ำเงินสด เมนูขาว และเทอร์ควอยซ์ — สว่าง คมชัด สมดุล", accent: "#1976d2", fontFamily: "Sarabun" },
+  { id: "shop", label: "ร้านค้า (มาตรฐาน)", detail: "กรมท่าหม่น เทาสเลต และเมนูขาว — สุภาพ ชัดเจน เป็นมืออาชีพ", accent: "#29435F", fontFamily: "Sarabun" },
   { id: "apple", label: "Apple", detail: "ขาวสะอาด ปุ่มทรงแคปซูล ฟอนต์ระบบ Apple — เรียบแบบ iOS/macOS", accent: "#0071e3", fontFamily: "SF / Helvetica" },
   { id: "microsoft", label: "Microsoft", detail: "แบบ Fluent — ขอบคม เรียบตึง ฟอนต์ Segoe UI แบบ Windows 11", accent: "#0f6cbd", fontFamily: "Segoe UI" },
   { id: "android", label: "Android", detail: "แบบ Material You — การ์ดมนมาก โทนม่วงพาสเทล แบบแอปบนมือถือ", accent: "#6750a4", fontFamily: "Roboto / Google Sans" },
@@ -69,7 +69,7 @@ export function normalizeTheme(theme: string | undefined | null): string {
   return DEFAULT_THEME;
 }
 
-/** preset id หรือ hex เดิม → สีน้ำเงินมาตรฐานของระบบ */
+/** preset id หรือ hex เดิม → สีกรมท่าหม่นมาตรฐานของระบบ */
 export function resolveThemeColor(theme: string | undefined | null): string {
   normalizeTheme(theme);
   return THEME_PRESETS[0].base;
@@ -77,34 +77,34 @@ export function resolveThemeColor(theme: string | undefined | null): string {
 
 /** เขียน CSS variables ทั้งกลุ่มจากสีหลักสีเดียว */
 export function applyThemeColor(theme: string | undefined | null): string {
-  // One government palette; legacy saved colors remain readable but no longer
+  // One application palette; legacy saved colors remain readable but no longer
   // override the shared design.
   normalizeTheme(theme);
-  const base = "#1d4ed8";
+  const base = "#29435F";
   const rgb = hexToRgb(base);
   if (!rgb) return base;
   const [r, g, b] = rgb;
   const root = document.documentElement;
-  root.dataset.palette = "government-blue";
+  root.dataset.palette = "navy-slate";
   const vars: Record<string, string> = {
     "--teal": base,
-    "--teal-dark": "#163b73",
-    "--teal-soft": "#dbeafe",
-    "--teal-mist": "#eff6ff",
-    "--canvas-gradient": "linear-gradient(135deg, #e7f0ff 0%, #f8fbff 46%, #dce9fb 100%)",
-    "--workspace-gradient": "linear-gradient(135deg, rgb(231 240 255 / 96%) 0%, rgb(248 251 255 / 92%) 48%, rgb(220 233 251 / 94%) 100%)",
-    "--sidebar-gradient": "linear-gradient(180deg, #f8fbff 0%, #edf4ff 52%, #dbe8fa 100%)",
-    "--topbar-gradient": "linear-gradient(110deg, rgb(255 255 255 / 94%) 0%, rgb(231 240 255 / 92%) 100%)",
-    "--surface-gradient": "linear-gradient(145deg, #ffffff 0%, #f8fbff 58%, #edf4ff 100%)",
-    "--accent-gradient": "linear-gradient(135deg, #2563eb 0%, #1d4ed8 48%, #163b73 100%)",
+    "--teal-dark": "#17283D",
+    "--teal-soft": "#DCE3EA",
+    "--teal-mist": "#F3F5F7",
+    "--canvas-gradient": "linear-gradient(135deg, #E5EAF0 0%, #F7F8FA 46%, #DDE3E8 100%)",
+    "--workspace-gradient": "linear-gradient(135deg, rgb(229 234 240 / 96%) 0%, rgb(247 248 250 / 94%) 48%, rgb(221 227 232 / 95%) 100%)",
+    "--sidebar-gradient": "linear-gradient(180deg, #F8FAFC 0%, #E9EEF2 52%, #DCE3E9 100%)",
+    "--topbar-gradient": "linear-gradient(110deg, rgb(255 255 255 / 95%) 0%, rgb(229 234 240 / 92%) 100%)",
+    "--surface-gradient": "linear-gradient(145deg, #FFFFFF 0%, #F7F9FA 58%, #E9EEF2 100%)",
+    "--accent-gradient": "linear-gradient(135deg, #526B84 0%, #29435F 52%, #17283D 100%)",
     "--app-secondary": "#0f766e",
     "--app-secondary-soft": "#ccfbf1",
     "--app-health": "#15803d",
     "--app-health-soft": "#dcfce7",
-    "--rail-a": "#163b73",
-    "--rail-b": "#0f2f5f",
-    "--rail-solid": "#123665",
-    "--rail-edge": "#0b2548",
+    "--rail-a": "#22384F",
+    "--rail-b": "#17283D",
+    "--rail-solid": "#1D3248",
+    "--rail-edge": "#102235",
     "--teal-glow": `rgba(${r}, ${g}, ${b}, .22)`,
   };
   for (const [key, value] of Object.entries(vars)) root.style.setProperty(key, value);
