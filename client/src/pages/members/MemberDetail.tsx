@@ -1,4 +1,3 @@
-import { LimitReductionModal } from "@/components/LimitReductionModal";
 import { ActionButton } from "@/components/ActionButton";
 import { useState } from "react";
 import { MemberCardActionsModal } from "@/components/MemberCardActionsModal";
@@ -25,7 +24,6 @@ import {
   ShoppingCart,
   Star,
   Trash2,
-  TrendingDown,
   WalletCards,
   X,
 } from "@/lib/icons";
@@ -67,15 +65,13 @@ import {
 /**
  * MemberDetail — single-member view: profile, stats, transaction history,
  * wallet modals (deposit/withdrawal/refund) with slip print, edit modal,
- * limit-reduction request dialog, card print, and statement export.
+ * card print, and statement export.
  *
  * Extracted from Home.tsx (V2-C2) — pure move, no business-logic change.
  *
  * ROUND 77 (user) — wallet modal becomes a slip after success with the same
  * download/print buttons as receipts, instead of closing immediately.
  * Round 31 — deposit/withdrawal here also use a 2-step flow (form → confirm).
- * ROUND 34 (req 23.2) — limit-reduction request is a 2-step flow that lands
- * in "pending review" status until an admin approves it.
  * ROUND 38 (ข้อ 37) — member photo upload from camera in the edit dialog.
  */
 export function MemberDetail({
@@ -140,7 +136,6 @@ export function MemberDetail({
     idCard: string;
     gender: "ชาย" | "หญิง" | "ไม่ระบุ";
     photoUrl: string;
-    creditLimit: string;
     cardNumber: string;
     patientCode: string;
   } | null>(null);
@@ -152,8 +147,6 @@ export function MemberDetail({
   const [cardOpen, setCardOpen] = useState(false);
   const [cardAction, setCardAction] = useState<"manage" | "return" | null>(null);
   const [statementOpen, setStatementOpen] = useState(false);
-  // ROUND 34 (req 23.2) — ขอลดวงเงินซื้อสินค้าต่อวัน: 2 ขั้นเหมือนเติม/ถอน (กรอก → ยืนยัน → ส่ง)
-  const [limitOpen, setLimitOpen] = useState(false);
   const actor = userName || "ผู้ใช้ระบบ";
   const actorRole = roleThaiLabel(role);
   const profile = detailQuery.data?.member ?? member;
@@ -285,7 +278,6 @@ export function MemberDetail({
     },
     onError: mutationError => setError(getErrorMessage(mutationError)),
   });
-  // ROUND 34 (req 23.2) — ยื่นคำขอลดวงเงิน: เจ้าหน้าที่ทุกคนทำได้ คำขอเข้าสถานะรอพิจารณา
   const deleteMutation = trpc.member.delete.useMutation({
     onSuccess: result => {
       void utils.member.list.invalidate();
@@ -312,8 +304,6 @@ export function MemberDetail({
             ? "หญิง"
             : "ไม่ระบุ",
       photoUrl: detail?.photoUrl ?? "",
-      creditLimit:
-        detail?.creditLimit != null ? String(detail.creditLimit) : "",
       cardNumber: detail?.cardNumber ?? profile.cardNumber ?? "",
       patientCode: detail?.patientCode ?? profile.patientCode ?? "",
     });
@@ -348,20 +338,6 @@ export function MemberDetail({
       setError("กรุณาระบุชื่อและนามสกุลสมาชิก");
       return;
     }
-    // ROUND 34 — วงเงินซื้อสินค้าต่อวัน: เว้นว่าง = ไม่จำกัด (null) ไม่งั้นต้องเป็นจำนวนเต็มบวก
-    const creditLimitDraft = editForm.creditLimit.trim();
-    const creditLimitValue =
-      creditLimitDraft === "" ? null : Number(creditLimitDraft);
-    if (
-      creditLimitValue !== null &&
-      (!Number.isFinite(creditLimitValue) ||
-        !Number.isInteger(creditLimitValue) ||
-        creditLimitValue <= 0 ||
-        creditLimitValue > 1_000_000)
-    ) {
-      setError("วงเงินต้องเป็นตัวเลขมากกว่า 0 และไม่เกิน 1,000,000");
-      return;
-    }
     setError("");
     updateMutation.mutate({
       memberNumber: member.memberNumber,
@@ -373,7 +349,6 @@ export function MemberDetail({
       type: editForm.type,
       gender: editForm.gender,
       photoUrl: editForm.photoUrl || null,
-      creditLimit: creditLimitValue,
       cardNumber: editForm.cardNumber.trim() || null,
       actor,
       actorRole,
@@ -415,11 +390,6 @@ export function MemberDetail({
       actorRole,
     });
   };
-  // ROUND 34 (req 23.2) — ขอลดวงเงิน: เปิดโมดัล + ตรวจข้อมูลก่อนขั้นยืนยัน + ส่งคำขอ
-  const openLimitDialog = () => {
-    setError("");
-    setLimitOpen(true);
-  };
   return (
     <>
       <SectionHeader
@@ -453,15 +423,6 @@ export function MemberDetail({
               <StatusPill tone={statusMeta.tone}>
                 {statusMeta.label}
               </StatusPill>{" "}
-              <span
-                className="member-limit-chip"
-                title="วงเงินซื้อสินค้าต่อวันของสมาชิกนี้ (ชำระหักบัญชี) — เว้นว่างคือไม่จำกัด"
-              >
-                วงเงินซื้อ/วัน{" "}
-                {profile.creditLimit != null
-                  ? money(profile.creditLimit)
-                  : "ไม่จำกัด"}
-              </span>
             </p>
           </div>
         </div>
@@ -500,13 +461,6 @@ export function MemberDetail({
             title={!profile.cardNumber ? "สมาชิกยังไม่มีบัตรที่ต้องคืน" : "รับบัตรคืน คืนยอดคงเหลือทั้งหมด และปิดรอบบัตร"}
           >
             <RotateCcw size={15} /> คืนบัตร
-          </button>
-          <button
-            className="outline-button"
-            onClick={openLimitDialog}
-            title="ส่งคำขอปรับวงเงินซื้อสินค้าต่อวัน ไม่ใช่การถอนเงินคงเหลือ"
-          >
-            <TrendingDown size={15} /> ขอปรับวงเงินซื้อ/วัน
           </button>
           <button
             className="outline-button"
@@ -557,7 +511,7 @@ export function MemberDetail({
           )}
         </div>
       </div>
-      {error && !walletOpen && !editOpen && !limitOpen && (
+      {error && !walletOpen && !editOpen && (
         <div className="notice-bar error" style={{ marginBottom: 14 }}>
           <ShieldCheck size={16} /> {error}
           <button onClick={() => setError("")}>
@@ -1222,24 +1176,6 @@ export function MemberDetail({
                 </select>
               </label>
               <label>
-                วงเงินซื้อสินค้าต่อวัน (บาท)
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min="1"
-                  step="1"
-                  value={editForm.creditLimit}
-                  onChange={event =>
-                    setEditForm({
-                      ...editForm,
-                      creditLimit: event.target.value,
-                    })
-                  }
-                  placeholder="เว้นว่าง = ไม่จำกัด"
-                  title="ยอดซื้อรวมต่อวันเมื่อชำระหักบัญชีสมาชิก · เว้นว่าง = ไม่จำกัด"
-                />
-              </label>
-              <label>
                 เบอร์โทรศัพท์
                 <input
                   value={editForm.phone}
@@ -1414,16 +1350,6 @@ export function MemberDetail({
           }}
         />
       )}
-      {limitOpen && (
-        <LimitReductionModal
-          member={member}
-          role={role}
-          userName={userName}
-          onClose={() => setLimitOpen(false)}
-          onSuccess={setNotice}
-        />
-      )}
-
       <ConfirmDialog
         open={confirmDelete}
         title="ยืนยันการลบสมาชิก?"

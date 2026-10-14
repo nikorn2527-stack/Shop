@@ -539,7 +539,7 @@ export function AppShell({
             </button>
           )}
           </div> : null}
-          {!railHidden.has("card") || !railHidden.has("deposit") || !railHidden.has("withdraw") || !railHidden.has("register") || !railHidden.has("limit") ? <div className="pos-rail-group"><span className="pos-rail-group-label">งานสมาชิก</span>
+          {!railHidden.has("card") || !railHidden.has("deposit") || !railHidden.has("withdraw") || !railHidden.has("register") ? <div className="pos-rail-group"><span className="pos-rail-group-label">งานสมาชิก</span>
           {!railHidden.has("card") && <button type="button" className="rail-btn rail-member" title="จ่าย เปลี่ยน คืนบัตร หรือปิดรอบบัญชี" onClick={() => window.dispatchEvent(new CustomEvent("pos-rail", { detail: "card" }))}><CreditCard size={20} /><b>จัดการบัตร</b><kbd>{shortcutLabel("card")}</kbd></button>}
           {!railHidden.has("deposit") && (
             <button

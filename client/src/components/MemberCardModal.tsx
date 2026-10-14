@@ -24,8 +24,6 @@ export type MemberCardData = {
   createdAt?: string | null;
   photoUrl?: string | null;
   gender?: string | null;
-  /** ROUND 34 — วงเงินซื้อต่อวัน (ชำระหักบัญชี) แสดงเฉพาะโหมดยืนยัน */
-  creditLimit?: number | null;
   /** ROUND 65 — รหัสบัตรเงินสด / รหัสผู้ป่วย (HN) — แสดงบนบัตรเมื่อมีข้อมูล */
   cardNumber?: string | null;
   patientCode?: string | null;
@@ -231,7 +229,7 @@ export function MemberCardModal({
         {suspended ? <ShieldAlert size={15} /> : <ScanLine size={15} />}
         <span>{confirmHint ?? (suspended
           ? "บัตรใบนี้ถูกระงับการใช้จ่าย — ตรวจสอบกับสมาชิกและผู้บริหารก่อน หากยืนยันจะยังชำระด้วยเงินสด/QR ได้แต่หักบัญชีไม่ได้"
-          : "ตรวจสอบว่าเป็นสมาชิกที่ถูกต้องแล้วกดยืนยัน — ยอดในบัญชียังไม่ถูกหักจนกว่าจะกดชำระเงินท้ายบิล")}{member.creditLimit != null ? <> · วงเงินซื้อ/วัน {money(member.creditLimit)}</> : null}</span>
+          : "ตรวจสอบว่าเป็นสมาชิกที่ถูกต้องแล้วกดยืนยัน — ยอดในบัญชียังไม่ถูกหักจนกว่าจะกดชำระเงินท้ายบิล")}</span>
         <b className="verify-balance-chip">{money(member.balance)}<small>ยอดคงเหลือ ณ ตอนสแกน</small></b>
       </div>
     )}

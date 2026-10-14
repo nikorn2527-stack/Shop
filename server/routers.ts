@@ -66,8 +66,6 @@ import {
   listAppUsers,
   listAuditLogs,
   listDayClosures,
-  listLimitRequests,
-  countPendingLimitRequests,
   listMembers,
   listProducts,
   listStockRows,
@@ -79,8 +77,6 @@ import {
   stockBalanceReport,
   receiveStockLines,
   receiveStockBatch,
-  requestLimitReduction,
-  decideLimitRequest,
   registerLoginFailure,
   registerMember,
   revokeAppSession,
@@ -256,27 +252,9 @@ const memberUpdateInput = z.object({
   type: z.string().optional(),
   gender: z.enum(["ชาย", "หญิง", "ไม่ระบุ"]).nullish(),
   photoUrl: z.string().max(600_000).nullish(),
-  // Req 23.2 — วงเงินซื้อสินค้าต่อวัน (null = ไม่จำกัด)
-  creditLimit: z.number().min(1).max(1000000).nullable().optional(),
   // ROUND 65 — รหัสบัตรเงินสด / รหัสผู้ป่วย (HN)
   cardNumber: z.string().max(30, "รหัสบัตรยาวเกินไป").nullish(),
   patientCode: z.string().max(30, "รหัสผู้ป่วยยาวเกินไป").nullish(),
-  actor: z.string().optional(),
-  actorRole: z.string().optional(),
-});
-
-// Req 23.2 — การขอลดวงเงิน: เจ้าหน้าที่ยื่นคำขอ · ผู้บริหารพิจารณา (approve/reject)
-const memberLimitRequestInput = z.object({
-  memberNumber: z.string().min(1),
-  requestedLimit: z.number().int().min(1).max(1000000),
-  reason: z.string().max(500).optional(),
-  actor: z.string().optional(),
-  actorRole: z.string().optional(),
-});
-
-const memberLimitDecisionInput = z.object({
-  requestId: z.number().int().positive(),
-  decision: z.enum(["approve", "reject"]),
   actor: z.string().optional(),
   actorRole: z.string().optional(),
 });
@@ -1268,28 +1246,6 @@ export const appRouter = router({
           return updateMember(getWelfareDb(), { ...input, actor, actorRole });
         });
       }),
-    // Req 23.2 — การขอลดวงเงิน: เจ้าหน้าที่ที่ล็อกอินยื่นคำขอได้ (คำขอเข้าสถานะ pending)
-    requestLimitReduction: publicProcedure
-      .input(memberLimitRequestInput)
-      .mutation(({ ctx, input }) => {
-        const { actor, actorRole } = resolveActor(ctx, input);
-        return withStoreErrors(() => {
-          requireLogin(ctx); // P1-c — ยื่นคำขอลดวงเงินต้องมีเซสชันเจ้าหน้าที่
-          return requestLimitReduction(getWelfareDb(), { ...input, actor, actorRole });
-        });
-      }),
-    // Req 23.2 — พิจารณาคำขอลดวงเงิน: ผู้บริหารเท่านั้น (approve = ตั้งวงเงินใหม่ / reject = คงเดิม)
-    decideLimitRequest: publicProcedure
-      .input(memberLimitDecisionInput)
-      .mutation(({ ctx, input }) => {
-        const { actor, actorRole } = resolveActor(ctx, input);
-        return withStoreErrors(() => {
-          if (!isAdminCtx(ctx, input)) {
-            throw new TRPCError({ code: "FORBIDDEN", message: "การพิจารณาคำขอลดวงเงินต้องใช้สิทธิ์ผู้บริหาร" });
-          }
-          return decideLimitRequest(getWelfareDb(), { ...input, actor, actorRole });
-        });
-      }),
     delete: publicProcedure
       .input(memberDeleteInput)
       .mutation(({ ctx, input }) => {
@@ -1377,18 +1333,6 @@ export const appRouter = router({
         requireLogin(ctx);
         return stockBalanceReport(getWelfareDb(), input ?? {});
       })),
-    // Req 23.2 — คำขอลดวงเงินทั้งหมด (รอพิจารณาขึ้นก่อน) + จำนวนค้างพิจารณาสำหรับ badge
-    limitRequests: publicProcedure
-      .input(z.object({ status: z.enum(["pending", "approved", "rejected"]).optional(), limit: z.number().int().min(1).max(200).optional() }).optional())
-      .query(({ ctx, input }) =>
-        withStoreErrors(() => {
-          requireLogin(ctx);
-          return {
-            items: listLimitRequests(getWelfareDb(), input ?? {}),
-            pendingCount: countPendingLimitRequests(getWelfareDb()),
-          };
-        }),
-      ),
     businessPeriod: publicProcedure
       .input(z.unknown().optional())
       .query(({ ctx }) => withStoreErrors(() => {

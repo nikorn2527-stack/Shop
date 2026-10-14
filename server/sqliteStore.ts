@@ -2360,16 +2360,6 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
   if (input.memberNumber?.trim()) member = requireUsableMemberCard(db, input.memberNumber);
   if (isWallet && member) {
     if (member.balance < total) throw new StoreError(`ยอดเงินคงเหลือไม่พอ · ยอดชำระ ${money(total)} คงเหลือ ${money(member.balance)}`);
-    // Req 23.2 — วงเงินซื้อสินค้าต่อวัน: wallet bills of TODAY plus this bill
-    // must stay within the member's credit limit (null = ไม่จำกัด).
-    if (member.creditLimit != null) {
-      const todayStart = `${formatDate(new Date())} 00:00:00`;
-      const usedRow = db.prepare(`SELECT ROUND(COALESCE(SUM(total), 0), 2) AS usedToday FROM sales WHERE member_number = ? AND payment_method = ? AND created_at >= ?`).get(member.memberNumber, WALLET_PAYMENT, todayStart) as { usedToday: number };
-      const usedToday = round2(usedRow.usedToday ?? 0);
-      if (round2(usedToday + total) > member.creditLimit) {
-        throw new StoreError(`เกินวงเงินซื้อสินค้าต่อวัน · วงเงิน ${money(member.creditLimit)} · ใช้ไปแล้ววันนี้ ${money(usedToday)} · บิลนี้ ${money(total)}`);
-      }
-    }
   }
 
   const now = new Date();
@@ -2840,8 +2830,6 @@ export type UpdateMemberInput = {
   type?: string;
   gender?: string | null;
   photoUrl?: string | null;
-  /** วงเงินซื้อสินค้าต่อวัน — null = ไม่จำกัด (req 23.2) */
-  creditLimit?: number | null;
   /** ROUND 65 — รหัสบัตรเงินสด · "" = ล้าง */
   cardNumber?: string | null;
   /** ROUND 65 — รหัสผู้ป่วย (HN) · "" = ล้าง */
@@ -2860,9 +2848,6 @@ export function updateMember(db: SqliteDb, input: UpdateMemberInput): SqliteMemb
   if (typeof input.firstName === "string" && !input.firstName.trim()) throw new StoreError("กรุณาระบุชื่อสมาชิก");
   if (typeof input.lastName === "string" && !input.lastName.trim()) throw new StoreError("กรุณาระบุนามสกุลสมาชิก");
   if (typeof input.type === "string" && !input.type.trim()) throw new StoreError("กรุณาระบุประเภทสมาชิก");
-  if (input.creditLimit !== undefined && input.creditLimit !== null && !(input.creditLimit > 0)) {
-    throw new StoreError("วงเงินซื้อสินค้าต่อวันต้องมากกว่า 0");
-  }
 
   const assignments: string[] = [];
   const values: (string | number | null)[] = [];
@@ -2907,11 +2892,6 @@ export function updateMember(db: SqliteDb, input: UpdateMemberInput): SqliteMemb
     assignments.push("photo_url = ?");
     values.push(input.photoUrl?.trim() || null);
     changedLabels.push("รูปสมาชิก");
-  }
-  if (input.creditLimit !== undefined && input.creditLimit !== member.creditLimit) {
-    assignments.push("credit_limit = ?");
-    values.push(input.creditLimit === null ? null : round2(input.creditLimit));
-    changedLabels.push("วงเงินซื้อสินค้าต่อวัน");
   }
   // ROUND 65 — รหัสบัตร/รหัสผู้ป่วย: ตรวจซ้ำกับสมาชิกคนอื่นก่อนบันทึก
   if (input.cardNumber !== undefined) {

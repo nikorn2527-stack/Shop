@@ -25,22 +25,17 @@ describe("member card workflow UI", () => {
     expect(modalSource).toContain('release.mutate({ ...input, mode: "refund" })');
   });
 
-  it("labels the legacy credit-limit request as a purchase limit, not cash withdrawal", () => {
+  it("keeps the removed purchase-limit workflow out and adds card numbers to reports", () => {
     const detailSource = readSource("./pages/members/MemberDetail.tsx");
-    const limitSource = readSource("./components/LimitReductionModal.tsx");
-
-    expect(detailSource).toContain("ขอปรับวงเงินซื้อ/วัน");
-    expect(limitSource).toContain("รายการนี้ปรับวงเงินซื้อสินค้าเท่านั้น ไม่ได้ถอนเงินคงเหลือ");
-  });
-
-  it("keeps purchase-limit requests out of money history and adds card numbers to reports", () => {
+    const posSource = readSource("./pages/Pos.tsx");
     const reportSource = readSource("./pages/reports/Reports.tsx");
     const serverSource = readSource("../../server/sqliteStore.ts");
 
-    expect(reportSource).not.toContain('["limit_request", "ขอลดวงเงิน"]');
+    expect(detailSource).not.toContain("ปรับวงเงิน");
+    expect(posSource).not.toContain("LimitReductionModal");
+    expect(reportSource).not.toContain("limitRequests");
     expect(reportSource).toContain('"เลขบัตร"');
-    expect(reportSource).toContain("รายการนี้ไม่ใช่การถอนเงิน จึงแยกออกจากประวัติธุรกรรม");
-    expect(serverSource).toContain("Credit-limit requests are deliberately excluded because they do not move money.");
+    expect(serverSource).not.toContain("เกินวงเงินซื้อสินค้าต่อวัน");
     expect(serverSource).toContain("s.card_number AS cardNumber");
   });
 });

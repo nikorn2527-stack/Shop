@@ -15,7 +15,6 @@ import { SharedSearch } from "@/components/SharedSearch";
  *   - ROUND 61 (user): มุมมอง "แยกตามสินค้า / รายการในบิล / พนักงานขาย" เป็นรายงานขั้นสูง (เวอร์ชันโปร)
  *   - ROUND 77 (user): เลือกประเภทธุรกรรมได้หลายอย่างพร้อมกัน
  *   - ROUND 79 (user): เลือกพนักงานขายได้หลายคนพร้อมกัน
- *   - ROUND 34 (req 23.2): สถานะคำขอลดวงเงิน → ป้ายสี
  *   - UI-9: ปุ่มลัดช่วงเวลาของธุรกรรมสมาชิก
  */
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
@@ -46,7 +45,7 @@ import {
 import { type EditionFeatureKey } from "@shared/editions";
 import { EditionUpgradeModal, useEditionStatus } from "@/components/EditionUi";
 import type { MemberLite, Role } from "../pageData";
-import type { LimitRequestRow, MemberTransactionRow, SaleHistoryEntry } from "../../../../server/sqliteStore";
+import type { MemberTransactionRow, SaleHistoryEntry } from "../../../../server/sqliteStore";
 import {
   isAdminRole,
   memberFullName,
@@ -289,12 +288,6 @@ export function Reports({
   const [debouncedBalanceSearch, setDebouncedBalanceSearch] = useState("");
   const [stockSearch, setStockSearch] = useState("");
   const [debouncedStockSearch, setDebouncedStockSearch] = useState("");
-  // คำขอปรับวงเงินซื้อ/วันแยกจากประวัติธุรกรรมเงินจริง
-  const [limitDecision, setLimitDecision] = useState<{
-    row: LimitRequestRow;
-    decision: "approve" | "reject";
-  } | null>(null);
-  const [limitError, setLimitError] = useState("");
   const isoDay = (date: Date) =>
     `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
   // ROUND 49 — ช่วงเวลาของรายงานมาจากแหล่งเดียว: ปุ่มลัด หรือช่องกำหนดเอง
@@ -541,37 +534,6 @@ export function Reports({
     );
     return () => clearTimeout(timer);
   }, [stockSearch]);
-  // ROUND 34 (req 23.2) — คำขอลดวงเงินค้างพิจารณา (ข้อมูลน้อย ดึงตลอดเพื่อการ์ดสรุปและ badge)
-  const limitRequestsQuery = trpc.reports.limitRequests.useQuery({
-    status: "pending",
-    limit: 200,
-  });
-  const pendingLimitCount = limitRequestsQuery.data?.pendingCount ?? 0;
-  // ผู้บริหารอนุมัติ/ปฏิเสธคำขอจากแถวรอพิจารณาในตาราง (approve = ตั้งวงเงินเป็นค่าที่ขอ)
-  const decideLimitMutation = trpc.member.decideLimitRequest.useMutation({
-    onSuccess: result => {
-      const name = result.memberName ?? result.memberNumber;
-      setLimitDecision(null);
-      setLimitError("");
-      setNotice(
-        result.status === "approved"
-          ? `อนุมัติคำขอปรับวงเงินซื้อ/วันของ ${name} แล้ว · วงเงินใหม่ ${money(result.requestedLimit)}`
-          : `ปฏิเสธคำขอปรับวงเงินซื้อ/วันของ ${name} แล้ว · วงเงินคงเดิม ${result.currentLimit != null ? money(result.currentLimit) : "ไม่จำกัด"}`
-      );
-      void utils.reports.limitRequests.invalidate();
-      void utils.member.list.invalidate();
-    },
-    onError: mutationError => setLimitError(getErrorMessage(mutationError)),
-  });
-  const confirmLimitDecision = () => {
-    if (!limitDecision) return;
-    decideLimitMutation.mutate({
-      requestId: limitDecision.row.id,
-      decision: limitDecision.decision,
-      actor: userName || "ผู้ใช้ระบบ",
-      actorRole: role === "admin" ? "ผู้บริหาร" : "เจ้าหน้าที่",
-    });
-  };
   const [notice, setNotice] = useState("");
   const [billSearch, setBillSearch] = useState("");
   const [debouncedBillSearch, setDebouncedBillSearch] = useState("");
@@ -3044,32 +3006,6 @@ export function Reports({
                   <span>{txTotals.refundCount} รายการ</span>
                 </div>
               </div>
-              {isAdminRole(role) && pendingLimitCount > 0 && (
-                <div className="table-wrap limit-request-panel">
-                  <div className="table-toolbar">
-                    <div>
-                      <h3>คำขอปรับวงเงินซื้อ/วัน</h3>
-                      <p>รายการนี้ไม่ใช่การถอนเงิน จึงแยกออกจากประวัติธุรกรรม</p>
-                    </div>
-                  </div>
-                  <table className="entity-table" aria-label="คำขอปรับวงเงินซื้อรายวัน">
-                    <thead><tr><th>วันที่ · เวลา</th><th>สมาชิก</th><th>วงเงินปัจจุบัน</th><th>วงเงินที่ขอ</th><th>ผู้ยื่นคำขอ</th><th>พิจารณา</th></tr></thead>
-                    <tbody>
-                      {limitRequestsQuery.data?.items.map(row => (
-                        <tr key={row.id}>
-                          <td><small className="cell-mono">{formatLogDateTime(row.createdAt)}</small></td>
-                          <td><b>{row.memberName ?? "—"}</b><small className="cell-sub">{row.memberNumber}</small></td>
-                          <td>{row.currentLimit == null ? "ไม่จำกัด" : money(row.currentLimit)}</td>
-                          <td><b>{money(row.requestedLimit)}</b></td>
-                          <td>{row.requestedBy}</td>
-                          <td><span className="limit-act-row"><button type="button" className="limit-act limit-act-approve" disabled={decideLimitMutation.isPending} onClick={() => { setLimitError(""); setLimitDecision({ row, decision: "approve" }); }}><Check size={12} /> อนุมัติ</button><button type="button" className="limit-act limit-act-reject" disabled={decideLimitMutation.isPending} onClick={() => { setLimitError(""); setLimitDecision({ row, decision: "reject" }); }}><X size={12} /> ปฏิเสธ</button></span></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
             </section>
           )}
           {reportTab === "stock" && (
@@ -3536,107 +3472,6 @@ export function Reports({
           )}
         </div>
       </div>
-      {limitDecision && (
-        <div className="modal-backdrop" onClick={() => setLimitDecision(null)}>
-          <div
-            className="confirm-modal limit-decide-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label="ยืนยันการพิจารณาคำขอปรับวงเงินซื้อรายวัน"
-            onClick={event => event.stopPropagation()}
-          >
-            <div className="confirm-icon">
-              <TrendingDown size={21} />
-            </div>
-            <div className="modal-heading">
-              <div>
-                <h2>
-                  {limitDecision.decision === "approve"
-                    ? "ยืนยันอนุมัติการปรับวงเงินซื้อ/วัน?"
-                    : "ยืนยันปฏิเสธการปรับวงเงินซื้อ/วัน?"}
-                </h2>
-                <p>ผู้พิจารณา: {userName || "ผู้ใช้ระบบ"} · ผู้บริหาร</p>
-              </div>
-              <button
-                className="icon-button"
-                onClick={() => setLimitDecision(null)}
-                aria-label="ปิดหน้าต่าง"
-              >
-                <X size={17} />
-              </button>
-            </div>
-            <div className="wallet-confirm-rows">
-              <div>
-                <span>สมาชิก</span>
-                <b>
-                  {limitDecision.row.memberName ?? "—"} ·{" "}
-                  {limitDecision.row.memberNumber}
-                </b>
-              </div>
-              <div>
-                <span>วงเงินปัจจุบัน</span>
-                <b>
-                  {limitDecision.row.currentLimit != null
-                    ? money(limitDecision.row.currentLimit)
-                    : "ไม่จำกัด"}
-                </b>
-              </div>
-              <div>
-                <span>วงเงินใหม่ที่ขอ</span>
-                <b className="purple-text">{money(limitDecision.row.requestedLimit)}</b>
-              </div>
-              {limitDecision.row.reason && (
-                <div>
-                  <span>เหตุผล</span>
-                  <b>{limitDecision.row.reason}</b>
-                </div>
-              )}
-              <div>
-                <span>ผู้ยื่นคำขอ</span>
-                <b>{limitDecision.row.requestedBy || "ไม่ระบุ"}</b>
-              </div>
-            </div>
-            <div className="limit-decide-note">
-              <ShieldCheck size={15} />{" "}
-              {limitDecision.decision === "approve"
-                ? `อนุมัติแล้ว วงเงินซื้อสินค้าต่อวันของสมาชิกจะถูกตั้งเป็น ${money(limitDecision.row.requestedLimit)} ทันที และบันทึกลง Log`
-                : `ปฏิเสธแล้ว วงเงินของสมาชิกคงเดิม (${limitDecision.row.currentLimit != null ? money(limitDecision.row.currentLimit) : "ไม่จำกัด"}) · สมาชิกยื่นคำขอใหม่ได้`}
-            </div>
-            {limitError && (
-              <div className="notice-bar error">
-                <ShieldCheck size={16} /> {limitError}
-                <button onClick={() => setLimitError("")}>
-                  <X size={14} />
-                </button>
-              </div>
-            )}
-            <div className="confirm-actions">
-              <button
-                className="outline-button"
-                onClick={() => setLimitDecision(null)}
-              >
-                ยกเลิก
-              </button>
-              <button
-                className={
-                  limitDecision.decision === "approve"
-                    ? "primary-button"
-                    : "danger-button"
-                }
-                disabled={decideLimitMutation.isPending}
-                onClick={confirmLimitDecision}
-              >
-                <Check size={16} />{" "}
-                {decideLimitMutation.isPending
-                  ? "กำลังบันทึก…"
-                  : limitDecision.decision === "approve"
-                    ? "ยืนยันอนุมัติ"
-                    : "ยืนยันปฏิเสธ"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       {viewedReceipt && (
         <ReceiptModal
           receipt={viewedReceipt}

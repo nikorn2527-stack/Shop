@@ -159,7 +159,7 @@ export function MemberScanPicker({
             <b>
               {selected.memberNumber} · สมาชิก{memberFullName(selected)}
             </b>
-            <small>ยอดคงเหลือ {money(selected.balance)}{selected.creditLimit != null ? ` · วงเงิน/วัน ${money(selected.creditLimit)}` : ""}</small>
+            <small>ยอดคงเหลือ {money(selected.balance)}</small>
           </div>
           <button
             type="button"
