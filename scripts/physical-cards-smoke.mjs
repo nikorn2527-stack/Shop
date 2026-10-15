@@ -53,7 +53,20 @@ try {
   };
   await register(`First-${code}`, 25);
   await page.waitForFunction(code => [...document.querySelectorAll('[aria-label="จัดการบัตรเปล่า"] tbody tr')].some(r => r.textContent.includes(code) && r.textContent.includes('ใช้งาน')), {}, code);
+  await page.click('[data-nav-item=members]');
+  await page.waitForSelector('[aria-label="รายการสมาชิก"]');
+  await page.waitForFunction(name => [...document.querySelectorAll('[aria-label="รายการสมาชิก"] tbody tr')].some(row => row.textContent.includes(name)), {}, `First-${code}`);
+  const firstMemberRow = await page.evaluateHandle(name => [...document.querySelectorAll('[aria-label="รายการสมาชิก"] tbody tr')].find(row => row.textContent.includes(name)), `First-${code}`);
+  await firstMemberRow.asElement().click();
+  await firstMemberRow.dispose();
   await click('คืนบัตร');
+  const cardDialog = '[aria-label="จัดการบัตรสมาชิก"]';
+  await page.waitForSelector(cardDialog);
+  await click('ตรวจสอบ');
+  await click('ยืนยัน');
+  await page.waitForFunction(selector => !document.querySelector(selector), {}, cardDialog);
+  await page.click('[data-nav-item=cards]');
+  await page.waitForSelector('.card-management-page [aria-label="จัดการบัตรเปล่า"]');
   await page.waitForFunction(code => [...document.querySelectorAll('[aria-label="จัดการบัตรเปล่า"] tbody tr')].some(r => r.textContent.includes(code) && r.textContent.includes('คืนแล้ว')), {}, code);
   await register(`Second-${code}`, 0);
   await page.reload({ waitUntil: 'networkidle2' });
@@ -62,11 +75,12 @@ try {
     const first = db.prepare('SELECT member_number, card_number, balance FROM members WHERE first_name = ?').get(`First-${code}`);
     const second = db.prepare('SELECT member_number, card_number, balance FROM members WHERE first_name = ?').get(`Second-${code}`);
     assert.equal(first.card_number, null);
-    assert.equal(first.balance, 25);
+    assert.equal(first.balance, 0);
     assert.equal(second.card_number, code);
     assert.equal(second.balance, 0);
     assert.notEqual(first.member_number, second.member_number);
     assert.equal(db.prepare('SELECT COUNT(*) AS count FROM card_assignments WHERE card_number = ?').get(code).count, 3);
+    assert.equal(db.prepare("SELECT COUNT(*) AS count FROM member_transactions WHERE member_number = ? AND type = 'refund'").get(first.member_number).count, 1);
   } finally { db.close(); }
   assert.deepEqual(errors, []);
   await page.screenshot({ path: path.join(cfg.dir, 'reusable-card-verified.png'), fullPage: true });
