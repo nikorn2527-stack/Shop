@@ -741,24 +741,20 @@ function initializeCardUsageSessions(db: SqliteDb) {
       UPDATE sales SET card_usage_session_id = (SELECT id FROM card_usage_sessions WHERE member_number = NEW.member_number AND ended_at IS NULL)
       WHERE id = NEW.id AND NEW.card_usage_session_id IS NULL;
     END;`);
-  // Link legacy rows to the physical-card round that covered their timestamp.
-  // Imported installations commonly have one synthetic legacy round created
-  // after their historical ledger; that round intentionally represents those
-  // earlier rows until the first real return/reassignment closes it.
+  // Link legacy rows to the best available physical-card round. Keep this
+  // startup migration independent of transaction timestamps: a few production
+  // databases reached this migration with a partially upgraded transaction
+  // table, and preparing a correlated t.created_at query made the whole server
+  // fail before login. For one-session members the match is unambiguous; for
+  // members with several rounds, prefer the currently open round and then the
+  // newest legacy round. New writes are linked exactly by the insert trigger.
   db.prepare(`UPDATE member_transactions AS t
     SET card_usage_session_id = (
       SELECT s.id FROM card_usage_sessions s
       WHERE s.member_number = t.member_number
-        AND (
-          (t.created_at >= s.started_at AND (s.ended_at IS NULL OR t.created_at <= s.ended_at))
-          OR (s.legacy = 1 AND NOT EXISTS (
-            SELECT 1 FROM card_usage_sessions exact
-            WHERE exact.member_number = t.member_number
-              AND t.created_at >= exact.started_at
-              AND (exact.ended_at IS NULL OR t.created_at <= exact.ended_at)
-          ))
-        )
-      ORDER BY CASE WHEN t.created_at >= s.started_at THEN 0 ELSE 1 END, s.id DESC
+      ORDER BY CASE WHEN s.ended_at IS NULL THEN 0 ELSE 1 END,
+        CASE WHEN s.legacy = 1 THEN 0 ELSE 1 END,
+        s.id DESC
       LIMIT 1
     )
     WHERE t.card_usage_session_id IS NULL`).run();

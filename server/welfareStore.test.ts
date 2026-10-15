@@ -177,6 +177,64 @@ describe("welfare store seeding", () => {
     }
   });
 
+  it("opens a partially migrated card database without requiring transaction timestamps during session backfill", () => {
+    const directory = mkdtempSync(join(tmpdir(), "welfare-partial-card-migration-"));
+    const filename = join(directory, "store.sqlite");
+    try {
+      const legacy = new DatabaseSync(filename);
+      legacy.exec(`
+        PRAGMA foreign_keys = ON;
+        CREATE TABLE members (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          member_number TEXT NOT NULL UNIQUE,
+          first_name TEXT NOT NULL,
+          last_name TEXT NOT NULL,
+          balance REAL NOT NULL DEFAULT 0,
+          status TEXT NOT NULL DEFAULT 'active',
+          card_number TEXT,
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE member_transactions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          member_number TEXT NOT NULL,
+          type TEXT NOT NULL CHECK (type IN ('purchase', 'deposit', 'withdrawal')),
+          detail TEXT NOT NULL,
+          amount REAL NOT NULL,
+          payment_method TEXT,
+          balance_after REAL,
+          actor TEXT,
+          slip_url TEXT,
+          client_request_id TEXT,
+          card_usage_session_id INTEGER,
+          FOREIGN KEY (member_number) REFERENCES members(member_number)
+        );
+        INSERT INTO members (member_number, first_name, last_name, balance, status, card_number)
+          VALUES ('PARTIAL-1', 'ฐาน', 'กึ่งย้าย', 80, 'active', 'PARTIAL-CARD');
+        INSERT INTO member_transactions (member_number, type, detail, amount, balance_after)
+          VALUES ('PARTIAL-1', 'deposit', 'รายการก่อนระบบรอบบัตร', 80, 80);
+      `);
+      legacy.close();
+
+      db = openWelfareStore(filename);
+      expect(db.prepare("PRAGMA quick_check").get()).toEqual({ quick_check: "ok" });
+      expect(db.prepare("SELECT created_at AS createdAt FROM member_transactions WHERE member_number = 'PARTIAL-1'").get()).toMatchObject({
+        createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2} /),
+      });
+      expect(db.prepare("SELECT card_usage_session_id AS sessionId FROM member_transactions WHERE member_number = 'PARTIAL-1'").get()).toMatchObject({
+        sessionId: expect.any(Number),
+      });
+    } finally {
+      db?.close();
+      db = undefined;
+      try {
+        rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code !== "EPERM" && code !== "EBUSY") throw error;
+      }
+    }
+  });
+
   it("seeds products, members, lots, audit logs and a 30-day sales history", () => {
     const database = freshDb();
     // Round 32-18 — seed เดิม 8 รายการ + สินค้าตัวอย่างทดสอบยิงบาร์โค้ดอีก 5 รายการ
