@@ -572,6 +572,11 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
   `);
   ensureColumn(db, "members", "phone", "TEXT");
   ensureColumn(db, "members", "type", "TEXT NOT NULL DEFAULT 'สมาชิก'");
+  // Some early production databases were created without the transaction
+  // timestamp column. Add and backfill it before any migration/backfill query
+  // references member_transactions.created_at.
+  ensureColumn(db, "member_transactions", "created_at", "TEXT");
+  db.prepare("UPDATE member_transactions SET created_at = CURRENT_TIMESTAMP WHERE created_at IS NULL OR TRIM(created_at) = ''").run();
   ensureColumn(db, "member_transactions", "balance_after", "REAL");
   ensureColumn(db, "audit_logs", "actor_role", "TEXT");
   ensureColumn(db, "sale_items", "unit", "TEXT");
@@ -670,6 +675,15 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
   // ROUND 65 (user) — DB เดิมสร้าง member_transactions ด้วย CHECK 3 ชนิดเดิม →
   // ขยายเป็น 5 ชนิด (เพิ่ม activation/refund) ด้วยการสร้างตารางใหม่แล้วคัดลอกข้อมูล
   upgradeMemberTransactionsTypes(db);
+  // ALTER TABLE cannot add a non-constant CURRENT_TIMESTAMP default on SQLite.
+  // This trigger gives upgraded legacy tables the same insert-time behaviour as
+  // newly-created databases when a caller omits created_at.
+  db.exec(`CREATE TRIGGER IF NOT EXISTS member_transactions_created_at_default
+    AFTER INSERT ON member_transactions
+    WHEN NEW.created_at IS NULL OR TRIM(NEW.created_at) = ''
+    BEGIN
+      UPDATE member_transactions SET created_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+    END;`);
   // ROUND 65 (user) — จำนวนที่ "รับเข้าจริง" ของแต่ละ Lot (qty ปัจจุบันโดนหักตอนขาย
   // ไปแล้ว) ใช้คำนวณยอดยกมาของรายงานสินค้าคงคลังให้ตรงชีทโรงพยาบาล
   ensureColumn(db, "stock_lots", "received_qty", "INTEGER");

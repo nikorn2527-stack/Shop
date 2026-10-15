@@ -110,6 +110,51 @@ function tableCount(database: SqliteDb, table: string) {
 }
 
 describe("welfare store seeding", () => {
+  it("upgrades a legacy transaction table without created_at before startup queries run", () => {
+    const directory = mkdtempSync(join(tmpdir(), "welfare-legacy-tx-"));
+    const filename = join(directory, "store.sqlite");
+    try {
+      const legacy = createSqliteStore(filename);
+      legacy.prepare(`INSERT INTO members (member_number, first_name, last_name, balance, status) VALUES ('LEGACY-1', 'ฐาน', 'เก่า', 25, 'active')`).run();
+      legacy.exec(`
+        ALTER TABLE member_transactions RENAME TO member_transactions_with_timestamp;
+        CREATE TABLE member_transactions (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          member_number TEXT NOT NULL,
+          type TEXT NOT NULL CHECK (type IN ('purchase', 'deposit', 'withdrawal', 'activation', 'refund')),
+          detail TEXT NOT NULL,
+          amount REAL NOT NULL,
+          payment_method TEXT,
+          balance_after REAL,
+          actor TEXT,
+          slip_url TEXT,
+          client_request_id TEXT,
+          card_usage_session_id INTEGER,
+          FOREIGN KEY (member_number) REFERENCES members(member_number)
+        );
+        INSERT INTO member_transactions (id, member_number, type, detail, amount, payment_method, balance_after)
+          VALUES (1, 'LEGACY-1', 'deposit', 'รายการจากฐานเดิม', 25, 'เงินสด', 25);
+        DROP TABLE member_transactions_with_timestamp;
+      `);
+      legacy.close();
+
+      db = openWelfareStore(filename);
+      const columns = db.prepare("PRAGMA table_info(member_transactions)").all() as unknown as { name: string }[];
+      expect(columns.some(column => column.name === "created_at")).toBe(true);
+      expect(db.prepare("SELECT created_at AS createdAt FROM member_transactions WHERE id = 1").get()).toMatchObject({
+        createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2} /),
+      });
+      db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount) VALUES ('LEGACY-1', 'deposit', 'หลังอัปเกรด', 1)`).run();
+      expect(db.prepare("SELECT created_at AS createdAt FROM member_transactions WHERE detail = 'หลังอัปเกรด'").get()).toMatchObject({
+        createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2} /),
+      });
+    } finally {
+      db?.close();
+      db = undefined;
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
   it("seeds products, members, lots, audit logs and a 30-day sales history", () => {
     const database = freshDb();
     // Round 32-18 — seed เดิม 8 รายการ + สินค้าตัวอย่างทดสอบยิงบาร์โค้ดอีก 5 รายการ
