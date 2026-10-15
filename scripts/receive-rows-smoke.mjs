@@ -296,7 +296,7 @@ try {
   await page.waitForSelector('.stock-workbench .dash-tabbar');
   await page.click('.stock-workbench .dash-tabbar button:last-child');
   await page.waitForSelector('.receipt-history-filters');
-  await page.type('.receipt-history-filters label:nth-of-type(3) input', 'ROW-LOT-001');
+  await page.type('.receipt-history-filters input[aria-label="ค้นหาสินค้า SKU หรือ Lot ในประวัติรับเข้า"]', 'ROW-LOT-001');
   await page.waitForFunction(() => document.querySelector('.stock-receipt-history')?.textContent.includes('ROW-LOT-001'));
   const preview = await page.evaluateHandle(() => [...document.querySelectorAll('.stock-receipt-history button')].find(node => node.textContent.includes('พรีวิว')));
   await preview.asElement().click();

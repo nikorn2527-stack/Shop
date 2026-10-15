@@ -94,7 +94,7 @@ export function LoginView({ brand, onAuthed }: { brand?: BrandSettings | null | 
         <p className="login-footer">v1.0.0 · ระบบร้านค้าสวัสดิการ<span className="powered-line">⚡ Powered by <b>PNG TEAM</b></span></p>
       </div>
       <Dialog open={transfer !== null} onOpenChange={open => { if (!open && !loginMutation.isPending) { setTransfer(null); setError(""); } }}>
-        <DialogContent showCloseButton={false} className="max-h-[calc(100dvh-2rem)] overflow-y-auto" onEscapeKeyDown={event => { if (loginMutation.isPending) event.preventDefault(); }} onPointerDownOutside={event => event.preventDefault()} onOpenAutoFocus={event => { event.preventDefault(); document.getElementById("cancel-session-transfer")?.focus(); }}>
+        <DialogContent showCloseButton={false} className="login-session-dialog max-h-[calc(100dvh-2rem)] overflow-y-auto" onEscapeKeyDown={event => { if (loginMutation.isPending) event.preventDefault(); }} onPointerDownOutside={event => event.preventDefault()} onOpenAutoFocus={event => { event.preventDefault(); document.getElementById("cancel-session-transfer")?.focus(); }}>
           <DialogHeader>
             <DialogTitle className="text-amber-800">บัญชีนี้เข้าใช้งานอยู่แล้ว</DialogTitle>
             <DialogDescription>ย้ายมาเครื่องนี้จะออกจากระบบที่เครื่องเดิม ตรวจให้แน่ใจว่างานที่เครื่องเดิมเสร็จแล้วก่อนยืนยัน</DialogDescription>

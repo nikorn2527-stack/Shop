@@ -527,7 +527,7 @@
     border: 1px solid #cbd5e1; border-radius: 10px; min-height: 36px; padding: 6px 12px;
   }
   :root .app-shell .stock-receipt-history .receipt-history-filters {
-    display: grid; grid-template-columns: auto 160px 160px minmax(180px, 1fr) minmax(140px, .8fr);
+    display: grid; grid-template-columns: minmax(230px, .9fr) minmax(180px, .75fr) minmax(150px, .6fr) auto;
     align-items: end; gap: 12px; padding: 16px; background: #f8fafc;
     border: 1px solid #e2e8f0; border-radius: 12px;
   }
@@ -540,17 +540,24 @@
     border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 10px;
     background: #fff; color: #0f172a; font-size: 14px; opacity: 1;
   }
-  :root .app-shell .receipt-history-filters .thai-date-field {
+  :root .app-shell .receipt-history-filters .thai-date-range-picker { width: 100%; }
+  :root .app-shell .receipt-history-filters .thai-date-range-field {
     width: 100%; min-height: 40px; background: #fff; color: #334155;
     border-color: #cbd5e1; border-radius: 8px;
   }
   :root .app-shell .receipt-history-filters > button { min-height: 40px; color: #334155; border-color: #cbd5e1; border-radius: 8px; }
   :root .app-shell .receipt-history-filters .receipt-export-actions {
-    grid-column: 1 / -1; justify-self: end; flex-wrap: nowrap;
+    grid-column: auto; justify-self: end; align-self: end; flex-wrap: nowrap;
   }
   :root .app-shell .receipt-history-filters .receipt-export-actions button { white-space: nowrap; }
   @media (max-width: 1400px) {
-    :root .app-shell .stock-receipt-history .receipt-history-filters { grid-template-columns: auto repeat(2, minmax(140px, 1fr)); }
+    :root .app-shell .stock-receipt-history .receipt-history-filters { grid-template-columns: minmax(220px, 1fr) minmax(170px, .8fr) minmax(145px, .65fr) auto; gap: 10px; }
+    :root .app-shell .receipt-history-filters .receipt-export-actions { gap: 5px; }
+    :root .app-shell .receipt-history-filters .receipt-export-actions button { padding-inline: 10px; }
+  }
+  @media (max-width: 1100px) {
+    :root .app-shell .stock-receipt-history .receipt-history-filters { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    :root .app-shell .receipt-history-filters .receipt-export-actions { grid-column: 1 / -1; }
   }
   @media (max-width: 600px) {
     :root .app-shell .stock-receipt-history .receipt-history-filters { grid-template-columns: minmax(0, 1fr); padding: 12px; }

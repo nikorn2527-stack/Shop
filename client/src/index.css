@@ -3617,6 +3617,19 @@ th { font-weight: 600; }
 .thai-date-field:hover { border-color: #a9d2c0; }
 .thai-date-field svg:first-child { color: var(--teal); }
 .thai-date-field .thai-date-caret { color: #98a094; transform: rotate(90deg); }
+.thai-date-range-picker { position: relative; display: inline-flex; align-items: center; min-width: 0; }
+.thai-date-range-field { display: inline-flex; align-items: center; gap: 8px; min-width: 220px; height: 35px; padding: 0 34px 0 11px; border: 1px solid #dfe9e3; border-radius: 8px; background: #fff; color: #47544b; font: inherit; font-size: 11.5px; cursor: pointer; transition: border-color .15s ease, box-shadow .15s ease, background .15s ease; }
+.thai-date-range-field:hover { border-color: #a9d2c0; background: #fcfefd; }
+.thai-date-range-field:focus-visible { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgba(45, 138, 108, .14); }
+.thai-date-range-field > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.thai-date-range-field > svg:first-child { flex: 0 0 auto; color: var(--teal); }
+.thai-date-range-field .thai-date-caret { flex: 0 0 auto; margin-left: auto; color: #98a094; transform: rotate(90deg); }
+.thai-date-range-clear { position: absolute; right: 6px; width: 24px; height: 24px; display: grid; place-items: center; border: 0; border-radius: 7px; background: transparent; color: #8b938b; cursor: pointer; }
+.thai-date-range-clear:hover { color: #b91c1c; background: #fef2f2; }
+.thai-date-range-pop { width: 276px; padding: 12px; }
+.thai-date-range-hint { margin: -1px 0 8px; padding: 6px 8px; border-radius: 7px; background: #eff8f4; color: #25775d; font-size: 11px; font-weight: 700; text-align: center; }
+.thai-date-range-pop .thai-date-grid button.in-range { border-radius: 5px; background: #e3f3ec; color: #205f4b; }
+.thai-date-range-pop .thai-date-grid button.picked { background: var(--teal); color: #fff; }
 /* ROUND 70 — ThaiDatePicker ที่อยู่ใน label ของฟอร์มกริด (เช่น วันหมดอายุในโมดัลรับเข้า): ขึ้นบรรทัดใหม่ใต้ข้อความ กว้างเต็มช่อง สูงเท่า input รอบข้าง ไม่ลอยติดข้อความ */
 .form-grid label .thai-date-picker, .compact-form label .thai-date-picker, .wallet-form label .thai-date-picker { display: flex; margin-top: 5px; }
 .form-grid label .thai-date-field, .compact-form label .thai-date-field, .wallet-form label .thai-date-field { width: 100%; height: 42px; }
@@ -3927,27 +3940,44 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 /* ── 37-1 (req 35): ส่วนแจ้งเตือน — toast (sonner) ธีมร้านค้าสวัสดิการ ──
    เด้งมุมขวาล่างเหนือแผงสินค้า ฟอนต์ Sarabun สีเขียว/แดง/เหลืองตามระบบ */
 [data-sonner-toaster] { font-family: "Sarabun", "TH Sarabun New", system-ui, sans-serif; z-index: 400; }
-[data-sonner-toast] { border-radius: 12px; border: 1px solid #e2e8e2; background: #fff; color: var(--ink); box-shadow: 0 14px 38px rgba(35, 62, 52, .17), 0 3px 9px rgba(35, 62, 52, .07); font-size: 13px; line-height: 1.5; padding: 11px 13px; align-items: flex-start; gap: 9px; }
-[data-sonner-toast] [data-title] { font-weight: 700; font-size: 13.5px; letter-spacing: -.15px; }
-[data-sonner-toast] [data-description] { color: var(--muted); font-size: 11.5px; margin-top: 2px; line-height: 1.55; }
+[data-sonner-toast] { position: relative; overflow: hidden; border-radius: 15px; border: 1px solid #dbe6e0; background: rgba(255,255,255,.98); color: var(--ink); box-shadow: 0 22px 48px rgba(25, 45, 37, .2), 0 5px 14px rgba(25, 45, 37, .1); font-size: 13px; line-height: 1.5; padding: 14px 15px 14px 17px; align-items: flex-start; gap: 11px; backdrop-filter: blur(14px); }
+[data-sonner-toast]::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: #64748b; }
+[data-sonner-toast] [data-icon] { width: 30px; height: 30px; flex: 0 0 30px; display: grid; place-items: center; margin-top: -2px; border-radius: 10px; background: #f1f5f9; }
+[data-sonner-toast] [data-title] { color: #172033; font-weight: 800; font-size: 14px; letter-spacing: -.15px; }
+[data-sonner-toast] [data-description] { color: #5e687b; font-size: 12px; margin-top: 3px; line-height: 1.55; }
 [data-sonner-toast] [data-button] { border-radius: 8px; }
-[data-sonner-toast] [data-close-button] { background: #f4f7f4; border: 1px solid #e2e8e2; color: #7c806f; width: 20px; height: 20px; }
+[data-sonner-toast] [data-close-button] { top: 10px; right: 10px; left: auto; transform: none; background: #f4f7f4; border: 1px solid #e2e8e2; color: #657064; width: 22px; height: 22px; }
 [data-sonner-toast] [data-close-button]:hover { background: #edf3ee; }
-[data-sonner-toast][data-type="success"] { border-color: #c3e5cf; background: #f4fbf6; }
+[data-sonner-toast][data-type="success"] { border-color: #b7ddc6; background: linear-gradient(135deg, #fff 0%, #f2fbf5 100%); }
+[data-sonner-toast][data-type="success"]::before { background: #16845f; }
 [data-sonner-toast][data-type="success"] [data-title] { color: #1f6a4d; }
+[data-sonner-toast][data-type="success"] [data-icon] { background: #dff5e8; }
 [data-sonner-toast][data-type="success"] [data-icon] svg { color: var(--teal); }
-[data-sonner-toast][data-type="error"] { border-color: #eccdc9; background: #fdf5f3; }
+[data-sonner-toast][data-type="error"] { border-color: #f2b8b8; background: linear-gradient(135deg, #fff 0%, #fff1f1 100%); }
+[data-sonner-toast][data-type="error"]::before { background: #dc2626; }
 [data-sonner-toast][data-type="error"] [data-title] { color: #a3554f; }
+[data-sonner-toast][data-type="error"] [data-icon] { background: #fee2e2; }
 [data-sonner-toast][data-type="error"] [data-icon] svg { color: var(--red); }
-[data-sonner-toast][data-type="warning"] { border-color: #ecdcb4; background: #fdf9ee; }
+[data-sonner-toast][data-type="warning"] { border-color: #ead096; background: linear-gradient(135deg, #fff 0%, #fff8e6 100%); }
+[data-sonner-toast][data-type="warning"]::before { background: #d38b12; }
 [data-sonner-toast][data-type="warning"] [data-title] { color: #8a6215; }
+[data-sonner-toast][data-type="warning"] [data-icon] { background: #fef0c7; }
 [data-sonner-toast][data-type="warning"] [data-icon] svg { color: var(--amber); }
+[data-sonner-toast][data-type="info"]::before { background: #1676a8; }
+[data-sonner-toast][data-type="info"] [data-icon] { background: #e0f2fe; }
 [data-sonner-toast][data-type="info"] [data-icon] svg { color: var(--teal); }
-[data-sonner-toast][data-styled="true"] { border-radius: 12px; }
+[data-sonner-toast][data-styled="true"] { border-radius: 15px; }
+[data-sonner-toast][data-mounted="true"] { animation: notice-arrive .28s cubic-bezier(.2,.8,.2,1); }
+@keyframes notice-arrive { from { opacity: 0; transform: translateY(-10px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @media (max-width: 640px) {
   [data-sonner-toaster] { left: 12px !important; right: 12px !important; width: auto !important; }
   [data-sonner-toast] { font-size: 12.5px; }
 }
+
+/* Login session-transfer dialog: opaque surface and clear depth over the login artwork. */
+[data-slot="dialog-overlay"] { background: rgba(15, 23, 42, .68); backdrop-filter: blur(4px); }
+.login-session-dialog { border: 1px solid #d8dee8; background: #fff !important; color: #172033; border-radius: 18px; box-shadow: 0 30px 90px rgba(15, 23, 42, .38), 0 8px 24px rgba(15, 23, 42, .18); }
+.login-session-dialog [data-slot="dialog-description"] { color: #566177; line-height: 1.65; }
 
 /* ── 37-2 (req 36): โหมดยืนยันบัตรสมาชิก — แถบเตือนใต้หัวโมดัล + เวทีบัตรโทนอ่อน ── */
 .member-verify-strip { display: flex; align-items: flex-start; gap: 8px; border: 1px solid #eddfb8; background: #fdf8ec; color: #8a6215; border-radius: 10px; padding: 9px 11px; font-size: 11.5px; line-height: 1.55; margin: 2px 0 12px; }

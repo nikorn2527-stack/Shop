@@ -12,7 +12,7 @@ import {
 } from "@/lib/icons";
 import { trpc } from "@/lib/trpc";
 import { downloadCsvFile } from "@/exportUtils";
-import { ThaiDatePicker } from "@/components/ThaiDatePicker";
+import { ThaiDateRangePicker } from "@/components/ThaiDateRangePicker";
 import { SharedSearch } from "@/components/SharedSearch";
 import {
   formatLogDateTime,
@@ -123,23 +123,7 @@ export function Logs() {
             </div>
             </SharedSearch>
             <div className="date-range-filter">
-              <ThaiDatePicker value={dateFrom} onChange={setDateFrom} max={dateTo || undefined} ariaLabel="กรองตั้งแต่วันที่" placeholder="ตั้งแต่วันที่" />
-              <span className="date-range-sep">→</span>
-              <ThaiDatePicker value={dateTo} onChange={setDateTo} min={dateFrom || undefined} ariaLabel="กรองถึงวันที่" placeholder="ถึงวันที่" />
-              {(dateFrom || dateTo) && (
-                <button
-                  type="button"
-                  className="date-range-clear"
-                  aria-label="ล้างตัวกรองช่วงเวลา"
-                  title="ล้างตัวกรองช่วงเวลา"
-                  onClick={() => {
-                    setDateFrom("");
-                    setDateTo("");
-                  }}
-                >
-                  <X size={15} />
-                </button>
-              )}
+              <ThaiDateRangePicker from={dateFrom} to={dateTo} onChange={(nextFrom, nextTo) => { setDateFrom(nextFrom); setDateTo(nextTo); }} ariaLabel="กรองประวัติระบบตามช่วงวันที่" />
             </div>
           </div>
         </div>

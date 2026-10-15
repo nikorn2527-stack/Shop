@@ -6,7 +6,8 @@ import puppeteer from 'puppeteer';
 import XLSX from 'xlsx';
 import { createSqliteStore, receiveStockLines } from '../server/sqliteStore.ts';
 
-const cfg = JSON.parse(fs.readFileSync(path.join(os.tmpdir(), 'shop-receipts-config.json'), 'utf8'));
+assert.ok(process.env.AUDIT_CONFIG_PATH, 'Set an isolated audit configuration');
+const cfg = JSON.parse(fs.readFileSync(process.env.AUDIT_CONFIG_PATH, 'utf8'));
 assert.ok(path.resolve(cfg.target).startsWith(path.resolve(os.tmpdir()) + path.sep));
 const db = createSqliteStore(cfg.target);
 const lot = `BROWSER-RECEIPT-${Date.now()}`;
@@ -41,17 +42,17 @@ try {
   const alignment = await page.$$eval('.stock-workbench .dash-tabbar button', nodes => nodes.map(n => n.getBoundingClientRect().top));
   assert.ok(Math.max(...alignment) - Math.min(...alignment) <= 2, 'Stock tabs must share one row');
   assert.equal(await page.$$eval('.receipt-history-filters input[type=date]', nodes => nodes.length), 0);
-  await page.click('.receipt-history-filters .thai-date-field');
+  await page.click('.receipt-history-filters .thai-date-range-field');
   await page.waitForSelector('.thai-date-pop');
   assert.ok(await page.$eval('.thai-date-pop', n => { const r = n.getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; }), 'Calendar must remain visible');
   await page.click('.thai-date-pop .thai-date-foot button');
   await page.waitForFunction(() => !document.querySelector('.thai-date-pop'));
 
-  await page.type('.receipt-history-filters label:nth-of-type(3) input', lot);
+  await page.type('.receipt-history-filters input[aria-label="ค้นหาสินค้า SKU หรือ Lot ในประวัติรับเข้า"]', lot);
   await page.waitForFunction(() => document.querySelectorAll('.stock-receipt-history tbody tr').length === 2);
   const text = await page.$eval('.stock-receipt-history', n => n.innerText);
   assert.ok(text.includes('Browser receiver') && text.includes('50.00'), text);
-  await click('พรีวิว / ส่งออก', '.stock-receipt-history');
+  await click('ดูพรีวิว', '.stock-receipt-history');
   await page.waitForSelector('.export-preview-modal');
   assert.ok(await page.$('.export-preview-modal iframe'), 'Actual document preview');
   const session = await page.createCDPSession();
