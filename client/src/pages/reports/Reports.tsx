@@ -54,7 +54,7 @@ import {
 } from "../pageData";
 import { SectionHeader, StatusPill } from "../PagePrimitives";
 import { PageTemplate } from "@/components/page/PageTemplate";
-import { ThaiDatePicker } from "@/components/ThaiDatePicker";
+import { ThaiDateRangePicker } from "@/components/ThaiDateRangePicker";
 import {
   downloadReportPdf,
   printReportDoc,
@@ -1726,27 +1726,13 @@ export function Reports({
                     ))}
                   </div>
                   {rangeMode === "custom" && (
-                    <div
+                    <ThaiDateRangePicker
                       className="range-picker report-custom-picker"
-                      role="group"
-                      aria-label="กำหนดช่วงวันที่"
-                    >
-                      <ThaiDatePicker
-                        value={rangeFrom}
-                        onChange={pickCustomFrom}
-                        max={rangeTo || undefined}
-                        ariaLabel="วันเริ่มต้น — เลือกวันเดียวก็แค่กดวันนี้"
-                      />
-                      <span className="range-sep" aria-hidden="true">
-                        →
-                      </span>
-                      <ThaiDatePicker
-                        value={rangeTo}
-                        onChange={pickCustomTo}
-                        min={rangeFrom || undefined}
-                        ariaLabel="วันสิ้นสุด — เว้นว่างไว้คือวันเดียวกับวันเริ่มต้น"
-                      />
-                    </div>
+                      from={rangeFrom}
+                      to={rangeTo}
+                      onChange={(nextFrom, nextTo) => { setRangeFrom(nextFrom); setRangeTo(nextTo); }}
+                      ariaLabel="กำหนดช่วงวันที่รายงานยอดขาย"
+                    />
                   )}
                   <div className="report-staff-multi" style={{ position: "relative" }}>
                     <button
@@ -2760,25 +2746,13 @@ export function Reports({
                       </button>
                     ))}
                   </div>
-                  {txCustomRange && <div
+                  {txCustomRange && <ThaiDateRangePicker
                     className="tx-date-range"
-                    role="group"
-                    aria-label="ช่วงวันที่ของธุรกรรม"
-                  >
-                    <ThaiDatePicker
-                      value={txFrom}
-                      onChange={pickTxFrom}
-                      max={txTo || undefined}
-                      ariaLabel="วันเริ่มต้นของธุรกรรม"
-                    />
-                    <span aria-hidden="true">→</span>
-                    <ThaiDatePicker
-                      value={txTo}
-                      onChange={pickTxTo}
-                      min={txFrom || undefined}
-                      ariaLabel="วันสิ้นสุดของธุรกรรม"
-                    />
-                  </div>}
+                    from={txFrom}
+                    to={txTo}
+                    onChange={(nextFrom, nextTo) => { setTxFrom(nextFrom); setTxTo(nextTo); }}
+                    ariaLabel="ช่วงวันที่ของธุรกรรม"
+                  />}
                 </div>
                 <div className="report-filter-row-main tx-filter-row">
                   <MemberScanPicker
@@ -3031,23 +3005,13 @@ export function Reports({
                     ))}
                   </div>
                   {rangeMode === "custom" && (
-                    <div className="report-custom-range">
-                      <ThaiDatePicker
-                        value={rangeFrom}
-                        onChange={pickCustomFrom}
-                        max={rangeTo || undefined}
-                        ariaLabel="วันเริ่มต้นของรายงานสินค้าคงคลัง"
-                      />
-                      <span className="range-sep" aria-hidden="true">
-                        →
-                      </span>
-                      <ThaiDatePicker
-                        value={rangeTo}
-                        onChange={pickCustomTo}
-                        min={rangeFrom || undefined}
-                        ariaLabel="วันสิ้นสุดของรายงานสินค้าคงคลัง — เว้นว่างไว้คือวันเดียวกับวันเริ่มต้น"
-                      />
-                    </div>
+                    <ThaiDateRangePicker
+                      className="report-custom-range"
+                      from={rangeFrom}
+                      to={rangeTo}
+                      onChange={(nextFrom, nextTo) => { setRangeFrom(nextFrom); setRangeTo(nextTo); }}
+                      ariaLabel="เลือกช่วงวันที่รายงานสินค้าคงคลัง"
+                    />
                   )}
                   <SharedSearch label="รายงาน · ค้นหาในแท็บนี้"><div className="search-field">
                     <Search size={16} />

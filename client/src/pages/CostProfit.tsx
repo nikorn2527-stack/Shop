@@ -1,7 +1,7 @@
 import { useState } from "react";
 import "../styles/cost-profit.css";
 import { trpc } from "@/lib/trpc";
-import { ThaiDatePicker } from "@/components/ThaiDatePicker";
+import { ThaiDateRangePicker } from "@/components/ThaiDateRangePicker";
 import { SectionHeader } from "./PagePrimitives";
 import { money } from "./pageData";
 import { formatThaiDate } from "./viewFormat";
@@ -59,8 +59,7 @@ export default function CostProfit() {
         {([['today', 'วันนี้'], ['month', 'เดือนนี้'], ['custom', 'กำหนดเอง']] as const).map(([value, label]) =>
           <button type="button" className={range === value ? "primary-button" : "outline-button"} aria-pressed={range === value} key={value} onClick={() => choose(value)}>{label}</button>)}
       </div>
-      <label>ตั้งแต่<ThaiDatePicker value={from} onChange={value => { setRange("custom"); setFrom(value); }} ariaLabel="วันที่เริ่มต้นต้นทุนและกำไร" /></label>
-      <label>ถึง<ThaiDatePicker value={to} onChange={value => { setRange("custom"); setTo(value); }} ariaLabel="วันที่สิ้นสุดต้นทุนและกำไร" /></label>
+      <label>ช่วงวันที่<ThaiDateRangePicker from={from} to={to} onChange={(nextFrom, nextTo) => { setRange("custom"); setFrom(nextFrom); setTo(nextTo); }} ariaLabel="เลือกช่วงวันที่ต้นทุนและกำไร" /></label>
     </div>
     {!valid && <p role="alert">กรุณาเลือกวันที่เริ่มต้นไม่เกินวันที่สิ้นสุด</p>}
     {query.isError && <p role="alert">โหลดข้อมูลไม่สำเร็จ: {query.error.message} <button type="button" className="outline-button" onClick={() => void query.refetch()}>ลองอีกครั้ง</button></p>}
