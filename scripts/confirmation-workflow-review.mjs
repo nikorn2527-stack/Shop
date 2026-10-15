@@ -81,7 +81,7 @@ try {
   });
   assert.ok(Math.abs(desktopDock.center - desktopDock.viewportCenter) < 3, 'Save dock must be centered on desktop');
   assert.ok(desktopDock.bottom >= 17, 'Save dock must keep a safe gap from the viewport edge');
-  assert.equal(desktopDock.saveBackground, 'rgb(41, 67, 95)');
+  assert.equal(desktopDock.saveBackground, 'rgb(66, 107, 140)');
   assert.ok(desktopDock.overflow <= 2);
 
   await page.setViewport({ width: 390, height: 844 });

@@ -20,7 +20,7 @@
     width: 7px; height: 7px; border-radius: 50%; background: var(--status-color);
   }
   :root:root :is(.status-pill.green, .status-badge.green, .card-inventory-status.is-blank, .card-inventory-status.is-returned_vacant) { --status-color: #15803d; }
-  :root:root :is(.status-pill.blue, .status-badge.blue, .card-inventory-status.is-assigned) { --status-color: #29435F; }
+  :root:root :is(.status-pill.blue, .status-badge.blue, .card-inventory-status.is-assigned) { --status-color: #426B8C; }
   :root:root :is(.status-pill.amber, .status-badge.amber) { --status-color: #a16207; }
   :root:root :is(.status-pill.red, .status-badge.red, .card-inventory-status.is-lost, .card-inventory-status.is-damaged) { --status-color: #b91c1c; }
   :root:root :is(.status-pill.purple, .status-badge.purple) { --status-color: #475569; }
@@ -50,7 +50,7 @@
   :root:root :is(.card-inventory-status.is-blank, .card-inventory-status.is-returned_vacant) {
     background: #bbf7d0; color: #14532d; border-color: #16a34a;
   }
-  :root:root .card-inventory-status.is-assigned { background: #DCE3EA; color: #17283D; border-color: #526B84; }
+  :root:root .card-inventory-status.is-assigned { background: #DCE3EA; color: #31536F; border-color: #6F8DA6; }
   :root:root :is(.card-inventory-status.is-lost, .card-inventory-status.is-damaged) {
     background: #fecaca; color: #991b1b; border-color: #dc2626;
   }
@@ -66,7 +66,7 @@
   :root :is(.app-shell, .modal-backdrop, [role="dialog"]) .ghost-button:not(:disabled):hover {
     background: #cbd5e1; border-color: #334155; color: #0f172a;
   }
-  :root .ghost-button:focus-visible { outline: 3px solid #29435F; outline-offset: 3px; }
+  :root .ghost-button:focus-visible { outline: 3px solid #426B8C; outline-offset: 3px; }
   :root:root :is(.notice-bar.warning, .notice-bar.warn, .inline-message.warning, .status-pill.amber, .status-badge.amber) {
     background: #fde68a; color: #713f12; border: 1px solid #d97706;
   }
@@ -353,11 +353,11 @@
 /* Stronger screen accents without tinting documents or changing task colors. */
 @media screen {
   :root .app-shell :is(.sidebar nav, .admin-nav) button.active {
-    background: var(--teal-soft); color: #17283D;
+    background: var(--teal-soft); color: #31536F;
     border-color: #AAB7C4;
   }
   :root .app-shell :is(.sidebar nav, .admin-nav) button.active svg {
-    color: #29435F;
+    color: #426B8C;
   }
   :root .app-shell :is(.section-header h1, .section-header h2, .page-heading h1) {
     color: #0f172a;
@@ -417,7 +417,7 @@
 .card-inventory-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .card-inventory-actions button { width: auto; min-height: 34px; padding: 6px 12px; margin: 0; }
 .card-inventory-status { display: inline-flex; white-space: nowrap; border-radius: 999px; padding: 4px 10px; background: #f1f5f9; color: #475569; }
-.card-inventory-status.is-assigned { background: #F3F5F7; color: #29435F; }
+.card-inventory-status.is-assigned { background: #F3F5F7; color: #426B8C; }
 .card-inventory-status.is-blank, .card-inventory-status.is-returned_vacant { background: #ecfdf5; color: #047857; }
 .card-inventory-status.is-lost, .card-inventory-status.is-damaged { background: #fef2f2; color: #b91c1c; }
 @media (max-width: 640px) { .card-inventory-create { align-items: stretch; } .card-inventory-create > button { width: 100%; } .card-inventory-codes { flex-basis: 100%; } }
@@ -572,7 +572,7 @@
   :root .app-shell .pos-rail .rail-btn.rail-register { --task-ink: #0f766e; --task-tint: #ccfbf1; }
   :root .app-shell .pos-rail .rail-btn.rail-special { --task-ink: #a16207; --task-tint: #fef3c7; }
   :root .app-shell .pos-rail .rail-btn.rail-manage { --task-ink: #475569; --task-tint: #e2e8f0; }
-  :root .app-shell .pos-rail .rail-btn.rail-inventory { --task-ink: #29435F; --task-tint: #DCE3EA; }
+  :root .app-shell .pos-rail .rail-btn.rail-inventory { --task-ink: #426B8C; --task-tint: #DCE3EA; }
   :root .app-shell .pos-rail .rail-btn.rail-add { --task-ink: #be185d; --task-tint: #fce7f3; }
   :root .app-shell .pos-rail .rail-btn:is(:hover, .active) {
     background: var(--task-tint); color: #0f172a; border-color: var(--task-ink);

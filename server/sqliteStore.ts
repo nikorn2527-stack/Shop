@@ -675,6 +675,9 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
   // ROUND 65 (user) — DB เดิมสร้าง member_transactions ด้วย CHECK 3 ชนิดเดิม →
   // ขยายเป็น 5 ชนิด (เพิ่ม activation/refund) ด้วยการสร้างตารางใหม่แล้วคัดลอกข้อมูล
   upgradeMemberTransactionsTypes(db);
+  // Recreate the partial index after a legacy CHECK-constraint table rebuild,
+  // because dropping the old table also drops all of its indexes.
+  db.exec("CREATE INDEX IF NOT EXISTS idx_member_tx_client_req ON member_transactions(client_request_id) WHERE client_request_id IS NOT NULL");
   // ALTER TABLE cannot add a non-constant CURRENT_TIMESTAMP default on SQLite.
   // This trigger gives upgraded legacy tables the same insert-time behaviour as
   // newly-created databases when a caller omits created_at.
@@ -1056,19 +1059,31 @@ function upgradeMemberTransactionsTypes(db: SqliteDb) {
       payment_method TEXT,
       balance_after REAL,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      actor TEXT,
+      slip_url TEXT,
+      client_request_id TEXT,
+      card_usage_session_id INTEGER,
       FOREIGN KEY (member_number) REFERENCES members(member_number)
     );
   `);
   db.exec(`
-    INSERT INTO member_transactions_new (id, member_number, type, detail, amount, payment_method, balance_after, created_at)
-      SELECT id, member_number, type, detail, amount, payment_method, balance_after, created_at FROM member_transactions;
+    INSERT INTO member_transactions_new (
+      id, member_number, type, detail, amount, payment_method, balance_after,
+      created_at, actor, slip_url, client_request_id, card_usage_session_id
+    )
+      SELECT id, member_number, type, detail, amount, payment_method, balance_after,
+        created_at, actor, slip_url, client_request_id, NULL
+      FROM member_transactions;
     DROP TABLE member_transactions;
     ALTER TABLE member_transactions_new RENAME TO member_transactions;
   `);
-  // คอลัมน์เสริมที่เคยเพิ่มด้วย ensureColumn ในรอบก่อนต้องกลับมาให้ครบหลังสลับตาราง
+  // Keep every additive column when replacing the legacy CHECK constraint.
+  // Losing client_request_id here would remove retry protection from old rows.
   ensureColumn(db, "member_transactions", "balance_after", "REAL");
   ensureColumn(db, "member_transactions", "actor", "TEXT");
   ensureColumn(db, "member_transactions", "slip_url", "TEXT");
+  ensureColumn(db, "member_transactions", "client_request_id", "TEXT");
+  ensureColumn(db, "member_transactions", "card_usage_session_id", "INTEGER");
 }
 
 export function seedSqliteDemoData(db: SqliteDb) {

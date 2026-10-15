@@ -11,7 +11,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { backupSqliteDatabase, listSqliteBackups, pruneSqliteBackupsByCount } from "../sqliteBackup";
-import { getBackupDir, getWelfareDb, getWelfareDbPath } from "../welfareStore";
+import { getBackupDir, getWelfareDb, getWelfareDbPath, verifyWelfareDbStartup } from "../welfareStore";
 import { closeElapsedBusinessPeriods, getSettings, logAction } from "../sqliteStore";
 import { ensureLanHttpsCert, getHttpsCertDir } from "./https";
 
@@ -74,6 +74,10 @@ function startCutoffScheduler() {
 }
 
 async function startServer() {
+  const database = verifyWelfareDbStartup();
+  const release = process.env.RAILWAY_GIT_COMMIT_SHA ?? process.env.APP_VERSION ?? "local";
+  console.log(`[Startup] release=${release} database=${database.path} quick_check=${database.quickCheck}`);
+  console.log(`[Startup] member_transactions columns=${database.transactionColumns.join(",")}`);
   const app = express();
   // ROUND 57 (user) — โหมด HTTPS (env HTTPS=1) สำหรับเปิดกล้องบนอุปกรณ์ที่เข้า
   // ผ่าน IP วงแลน: เบราว์เซอร์อนุญาต getUserMedia เฉพาะ secure context
@@ -139,4 +143,7 @@ async function startServer() {
   });
 }
 
-startServer().catch(console.error);
+startServer().catch(error => {
+  console.error("[Startup] Application failed before accepting traffic:", error);
+  process.exitCode = 1;
+});

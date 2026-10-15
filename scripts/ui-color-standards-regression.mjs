@@ -20,7 +20,7 @@ try {
     'rgb(236, 253, 245)',
     'rgb(254, 242, 242)',
     'rgb(248, 250, 252)',
-    'rgb(41, 67, 95)',
+    'rgb(66, 107, 140)',
   ];
   const readExportButtons = selector => page.$$eval(`${selector} .export-btn`, nodes => nodes.map(node => ({
     className: node.className,

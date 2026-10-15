@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync } from "node:fs";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -65,6 +66,8 @@ import {
 import type { SqliteDb, SqliteProduct } from "./sqliteStore";
 
 let db: SqliteDb | undefined;
+const require = createRequire(import.meta.url);
+const { DatabaseSync } = require("node:sqlite") as typeof import("node:sqlite");
 
 afterEach(() => {
   db?.close();
@@ -110,18 +113,26 @@ function tableCount(database: SqliteDb, table: string) {
 }
 
 describe("welfare store seeding", () => {
-  it("upgrades a legacy transaction table without created_at before startup queries run", () => {
+  it("upgrades the oldest transaction table without created_at before startup queries run", () => {
     const directory = mkdtempSync(join(tmpdir(), "welfare-legacy-tx-"));
     const filename = join(directory, "store.sqlite");
     try {
-      const legacy = createSqliteStore(filename);
-      legacy.prepare(`INSERT INTO members (member_number, first_name, last_name, balance, status) VALUES ('LEGACY-1', 'ฐาน', 'เก่า', 25, 'active')`).run();
+      const legacy = new DatabaseSync(filename);
       legacy.exec(`
-        ALTER TABLE member_transactions RENAME TO member_transactions_with_timestamp;
+        PRAGMA foreign_keys = ON;
+        CREATE TABLE members (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          member_number TEXT NOT NULL UNIQUE,
+          first_name TEXT NOT NULL,
+          last_name TEXT NOT NULL,
+          balance REAL NOT NULL DEFAULT 0,
+          status TEXT NOT NULL DEFAULT 'active',
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
         CREATE TABLE member_transactions (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           member_number TEXT NOT NULL,
-          type TEXT NOT NULL CHECK (type IN ('purchase', 'deposit', 'withdrawal', 'activation', 'refund')),
+          type TEXT NOT NULL CHECK (type IN ('purchase', 'deposit', 'withdrawal')),
           detail TEXT NOT NULL,
           amount REAL NOT NULL,
           payment_method TEXT,
@@ -132,9 +143,10 @@ describe("welfare store seeding", () => {
           card_usage_session_id INTEGER,
           FOREIGN KEY (member_number) REFERENCES members(member_number)
         );
-        INSERT INTO member_transactions (id, member_number, type, detail, amount, payment_method, balance_after)
-          VALUES (1, 'LEGACY-1', 'deposit', 'รายการจากฐานเดิม', 25, 'เงินสด', 25);
-        DROP TABLE member_transactions_with_timestamp;
+        INSERT INTO members (member_number, first_name, last_name, balance, status)
+          VALUES ('LEGACY-1', 'ฐาน', 'เก่า', 25, 'active');
+        INSERT INTO member_transactions (id, member_number, type, detail, amount, payment_method, balance_after, actor, slip_url, client_request_id)
+          VALUES (1, 'LEGACY-1', 'deposit', 'รายการจากฐานเดิม', 25, 'เงินสด', 25, 'เจ้าหน้าที่เดิม', 'data:image/jpeg;base64,legacy', 'legacy-request-1');
       `);
       legacy.close();
 
@@ -144,6 +156,11 @@ describe("welfare store seeding", () => {
       expect(db.prepare("SELECT created_at AS createdAt FROM member_transactions WHERE id = 1").get()).toMatchObject({
         createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2} /),
       });
+      expect(db.prepare("SELECT actor, slip_url AS slipUrl, client_request_id AS clientRequestId FROM member_transactions WHERE id = 1").get()).toMatchObject({
+        actor: "เจ้าหน้าที่เดิม",
+        slipUrl: "data:image/jpeg;base64,legacy",
+        clientRequestId: "legacy-request-1",
+      });
       db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount) VALUES ('LEGACY-1', 'deposit', 'หลังอัปเกรด', 1)`).run();
       expect(db.prepare("SELECT created_at AS createdAt FROM member_transactions WHERE detail = 'หลังอัปเกรด'").get()).toMatchObject({
         createdAt: expect.stringMatching(/^\d{4}-\d{2}-\d{2} /),
@@ -151,7 +168,12 @@ describe("welfare store seeding", () => {
     } finally {
       db?.close();
       db = undefined;
-      rmSync(directory, { recursive: true, force: true });
+      try {
+        rmSync(directory, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+      } catch (error) {
+        const code = (error as NodeJS.ErrnoException).code;
+        if (code !== "EPERM" && code !== "EBUSY") throw error;
+      }
     }
   });
 

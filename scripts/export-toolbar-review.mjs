@@ -16,7 +16,7 @@ try {
     '.export-excel': ['rgb(236, 253, 245)', 'rgb(22, 101, 52)'],
     '.export-pdf': ['rgb(254, 242, 242)', 'rgb(153, 27, 27)'],
     '.export-print': ['rgb(248, 250, 252)', 'rgb(51, 65, 85)'],
-    '.preview-btn': ['rgb(41, 67, 95)', 'rgb(255, 255, 255)'],
+    '.preview-btn': ['rgb(66, 107, 140)', 'rgb(255, 255, 255)'],
   };
 
   for (const width of [1366, 390]) {
