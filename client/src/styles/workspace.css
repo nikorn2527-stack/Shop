@@ -527,7 +527,7 @@
     border: 1px solid #cbd5e1; border-radius: 10px; min-height: 36px; padding: 6px 12px;
   }
   :root .app-shell .stock-receipt-history .receipt-history-filters {
-    display: grid; grid-template-columns: auto 160px 160px minmax(180px, 1fr) minmax(140px, .8fr) auto;
+    display: grid; grid-template-columns: auto 160px 160px minmax(180px, 1fr) minmax(140px, .8fr);
     align-items: end; gap: 12px; padding: 16px; background: #f8fafc;
     border: 1px solid #e2e8f0; border-radius: 12px;
   }
@@ -545,11 +545,16 @@
     border-color: #cbd5e1; border-radius: 8px;
   }
   :root .app-shell .receipt-history-filters > button { min-height: 40px; color: #334155; border-color: #cbd5e1; border-radius: 8px; }
+  :root .app-shell .receipt-history-filters .receipt-export-actions {
+    grid-column: 1 / -1; justify-self: end; flex-wrap: nowrap;
+  }
+  :root .app-shell .receipt-history-filters .receipt-export-actions button { white-space: nowrap; }
   @media (max-width: 1400px) {
     :root .app-shell .stock-receipt-history .receipt-history-filters { grid-template-columns: auto repeat(2, minmax(140px, 1fr)); }
   }
   @media (max-width: 600px) {
     :root .app-shell .stock-receipt-history .receipt-history-filters { grid-template-columns: minmax(0, 1fr); padding: 12px; }
+    :root .app-shell .receipt-history-filters .receipt-export-actions { justify-self: stretch; flex-wrap: wrap; }
   }
   /* Task colors are independent of the app palette and remain visible on hover. */
   :root .app-shell .pos-rail .rail-btn {
