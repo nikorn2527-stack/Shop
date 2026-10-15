@@ -39,6 +39,12 @@
     :root:root .app-shell .report-export-actions .export-print::before {
       content: ""; position: absolute; left: -7px; width: 1px; height: 20px; background: #cbd5e1;
     }
+    :root:root .app-shell .stock-page .table-toolbar { flex-wrap: wrap; }
+    :root:root .app-shell .stock-page .table-toolbar > .toolbar-actions {
+      flex: 1 0 100%; justify-content: flex-end; flex-wrap: nowrap;
+    }
+    :root:root .app-shell .stock-page .stock-export-actions { flex-wrap: nowrap; }
+    :root:root .app-shell .stock-page .table-toolbar :is(.outline-button, .export-btn) { white-space: nowrap; }
   }
   :root:root .card-inventory-status { border: 1px solid #64748b; font-weight: 700; }
   :root:root :is(.card-inventory-status.is-blank, .card-inventory-status.is-returned_vacant) {
