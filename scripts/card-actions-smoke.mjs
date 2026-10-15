@@ -8,7 +8,7 @@ import { DatabaseSync, backup } from 'node:sqlite';
 import { createSqliteStore, createBlankCards, registerMember, cardUsageHistory } from '../server/sqliteStore.ts';
 
 // Never run this fixture against a live database.
-const source = JSON.parse(fs.readFileSync(path.join(os.tmpdir(), 'shop-dummy-config.json'), 'utf8'));
+const source = JSON.parse(fs.readFileSync(process.env.AUDIT_CONFIG_PATH ?? path.join(os.tmpdir(), 'shop-dummy-config.json'), 'utf8'));
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'shop-card-actions-'));
 const target = path.join(dir, 'test.sqlite');
 const original = new DatabaseSync(source.target, { readOnly: true });
@@ -54,8 +54,7 @@ try {
     await handle.dispose();
   };
   const dialog = '[aria-label="จัดการบัตรสมาชิก"]';
-  await page.click('[data-nav-item=members]');
-  await click('จัดการบัตรเปล่า');
+  await page.click('[data-nav-item=cards]');
   await page.waitForSelector('.card-inventory');
   assert.equal(await page.$('.card-inventory-builder'), null, 'Builder must be collapsed initially');
   const alignment = await page.evaluate(() => {
@@ -123,12 +122,11 @@ try {
   await page.screenshot({ path: path.join(dir, 'card-inventory.png'), fullPage: true });
   const openMember = async (action = 'คืนบัตร') => {
     await page.click('[data-nav-item=members]');
-    await click('รายการสมาชิก');
     await page.waitForSelector('[aria-label="รายการสมาชิก"]');
     await page.waitForFunction(number => [...document.querySelectorAll('[aria-label="รายการสมาชิก"] tbody tr')].some(r => r.textContent.includes(number)), {}, member.memberNumber);
     const row = await page.evaluateHandle(number => [...document.querySelectorAll('[aria-label="รายการสมาชิก"] tbody tr')].find(r => r.textContent.includes(number)), member.memberNumber);
     await row.asElement().click(); await row.dispose();
-    await click('จัดการบัตร');
+    await click('คืนบัตร');
     await page.waitForSelector(dialog);
     if (await page.evaluate((scope, action) => [...document.querySelectorAll(scope + ' button')].some(b => b.textContent.trim() === action), dialog, action)) await click(action, dialog);
   };

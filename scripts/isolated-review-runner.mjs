@@ -48,14 +48,17 @@ for (const script of scripts) {
   });
   try {
     let ready = false;
-    // Windows production startup can exceed 30 seconds while antivirus scans the
-    // freshly built bundle; allow up to 90 seconds before treating it as a failure.
-    for (let i = 0; i < 180; i++) {
+    // Windows production startup can take several minutes while SQLite startup
+    // checks and antivirus scan the copied database and freshly built bundle.
+    for (let i = 0; i < 600; i++) {
+      if (server.exitCode !== null) {
+        throw new Error(`Isolated server exited before readiness:\n${fs.readFileSync(path.join(dir, 'server.log'), 'utf8')}`);
+      }
       try { ready = (await fetch(baseUrl)).ok; } catch {}
       if (ready) break;
       await new Promise(resolve => setTimeout(resolve, 500));
     }
-    assert.ok(ready, 'Isolated server did not start');
+    assert.ok(ready, `Isolated server did not start; evidence: ${dir}`);
     const code = await new Promise((resolve, reject) => {
       const child = spawn(process.execPath, ['--import', 'tsx', path.resolve('scripts', script)], {
         env: { ...process.env, AUDIT_CONFIG_PATH: configPath, AUDIT_BASE_URL: baseUrl }, stdio: 'inherit',

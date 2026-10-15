@@ -19,6 +19,8 @@ describe("member card workflow UI", () => {
     expect(detailSource).not.toContain('> จัดการบัตร');
     expect(membersSource).not.toContain("จัดการบัตรเปล่า");
     expect(membersSource).not.toContain("<CardInventory");
+    expect(shellSource).toContain('safeView === "cards"');
+    expect(shellSource).toContain("<CardInventory canManage={isAdminRole(role)} />");
     expect(settingsSource).toContain('key: "card"');
     expect(settingsSource).toContain('label: "คืนบัตร"');
     expect(shellSource).toContain('new CustomEvent("pos-rail", { detail: "card" })');

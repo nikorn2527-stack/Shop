@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import puppeteer from 'puppeteer';
 import { DatabaseSync } from 'node:sqlite';
 
-const cfg = JSON.parse(fs.readFileSync(path.join(os.tmpdir(), 'shop-dummy-config.json'), 'utf8'));
+const cfg = JSON.parse(fs.readFileSync(process.env.AUDIT_CONFIG_PATH ?? path.join(os.tmpdir(), 'shop-dummy-config.json'), 'utf8'));
 assert.ok(path.resolve(cfg.target).startsWith(path.resolve(os.tmpdir()) + path.sep));
 const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox'], dumpio: true });
 try {
@@ -25,15 +25,20 @@ try {
     await handle.asElement().click();
     await handle.dispose();
   };
-  await page.click('[data-nav-item=members]');
-  await click('จัดการบัตรเปล่า');
+  await page.click('[data-nav-item=cards]');
+  await page.waitForSelector('.card-management-page [aria-label="จัดการบัตรเปล่า"]');
+  assert.equal(await page.$eval('.card-management-page h1', node => node.textContent.trim()), 'จัดการบัตรสมาชิก');
+  await click('เพิ่มบัตรเปล่า');
+  await click('ใช้รหัสบัตรเดิม');
   await page.waitForSelector('[aria-label="จัดการบัตรเปล่า"] textarea');
   const code = `CARD-BROWSER-${Date.now()}`;
   await page.type('[aria-label="จัดการบัตรเปล่า"] textarea', code);
-  await click('เพิ่มบัตรเปล่า');
+  await click('ลงทะเบียนบัตรเปล่า');
   await page.waitForFunction(code => document.querySelector('[aria-label="จัดการบัตรเปล่า"] tbody')?.textContent.includes(code), {}, code);
   const register = async (name, amount) => {
-    await click('เพิ่มสมาชิก');
+    await page.click('[data-nav-item=pos]');
+    await page.waitForSelector('.rail-register');
+    await page.click('.rail-register');
     await page.waitForSelector('[name=firstName]');
     await page.type('[name=firstName]', name);
     await page.type('[name=lastName]', 'Audit');
@@ -42,6 +47,9 @@ try {
     await click('บันทึกสมาชิก');
     await page.waitForFunction(() => !document.querySelector('.pos-register-modal'));
     assert.equal(await page.$('.member-card-modal'), null, 'Registration must not print a new card');
+    await page.click('.rail-exit');
+    await page.click('[data-nav-item=cards]');
+    await page.waitForSelector('.card-management-page [aria-label="จัดการบัตรเปล่า"]');
   };
   await register(`First-${code}`, 25);
   await page.waitForFunction(code => [...document.querySelectorAll('[aria-label="จัดการบัตรเปล่า"] tbody tr')].some(r => r.textContent.includes(code) && r.textContent.includes('ใช้งาน')), {}, code);

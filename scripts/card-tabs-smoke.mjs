@@ -4,7 +4,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import puppeteer from 'puppeteer';
 
-const cfg = JSON.parse(fs.readFileSync(path.join(os.tmpdir(), 'shop-dummy-config.json'), 'utf8'));
+const cfg = JSON.parse(fs.readFileSync(process.env.AUDIT_CONFIG_PATH ?? path.join(os.tmpdir(), 'shop-dummy-config.json'), 'utf8'));
 assert.ok(path.resolve(cfg.target).startsWith(path.resolve(os.tmpdir()) + path.sep));
 const browser = await puppeteer.launch({ headless: true, pipe: true, args: ['--no-sandbox'] });
 try {
@@ -23,19 +23,18 @@ try {
     await handle.asElement().click();
     await handle.dispose();
   };
-  await page.click('[data-nav-item=members]');
-  assert.equal(await page.$('[aria-label="จัดการบัตรเปล่า"]'), null);
-  await click('จัดการบัตรเปล่า');
-  await page.waitForSelector('[aria-label="จัดการบัตรเปล่า"] textarea');
-  assert.equal(await page.$('.member-top-grid'), null, 'Member overview must not crowd card tab');
-  await click('เตรียมรหัสบัตรจำลอง 20 ใบ');
-  const codes = await page.$eval('textarea', element => element.value.split('\n'));
-  assert.equal(codes.length, 20);
-  assert.equal(new Set(codes).size, 20);
-  assert.ok(codes.every(code => /^DEMO-CARD-\d{5}$/.test(code)));
+  await page.click('[data-nav-item=cards]');
+  await page.waitForSelector('.card-management-page [aria-label="จัดการบัตรเปล่า"]');
+  assert.equal(await page.$eval('.card-management-page h1', node => node.textContent.trim()), 'จัดการบัตรสมาชิก');
   await click('เพิ่มบัตรเปล่า');
-  await page.waitForFunction(code => document.querySelector('[aria-label="จัดการบัตรเปล่า"] tbody')?.textContent.includes(code), {}, codes[0]);
-  await click('รายการสมาชิก');
+  await click('ใช้รหัสบัตรเดิม');
+  await page.waitForSelector('[aria-label="จัดการบัตรเปล่า"] textarea');
+  assert.equal(await page.$('.member-top-grid'), null, 'Member overview must not crowd card management');
+  const code = `CARD-MENU-${Date.now()}`;
+  await page.type('[aria-label="จัดการบัตรเปล่า"] textarea', code);
+  await click('ลงทะเบียนบัตรเปล่า');
+  await page.waitForFunction(code => document.querySelector('[aria-label="จัดการบัตรเปล่า"] tbody')?.textContent.includes(code), {}, code);
+  await page.click('[data-nav-item=members]');
   await page.waitForSelector('.member-top-grid');
   assert.equal(await page.$('[aria-label="จัดการบัตรเปล่า"]'), null);
   await page.click('[data-nav-item=profit]');
@@ -43,12 +42,11 @@ try {
   assert.ok(await page.evaluate(() => document.querySelector('.nav-group-label')?.parentElement.textContent.includes('การบริหารจัดการ')));
   await page.screenshot({ path: path.join(cfg.dir, 'profit-menu-verified.png'), fullPage: true });
   await page.reload({ waitUntil: 'networkidle2' });
-  await page.click('[data-nav-item=members]');
-  await click('จัดการบัตรเปล่า');
-  await page.waitForFunction(code => document.querySelector('[aria-label="จัดการบัตรเปล่า"] tbody')?.textContent.includes(code), {}, codes[0]);
-  await page.screenshot({ path: path.join(cfg.dir, 'card-tab-verified.png'), fullPage: true });
+  await page.click('[data-nav-item=cards]');
+  await page.waitForFunction(code => document.querySelector('[aria-label="จัดการบัตรเปล่า"] tbody')?.textContent.includes(code), {}, code);
+  await page.screenshot({ path: path.join(cfg.dir, 'card-menu-verified.png'), fullPage: true });
   assert.deepEqual(errors, []);
-  console.log('PASS: login, isolated card tab, 20 demo cards, save/reload, member tab and financial report menu');
+  console.log('PASS: login, card management menu, save/reload, member page and financial report menu');
 } finally {
   await browser.close();
 }

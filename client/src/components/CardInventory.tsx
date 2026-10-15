@@ -36,7 +36,10 @@ export function CardInventory({ canManage }: { canManage: boolean }) {
     }
   }, [historyCard]);
   const history = trpc.card.history.useQuery({ cardNumber: historyCard }, { enabled: Boolean(historyCard) });
-  const cards = trpc.card.list.useQuery({ search });
+  const cards = trpc.card.list.useQuery(
+    { search },
+    { refetchOnMount: "always" }
+  );
   const refresh = () => {
     setError("");
     setNotice("บันทึกแล้ว");
