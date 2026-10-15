@@ -41,6 +41,8 @@ try {
     for (const menu of ['dashboard', 'stock', 'members', 'reports', 'profit', 'users', 'logs', 'settings', 'pos']) {
       await page.goto(cfg.baseUrl, { waitUntil: 'networkidle2' });
       await page.waitForSelector('[data-nav-item=dashboard]');
+      const logoutColor = await page.$eval('button[aria-label="ออกจากระบบ"]', node => getComputedStyle(node).color);
+      assert.equal(logoutColor, 'rgb(185, 28, 28)', `Logout label and icon must be red at ${width}px`);
       if (width === 390) await click('[aria-label="เปิดเมนู"]');
       await click(`[data-nav-item=${menu}]`);
       await inspect(menu, width);

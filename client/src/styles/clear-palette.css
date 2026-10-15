@@ -190,6 +190,15 @@
   :root:root .modal-backdrop :is(.preview-format-btn.format-print, .statement-export-print):not(:disabled):hover { background: #e2e8f0; color: #0f172a; border-color: #475569; }
   :root:root .modal-backdrop .preview-format-btn.preferred:not(:disabled) { box-shadow: 0 0 0 3px rgb(41 67 95 / 16%); }
 
+  /* Logout remains an outlined secondary action, but its label and icon use the
+     destructive colour so it cannot be mistaken for ordinary navigation. */
+  :root:root .app-shell .shell-logout,
+  :root:root .app-shell .shell-logout:not(:disabled):hover,
+  :root:root .app-shell .shell-logout:focus-visible,
+  :root:root .app-shell .shell-logout:disabled {
+    color: #b91c1c !important;
+  }
+
   /* Keep the top-right dialog exit easy to spot without turning unrelated icon
      controls red. This covers the legacy modal shell and Radix's built-in X. */
   :root:root .modal-backdrop .modal-heading > .icon-button,
