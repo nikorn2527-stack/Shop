@@ -190,6 +190,35 @@
   :root:root .modal-backdrop :is(.preview-format-btn.format-print, .statement-export-print):not(:disabled):hover { background: #e2e8f0; color: #0f172a; border-color: #475569; }
   :root:root .modal-backdrop .preview-format-btn.preferred:not(:disabled) { box-shadow: 0 0 0 3px rgb(41 67 95 / 16%); }
 
+  /* Keep the top-right dialog exit easy to spot without turning unrelated icon
+     controls red. This covers the legacy modal shell and Radix's built-in X. */
+  :root:root .modal-backdrop .modal-heading > .icon-button,
+  :root:root [data-slot="dialog-content"] > [data-slot="dialog-close"] {
+    width: 34px; height: 34px; min-width: 34px; min-height: 34px;
+    border: 1px solid #991b1b; border-radius: 8px;
+    background: #b91c1c; background-image: none;
+    color: #ffffff; opacity: 1;
+    box-shadow: 0 3px 9px rgb(127 29 29 / 24%);
+  }
+  :root:root .modal-backdrop .modal-heading > .icon-button:not(:disabled):hover,
+  :root:root [data-slot="dialog-content"] > [data-slot="dialog-close"]:not(:disabled):hover {
+    border-color: #7f1d1d; background: #991b1b; color: #ffffff;
+  }
+  :root:root .modal-backdrop .modal-heading > .icon-button:focus-visible,
+  :root:root [data-slot="dialog-content"] > [data-slot="dialog-close"]:focus-visible {
+    outline: 3px solid #fecaca; outline-offset: 2px;
+  }
+  :root:root .modal-backdrop .modal-heading > .icon-button:disabled,
+  :root:root [data-slot="dialog-content"] > [data-slot="dialog-close"]:disabled {
+    background: #b91c1c; color: #ffffff; opacity: .55; cursor: not-allowed;
+  }
+  @media (max-width: 560px) {
+    :root:root .modal-backdrop .modal-heading > .icon-button,
+    :root:root [data-slot="dialog-content"] > [data-slot="dialog-close"] {
+      width: 40px; height: 40px; min-width: 40px; min-height: 40px;
+    }
+  }
+
   /* Confirmation color communicates impact: navy normal, amber caution, red destructive. */
   :root:root .modal-backdrop .confirm-icon.primary { background: #dce3ea; color: #29435f; }
   :root:root .modal-backdrop .confirm-icon.warning { background: #fef3c7; color: #a16207; }

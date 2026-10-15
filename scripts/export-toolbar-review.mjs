@@ -75,6 +75,15 @@ try {
     return [selector, [style.backgroundColor, style.color]];
   })), Object.keys(previewExpected));
   assert.deepEqual(previewStyles, previewExpected, 'Shared export preview must preserve file-type colors');
+  const closeStyle = await page.$eval('.export-preview-modal .modal-heading > .icon-button', node => {
+    const style = getComputedStyle(node);
+    const rect = node.getBoundingClientRect();
+    return { background: style.backgroundColor, color: style.color, width: rect.width, height: rect.height, label: node.getAttribute('aria-label') };
+  });
+  assert.equal(closeStyle.background, 'rgb(185, 28, 28)', 'Export preview X must use a red background');
+  assert.equal(closeStyle.color, 'rgb(255, 255, 255)', 'Export preview X must remain white for contrast');
+  assert.ok(closeStyle.width >= 34 && closeStyle.height >= 34, 'Export preview X must have a clear pointer target');
+  assert.ok(closeStyle.label?.startsWith('ปิด'), 'Export preview X must have an accessible label');
   await page.screenshot({ path: `${cfg.dir}/shared-export-preview-1366.png` });
   await page.setViewport({ width: 390, height: 844 });
   const mobilePreview = await page.$eval('.export-preview-modal', modal => {
@@ -88,6 +97,14 @@ try {
   assert.ok(mobilePreview.overflow <= 2, 'Shared export preview must not overflow on mobile');
   assert.equal(mobilePreview.rows, 2, 'Shared export preview must use two rows on mobile');
   assert.equal(mobilePreview.columns, 2, 'Shared export preview must use two columns on mobile');
+  const mobileClose = await page.$eval('.export-preview-modal .modal-heading > .icon-button', node => {
+    const rect = node.getBoundingClientRect();
+    const style = getComputedStyle(node);
+    return { background: style.backgroundColor, color: style.color, width: rect.width, height: rect.height };
+  });
+  assert.equal(mobileClose.background, 'rgb(185, 28, 28)');
+  assert.equal(mobileClose.color, 'rgb(255, 255, 255)');
+  assert.ok(mobileClose.width >= 40 && mobileClose.height >= 40, 'Mobile X must meet the coarse-pointer target size');
   await page.screenshot({ path: `${cfg.dir}/shared-export-preview-390.png` });
   assert.deepEqual(errors, []);
   console.log('EXPORT_TOOLBAR_PASS', cfg.dir);

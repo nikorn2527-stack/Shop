@@ -48,12 +48,22 @@ try {
       viewportY: innerHeight / 2,
       buttonBackground: style.backgroundColor,
       buttonColor: style.color,
+      close: (() => {
+        const close = node.querySelector('.modal-heading > .icon-button');
+        const closeStyle = getComputedStyle(close);
+        const closeRect = close.getBoundingClientRect();
+        return { background: closeStyle.backgroundColor, color: closeStyle.color, width: closeRect.width, height: closeRect.height, label: close.getAttribute('aria-label') };
+      })(),
     };
   });
   assert.ok(Math.abs(warningDialog.centerX - warningDialog.viewportX) < 3, 'Warning dialog must be horizontally centered');
   assert.ok(Math.abs(warningDialog.centerY - warningDialog.viewportY) < 3, 'Warning dialog must be vertically centered');
   assert.equal(warningDialog.buttonBackground, 'rgb(180, 83, 9)');
   assert.equal(warningDialog.buttonColor, 'rgb(255, 255, 255)');
+  assert.equal(warningDialog.close.background, 'rgb(185, 28, 28)', 'Confirmation X must use a red background');
+  assert.equal(warningDialog.close.color, 'rgb(255, 255, 255)', 'Confirmation X must remain white for contrast');
+  assert.ok(warningDialog.close.width >= 34 && warningDialog.close.height >= 34);
+  assert.ok(warningDialog.close.label?.startsWith('ปิด'));
   await page.screenshot({ path: `${cfg.dir}/dev-access-warning.png` });
 
   await clickText('ยืนยันเปิด Dev Access', '.confirm-modal');
