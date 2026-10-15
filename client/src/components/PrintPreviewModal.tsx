@@ -162,7 +162,7 @@ export function PrintPreviewModal({
         {paper === "a4" ? (
           <div className="export-preview-actions">
             <div className="preview-format-list">
-              <button type="button" className="preview-format-btn preferred" onClick={doPrint} disabled={!ready}>
+              <button type="button" className="preview-format-btn format-print preferred" onClick={doPrint} disabled={!ready}>
                 <Printer size={15} /><span><b>พิมพ์</b></span>
                 <i className="preferred-dot" aria-hidden="true" />
               </button>

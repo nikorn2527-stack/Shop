@@ -87,7 +87,7 @@ export function ExportPreviewModal({
               <button
                 key={format}
                 type="button"
-                className={`preview-format-btn${state.preferred === format ? " preferred" : ""}`}
+                className={`preview-format-btn format-${format}${state.preferred === format ? " preferred" : ""}`}
                 onClick={() => onRun(format)}
                 title={FORMAT_META[format].hint}
               >

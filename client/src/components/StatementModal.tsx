@@ -162,8 +162,8 @@ export function StatementModal({ member, transactions, onClose }: { member: Stat
     </div>
     <div className="statement-actions modal-actions">
       <span className="statement-hint"><FileText size={14} /> A4 · {totals.count} รายการ · เอกสารทางการ (template เดียวกับรายงานอื่น)</span>
-      <button className="outline-button red" disabled={busy} onClick={downloadPdf} title="ดาวน์โหลดรายงานเป็น PDF vector (เหมือนรายงานอื่น)"><Download size={16} /> {busy ? "กำลังสร้าง PDF..." : "ดาวน์โหลด PDF"}</button>
-      <button className="primary-button" onClick={printStatement} title="พิมพ์รายงาน A4"><Printer size={16} /> พิมพ์รายงาน</button>
+      <button className="outline-button statement-export-pdf" disabled={busy} onClick={downloadPdf} title="ดาวน์โหลดรายงานเป็น PDF vector (เหมือนรายงานอื่น)"><Download size={16} /> {busy ? "กำลังสร้าง PDF..." : "ดาวน์โหลด PDF"}</button>
+      <button className="outline-button statement-export-print" onClick={printStatement} title="พิมพ์รายงาน A4"><Printer size={16} /> พิมพ์รายงาน</button>
     </div>
   </div></div>;
 }

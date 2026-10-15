@@ -63,6 +63,32 @@ try {
   await preview.click();
   await page.waitForSelector('.export-preview-modal', { visible: true });
   await page.waitForSelector('.export-preview-modal iframe');
+  const previewExpected = {
+    '.format-csv': ['rgb(236, 254, 255)', 'rgb(21, 94, 117)'],
+    '.format-xlsx': ['rgb(236, 253, 245)', 'rgb(22, 101, 52)'],
+    '.format-pdf': ['rgb(254, 242, 242)', 'rgb(153, 27, 27)'],
+    '.format-print': ['rgb(248, 250, 252)', 'rgb(51, 65, 85)'],
+  };
+  const previewStyles = await page.$eval('.export-preview-modal', (modal, selectors) => Object.fromEntries(selectors.map(selector => {
+    const node = modal.querySelector(selector);
+    const style = getComputedStyle(node);
+    return [selector, [style.backgroundColor, style.color]];
+  })), Object.keys(previewExpected));
+  assert.deepEqual(previewStyles, previewExpected, 'Shared export preview must preserve file-type colors');
+  await page.screenshot({ path: `${cfg.dir}/shared-export-preview-1366.png` });
+  await page.setViewport({ width: 390, height: 844 });
+  const mobilePreview = await page.$eval('.export-preview-modal', modal => {
+    const buttons = [...modal.querySelectorAll('.preview-format-btn')].map(node => node.getBoundingClientRect());
+    return {
+      overflow: document.documentElement.scrollWidth - innerWidth,
+      rows: new Set(buttons.map(rect => Math.round(rect.top))).size,
+      columns: new Set(buttons.map(rect => Math.round(rect.left))).size,
+    };
+  });
+  assert.ok(mobilePreview.overflow <= 2, 'Shared export preview must not overflow on mobile');
+  assert.equal(mobilePreview.rows, 2, 'Shared export preview must use two rows on mobile');
+  assert.equal(mobilePreview.columns, 2, 'Shared export preview must use two columns on mobile');
+  await page.screenshot({ path: `${cfg.dir}/shared-export-preview-390.png` });
   assert.deepEqual(errors, []);
   console.log('EXPORT_TOOLBAR_PASS', cfg.dir);
 } finally {

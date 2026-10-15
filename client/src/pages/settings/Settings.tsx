@@ -4304,6 +4304,7 @@ export function Settings({
           )}
           <ConfirmDialog
             open={devAccessConfirm}
+            tone="warning"
             title="ยืนยันการเปิด Dev Access?"
             description="การเปิดสวิตช์นี้อนุญาตให้บัญชีผู้พัฒนา (dev) เข้าสู่ระบบและเข้าถึงข้อมูลของร้านได้ทั้งหมดเท่าผู้บริหาร · ทุกการเข้าสู่ระบบจะถูกบันทึกลงประวัติระบบ เป็นสีแดง · แนะนำให้เปิดเฉพาะช่วงที่จำเป็น แล้วปิดกลับเมื่อเสร็จ (ต้องกดบันทึกการตั้งค่าจึงมีผล)"
             confirmLabel="ยืนยันเปิด Dev Access"
@@ -4315,6 +4316,7 @@ export function Settings({
           />
           <ConfirmDialog
             open={importConfirm}
+            tone="warning"
             title="ยืนยันการนำเข้าข้อมูล?"
             description={`จะนำเข้า ${currentSheet ? currentSheet.totalRows.toLocaleString("th-TH") : ""} แถว จากไฟล์ ${importFile?.name ?? ""} (${importKind === "members" ? "สมาชิก" : "สินค้า"} · ${duplicateMode === "skip" ? "ข้ามรายการซ้ำ" : "อัปเดตข้อมูลที่ซ้ำ"}) · ระบบจะสำรองข้อมูลทั้งระบบเป็นไฟล์ป้องกันก่อนนำเข้าเสมอ และบันทึกการนำเข้าลง Log`}
             confirmLabel="ยืนยันนำเข้าข้อมูล"

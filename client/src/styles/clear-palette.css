@@ -166,6 +166,63 @@
   :root:root .app-shell .report-export-actions .preview-btn:not(:disabled):hover {
     background: #17283d; background-image: none; color: #ffffff; border-color: #17283d;
   }
+  /* Export choices keep the same file-type language everywhere, including shared previews. */
+  :root:root .modal-backdrop .preview-format-btn:not(:disabled) {
+    background-image: none; font-weight: 700; box-shadow: 0 1px 2px rgb(15 23 42 / 6%);
+  }
+  :root:root .modal-backdrop .preview-format-btn.format-csv:not(:disabled) {
+    background: #ecfeff; color: #155e75; border-color: #67e8f9;
+  }
+  :root:root .modal-backdrop .preview-format-btn.format-xlsx:not(:disabled) {
+    background: #ecfdf5; color: #166534; border-color: #86efac;
+  }
+  :root:root .modal-backdrop .preview-format-btn.format-pdf:not(:disabled),
+  :root:root .modal-backdrop .statement-export-pdf:not(:disabled) {
+    background: #fef2f2; background-image: none; color: #991b1b; border-color: #fca5a5;
+  }
+  :root:root .modal-backdrop .preview-format-btn.format-print:not(:disabled),
+  :root:root .modal-backdrop .statement-export-print:not(:disabled) {
+    background: #f8fafc; background-image: none; color: #334155; border-color: #94a3b8;
+  }
+  :root:root .modal-backdrop .preview-format-btn.format-csv:not(:disabled):hover { background: #cffafe; color: #164e63; border-color: #0891b2; }
+  :root:root .modal-backdrop .preview-format-btn.format-xlsx:not(:disabled):hover { background: #dcfce7; color: #14532d; border-color: #16a34a; }
+  :root:root .modal-backdrop :is(.preview-format-btn.format-pdf, .statement-export-pdf):not(:disabled):hover { background: #fee2e2; color: #7f1d1d; border-color: #dc2626; }
+  :root:root .modal-backdrop :is(.preview-format-btn.format-print, .statement-export-print):not(:disabled):hover { background: #e2e8f0; color: #0f172a; border-color: #475569; }
+  :root:root .modal-backdrop .preview-format-btn.preferred:not(:disabled) { box-shadow: 0 0 0 3px rgb(41 67 95 / 16%); }
+
+  /* Confirmation color communicates impact: navy normal, amber caution, red destructive. */
+  :root:root .modal-backdrop .confirm-icon.primary { background: #dce3ea; color: #29435f; }
+  :root:root .modal-backdrop .confirm-icon.warning { background: #fef3c7; color: #a16207; }
+  :root:root .modal-backdrop .confirm-icon.danger { background: #fee2e2; color: #b91c1c; }
+  :root:root .modal-backdrop .confirm-button {
+    display: inline-flex; align-items: center; justify-content: center; min-height: 40px;
+    border: 1px solid transparent; border-radius: 8px; padding: 9px 14px;
+    color: #fff; font: inherit; font-weight: 700; cursor: pointer;
+  }
+  :root:root .modal-backdrop .confirm-button.primary { background: #29435f; border-color: #29435f; }
+  :root:root .modal-backdrop .confirm-button.primary:not(:disabled):hover { background: #17283d; border-color: #17283d; }
+  :root:root .modal-backdrop .confirm-button.warning { background: #b45309; border-color: #b45309; }
+  :root:root .modal-backdrop .confirm-button.warning:not(:disabled):hover { background: #92400e; border-color: #92400e; }
+  :root:root .modal-backdrop .confirm-button.danger { background: #b91c1c; border-color: #b91c1c; }
+  :root:root .modal-backdrop .confirm-button.danger:not(:disabled):hover { background: #991b1b; border-color: #991b1b; }
+  :root:root .modal-backdrop .confirm-button:disabled { cursor: wait; opacity: .6; }
+
+  /* Unsaved settings stay visible without interrupting every reversible field change. */
+  :root:root .app-shell .settings-save-bar {
+    left: 50%; right: auto; bottom: max(18px, env(safe-area-inset-bottom));
+    transform: translateX(-50%); width: min(calc(100% - 32px), 620px);
+    border-color: #aab7c4; box-shadow: 0 16px 40px rgb(15 23 42 / 22%);
+  }
+  :root:root .app-shell .settings-save-bar .save-dot { background: #d97706; box-shadow: 0 0 0 4px rgb(217 119 6 / 16%); }
+  :root:root .app-shell .settings-save-bar .save-bar-actions .primary-button {
+    background: #29435f; background-image: none; border-color: #29435f; color: #fff;
+  }
+  :root:root .app-shell .settings-save-bar .save-bar-actions .primary-button:not(:disabled):hover {
+    background: #17283d; background-image: none; border-color: #17283d; color: #fff;
+  }
+  @media (max-width: 560px) {
+    :root:root .app-shell .settings-save-bar { left: 12px; right: 12px; width: auto; transform: none; }
+  }
   :root:root :is(.status-pill, .status-badge, .card-inventory-status) {
     background: transparent !important; border: 0 !important;
     color: var(--status-color, #475569) !important;

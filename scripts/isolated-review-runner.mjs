@@ -48,7 +48,9 @@ for (const script of scripts) {
   });
   try {
     let ready = false;
-    for (let i = 0; i < 60; i++) {
+    // Windows production startup can exceed 30 seconds while antivirus scans the
+    // freshly built bundle; allow up to 90 seconds before treating it as a failure.
+    for (let i = 0; i < 180; i++) {
       try { ready = (await fetch(baseUrl)).ok; } catch {}
       if (ready) break;
       await new Promise(resolve => setTimeout(resolve, 500));

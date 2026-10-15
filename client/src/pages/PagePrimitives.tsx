@@ -43,8 +43,10 @@ export function SectionHeader({ eyebrow, title, description, action }: { eyebrow
   );
 }
 
-export function ConfirmDialog({ open, title, description, confirmLabel, onCancel, onConfirm, pending = false, error }: { open: boolean; title: string; description: string; confirmLabel: string; onCancel: () => void; onConfirm: () => void; pending?: boolean; error?: string }) {
+export type ConfirmDialogTone = "primary" | "warning" | "danger";
+
+export function ConfirmDialog({ open, title, description, confirmLabel, onCancel, onConfirm, pending = false, error, tone = "danger" }: { open: boolean; title: string; description: string; confirmLabel: string; onCancel: () => void; onConfirm: () => void; pending?: boolean; error?: string; tone?: ConfirmDialogTone }) {
   if (!open) return null;
-  return <div className="modal-backdrop" onClick={() => { if (!pending) onCancel(); }}><div className="confirm-modal" aria-busy={pending} onClick={(event) => event.stopPropagation()}><div className="confirm-icon"><ShieldCheck size={21} /></div><div className="modal-heading"><div><h2>{title}</h2><p>{description}</p></div><button type="button" className="icon-button" disabled={pending} onClick={onCancel} aria-label="ปิด"><X size={17} /></button></div>{error && <div className="notice-bar error" role="alert">{error}</div>}<div className="confirm-actions"><button type="button" className="outline-button" disabled={pending} onClick={onCancel}>ยกเลิก</button><button type="button" className="danger-button" disabled={pending} onClick={() => { if (!pending) onConfirm(); }}>{confirmLabel}</button></div></div></div>;
+  return <div className="modal-backdrop" onClick={() => { if (!pending) onCancel(); }}><div className={`confirm-modal confirm-${tone}`} role="alertdialog" aria-modal="true" aria-busy={pending} onClick={(event) => event.stopPropagation()}><div className={`confirm-icon ${tone}`}><ShieldCheck size={21} /></div><div className="modal-heading"><div><h2>{title}</h2><p>{description}</p></div><button type="button" className="icon-button" disabled={pending} onClick={onCancel} aria-label="ปิด"><X size={17} /></button></div>{error && <div className="notice-bar error" role="alert">{error}</div>}<div className="confirm-actions"><button type="button" className="outline-button" disabled={pending} onClick={onCancel}>ยกเลิก</button><button type="button" className={`confirm-button ${tone}`} disabled={pending} onClick={() => { if (!pending) onConfirm(); }}>{confirmLabel}</button></div></div></div>;
 }
 

@@ -1064,6 +1064,7 @@ export function MemberDetail({
       )}
       <ConfirmDialog
         open={confirmStatus}
+        tone={profile.status === "active" ? "warning" : "primary"}
         title={
           profile.status === "active"
             ? "ยืนยันการระงับสมาชิก?"
