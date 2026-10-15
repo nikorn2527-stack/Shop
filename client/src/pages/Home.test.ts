@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { addScannedItem, calculateCartSubtotal, canAccessView, formatMemberNumber, isStockAlert } from "./Home";
+import { navItems } from "./pageData";
 
 describe("POS cart calculations", () => {
   it("calculates subtotal across quantities", () => {
@@ -28,10 +29,18 @@ describe("POS cart calculations", () => {
 
   it("limits staff to operational views while admins can access audit settings", () => {
     expect(canAccessView("staff", "pos")).toBe(true);
+    expect(canAccessView("staff", "cards")).toBe(true);
     expect(canAccessView("staff", "settings")).toBe(false);
     expect(canAccessView("staff", "logs")).toBe(false);
     expect(canAccessView("admin", "settings")).toBe(true);
     expect(canAccessView("admin", "logs")).toBe(true);
+  });
+
+  it("keeps member-card management visible in the main navigation", () => {
+    expect(navItems).toContainEqual(expect.objectContaining({
+      id: "cards",
+      label: "จัดการบัตรสมาชิก",
+    }));
   });
 
   it("formats member numbers and identifies stock alerts", () => {

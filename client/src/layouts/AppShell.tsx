@@ -48,6 +48,7 @@ import { useEditionStatus } from "@/components/EditionUi";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { SharedSearchHost, SharedSearchProvider } from "@/components/SharedSearch";
 import { KeyboardShortcutsOverlay, ShortcutsFab } from "@/components/KeyboardShortcutsOverlay";
+import { CardInventory } from "@/components/CardInventory";
 import { Dashboard } from "../pages/Dashboard";
 import { Pos } from "../pages/Pos";
 import { Stock } from "../pages/Stock";
@@ -69,6 +70,7 @@ import {
   type View,
 } from "../pages/pageData";
 import { formatThaiDate } from "../pages/viewFormat";
+import { SectionHeader } from "../pages/PagePrimitives";
 import type { SettingsTab } from "../pages/shared";
 import type { User } from "../../../drizzle/schema";
 
@@ -873,6 +875,16 @@ export function AppShell({
               focusMemberNumber={pendingMemberNumber}
               onFocusMemberConsumed={() => setPendingMemberNumber(null)}
             />
+          )}
+          {safeView === "cards" && (
+            <div className="card-management-page">
+              <SectionHeader
+                eyebrow="สมาชิกและบัตรหมุนเวียน"
+                title="จัดการบัตรสมาชิก"
+                description="ดูสถานะบัตร รับคืนบัตร ตรวจประวัติการใช้งาน และจัดเตรียมบัตรเปล่า"
+              />
+              <CardInventory canManage={isAdminRole(role)} />
+            </div>
           )}
           {safeView === "profit" && <CostProfit />}
           {safeView === "reports" && (

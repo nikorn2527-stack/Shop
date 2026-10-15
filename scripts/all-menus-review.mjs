@@ -38,7 +38,7 @@ try {
   }
   for (const width of [1366, 390]) {
     await page.setViewport({ width, height: width === 390 ? 844 : 768 });
-    for (const menu of ['dashboard', 'stock', 'members', 'reports', 'profit', 'users', 'logs', 'settings', 'pos']) {
+    for (const menu of ['dashboard', 'stock', 'members', 'cards', 'reports', 'profit', 'users', 'logs', 'settings', 'pos']) {
       await page.goto(cfg.baseUrl, { waitUntil: 'networkidle2' });
       await page.waitForSelector('[data-nav-item=dashboard]');
       const logoutColor = await page.$eval('button[aria-label="ออกจากระบบ"]', node => getComputedStyle(node).color);

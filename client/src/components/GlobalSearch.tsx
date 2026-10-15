@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Activity,
   BarChart3,
+  CreditCard,
   Package,
   PackageSearch,
   ReceiptText,
@@ -74,6 +75,7 @@ export function GlobalSearch({ role, open, onClose, onNavigate, onOpenMember, on
       { key: "quick-pos", label: "เปิดหน้าร้าน POS", icon: ShoppingCart, view: "pos" },
       { key: "quick-receive", label: "เปิดหน้าสต็อกสินค้า", icon: PackageSearch, view: "stock" },
       { key: "quick-register", label: "ลงทะเบียนสมาชิก", icon: UserPlus, view: "members" },
+      { key: "quick-cards", label: "จัดการบัตรสมาชิก", icon: CreditCard, view: "cards" },
       { key: "quick-reports", label: "ดูรายงานยอดขาย", icon: BarChart3, view: "reports" },
     ];
     if (isAdminRole(role)) {
