@@ -29,18 +29,16 @@ describe("POS cart calculations", () => {
 
   it("limits staff to operational views while admins can access audit settings", () => {
     expect(canAccessView("staff", "pos")).toBe(true);
-    expect(canAccessView("staff", "cards")).toBe(true);
+    expect(canAccessView("staff", "members")).toBe(true);
     expect(canAccessView("staff", "settings")).toBe(false);
     expect(canAccessView("staff", "logs")).toBe(false);
     expect(canAccessView("admin", "settings")).toBe(true);
     expect(canAccessView("admin", "logs")).toBe(true);
   });
 
-  it("keeps member-card management visible in the main navigation", () => {
-    expect(navItems).toContainEqual(expect.objectContaining({
-      id: "cards",
-      label: "จัดการบัตรสมาชิก",
-    }));
+  it("keeps member-card management inside members instead of the main navigation", () => {
+    expect(navItems).toContainEqual(expect.objectContaining({ id: "members", label: "สมาชิกและบัญชี" }));
+    expect(navItems).not.toContainEqual(expect.objectContaining({ id: "cards" }));
   });
 
   it("formats member numbers and identifies stock alerts", () => {

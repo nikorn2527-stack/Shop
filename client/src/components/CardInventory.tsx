@@ -139,7 +139,7 @@ export function CardInventory({ canManage }: { canManage: boolean }) {
       {cards.isLoading ? (
         <p>กำลังโหลด…</p>
       ) : (
-        <div className="table-wrap">
+        <div className="table-wrap card-inventory-table-wrap" tabIndex={0} aria-label="ตารางบัตรสมาชิก เลื่อนได้ทั้งแนวนอนและแนวตั้ง">
           <table>
             <thead>
               <tr>

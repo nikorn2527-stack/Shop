@@ -41,12 +41,13 @@ type CommandItem = {
 
 const SECTION_ORDER: CommandSection[] = ["การดำเนินการด่วน", "เมนู", "สมาชิก", "สินค้า", "บิลขาย"];
 
-export function GlobalSearch({ role, open, onClose, onNavigate, onOpenMember, onOpenBill, onOpenProduct }: {
+export function GlobalSearch({ role, open, onClose, onNavigate, onOpenMember, onOpenCards, onOpenBill, onOpenProduct }: {
   role: Role;
   open: boolean;
   onClose: () => void;
   onNavigate: (view: View) => void;
   onOpenMember: (memberNumber: string) => void;
+  onOpenCards: () => void;
   onOpenBill: (orderNumber: string) => void;
   onOpenProduct: (productId: number) => void;
 }) {
@@ -75,7 +76,6 @@ export function GlobalSearch({ role, open, onClose, onNavigate, onOpenMember, on
       { key: "quick-pos", label: "เปิดหน้าร้าน POS", icon: ShoppingCart, view: "pos" },
       { key: "quick-receive", label: "เปิดหน้าสต็อกสินค้า", icon: PackageSearch, view: "stock" },
       { key: "quick-register", label: "ลงทะเบียนสมาชิก", icon: UserPlus, view: "members" },
-      { key: "quick-cards", label: "จัดการบัตรสมาชิก", icon: CreditCard, view: "cards" },
       { key: "quick-reports", label: "ดูรายงานยอดขาย", icon: BarChart3, view: "reports" },
     ];
     if (isAdminRole(role)) {
@@ -103,6 +103,9 @@ export function GlobalSearch({ role, open, onClose, onNavigate, onOpenMember, on
       if (needle === "" || action.label.toLowerCase().includes(needle)) {
         list.push({ key: action.key, section: "การดำเนินการด่วน", icon: action.icon, label: action.label, sub: "ทางลัดไปยังงานที่ใช้บ่อย", select: () => onNavigate(action.view) });
       }
+    }
+    if (needle === "" || "จัดการบัตรสมาชิก บัตรเปล่า บัตรหมุนเวียน ประวัติ".includes(needle)) {
+      list.push({ key: "quick-cards", section: "การดำเนินการด่วน", icon: CreditCard, label: "จัดการบัตรสมาชิก", sub: "อยู่ในเมนูสมาชิกและบัญชี", select: onOpenCards });
     }
     for (const menu of menuEntries) {
       if (needle === "" || `${menu.label} ${menu.caption}`.toLowerCase().includes(needle)) {
@@ -139,7 +142,7 @@ export function GlobalSearch({ role, open, onClose, onNavigate, onOpenMember, on
       capped.push(item);
     }
     return capped;
-  }, [open, needle, trimmed, quickActions, menuEntries, membersQuery.data, productsQuery.data, billsQuery.data, onNavigate, onOpenMember, onOpenBill, onOpenProduct]);
+  }, [open, needle, trimmed, quickActions, menuEntries, membersQuery.data, productsQuery.data, billsQuery.data, onNavigate, onOpenMember, onOpenCards, onOpenBill, onOpenProduct]);
 
   useEffect(() => {
     setHighlighted((current) => (items.length === 0 ? 0 : Math.min(current, items.length - 1)));

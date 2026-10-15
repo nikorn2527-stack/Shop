@@ -54,7 +54,8 @@ try {
     await handle.dispose();
   };
   const dialog = '[aria-label="จัดการบัตรสมาชิก"]';
-  await page.click('[data-nav-item=cards]');
+  await page.click('[data-nav-item=members]');
+  await page.click('[data-member-section=cards]');
   await page.waitForSelector('.card-inventory');
   assert.equal(await page.$('.card-inventory-builder'), null, 'Builder must be collapsed initially');
   const alignment = await page.evaluate(() => {

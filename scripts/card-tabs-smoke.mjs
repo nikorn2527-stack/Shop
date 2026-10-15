@@ -23,9 +23,9 @@ try {
     await handle.asElement().click();
     await handle.dispose();
   };
-  await page.click('[data-nav-item=cards]');
-  await page.waitForSelector('.card-management-page [aria-label="จัดการบัตรเปล่า"]');
-  assert.equal(await page.$eval('.card-management-page h1', node => node.textContent.trim()), 'จัดการบัตรสมาชิก');
+  await page.click('[data-nav-item=members]');
+  await page.click('[data-member-section=cards]');
+  await page.waitForSelector('.member-card-management [aria-label="จัดการบัตรเปล่า"]');
   await click('เพิ่มบัตรเปล่า');
   await click('ใช้รหัสบัตรเดิม');
   await page.waitForSelector('[aria-label="จัดการบัตรเปล่า"] textarea');
@@ -34,7 +34,7 @@ try {
   await page.type('[aria-label="จัดการบัตรเปล่า"] textarea', code);
   await click('ลงทะเบียนบัตรเปล่า');
   await page.waitForFunction(code => document.querySelector('[aria-label="จัดการบัตรเปล่า"] tbody')?.textContent.includes(code), {}, code);
-  await page.click('[data-nav-item=members]');
+  await click('รายชื่อสมาชิก');
   await page.waitForSelector('.member-top-grid');
   assert.equal(await page.$('[aria-label="จัดการบัตรเปล่า"]'), null);
   await page.click('[data-nav-item=profit]');
@@ -42,8 +42,29 @@ try {
   assert.ok(await page.evaluate(() => document.querySelector('.nav-group-label')?.parentElement.textContent.includes('การบริหารจัดการ')));
   await page.screenshot({ path: path.join(cfg.dir, 'profit-menu-verified.png'), fullPage: true });
   await page.reload({ waitUntil: 'networkidle2' });
-  await page.click('[data-nav-item=cards]');
+  await page.click('[data-nav-item=members]');
+  await page.click('[data-member-section=cards]');
   await page.waitForFunction(code => document.querySelector('[aria-label="จัดการบัตรเปล่า"] tbody')?.textContent.includes(code), {}, code);
+  await page.setViewport({ width: 390, height: 844 });
+  const scrollState = await page.$eval('.card-inventory-table-wrap', node => {
+    const horizontalScrollable = node.scrollWidth > node.clientWidth;
+    node.scrollLeft = node.scrollWidth;
+    const verticalScrollable = node.scrollHeight > node.clientHeight;
+    if (verticalScrollable) node.scrollTop = node.scrollHeight;
+    return {
+      horizontalScrollable,
+      horizontalMoved: node.scrollLeft > 0,
+      verticalScrollable,
+      verticalMoved: node.scrollTop > 0,
+      overflowX: getComputedStyle(node).overflowX,
+      overflowY: getComputedStyle(node).overflowY,
+    };
+  });
+  assert.equal(scrollState.horizontalScrollable, true, 'Card table must overflow horizontally on mobile');
+  assert.equal(scrollState.horizontalMoved, true, 'Card table must scroll horizontally on mobile');
+  assert.equal(scrollState.overflowX, 'auto');
+  assert.equal(scrollState.overflowY, 'auto');
+  if (scrollState.verticalScrollable) assert.equal(scrollState.verticalMoved, true, 'Tall card table must scroll vertically');
   await page.screenshot({ path: path.join(cfg.dir, 'card-menu-verified.png'), fullPage: true });
   assert.deepEqual(errors, []);
   console.log('PASS: login, card management menu, save/reload, member page and financial report menu');

@@ -35,6 +35,8 @@ import { SectionHeader, StatusPill } from "../PagePrimitives";
 // directly from "./MemberDetail". Safe at module-eval time and render time.
 import { MemberDetail } from "./MemberDetail";
 import { MemberRegistrationModal } from "@/components/MemberRegistrationModal";
+import { CardInventory } from "@/components/CardInventory";
+import { isAdminRole } from "../pageData";
 
 /**
  * Members — list view with search + status filter + per-row drilldown to
@@ -48,12 +50,15 @@ export function Members({
   userName,
   focusMemberNumber,
   onFocusMemberConsumed,
+  initialSection = "members",
 }: {
   role: Role;
   userName: string;
   focusMemberNumber: string | null;
   onFocusMemberConsumed: () => void;
+  initialSection?: "members" | "cards";
 }) {
+  const [activeSection, setActiveSection] = useState<"members" | "cards">(initialSection);
   const [query, setQuery] = useState("");
   const [registrationOpen, setRegistrationOpen] = useState(false);
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -69,6 +74,10 @@ export function Members({
   const [selectedMember, setSelectedMember] = useState<MemberLite | null>(null);
   const actor = userName || "ผู้ใช้ระบบ";
   const actorRole = roleThaiLabel(role);
+  useEffect(() => setActiveSection(initialSection), [initialSection]);
+  useEffect(() => {
+    if (focusMemberNumber) setActiveSection("members");
+  }, [focusMemberNumber]);
   useEffect(() => {
     const timer = setTimeout(
       () =>
@@ -189,10 +198,23 @@ export function Members({
   return (
     <>
       <SectionHeader
-        eyebrow="สมาชิกและบัญชีสวัสดิการ"
-        title="จัดการสมาชิก"
-        description=""
+        eyebrow="สมาชิก บัญชี และบัตรหมุนเวียน"
+        title="สมาชิกและบัญชี"
+        description="ดูแลข้อมูลสมาชิก ยอดคงเหลือ และบัตรสมาชิกได้ในที่เดียว"
       />
+      <div className="dash-tabbar member-section-tabs" role="tablist" aria-label="ส่วนจัดการสมาชิกและบัตร">
+        <button type="button" role="tab" aria-selected={activeSection === "members"} className={`dash-tab${activeSection === "members" ? " active" : ""}`} onClick={() => setActiveSection("members")}>
+          <UsersRound size={16} /> รายชื่อสมาชิก
+        </button>
+        <button type="button" role="tab" aria-selected={activeSection === "cards"} className={`dash-tab${activeSection === "cards" ? " active" : ""}`} data-member-section="cards" onClick={() => setActiveSection("cards")}>
+          <IdCard size={16} /> จัดการบัตรสมาชิก
+        </button>
+      </div>
+      {activeSection === "cards" ? (
+        <div className="card-management-page member-card-management" role="tabpanel">
+          <CardInventory canManage={isAdminRole(role)} />
+        </div>
+      ) : <>
       <div className="member-top-grid">
         <div className="member-balance-card">
           <div>
@@ -437,6 +459,7 @@ export function Members({
         setStatusFilter("ทั้งหมด");
         setNotice(`เพิ่มสมาชิก ${member.firstName} ${member.lastName} · ${member.memberNumber} แล้ว`);
       }} />}
+      </>}
     </>
   );
 }

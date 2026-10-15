@@ -38,7 +38,7 @@ try {
   }
   for (const width of [1366, 390]) {
     await page.setViewport({ width, height: width === 390 ? 844 : 768 });
-    for (const menu of ['dashboard', 'stock', 'members', 'cards', 'reports', 'profit', 'users', 'logs', 'settings', 'pos']) {
+    for (const menu of ['dashboard', 'stock', 'members', 'reports', 'profit', 'users', 'logs', 'settings', 'pos']) {
       await page.goto(cfg.baseUrl, { waitUntil: 'networkidle2' });
       await page.waitForSelector('[data-nav-item=dashboard]');
       const logoutColor = await page.$eval('button[aria-label="ออกจากระบบ"]', node => getComputedStyle(node).color);
@@ -46,6 +46,10 @@ try {
       if (width === 390) await click('[aria-label="เปิดเมนู"]');
       await click(`[data-nav-item=${menu}]`);
       await inspect(menu, width);
+      if (menu === 'members') {
+        await click('[data-member-section=cards]');
+        await inspect('members-cards', width);
+      }
       if (menu === 'settings') {
         const categories = await page.$$eval('.settings-cat', nodes => nodes.map(node => node.textContent.trim()));
         for (let category = 0; category < categories.length; category++) {

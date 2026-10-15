@@ -411,8 +411,10 @@
 :root .app-shell .card-inventory table thead th { background: #f8fafc; color: #334155; }
 .card-inventory table thead th { background: #f8fafc; color: #334155; }
 .card-inventory table td { color: #0f172a; }
-.card-inventory .table-wrap { overflow-x: auto; }
+.card-inventory .card-inventory-table-wrap { display: block; width: 100%; max-width: 100%; max-height: min(58vh, 620px); overflow: auto; overscroll-behavior: contain; scrollbar-gutter: stable; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; border: 1px solid #e2e8f0; border-radius: 12px; }
+.card-inventory .card-inventory-table-wrap:focus-visible { outline: 3px solid rgba(66, 107, 140, .28); outline-offset: 2px; }
 .card-inventory table { min-width: 760px; }
+.card-inventory .card-inventory-table-wrap thead th { position: sticky; top: 0; z-index: 2; box-shadow: 0 1px 0 #e2e8f0; }
 .card-inventory table th, .card-inventory table td:first-child, .card-inventory table td:nth-child(3) { white-space: nowrap; }
 .card-inventory-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .card-inventory-actions button { width: auto; min-height: 34px; padding: 6px 12px; margin: 0; }
@@ -422,6 +424,7 @@
 .card-inventory-status.is-lost, .card-inventory-status.is-damaged { background: #fef2f2; color: #b91c1c; }
 @media (max-width: 640px) { .card-inventory-create { align-items: stretch; } .card-inventory-create > button { width: 100%; } .card-inventory-codes { flex-basis: 100%; } }
 @media (max-width: 640px) { :root .app-shell .card-inventory .card-inventory-create > button { width: 100%; } }
+@media (max-width: 640px) { .member-section-tabs { overflow-x: auto; flex-wrap: nowrap; margin-bottom: 12px; } .member-section-tabs .dash-tab { min-height: 42px; } .card-inventory .card-inventory-table-wrap { max-height: 55vh; } }
 /* Shared screen surfaces. Print/export documents deliberately keep their own styles. */
 /* Standard palette across login and workspace. Documents keep their own ink. */
 @media screen {

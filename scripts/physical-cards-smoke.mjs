@@ -25,9 +25,16 @@ try {
     await handle.asElement().click();
     await handle.dispose();
   };
-  await page.click('[data-nav-item=cards]');
-  await page.waitForSelector('.card-management-page [aria-label="จัดการบัตรเปล่า"]');
-  assert.equal(await page.$eval('.card-management-page h1', node => node.textContent.trim()), 'จัดการบัตรสมาชิก');
+  const openCards = async () => {
+    const backToMembers = await page.evaluateHandle(() => [...document.querySelectorAll('button')].find(button => button.getClientRects().length && button.textContent.includes('กลับไปรายการสมาชิก')));
+    if (backToMembers.asElement()) await backToMembers.asElement().click();
+    else if (!await page.$('[data-member-section=cards]')) await page.click('[data-nav-item=members]');
+    await backToMembers.dispose();
+    await page.waitForSelector('[data-member-section=cards]');
+    await page.click('[data-member-section=cards]');
+    await page.waitForSelector('.member-card-management [aria-label="จัดการบัตรเปล่า"]');
+  };
+  await openCards();
   await click('เพิ่มบัตรเปล่า');
   await click('ใช้รหัสบัตรเดิม');
   await page.waitForSelector('[aria-label="จัดการบัตรเปล่า"] textarea');
@@ -48,12 +55,11 @@ try {
     await page.waitForFunction(() => !document.querySelector('.pos-register-modal'));
     assert.equal(await page.$('.member-card-modal'), null, 'Registration must not print a new card');
     await page.click('.rail-exit');
-    await page.click('[data-nav-item=cards]');
-    await page.waitForSelector('.card-management-page [aria-label="จัดการบัตรเปล่า"]');
+    await openCards();
   };
   await register(`First-${code}`, 25);
   await page.waitForFunction(code => [...document.querySelectorAll('[aria-label="จัดการบัตรเปล่า"] tbody tr')].some(r => r.textContent.includes(code) && r.textContent.includes('ใช้งาน')), {}, code);
-  await page.click('[data-nav-item=members]');
+  await click('รายชื่อสมาชิก');
   await page.waitForSelector('[aria-label="รายการสมาชิก"]');
   await page.waitForFunction(name => [...document.querySelectorAll('[aria-label="รายการสมาชิก"] tbody tr')].some(row => row.textContent.includes(name)), {}, `First-${code}`);
   const firstMemberRow = await page.evaluateHandle(name => [...document.querySelectorAll('[aria-label="รายการสมาชิก"] tbody tr')].find(row => row.textContent.includes(name)), `First-${code}`);
@@ -65,8 +71,7 @@ try {
   await click('ตรวจสอบ');
   await click('ยืนยัน');
   await page.waitForFunction(selector => !document.querySelector(selector), {}, cardDialog);
-  await page.click('[data-nav-item=cards]');
-  await page.waitForSelector('.card-management-page [aria-label="จัดการบัตรเปล่า"]');
+  await openCards();
   await page.waitForFunction(code => [...document.querySelectorAll('[aria-label="จัดการบัตรเปล่า"] tbody tr')].some(r => r.textContent.includes(code) && r.textContent.includes('คืนแล้ว')), {}, code);
   await register(`Second-${code}`, 0);
   await page.reload({ waitUntil: 'networkidle2' });

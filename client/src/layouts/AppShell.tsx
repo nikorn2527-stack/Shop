@@ -48,7 +48,6 @@ import { useEditionStatus } from "@/components/EditionUi";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { SharedSearchHost, SharedSearchProvider } from "@/components/SharedSearch";
 import { KeyboardShortcutsOverlay, ShortcutsFab } from "@/components/KeyboardShortcutsOverlay";
-import { CardInventory } from "@/components/CardInventory";
 import { Dashboard } from "../pages/Dashboard";
 import { Pos } from "../pages/Pos";
 import { Stock } from "../pages/Stock";
@@ -70,7 +69,6 @@ import {
   type View,
 } from "../pages/pageData";
 import { formatThaiDate } from "../pages/viewFormat";
-import { SectionHeader } from "../pages/PagePrimitives";
 import type { SettingsTab } from "../pages/shared";
 import type { User } from "../../../drizzle/schema";
 
@@ -88,6 +86,7 @@ export type AppShellViewComponents = {
     userName: string;
     focusMemberNumber: string | null;
     onFocusMemberConsumed: () => void;
+    initialSection?: "members" | "cards";
   }>;
   Reports: ComponentType<{
     financialOverview?: boolean;
@@ -157,6 +156,7 @@ export function AppShell({
   const [pendingMemberNumber, setPendingMemberNumber] = useState<string | null>(
     null
   );
+  const [memberSection, setMemberSection] = useState<"members" | "cards">("members");
   const [pendingBillNumber, setPendingBillNumber] = useState<string | null>(
     null
   );
@@ -734,6 +734,7 @@ export function AppShell({
               key={id}
               title={`${label} — ${caption}`}
               onClick={() => {
+                if (id === "members") setMemberSection("members");
                 setActiveView(id);
                 setMobileNav(false);
               }}
@@ -874,17 +875,8 @@ export function AppShell({
               userName={profileName}
               focusMemberNumber={pendingMemberNumber}
               onFocusMemberConsumed={() => setPendingMemberNumber(null)}
+              initialSection={memberSection}
             />
-          )}
-          {safeView === "cards" && (
-            <div className="card-management-page">
-              <SectionHeader
-                eyebrow="สมาชิกและบัตรหมุนเวียน"
-                title="จัดการบัตรสมาชิก"
-                description="ดูสถานะบัตร รับคืนบัตร ตรวจประวัติการใช้งาน และจัดเตรียมบัตรเปล่า"
-              />
-              <CardInventory canManage={isAdminRole(role)} />
-            </div>
           )}
           {safeView === "profit" && <CostProfit />}
           {safeView === "reports" && (
@@ -932,6 +924,7 @@ export function AppShell({
             setActiveView("pos");
           }}
           onNavigate={view => {
+            if (view === "members") setMemberSection("members");
             setActiveView(view);
             setSearchOpen(false);
             setMobileNav(false);
@@ -939,7 +932,15 @@ export function AppShell({
           onOpenMember={memberNumber => {
             setSearchOpen(false);
             setPendingMemberNumber(memberNumber);
+            setMemberSection("members");
             setActiveView("members");
+          }}
+          onOpenCards={() => {
+            setSearchOpen(false);
+            setPendingMemberNumber(null);
+            setMemberSection("cards");
+            setActiveView("members");
+            setMobileNav(false);
           }}
           onOpenBill={orderNumber => {
             setSearchOpen(false);
