@@ -116,7 +116,7 @@
   .stock-receive-modal .receive-unknown-product > div { display: flex; flex-wrap: wrap; gap: 8px; }
 }
 @media screen {
-  .stock-receive-modal .receive-split-workspace { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); gap: 16px; align-items: start; }
+  .stock-receive-modal .receive-split-workspace { display: grid; grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr); gap: 16px; align-items: stretch; }
   .stock-receive-modal .receive-split-workspace > div { min-width: 0; }
   .stock-receive-modal .receive-entry-side .receive-unified-form { display: block !important; }
   .stock-receive-modal .receive-entry-side .receive-scan-toolbar { display: block; }
@@ -131,7 +131,9 @@
   .stock-receive-modal .receive-row-edit-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 12px; background: #f8fafc; }
   .stock-receive-modal .receive-row-edit-form label { display: grid; gap: 4px; min-width: 0; }
   .stock-receive-modal .receive-entry-side .receive-inline-new .receive-new-required { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  :root .stock-receive-modal .receive-review-side .receive-entry-table-wrap { max-height: calc(100dvh - 250px); }
+  .stock-receive-modal .receive-review-side { min-height: 0; display: flex; flex-direction: column; }
+  .stock-receive-modal .receive-review-side .receive-cart { min-height: 0; flex: 1 1 auto; display: flex; flex-direction: column; margin-top: 0; }
+  :root .stock-receive-modal .receive-review-side .receive-entry-table-wrap { min-height: 0; max-height: none; flex: 1 1 auto; }
   :root .modal-backdrop .stock-receive-modal .receive-review-side .receive-simple-table { min-width: 1100px; table-layout: auto; }
   .stock-receive-modal .receive-entry-side .receive-new-required { grid-template-columns: 1fr; }
   @media (max-width: 999px) { .stock-receive-modal .receive-split-workspace { grid-template-columns: 1fr; } }
@@ -170,9 +172,16 @@
     width: calc(100vw - 16px); max-width: none; padding: 0; overflow: visible; background: transparent; border: 0; box-shadow: none;
   }
   :root .modal-backdrop .form-modal.stock-receive-modal {
-    width: calc(100vw - 16px); max-width: none; max-height: calc(100dvh - 16px); box-sizing: border-box;
+    width: calc(100vw - 16px); max-width: none; height: calc(100dvh - 16px); max-height: calc(100dvh - 16px); box-sizing: border-box;
     position: fixed; left: 8px; right: 8px; top: 8px; margin: 0;
+    display: flex; flex-direction: column; overflow: hidden;
   }
+  :root .modal-backdrop .stock-receive-modal > .modal-heading,
+  :root .modal-backdrop .stock-receive-modal > .modal-actions,
+  :root .modal-backdrop .stock-receive-modal > .notice-bar { flex: 0 0 auto; }
+  :root .modal-backdrop .stock-receive-modal > .receive-split-workspace { min-height: 0; flex: 1 1 auto; }
+  :root .modal-backdrop .stock-receive-modal .receive-entry-side { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  :root .modal-backdrop .stock-receive-modal .receive-review-side .receive-cart { max-height: none; }
   :root .modal-backdrop .stock-receive-modal > * { min-width: 0; max-width: 100%; box-sizing: border-box; }
   :root .modal-backdrop .stock-receive-modal .receive-unified-form > * { min-width: 0; max-width: 100%; box-sizing: border-box; }
   :root .modal-backdrop .stock-receive-modal .receive-entry-table { table-layout: fixed; }
@@ -201,7 +210,7 @@
   :root .modal-backdrop .stock-receive-modal .receive-core-row .receive-purchase-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px;
   }
-  :root .modal-backdrop .stock-receive-modal .receive-entry-table-wrap { max-height: 42vh; }
+  :root .modal-backdrop .stock-receive-modal .receive-entry-table-wrap { max-height: none; }
 }
 @media screen {
   .stock-receive-modal .receive-new-required { display: grid; grid-template-columns: 1fr 2fr 1fr 1fr auto; align-items: end; gap: 10px; }
@@ -820,6 +829,15 @@
   :root .modal-backdrop .stock-receive-modal .form-grid { gap: 16px; }
   :root .modal-backdrop .stock-receive-modal .receive-confirm-info small { font-family: inherit; line-height: 1.6; }
   :root .modal-backdrop .stock-receive-modal .receive-cart-cost { color: #334155; }
+  :root .modal-backdrop .bulk-filter-group .filter-chip.active {
+    background: #fff; color: #0f172a; border-color: #64748b; box-shadow: inset 0 0 0 1px #64748b;
+  }
+  :root .modal-backdrop .bulk-filter-group .filter-chip.active b { color: #0f172a; }
+  @media (min-width: 1200px) {
+    :root .app-shell .stock-page > .section-header:has(> .shared-search-host) { flex-wrap: nowrap; align-items: flex-end; }
+    :root .app-shell .stock-page > .section-header:has(> .shared-search-host) > .shared-search-host { flex: 1 1 420px; width: auto; max-width: 520px; }
+    :root .app-shell .stock-page > .section-header:has(> .shared-search-host) > .section-actions { flex: 0 1 auto; }
+  }
   @media (max-width: 560px) {
     :root .modal-backdrop .stock-receive-modal .receive-purchase-grid { grid-template-columns: 1fr; }
     :root .modal-backdrop .stock-receive-modal .receive-lines-head b { white-space: normal; }

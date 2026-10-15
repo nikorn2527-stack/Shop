@@ -213,7 +213,7 @@ export function BulkPriceModal({ open, products, actor, actorRole, onClose, onDo
       <div className="form-modal bulk-price-modal" role="dialog" aria-modal="true" aria-label="ปรับราคาหลายรายการพร้อมกัน" onClick={(event) => event.stopPropagation()}>
         <div className="modal-heading">
           <div>
-            <span className="eyebrow">BULK PRICING · ปรับราคาหลายรายการ</span>
+            <span className="eyebrow">ปรับราคาหลายรายการ</span>
             <h2>ตั้งราคา / ต้นทุนหลายรายการพร้อมกัน</h2>
             <p>กรอกเฉพาะช่องที่ต้องการแก้ แล้วกดบันทึกครั้งเดียว — ระบบบันทึกทั้งชุดในคราวเดียวและลง Log สรุปรายการเดียว</p>
           </div>
