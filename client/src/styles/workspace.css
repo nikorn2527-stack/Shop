@@ -418,6 +418,11 @@
 .card-inventory table th, .card-inventory table td:first-child, .card-inventory table td:nth-child(3) { white-space: nowrap; }
 .card-inventory-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .card-inventory-actions button { width: auto; min-height: 34px; padding: 6px 12px; margin: 0; }
+.card-inventory-actions .card-action-history { background: #F3F5F7; border-color: #AAB7C4; color: #31536F; }
+.card-inventory-actions .card-action-release { background: #ecfdf5; border-color: #6ee7b7; color: #047857; }
+.card-inventory-actions .card-action-lost { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
+.card-inventory-actions .card-action-damaged { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+.card-inventory-actions .outline-button:disabled { opacity: .55; }
 .card-inventory-status { display: inline-flex; white-space: nowrap; border-radius: 999px; padding: 4px 10px; background: #f1f5f9; color: #475569; }
 .card-inventory-status.is-assigned { background: #F3F5F7; color: #426B8C; }
 .card-inventory-status.is-blank, .card-inventory-status.is-returned_vacant { background: #ecfdf5; color: #047857; }

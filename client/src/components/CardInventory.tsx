@@ -158,11 +158,11 @@ export function CardInventory({ canManage }: { canManage: boolean }) {
                   <td>{card.assignedMemberNumber || "—"}</td>
                   <td>{staffName(card.createdBy)}<br />{card.createdAt}</td>
                   <td>{staffName(card.updatedBy)}</td>
-                  <td><div className="card-inventory-actions">
-                    <button type="button" className="outline-button" onClick={() => { setHistoryCard(card.cardNumber); setSessionId(null); }}>ประวัติการใช้บัตร</button>
+                  <td><div className="card-inventory-actions" data-card-status={card.status}>
+                    <button type="button" className="outline-button card-action-history" onClick={() => { setHistoryCard(card.cardNumber); setSessionId(null); }}>ประวัติการใช้บัตร</button>
                     {card.status === "assigned" && (
                       <button
-                        className="outline-button"
+                        className="outline-button card-action-release"
                         disabled={pending}
                         onClick={() => {
                           if (
@@ -181,7 +181,7 @@ export function CardInventory({ canManage }: { canManage: boolean }) {
                       card.status !== "damaged" && (
                         <>
                           <button
-                            className="outline-button"
+                            className="outline-button card-action-lost"
                             disabled={pending}
                             onClick={() => {
                               if (
@@ -198,7 +198,7 @@ export function CardInventory({ canManage }: { canManage: boolean }) {
                             แจ้งหาย
                           </button>
                           <button
-                            className="outline-button"
+                            className="outline-button card-action-damaged"
                             disabled={pending}
                             onClick={() => {
                               if (
