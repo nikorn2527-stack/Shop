@@ -24,7 +24,7 @@ try {
   await page.waitForSelector('.pos-head');
   const accent = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--teal').trim());
   console.log('ACTIVE_ACCENT', accent);
-  assert.equal(accent, '#426B8C', 'Every saved theme must migrate to Navy Slate');
+  assert.equal(accent, '#0f766e', 'Active brand accent must be deep teal');
   assert.equal(await page.evaluate(() => document.documentElement.dataset.palette), 'navy-slate');
   const gradients = await page.evaluate(() => {
     const image = selector => getComputedStyle(document.querySelector(selector)).backgroundImage;

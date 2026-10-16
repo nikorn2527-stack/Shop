@@ -21,7 +21,7 @@ export type BrandSettings = { appName: string; appLogo: string; appTheme: string
  * ค่าเดิมที่บันทึกไว้ยังอ่านได้ แต่จะถูกย้ายมาใช้พาเลตใหม่นี้อัตโนมัติ
  */
 export const THEME_PRESETS: { id: string; label: string; base: string }[] = [
-  { id: "navy-slate", label: "กรมท่าหม่น · เทาสเลต", base: "#426B8C" },
+  { id: "navy-slate", label: "กรมท่าหม่น · เทาสเลต", base: "#0f766e" },
 ];
 
 export const DEFAULT_THEME = "navy-slate";
@@ -31,7 +31,7 @@ const BRAND_CACHE_KEY = "png-brand-v1";
  *  id ใช้เป็น data-style บน <html> · accent = สีเน้นประจำแพลตฟอร์มที่จะใช้ตอนเลือกสไตล์ */
 export type UiStyleId = "shop" | "apple" | "microsoft" | "android";
 export const UI_STYLE_PRESETS: { id: UiStyleId; label: string; detail: string; accent: string; fontFamily: string }[] = [
-  { id: "shop", label: "ร้านค้า (มาตรฐาน)", detail: "กรมท่าหม่น เทาสเลต และเมนูขาว — สุภาพ ชัดเจน เป็นมืออาชีพ", accent: "#426B8C", fontFamily: "Sarabun" },
+  { id: "shop", label: "ร้านค้า (มาตรฐาน)", detail: "สีเทลเข้มสด ตัดกับพื้นขาวชัดเจน — ทันสมัย อ่านง่าย", accent: "#0f766e", fontFamily: "Sarabun" },
   { id: "apple", label: "Apple", detail: "ขาวสะอาด ปุ่มทรงแคปซูล ฟอนต์ระบบ Apple — เรียบแบบ iOS/macOS", accent: "#0071e3", fontFamily: "SF / Helvetica" },
   { id: "microsoft", label: "Microsoft", detail: "แบบ Fluent — ขอบคม เรียบตึง ฟอนต์ Segoe UI แบบ Windows 11", accent: "#0f6cbd", fontFamily: "Segoe UI" },
   { id: "android", label: "Android", detail: "แบบ Material You — การ์ดมนมาก โทนม่วงพาสเทล แบบแอปบนมือถือ", accent: "#6750a4", fontFamily: "Roboto / Google Sans" },
@@ -80,7 +80,7 @@ export function applyThemeColor(theme: string | undefined | null): string {
   // One application palette; legacy saved colors remain readable but no longer
   // override the shared design.
   normalizeTheme(theme);
-  const base = "#426B8C";
+  const base = "#0f766e";
   const rgb = hexToRgb(base);
   if (!rgb) return base;
   const [r, g, b] = rgb;
@@ -88,22 +88,22 @@ export function applyThemeColor(theme: string | undefined | null): string {
   root.dataset.palette = "navy-slate";
   const vars: Record<string, string> = {
     "--teal": base,
-    "--teal-dark": "#31536F",
-    "--teal-soft": "#E3EBF1",
-    "--teal-mist": "#F5F8FA",
+    "--teal-dark": "#115e59",
+    "--teal-soft": "#ccfbf1",
+    "--teal-mist": "#f0fdfa",
     "--canvas-gradient": "linear-gradient(135deg, #E5EAF0 0%, #F7F8FA 46%, #DDE3E8 100%)",
     "--workspace-gradient": "linear-gradient(135deg, rgb(229 234 240 / 96%) 0%, rgb(247 248 250 / 94%) 48%, rgb(221 227 232 / 95%) 100%)",
     "--sidebar-gradient": "linear-gradient(180deg, #F8FAFC 0%, #E9EEF2 52%, #DCE3E9 100%)",
     "--topbar-gradient": "linear-gradient(110deg, rgb(255 255 255 / 95%) 0%, rgb(229 234 240 / 92%) 100%)",
     "--surface-gradient": "linear-gradient(145deg, #FFFFFF 0%, #F7F9FA 58%, #E9EEF2 100%)",
-    "--accent-gradient": "linear-gradient(135deg, #6F8DA6 0%, #426B8C 52%, #31536F 100%)",
+    "--accent-gradient": "linear-gradient(135deg, #ccfbf1 0%, #0f766e 52%, #115e59 100%)",
     "--app-secondary": "#0f766e",
     "--app-secondary-soft": "#ccfbf1",
     "--app-health": "#15803d",
     "--app-health-soft": "#dcfce7",
     "--rail-a": "#365A78",
     "--rail-b": "#294A66",
-    "--rail-solid": "#31536F",
+    "--rail-solid": "#03543b",
     "--rail-edge": "#223F57",
     "--teal-glow": `rgba(${r}, ${g}, ${b}, .22)`,
   };

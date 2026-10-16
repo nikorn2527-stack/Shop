@@ -9,17 +9,17 @@ describe('standard application palette', () => {
     vi.stubGlobal('document', { documentElement: root });
     try {
       for (const saved of ['pastel', 'blue', '#00875a', undefined]) {
-        expect(applyThemeColor(saved)).toBe('#426B8C');
+        expect(applyThemeColor(saved)).toBe('#0f766e');
         expect(root.dataset.palette).toBe('navy-slate');
-        expect(values.get('--teal')).toBe('#426B8C');
-        expect(values.get('--teal-dark')).toBe('#31536F');
-        expect(values.get('--teal-soft')).toBe('#E3EBF1');
-        expect(values.get('--teal-mist')).toBe('#F5F8FA');
+        expect(values.get('--teal')).toBe('#0f766e');
+        expect(values.get('--teal-dark')).toBe('#115e59');
+        expect(values.get('--teal-soft')).toBe('#ccfbf1');
+        expect(values.get('--teal-mist')).toBe('#f0fdfa');
         expect(values.get('--canvas-gradient')).toContain('linear-gradient');
         expect(values.get('--workspace-gradient')).toContain('linear-gradient');
         expect(values.get('--sidebar-gradient')).toContain('linear-gradient');
         expect(values.get('--surface-gradient')).toContain('linear-gradient');
-        expect(values.get('--accent-gradient')).toContain('#31536F');
+        expect(values.get('--accent-gradient')).toContain('#115e59');
         expect(values.get('--app-secondary')).toBe('#0f766e');
         expect(values.get('--app-health')).toBe('#15803d');
       }
@@ -33,7 +33,7 @@ describe('navy slate theme migration', () => {
   it('maps every legacy preset and custom colour to the standard palette', () => {
     for (const theme of ['pastel', 'indigo', 'emerald', 'forest', 'matcha', 'teal', 'coffee', 'amber', 'rose', 'violet', '#00875a', '#4f46b8', undefined]) {
       expect(normalizeTheme(theme)).toBe('navy-slate');
-      expect(resolveThemeColor(theme)).toBe('#426B8C');
+      expect(resolveThemeColor(theme)).toBe('#0f766e');
     }
   });
 });
