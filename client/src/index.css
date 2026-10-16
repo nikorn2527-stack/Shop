@@ -20,28 +20,44 @@
 
 :root {
   font-family: "Sarabun", "TH Sarabun New", "TH SarabunPSK", "Leelawadee UI", Tahoma, system-ui, sans-serif;
-  color: #29241b;
-  background: #fcfbf7;
+  color: #0f172a;
+  background: #f8fafc;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-    --ink: #141e30;
-    --muted: #37465c;
-  --line: #e5e2d8;
+  /* สีข้อความ */
+  --ink: #0f172a;
+  --muted: #64748b;
+  /* ลายเส้น */
+  --line: #e2e8f0;
   --surface: #ffffff;
-  --canvas: #fcfbf7;
-  --teal: #4f46b8;
-  --teal-dark: #39318f;
-  --teal-soft: #eae8fa;
-  --teal-mist: #f3f2fc;
+  --canvas: #f8fafc;
+  /* สีหลักแบรนด์ — เขียวเทลเข้มสด */
+  --teal: #0f766e;
+  --teal-dark: #115e59;
+  --teal-soft: #ccfbf1;
+  --teal-mist: #f0fdfa;
+  --teal-glow: rgba(15, 118, 110, 0.2);
+  /* ราง navigation เดิม */
   --rail-a: #0c4b34;
   --rail-b: #07392a;
   --rail-solid: #03543b;
   --rail-edge: #013223;
-  --teal-glow: rgba(79, 70, 184, .2);
+  /* สีความหมายของปุ่ม — ดูแล้วรู้ทันทีว่าปุ่มนี้ทำอะไร */
+  --success: #16a34a;
+  --success-dark: #15803d;
+  --success-soft: #dcfce7;
+  --danger: #dc2626;
+  --danger-dark: #b91c1c;
+  --danger-soft: #fee2e2;
+  --warning: #d97706;
+  --warning-dark: #b45309;
+  --warning-soft: #fef3c7;
   --purple: #8267b5;
-  --amber: #c98a32;
-  --red: #c26162;
-  --shadow: 0 10px 30px rgba(64, 51, 24, .05), 0 2px 7px rgba(64, 51, 24, .04);
+  --amber: #d97706;
+  --red: #dc2626;
+  /* เงา — มีมิติขึ้น การ์ดลอยจากพื้นชัดเจน */
+  --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -2px rgba(0, 0, 0, 0.04);
+  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
 }
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; min-height: 100vh; background: var(--canvas); }
@@ -105,12 +121,87 @@ kbd { font-family: "IBM Plex Mono", monospace; font-size: 10px; color: #868b7c; 
 .section-header h1 { margin: 0; color: #243530; font-size: 24px; letter-spacing: -.7px; line-height: 1.15; }
 .section-header p { margin: 4px 0 0; color: #696c61; font-size: 11.5px; }
 .section-actions { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
-.outline-button, .primary-button, .scan-button { height: 36px; border-radius: 8px; padding: 0 12px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border: 1px solid #dfe8e4; color: #6b705d; background: #fff; font-size: 11px; transition: .18s ease; }
-.outline-button:hover { border-color: #abd0c2; color: var(--teal); background: #fbfffd; }
-.primary-button, .scan-button { border-color: var(--teal); color: #fff; background: var(--teal); box-shadow: 0 4px 10px rgba(35, 124, 97, .15); }
-.primary-button:hover, .scan-button:hover { background: var(--teal-dark); }
+/* ปุ่มระบุความสำคัญตามภารกิจ — ดูแล้วรู้ทันทีว่าปุ่มนี้ทำอะไร */
+.btn { height: 36px; border-radius: 8px; padding: 0 14px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; font-size: 11px; font-weight: 600; transition: all .18s ease; border: 1px solid transparent; cursor: pointer; }
+.btn:active { transform: scale(.97); }
+
+/* ปุ่มหลัก — ยืนยัน / ตกลง / บันทึก เป็นภารกิจหลักของหน้านั้น (สีเขียวเทลเข้ม) */
+.primary-button, .scan-button {
+  border: 0;
+  color: #fff;
+  background: linear-gradient(135deg, var(--teal), var(--teal-dark));
+  box-shadow: 0 4px 10px rgba(15, 118, 110, 0.3);
+}
+.primary-button:hover, .scan-button:hover {
+  background: linear-gradient(135deg, var(--teal-dark), #0d5c57);
+  box-shadow: 0 6px 12px rgba(15, 118, 110, 0.4);
+  transform: translateY(-1px);
+}
+
+/* ปุ่มสำเร็จ — เขียวสด ชัดเจนว่าเป็นผลบวก / เสร็จสิ้น */
+.success-button {
+  border: 0;
+  color: #fff;
+  background: linear-gradient(135deg, var(--success), var(--success-dark));
+  box-shadow: 0 4px 10px rgba(22, 163, 74, 0.3);
+}
+.success-button:hover {
+  background: linear-gradient(135deg, var(--success-dark), #147336);
+  box-shadow: 0 6px 12px rgba(22, 163, 74, 0.4);
+  transform: translateY(-1px);
+}
+
+/* ปุ่มอันตราย — ลบ / ยกเลิก / ปฏิเสธ สีแดงเตือนทันที */
+.danger-button {
+  border: 0;
+  color: #fff;
+  background: linear-gradient(135deg, var(--danger), var(--danger-dark));
+  box-shadow: 0 4px 10px rgba(220, 38, 38, 0.3);
+}
+.danger-button:hover {
+  background: linear-gradient(135deg, var(--danger-dark), #a21717);
+  box-shadow: 0 6px 12px rgba(220, 38, 38, 0.4);
+  transform: translateY(-1px);
+}
+
+/* ปุ่มเตือน — ส้มสำหรับ รอการยืนยัน / เตือนใจ */
+.warning-button {
+  border: 0;
+  color: #fff;
+  background: linear-gradient(135deg, var(--warning), var(--warning-dark));
+  box-shadow: 0 4px 10px rgba(217, 119, 6, 0.3);
+}
+.warning-button:hover {
+  background: linear-gradient(135deg, var(--warning-dark), #92400e);
+  box-shadow: 0 6px 12px rgba(217, 119, 6, 0.4);
+  transform: translateY(-1px);
+}
+
+/* ปุ่มรอง — ขอบสี โปร่งใส สำหรับการกระทำรอง */
+.outline-button {
+  border: 1px solid var(--line);
+  color: var(--muted);
+  background: #fff;
+}
+.outline-button:hover {
+  border-color: var(--teal);
+  color: var(--teal-dark);
+  background: var(--teal-mist);
+}
+
+/* ปุ่มธรรมดา — ไม่มีสีพื้น สำหรับการกระทำทั่วไป */
+.ghost-button {
+  border: 0;
+  color: var(--muted);
+  background: transparent;
+}
+.ghost-button:hover {
+  color: var(--ink);
+  background: #f1f5f9;
+}
 .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 13px; }
-.metric-card, .panel, .stock-stat, .report-card { background: var(--surface); border: 1px solid #e7eeeb; border-radius: 13px; box-shadow: var(--shadow); }
+.metric-card, .panel, .stock-stat, .report-card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+.metric-card:hover, .panel:hover, .stock-stat:hover, .report-card:hover { box-shadow: var(--shadow-lg); border-color: #cbd5e1; }
 .metric-card { padding: 12px 14px 10px; min-height: 98px; }
 .metric-card.highlight { background: #f1faf6; border-color: #dcefe7; }
 .metric-top { display: flex; justify-content: space-between; align-items: center; color: #686a5f; font-size: 11px; }
