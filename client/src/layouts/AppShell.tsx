@@ -674,8 +674,7 @@ export function AppShell({
                 </small>
               </div>
             </div>
-<button type="button" className="outline-button shell-logout" aria-label="ออกจากระบบ" title="ออกจากระบบ" onClick={logout} disabled={logoutMutation.isPending}><LogOut size={18} /><span>{logoutMutation.isPending ? "กำลังออก" : "ออกจากระบบ"}</span></button>
-</div>
+          </div>
           <span className="rail-spacer" aria-hidden="true" />
           <button
             type="button"
@@ -825,7 +824,7 @@ export function AppShell({
                 </small>
               </div>
             </div>
-<button type="button" className="outline-button shell-logout" aria-label="ออกจากระบบ" title="ออกจากระบบ" onClick={logout} disabled={logoutMutation.isPending}><LogOut size={18} /><span>{logoutMutation.isPending ? "กำลังออก" : "ออกจากระบบ"}</span></button>
+<button type="button" className="outline-button shell-logout sidebar-logout" aria-label="ออกจากระบบ" title="ออกจากระบบ" onClick={logout} disabled={logoutMutation.isPending}><LogOut size={18} /><span>{logoutMutation.isPending ? "กำลังออก" : "ออกจากระบบ"}</span></button>
 </div>)}</div>
       </aside>
       <main className="main-shell">
