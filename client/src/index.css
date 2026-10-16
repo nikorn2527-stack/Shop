@@ -6138,7 +6138,7 @@ button, .primary-button, .outline-button, .icon-button, .quick-amount-btn, .pay-
 .stock-catalog-menu button:hover, .stock-catalog-menu button:focus-visible { background: #eef8f3; outline: none; }
 .stock-catalog-menu button > svg { flex: 0 0 auto; margin-top: 2px; color: #348267; }
 .stock-catalog-menu .catalog-menu-add > svg { color: #047857; }
-.stock-catalog-menu .catalog-menu-receive > svg { color: #426B8C; }
+.stock-catalog-menu .catalog-menu-receive > svg { color: #0f766e; }
 .stock-catalog-menu .catalog-menu-add:hover, .stock-catalog-menu .catalog-menu-add:focus-visible { background: #ecfdf5; }
 .stock-catalog-menu .catalog-menu-receive:hover, .stock-catalog-menu .catalog-menu-receive:focus-visible { background: #F3F5F7; }
 .stock-catalog-menu button span { display: flex; min-width: 0; flex-direction: column; gap: 2px; }
