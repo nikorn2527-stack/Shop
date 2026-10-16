@@ -1,4 +1,4 @@
-import { ActionButton } from "@/components/ActionButton";
+﻿import { ActionButton } from "@/components/ActionButton";
 import { useState } from "react";
 import { MemberCardActionsModal } from "@/components/MemberCardActionsModal";
 import {
@@ -455,9 +455,9 @@ export function MemberDetail({
           </button>
           <button
             className="outline-button"
-            disabled={profile.status !== "active" || !profile.cardNumber}
+            disabled={profile.status !== "active" || !cardReady}
             onClick={() => setCardAction("return")}
-            title={!profile.cardNumber ? "สมาชิกยังไม่มีบัตรที่ต้องคืน" : "รับบัตรคืน คืนยอดคงเหลือทั้งหมด และปิดรอบบัตร"}
+            title={!profile.cardNumber ? "เธชเธกเธฒเธเธดเธเธขเธฑเธเนเธกเนเธกเธตเธเธฑเธ•เธฃเธ—เธตเนเธ•เนเธญเธเธเธทเธ" : !cardReady ? "เธเธฑเธ•เธฃเธขเธฑเธเนเธกเนเธเธฃเนเธญเธกเนเธเนเธเธฒเธ เธเธฃเธธเธ“เธฒเธ•เธฃเธงเธเธชเธญเธเธชเธ–เธฒเธเธฐเธเธฑเธ•เธฃ" : "เธฃเธฑเธเธเธฑเธ•เธฃเธเธทเธ เธเธทเธเธขเธญเธ”เธเธเน€เธซเธฅเธทเธญเธ—เธฑเนเธเธซเธกเธ” เนเธฅเธฐเธเธดเธ”เธฃเธญเธเธเธฑเธ•เธฃ"}
           >
             <RotateCcw size={15} /> คืนบัตร
           </button>
