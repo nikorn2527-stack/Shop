@@ -22,6 +22,7 @@ export function StockReceiptHistory({ canExport, onUpgrade, expanded = false }: 
   const [actor, setActor] = useState("");
   const [preview, setPreview] = useState<ExportPreviewState | null>(null);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const query = trpc.stock.receipts.useQuery({ from, to, search, actor }, { enabled: open });
   const entries = query.data ?? [];
   const columns = ["วัน–เวลา", "รหัส / สินค้า", "Lot", "จำนวนรับ", "หน่วย", "ต้นทุน/หน่วย", "มูลค่ารับเข้า", "ราคาขาย/หน่วย", "มูลค่าราคาขาย", "หมดอายุ", "เจ้าหน้าที่"];
@@ -57,7 +58,9 @@ export function StockReceiptHistory({ canExport, onUpgrade, expanded = false }: 
   };
   const openExport = async (preferred?: ExportFormat, direct = false) => {
     if (!canExport) { onUpgrade?.(); return; } // ปุ่ม export เปิดได้ทุกเวอร์ชัน — กดแล้วพาไป modal อัปเกรดเหมือนแท็บอื่น
-    if (!entries.length || query.isFetching) return;
+    if (query.isFetching) return;
+    if (!entries.length) { setNotice("ยังไม่มีรายการในช่วงที่เลือก — เลือกวันที่มีข้อมูลก่อน"); return; } // ไม่ disable ปุ่ม เดี๋ยวสีจางไม่เท่าหน้าอื่น
+    setNotice("");
     const state = buildExportState(preferred);
     if (direct && preferred) await runExportState(state, preferred);
     else setPreview(state);
@@ -75,14 +78,15 @@ export function StockReceiptHistory({ canExport, onUpgrade, expanded = false }: 
         <label className="receipt-product-filter">สินค้า / SKU / Lot<input aria-label="ค้นหาสินค้า SKU หรือ Lot ในประวัติรับเข้า" value={search} onChange={e => setSearch(e.target.value)} placeholder="ค้นหาสินค้าหรือ Lot" /></label>
         <label className="receipt-actor-filter">เจ้าหน้าที่<input aria-label="ค้นหาชื่อเจ้าหน้าที่ในประวัติรับเข้า" value={actor} onChange={e => setActor(e.target.value)} placeholder="ค้นหาชื่อเจ้าหน้าที่" /></label>
         <div className="report-export-actions stock-export-actions receipt-export-actions" aria-label="ส่งออกประวัติรับเข้าสินค้า">
-          <button type="button" className="outline-button compact export-btn export-csv" disabled={!entries.length || query.isFetching} onClick={() => void openExport("csv", true)} title="ดาวน์โหลด CSV"><Download size={15} /> CSV</button>
-          <button type="button" className="outline-button compact export-btn export-excel" disabled={!entries.length || query.isFetching} onClick={() => void openExport("xlsx", true)} title="ดาวน์โหลด Excel"><FileBarChart size={15} /> Excel</button>
-          <button type="button" className="outline-button compact export-btn export-pdf" disabled={!entries.length || query.isFetching} onClick={() => void openExport("pdf", true)} title="ดาวน์โหลด PDF"><FileText size={15} /> PDF</button>
-          <button type="button" className="outline-button compact export-btn export-print" disabled={!entries.length || query.isFetching} onClick={() => void openExport("print", true)} title="พิมพ์ประวัติรับเข้า"><Printer size={15} /> พิมพ์</button>
-          <button type="button" className="outline-button compact export-btn preview-btn" disabled={!entries.length || query.isFetching} onClick={() => void openExport()} title="ดูตัวอย่างเอกสารก่อนส่งออก"><Eye size={15} /> ดูพรีวิว</button>
+          <button type="button" className="outline-button compact export-btn export-csv" onClick={() => void openExport("csv", true)} title="ดาวน์โหลด CSV"><Download size={15} /> CSV</button>
+          <button type="button" className="outline-button compact export-btn export-excel" onClick={() => void openExport("xlsx", true)} title="ดาวน์โหลด Excel"><FileBarChart size={15} /> Excel</button>
+          <button type="button" className="outline-button compact export-btn export-pdf" onClick={() => void openExport("pdf", true)} title="ดาวน์โหลด PDF"><FileText size={15} /> PDF</button>
+          <button type="button" className="outline-button compact export-btn export-print" onClick={() => void openExport("print", true)} title="พิมพ์ประวัติรับเข้า"><Printer size={15} /> พิมพ์</button>
+          <button type="button" className="outline-button compact export-btn preview-btn" onClick={() => void openExport()} title="ดูตัวอย่างเอกสารก่อนส่งออก"><Eye size={15} /> ดูพรีวิว</button>
         </div>
       </div>
       <p>{entries.length} บรรทัดรับเข้า · มูลค่ารับเข้า {money(receivedTotal)}{unknownValues > 0 ? ` · ไม่ระบุมูลค่า ${unknownValues} รายการ` : ""} · มูลค่าตามราคาขายปัจจุบัน {money(total)}</p>
+      {notice && !entries.length && <p role="status">{notice}</p>}
       {query.isLoading ? <p>กำลังโหลด…</p> : query.isError ? <p role="alert">{query.error.message}</p> : <div className="table-wrap"><table className="data-table"><thead><tr>{columns.map(c => <th key={c}>{c}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={entries[index].id}>{row.map((cell, i) => <td key={i}>{cell}</td>)}</tr>)}</tbody></table>{!entries.length && <p>ไม่มีรายการรับเข้าในช่วงที่เลือก</p>}</div>}
     </>}
     {error && <p role="alert">{error}</p>}

@@ -166,9 +166,9 @@
   :root:root .app-shell .report-export-actions .preview-btn:not(:disabled):hover {
     background: #115e59; background-image: none; color: #ffffff; border-color: #115e59;
   }
-  /* Disabled export buttons keep per-type hues (dimmed) instead of collapsing into one flat gray. */
+  /* Disabled export buttons keep per-type hues at full strength (cursor alone signals disabled). */
   :root:root .app-shell .report-export-actions .export-btn:disabled {
-    box-shadow: none; opacity: 0.55; cursor: not-allowed;
+    box-shadow: none; cursor: not-allowed;
   }
   :root:root .app-shell .report-export-actions .export-csv:disabled {
     background: #ecfeff; background-image: none; color: #155e75; border-color: #a5f3fc;
@@ -183,7 +183,7 @@
     background: #f8fafc; background-image: none; color: #334155; border-color: #cbd5e1;
   }
   :root:root .app-shell .report-export-actions .preview-btn:disabled {
-    background: #0f766e; background-image: none; color: #ffffff; border-color: #0f766e; opacity: 0.5;
+    background: #0f766e; background-image: none; color: #ffffff; border-color: #0f766e;
   }
   /* Export choices keep the same file-type language everywhere, including shared previews. */
   :root:root .modal-backdrop .preview-format-btn:not(:disabled) {
