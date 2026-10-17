@@ -390,10 +390,12 @@ body, button, input, select, textarea { font-family: var(--font-body); }
 
 /* Daily sales export actions */
 .report-export-actions { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
-.report-export-actions .compact { display: inline-flex; align-items: center; gap: 5px; }
+.report-export-actions .compact { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--icon-muted); padding: 6px 12px; font-size: 12px; cursor: pointer; transition: all .18s ease; }
+.report-export-actions .compact:hover { background: var(--teal-mist); color: var(--teal-dark); border-color: var(--teal); }
 /* P1-UX-direct — ปุ่มดูพรีวิว เด่นกว่าปุ่ม export ตรงๆ (เพราะเป็นทางเข้า modal ตรวจก่อน) */
-.report-export-actions .preview-btn { color: var(--teal); border-color: #b8dccd; background: #f0faf5; }
-.report-export-actions .preview-btn:hover { background: #e3f3ec; border-color: var(--teal); }
+.report-export-actions .preview-btn { color: var(--teal-dark); border-color: var(--teal); background: var(--teal-soft); padding: 6px 12px; font-size: 12px; cursor: pointer; transition: all .18s ease; }
+.report-export-actions .preview-btn svg { color: var(--teal-dark); }
+.report-export-actions .preview-btn:hover { background: #b5f4ec; border-color: var(--teal-dark); }
 @media (max-width: 640px) { .report-export-actions { width: 100%; } .report-export-actions .compact { flex: 1; justify-content: center; } }
 
 /* --- real-data POS/Stock additions (OLD-2-b) -------------------------------- */
@@ -9285,13 +9287,17 @@ body:has(.modal-backdrop) .shortcuts-fab { display: none; }
 
 
   .report-export-actions .preview-btn:not(.print-preview-paper *, .receipt-paper *, .member-card-document *, .stock-count-sheet *) {
-    border-color: var(--teal-soft);
-    background: var(--teal-mist);
+    color: var(--teal-dark);
+    border-color: var(--teal);
+    background: var(--teal-soft);
+  }
+  .report-export-actions .preview-btn svg:not(.print-preview-paper *, .receipt-paper *, .member-card-document *, .stock-count-sheet *) {
+    color: var(--teal-dark);
   }
 
-
   .report-export-actions .preview-btn:hover:not(.print-preview-paper *, .receipt-paper *, .member-card-document *, .stock-count-sheet *) {
-    background: var(--teal-mist);
+    background: #b5f4ec;
+    border-color: var(--teal-dark);
   }
 
 
