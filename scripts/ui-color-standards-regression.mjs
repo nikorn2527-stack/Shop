@@ -20,7 +20,7 @@ try {
     'rgb(236, 253, 245)',
     'rgb(254, 242, 242)',
     'rgb(248, 250, 252)',
-    'rgb(66, 107, 140)',
+    'rgb(15, 118, 110)',
   ];
   const readExportButtons = selector => page.$$eval(`${selector} .export-btn`, nodes => nodes.map(node => ({
     className: node.className,
@@ -59,6 +59,7 @@ try {
   assert.deepEqual(receiptExportColors.map(item => item.className.split(' ').find(name => name.startsWith('export-') && name !== 'export-btn') ?? 'preview-btn'), [
     'export-csv', 'export-excel', 'export-pdf', 'export-print', 'preview-btn',
   ], JSON.stringify(receiptExportColors));
+  assert.deepEqual(receiptExportColors.map(item => item.background), expectedExportColors, JSON.stringify(receiptExportColors));
   await page.screenshot({ path: `${cfg.dir}/stock-receipt-export-colors.png` });
 
   await page.click('[data-nav-item=users]');

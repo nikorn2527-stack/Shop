@@ -14,7 +14,7 @@ const today = () => {
   return `${date.year}-${String(date.month).padStart(2, "0")}-${String(date.day).padStart(2, "0")}`;
 };
 
-export function StockReceiptHistory({ canExport, expanded = false }: { canExport: boolean; expanded?: boolean }) {
+export function StockReceiptHistory({ canExport, onUpgrade, expanded = false }: { canExport: boolean; onUpgrade?: () => void; expanded?: boolean }) {
   const [open, setOpen] = useState(expanded);
   const [from, setFrom] = useState(today);
   const [to, setTo] = useState(today);
@@ -56,7 +56,8 @@ export function StockReceiptHistory({ canExport, expanded = false }: { canExport
     } catch (e) { setError(e instanceof Error ? e.message : "ส่งออกไม่สำเร็จ"); }
   };
   const openExport = async (preferred?: ExportFormat, direct = false) => {
-    if (!canExport || !entries.length || query.isFetching) return;
+    if (!canExport) { onUpgrade?.(); return; } // ปุ่ม export เปิดได้ทุกเวอร์ชัน — กดแล้วพาไป modal อัปเกรดเหมือนแท็บอื่น
+    if (!entries.length || query.isFetching) return;
     const state = buildExportState(preferred);
     if (direct && preferred) await runExportState(state, preferred);
     else setPreview(state);
@@ -74,11 +75,11 @@ export function StockReceiptHistory({ canExport, expanded = false }: { canExport
         <label className="receipt-product-filter">สินค้า / SKU / Lot<input aria-label="ค้นหาสินค้า SKU หรือ Lot ในประวัติรับเข้า" value={search} onChange={e => setSearch(e.target.value)} placeholder="ค้นหาสินค้าหรือ Lot" /></label>
         <label className="receipt-actor-filter">เจ้าหน้าที่<input aria-label="ค้นหาชื่อเจ้าหน้าที่ในประวัติรับเข้า" value={actor} onChange={e => setActor(e.target.value)} placeholder="ค้นหาชื่อเจ้าหน้าที่" /></label>
         <div className="report-export-actions stock-export-actions receipt-export-actions" aria-label="ส่งออกประวัติรับเข้าสินค้า">
-          <button type="button" className="outline-button compact export-btn export-csv" disabled={!canExport || !entries.length || query.isFetching} onClick={() => void openExport("csv", true)} title="ดาวน์โหลด CSV"><Download size={15} /> CSV</button>
-          <button type="button" className="outline-button compact export-btn export-excel" disabled={!canExport || !entries.length || query.isFetching} onClick={() => void openExport("xlsx", true)} title="ดาวน์โหลด Excel"><FileBarChart size={15} /> Excel</button>
-          <button type="button" className="outline-button compact export-btn export-pdf" disabled={!canExport || !entries.length || query.isFetching} onClick={() => void openExport("pdf", true)} title="ดาวน์โหลด PDF"><FileText size={15} /> PDF</button>
-          <button type="button" className="outline-button compact export-btn export-print" disabled={!canExport || !entries.length || query.isFetching} onClick={() => void openExport("print", true)} title="พิมพ์ประวัติรับเข้า"><Printer size={15} /> พิมพ์</button>
-          <button type="button" className="outline-button compact export-btn preview-btn" disabled={!canExport || !entries.length || query.isFetching} onClick={() => void openExport()} title="ดูตัวอย่างเอกสารก่อนส่งออก"><Eye size={15} /> ดูพรีวิว</button>
+          <button type="button" className="outline-button compact export-btn export-csv" disabled={!entries.length || query.isFetching} onClick={() => void openExport("csv", true)} title="ดาวน์โหลด CSV"><Download size={15} /> CSV</button>
+          <button type="button" className="outline-button compact export-btn export-excel" disabled={!entries.length || query.isFetching} onClick={() => void openExport("xlsx", true)} title="ดาวน์โหลด Excel"><FileBarChart size={15} /> Excel</button>
+          <button type="button" className="outline-button compact export-btn export-pdf" disabled={!entries.length || query.isFetching} onClick={() => void openExport("pdf", true)} title="ดาวน์โหลด PDF"><FileText size={15} /> PDF</button>
+          <button type="button" className="outline-button compact export-btn export-print" disabled={!entries.length || query.isFetching} onClick={() => void openExport("print", true)} title="พิมพ์ประวัติรับเข้า"><Printer size={15} /> พิมพ์</button>
+          <button type="button" className="outline-button compact export-btn preview-btn" disabled={!entries.length || query.isFetching} onClick={() => void openExport()} title="ดูตัวอย่างเอกสารก่อนส่งออก"><Eye size={15} /> ดูพรีวิว</button>
         </div>
       </div>
       <p>{entries.length} บรรทัดรับเข้า · มูลค่ารับเข้า {money(receivedTotal)}{unknownValues > 0 ? ` · ไม่ระบุมูลค่า ${unknownValues} รายการ` : ""} · มูลค่าตามราคาขายปัจจุบัน {money(total)}</p>
