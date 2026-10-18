@@ -730,7 +730,9 @@
   :root .pos-premium-bill .pos-summary-count strong { color: #334155; }
   :root .pos-premium-bill .total-line { background: #f8fafc; border-radius: 16px; padding: 16px 12px; }
   :root .pos-premium-bill .total-line strong { font-size: 30px; color: #0f172a; }
-  :root .pos-premium-bill .payment-actions { display: flex; flex-direction: column; gap: 12px; width: min(100%, 240px); align-self: center; }
+  :root .pos-premium-bill .payment-actions { display: flex; flex-direction: column; gap: 12px; width: min(100%, 240px); align-self: center; order: 2; }
+  :root .pos-premium-bill .admin-pos-note { order: 1; }
+  :root .pos-premium-bill .cart-status-line { order: 3; }
   :root .pos-premium-bill .pay-button { order: 2; }
   :root .pos-premium-bill .pay-split button { border: 1px solid var(--neutral-200); border-radius: 999px; background: var(--neutral-100); color: var(--neutral-700); box-shadow: none; }
   :root .pos-premium-bill .pay-button { background: var(--teal); background-image: none; color: #fff; border: 0; border-radius: 16px; box-shadow: 0 2px 5px rgb(15 23 42 / 10%); }
@@ -747,12 +749,13 @@
     flex: none; min-height: 0; max-height: 560px; overflow: auto;
   }
   :root .app-shell .pos-premium-layout .quick-pick-panel .product-art {
-    height: 112px; font-size: 32px;
+    width: 64px; height: 64px; min-height: 0; font-size: 26px; border-bottom: 0; border-radius: 0;
   }
   :root .app-shell .pos-premium-layout .product-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px;
+    grid-template-columns: minmax(0, 1fr); gap: 8px;
   }
   :root .app-shell .pos-premium-layout .product-card {
+    display: grid; grid-template-columns: 64px minmax(0, 1fr); align-items: center; min-height: 72px;
     background: #fff; border-color: #e2e8f0; border-radius: 14px; box-shadow: none;
   }
   :root .app-shell .pos-premium-layout .product-card:hover {
@@ -768,7 +771,11 @@
   :root .app-shell .pos-premium-layout .quick-pick-panel .panel-heading p { display: none; }
   :root .app-shell .pos-premium-layout .quick-pick-panel .category-tabs { display: flex; flex-wrap: wrap; gap: 4px; }
   :root .app-shell .pos-premium-layout .quick-pick-panel .category-tabs button { padding: 5px 8px; font-size: 11px; }
-  :root .app-shell .pos-premium-layout .quick-pick-panel .product-card-info { padding: 8px; min-height: 0; gap: 4px; }
+  :root .app-shell .pos-premium-layout .quick-pick-panel .product-card-info { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; padding: 8px 12px; min-width: 0; min-height: 0; column-gap: 10px; row-gap: 4px; }
+  :root .app-shell .pos-premium-layout .quick-pick-panel .product-card-info b { grid-column: 1; grid-row: 1; }
+  :root .app-shell .pos-premium-layout .quick-pick-panel .product-card-info small { grid-column: 1; grid-row: 2; }
+  :root .app-shell .pos-premium-layout .quick-pick-panel .product-card-info strong { grid-column: 2; grid-row: 1 / span 2; white-space: nowrap; margin: 0; }
+  :root .app-shell .pos-premium-layout .quick-pick-panel .product-card .tier-stepper { grid-column: 1 / -1; }
   :root .app-shell .pos-premium-layout .quick-pick-panel .product-card { min-height: 0; }
   :root .app-shell .pos-premium-layout .quick-pick-panel .product-card-info small { margin: 0; font-size: 10px; }
   :root .app-shell .pos-premium-layout .quick-pick-panel .product-card-info b { white-space: normal; overflow-wrap: anywhere; }
@@ -783,7 +790,7 @@
     :root .pos-premium-bill .pos-payment-summary {
       align-self: stretch; min-height: 0; overflow-y: auto;
     }
-    :root .pos-premium-bill .payment-actions { margin-top: 0; }
+    :root .pos-premium-bill .payment-actions { margin-top: auto; }
     :root .app-shell .pos-premium-layout .quick-pick-panel {
       align-self: stretch; min-height: 0; overflow: hidden;
     }
@@ -795,18 +802,6 @@
     :root .app-shell.pos-terminal .page-content { overflow-y: auto; }
     :root .app-shell .pos-premium-layout { flex: 0 0 auto; grid-template-rows: auto; }
     :root .app-shell .pos-premium-layout { grid-template-columns: minmax(0, 1fr); }
-    :root .app-shell .pos-premium-layout .product-grid { grid-template-columns: minmax(0, 1fr); gap: 8px; }
-    :root .app-shell .pos-premium-layout .quick-pick-panel .product-card {
-      display: grid; grid-template-columns: 64px minmax(0, 1fr);
-      align-items: center; min-height: 64px;
-    }
-    :root .app-shell .pos-premium-layout .quick-pick-panel .product-card .product-art {
-      width: 64px; height: 64px; min-height: 0; font-size: 24px;
-      border-bottom: 0; border-radius: 0;
-    }
-    :root .app-shell .pos-premium-layout .quick-pick-panel .product-card .product-art-img { padding: 8px; }
-    :root .app-shell .pos-premium-layout .quick-pick-panel .product-card .product-card-info { align-self: center; }
-    :root .app-shell .pos-premium-layout .quick-pick-panel .product-card .tier-stepper { grid-column: 1 / -1; }
     :root .app-shell .pos-premium-layout .quick-pick-panel .product-scroll { max-height: 240px; }
   }
   @media (max-width: 900px) {

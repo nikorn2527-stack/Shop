@@ -44,10 +44,10 @@
     color: var(--ink);
     background: var(--canvas-gradient);
   }
-  :root:root :is(.app-shell, .modal-backdrop, .login-screen, [data-slot="dialog-content"]) :is(.primary-button, .solid-button, .scan-button, .login-submit, [data-action-tone="primary"]):not(:disabled) {
+  :root:root :is(.app-shell, .modal-backdrop, .login-screen, [data-slot="dialog-content"]) :is(.primary-button, .solid-button, .scan-button, .login-submit, .pay-button, :where(.payment-actions .pay-split) button, [data-action-tone="primary"]):not(:disabled) {
     background: var(--action-bg); background-image: none; border-color: var(--action-border); color: var(--action-ink); box-shadow: none;
   }
-  :root:root :is(.app-shell, .modal-backdrop, .login-screen, [data-slot="dialog-content"]) :is(.primary-button, .solid-button, .scan-button, .login-submit, [data-action-tone="primary"]):not(:disabled):hover {
+  :root:root :is(.app-shell, .modal-backdrop, .login-screen, [data-slot="dialog-content"]) :is(.primary-button, .solid-button, .scan-button, .login-submit, .pay-button, :where(.payment-actions .pay-split) button, [data-action-tone="primary"]):not(:disabled):hover {
     background: var(--action-hover); border-color: var(--action-border); color: var(--action-ink);
   }
   /* Function-specific actions override ordinary action styling explicitly. */

@@ -43,8 +43,8 @@
   .workflow-dialog .receipt-success { background: var(--success-bg); }
   .workflow-dialog .receipt-success > span { background: #d8f3e1; color: var(--success-ink); }
 
-  :root:root :is(.app-shell, .modal-backdrop, [data-slot="dialog-content"]) :is(.primary-button, .solid-button, .scan-button, .outline-button, .export-btn, .preview-format-btn, .confirm-button, .danger-button, .danger-outline-button, .blocker-button, [data-action-tone]):disabled {
-    background: var(--disabled-bg); background-image: none; border-color: var(--control-border); color: var(--disabled-ink); box-shadow: none; opacity: 1; cursor: not-allowed;
+  :root:root :is(.app-shell, .modal-backdrop, [data-slot="dialog-content"]) :is(.primary-button, .solid-button, .scan-button, .outline-button, .export-btn, .preview-format-btn, .confirm-button, .danger-button, .danger-outline-button, .blocker-button, .pay-button, :where(.payment-actions .pay-split) button, [data-action-tone]):disabled {
+    background: var(--disabled-bg); background-image: none; border-color: var(--control-border); color: var(--disabled-ink); box-shadow: none; opacity: 1; filter: none; cursor: not-allowed;
   }
   :root:root :is(.app-shell, .modal-backdrop) :is(.outline-button, .quick-amount-btn):not(.export-btn, .statement-export-pdf, .statement-export-print, [data-action-tone]):not(:disabled) {
     background: #fff; background-image: none; border: 1px solid var(--control-border); color: #334155; box-shadow: none;
@@ -55,6 +55,10 @@
   }
   :root:root :is(.app-shell, .modal-backdrop) :is(.scan-hero, .member-scan-field):focus-within { border: 1px solid var(--control-border); box-shadow: none; }
   :root:root :is(.app-shell, .modal-backdrop) :is(.pay-cash-input-row input, .scan-hero input, .member-scan-field input) { border: 1px solid var(--control-border); box-shadow: none; }
+  /* The scanner has one subtle focus border on its container, never a second orange ring. */
+  :root:root .app-shell .scan-hero input,
+  :root:root .app-shell .scan-hero input:focus-visible { border: 0; outline: 0; box-shadow: none; }
+  :root:root .app-shell .scan-hero:focus-within { border-color: #94a3b8; box-shadow: none; }
   :root:root :is(.app-shell, .modal-backdrop) :is(.pay-confirm-total b, .cart-total strong, .pay-total strong) { color: var(--ink); }
   :root:root .pos-rail .rail-btn > svg { background: #eef2f7; border-color: var(--control-border); color: var(--muted); }
   :root:root .pos-rail .rail-btn.active > svg { background: var(--action-soft); color: var(--action-primary); }

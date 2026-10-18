@@ -133,6 +133,28 @@ try {
 
   // Returning members continue on their original account, including after a closed visit.
   await page.click('[data-nav-item="pos"]'); await page.waitForSelector('.scan-hero input');
+  // POS layout: quiet scanner focus, checkout controls at the bottom, compact product rows.
+  await page.waitForSelector('.quick-pick-panel .product-card[role="button"]');
+  for (const viewport of [{ width: 1920, height: 1080 }, { width: 1366, height: 768 }, { width: 390, height: 844 }]) {
+    await page.setViewport(viewport); await pause(200);
+    await page.focus('.scan-hero input');
+    const geometry = await page.evaluate(() => {
+      const rect = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { x: r.x, y: r.y, right: r.right, bottom: r.bottom, width: r.width, height: r.height }; };
+      const cards = [...document.querySelectorAll('.quick-pick-panel .product-card[role="button"]')].slice(0, 2).map(card => { const r = card.getBoundingClientRect(); return { x: r.x, y: r.y, bottom: r.bottom }; });
+      const input = getComputedStyle(document.querySelector('.scan-hero input'));
+      return { cards, art: rect('.quick-pick-panel .product-card[role="button"] .product-art'), info: rect('.quick-pick-panel .product-card[role="button"] .product-card-info'), summary: rect('.pos-payment-summary'), actions: rect('.payment-actions'), focusOutline: input.outlineWidth, focusBorder: input.borderTopWidth, pageWidth: document.documentElement.scrollWidth };
+    });
+    assert.equal(geometry.focusOutline, '0px'); assert.equal(geometry.focusBorder, '0px', 'Scanner input does not double the container border');
+    assert.ok(geometry.cards.length >= 2); assert.ok(Math.abs(geometry.cards[0].x - geometry.cards[1].x) < 1, 'Quick picks use one column');
+    assert.ok(geometry.cards[1].y >= geometry.cards[0].bottom, 'Product rows do not share a grid row');
+    assert.ok(geometry.art.right <= geometry.info.x + 1, 'Product image sits beside its information');
+    assert.ok(geometry.summary.bottom - geometry.actions.bottom < 105, 'Payment buttons sit at the bottom of the summary');
+    assert.ok(geometry.pageWidth <= viewport.width + 1, 'No horizontal page overflow');
+    await page.screenshot({ path: path.join(dir, `pos-compact-${viewport.width}.png`), fullPage: viewport.width < 500 });
+  }
+  await page.setViewport({ width: 1366, height: 768 });
+  passed('POS layout fits desktop and mobile: subtle scanner focus, bottom payment buttons and one-column product rows');
+
   async function detectExisting(firstName, cardNumber = "") {
     await page.keyboard.press('F6'); await page.waitForSelector('.pos-register-modal');
     if (cardNumber) await fill('.pos-register-modal input[name="cardNumber"]', cardNumber);
