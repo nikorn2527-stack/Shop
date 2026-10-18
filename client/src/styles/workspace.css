@@ -418,11 +418,23 @@
 .card-inventory table th, .card-inventory table td:first-child, .card-inventory table td:nth-child(3) { white-space: nowrap; }
 .card-inventory-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .card-inventory-actions button { width: auto; min-height: 34px; padding: 6px 12px; margin: 0; }
-.card-inventory-actions .card-action-history { background: #F3F5F7; border-color: #AAB7C4; color: #115e59; }
-.card-inventory-actions .card-action-release { background: #ecfdf5; border-color: #6ee7b7; color: #047857; }
-.card-inventory-actions .card-action-lost { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
-.card-inventory-actions .card-action-damaged { background: #fef2f2; border-color: #fca5a5; color: #b91c1c; }
+.card-inventory-actions .card-action-history { background: var(--tone-teal-bg); border-color: var(--tone-teal-line); color: var(--tone-teal); }
+.card-inventory-actions .card-action-release { background: var(--tone-green-bg); border-color: var(--tone-green-line); color: var(--tone-green); }
+.card-inventory-actions .card-action-lost { background: var(--tone-amber-bg); border-color: var(--tone-amber-line); color: var(--tone-amber); }
+.card-inventory-actions .card-action-damaged { background: var(--tone-red-bg); border-color: var(--tone-red-line); color: var(--tone-red); }
 .card-inventory-actions .outline-button:disabled { opacity: .55; }
+/* ปุ่ม 4 การกระทำในตารางบัตร — สีธีมต้องชนะ rule กลาง Navy Slate (0,5,0) และไม่ถูกต้มเป็นเทาตอน disabled
+   ไอคอนในปุ่มใช้สีธีมเดียวกับตัวอักษร (--btn-icon) */
+@media screen {
+  :root:root .app-shell .card-inventory-actions .card-action-history { background: var(--tone-teal-bg); border-color: var(--tone-teal-line); color: var(--tone-teal); --btn-icon: var(--tone-teal); }
+  :root:root .app-shell .card-inventory-actions .card-action-history:hover { background: #ccfbf1; border-color: #5eead4; color: #115e59; --btn-icon: #115e59; }
+  :root:root .app-shell .card-inventory-actions .card-action-release { background: var(--tone-green-bg); border-color: var(--tone-green-line); color: var(--tone-green); --btn-icon: var(--tone-green); }
+  :root:root .app-shell .card-inventory-actions .card-action-release:hover { background: #dcfce7; border-color: #4ade80; color: #166534; --btn-icon: #166534; }
+  :root:root .app-shell .card-inventory-actions .card-action-lost { background: var(--tone-amber-bg); border-color: var(--tone-amber-line); color: var(--tone-amber); --btn-icon: var(--tone-amber); }
+  :root:root .app-shell .card-inventory-actions .card-action-lost:hover { background: #fef3c7; border-color: #fbbf24; color: #78350f; --btn-icon: #78350f; }
+  :root:root .app-shell .card-inventory-actions .card-action-damaged { background: var(--tone-red-bg); border-color: var(--tone-red-line); color: var(--tone-red); --btn-icon: var(--tone-red); }
+  :root:root .app-shell .card-inventory-actions .card-action-damaged:hover { background: #fee2e2; border-color: #f87171; color: #991b1b; --btn-icon: #991b1b; }
+}
 .card-inventory-status { display: inline-flex; white-space: nowrap; border-radius: 999px; padding: 4px 10px; background: #f1f5f9; color: #475569; }
 .card-inventory-status.is-assigned { background: #F3F5F7; color: #0f766e; }
 .card-inventory-status.is-blank, .card-inventory-status.is-returned_vacant { background: #ecfdf5; color: #047857; }

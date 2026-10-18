@@ -50,6 +50,13 @@
   /* สีไอคอน — ใช้สีเดียวกันทั้งแอป ไอคอนเดียวกันต้องสีเดียวกันทุกหน้า ไอคอนใช้สีเส้น (stroke) ไม่ใช่สีพื้นหลัง */
   --icon: #374151;
   --icon-muted: #6b7280;
+  /* ไอคอนในปุ่ม action — สีแบรนด์เดียวทั้งแอป (ห้ามกำหนดสีรายหน้า) */
+  --icon-accent: #0f766e;
+  /* ธีมสี semantic ชุดกลาง — ปุ่ม action/ส่งออก/เตือนทั้งแอปใช้ชุดนี้ */
+  --tone-teal: #0f766e;  --tone-teal-bg: #f0fdfa;  --tone-teal-line: #99f6e4;
+  --tone-green: #047857; --tone-green-bg: #ecfdf5; --tone-green-line: #6ee7b7;
+  --tone-amber: #92400e; --tone-amber-bg: #fffbeb; --tone-amber-line: #fcd34d;
+  --tone-red: #b91c1c;   --tone-red-bg: #fef2f2;   --tone-red-line: #fca5a5;
   /* ราง navigation เดิม (เก็บไว้เพื่อความเข้ากันได้) */
   --rail-a: #0c4b34;
   --rail-b: #07392a;
@@ -402,7 +409,10 @@ body, button, input, select, textarea { font-family: var(--font-body); }
 .report-export-actions .compact:hover { background: var(--teal-mist); color: var(--teal-dark); border-color: var(--teal); }
 /* P1-UX-direct — ปุ่มดูพรีวิว เด่นกว่าปุ่ม export ตรงๆ (เพราะเป็นทางเข้า modal ตรวจก่อน) */
 .report-export-actions .preview-btn { color: var(--teal-dark); border-color: var(--teal); background: var(--teal-soft); padding: 6px 12px; font-size: 12px; cursor: pointer; transition: all .18s ease; }
-.report-export-actions .preview-btn svg { color: var(--teal-dark); }
+.report-export-actions .preview-btn svg { color: var(--btn-icon, currentColor); }
+/* มาตรฐานสีไอคอนในปุ่ม — ประกาศที่เดียวใช้ทั้งแอป ปุ่มรอง/ปุ่มผีใช้สีแบรนด์ ธีมอื่นกำหนด --btn-icon ของตัวเอง */
+:is(.app-shell, .modal-backdrop, [role="dialog"]) :is(.outline-button, .ghost-button) { --btn-icon: var(--icon-accent); }
+:is(.app-shell, .modal-backdrop, [role="dialog"]) :is(.outline-button, .ghost-button) svg { color: var(--btn-icon, currentColor); }
 .report-export-actions .preview-btn:hover { background: #b5f4ec; border-color: var(--teal-dark); }
 @media (max-width: 640px) { .report-export-actions { width: 100%; } .report-export-actions .compact { flex: 1; justify-content: center; } }
 
@@ -9300,7 +9310,7 @@ body:has(.modal-backdrop) .shortcuts-fab { display: none; }
     background: var(--teal-soft);
   }
   .report-export-actions .preview-btn svg:not(.print-preview-paper *, .receipt-paper *, .member-card-document *, .stock-count-sheet *) {
-    color: var(--teal-dark);
+    color: var(--btn-icon, currentColor);
   }
 
   .report-export-actions .preview-btn:hover:not(.print-preview-paper *, .receipt-paper *, .member-card-document *, .stock-count-sheet *) {

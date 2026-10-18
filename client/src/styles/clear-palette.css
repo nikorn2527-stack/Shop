@@ -131,6 +131,9 @@
   :root:root .pos-rail .rail-btn.active { background: #DCE3EA; border-color: #0f766e; color: #1F2B38; box-shadow: inset 3px 0 0 #0f766e, 0 2px 4px rgb(31 43 56 / 12%); }
   :root:root :is(.scan-hero:focus-within, .member-scan-field:focus-within) { border-color: #0f766e; box-shadow: 0 0 0 3px rgb(66 107 140 / 14%); }
   :root:root :is(.cart-total strong, .cart-totals .total-line strong, .cost-profit-page a) { color: #115e59; }
+  /* ปุ่มส่งออกมีธีมสีรายชนิดอยู่แล้ว — ไอคอนใช้สีข้อความปุ่ม (ธีม) ไม่ใช่สีแบรนด์ */
+  :root:root :is(.app-shell, .modal-backdrop) .export-btn { --btn-icon: currentColor; }
+
   /* Report exports keep the screen palette restrained, but remain recognizable by file type. */
   :root:root .app-shell .report-export-actions .export-btn:not(:disabled) {
     font-weight: 700; box-shadow: 0 1px 2px rgb(15 23 42 / 6%);
