@@ -15,6 +15,15 @@ try {
 
   await page.click('[data-nav-item=stock]');
   await page.waitForSelector('.stock-export-actions');
+
+  // Brand icon accent token + semantic override guards (B: orange accent on cool UI)
+  const iconAccent = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--icon-accent').trim());
+  assert.equal(iconAccent, '#c2410c', 'Brand icon accent must stay deep orange');
+  const triggerIcon = await page.$eval('.stock-catalog-trigger svg', node => getComputedStyle(node).color);
+  assert.equal(triggerIcon, 'rgb(194, 65, 12)', `Outline button icons must use the icon accent: ${triggerIcon}`);
+  const logoutIcon = await page.$eval('.sidebar-logout svg', node => getComputedStyle(node).color);
+  assert.equal(logoutIcon, 'rgb(185, 28, 28)', `Logout icon must stay destructive red: ${logoutIcon}`);
+
   const expectedExportColors = [
     'rgb(236, 254, 255)',
     'rgb(236, 253, 245)',
@@ -84,7 +93,7 @@ try {
   await page.screenshot({ path: `${cfg.dir}/settings-selection-hierarchy.png` });
 
   assert.deepEqual(errors, [], 'UI color regression must not raise JavaScript errors');
-  console.log('UI_COLOR_STANDARDS_PASS', cfg.dir, { exportColors, orderExportColors, receiptExportColors, exportLayout, standardTab, settingsStyles });
+  console.log('UI_COLOR_STANDARDS_PASS', cfg.dir, { iconAccent, triggerIcon, logoutIcon, exportColors, orderExportColors, receiptExportColors, exportLayout, standardTab, settingsStyles });
 } finally {
   await browser.close();
 }

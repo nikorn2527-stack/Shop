@@ -50,8 +50,8 @@
   /* สีไอคอน — ใช้สีเดียวกันทั้งแอป ไอคอนเดียวกันต้องสีเดียวกันทุกหน้า ไอคอนใช้สีเส้น (stroke) ไม่ใช่สีพื้นหลัง */
   --icon: #374151;
   --icon-muted: #6b7280;
-  /* ไอคอนในปุ่ม action — สีแบรนด์เดียวทั้งแอป (ห้ามกำหนดสีรายหน้า) */
-  --icon-accent: #0f766e;
+  /* ไอคอนในปุ่ม action — accent เดียวทั้งแอป (ส้มเข้ม #c2410c ตัดกับ UI โทนเย็น · ห้ามกำหนดสีรายหน้า) */
+  --icon-accent: #c2410c;
   /* ธีมสี semantic ชุดกลาง — ปุ่ม action/ส่งออก/เตือนทั้งแอปใช้ชุดนี้ */
   --tone-teal: #0f766e;  --tone-teal-bg: #f0fdfa;  --tone-teal-line: #99f6e4;
   --tone-green: #047857; --tone-green-bg: #ecfdf5; --tone-green-line: #6ee7b7;
@@ -744,6 +744,8 @@ kbd.enter-hint { display: inline-flex; align-items: center; margin-left: 7px; pa
 /* Sidebar logout row (above the version line) — light sidebar theme */
 .sidebar-logout { width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: transparent; color: var(--danger-dark); font-size: 13.5px; margin-top: 8px; cursor: pointer; transition: color .15s ease, background .15s ease, border-color .15s ease; }
 .sidebar-logout svg { color: var(--danger-dark); }
+/* ไอคอน logout ต้องแดงตาม label — ชนะกฎกลาง --btn-icon: var(--icon-accent) ( specificity เท่ากัน แต่ประกาศทีหลัง ) */
+.app-shell .sidebar-logout { --btn-icon: var(--danger-dark); }
 .sidebar-logout:hover { background: var(--danger-mist); color: var(--danger-dark); border-color: var(--danger); }
 .sidebar-logout:hover svg { color: var(--danger-dark); }
 .sidebar-logout:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; }

@@ -2676,3 +2676,24 @@ Work Log:
 Stage Summary:
 - สำรวจเสร็จ ไม่มีไฟล์ถาวรถูกแก้ (probe ถูกลบแล้ว) — รอเจ้าของแอปเลือก B (แนะนำ, เสี่ยงต่ำ) หรือ A (ส้มเต็ม, ต้องแก้ 42 จุด + อัปเดต tests)
 
+
+
+---
+## Task ID: BRAND-COLOR-B (ทำของจริง)
+Agent: developer → reviewer
+
+Task: ใช้ตัวเลือก B — เปลี่ยนเฉพาะ `--icon-accent` เป็นส้มเข้ม `#c2410c` ให้ไอคอนปุ่มเด่นขึ้นโดยไม่แตะสีแบรนด์/semantic
+
+Work Log:
+- `client/src/index.css`: `--icon-accent: #0f766e → #c2410c` (1 ค่า) + อัปเดต comment
+- พบ side effect ตอน verify (baseline ก่อนแก้): ไอคอน `.sidebar-logout` โดนกฎกลาง `--btn-icon: var(--icon-accent)` ทับ (specificity 0,2,1 > 0,1,1) → ตอน teal เป็น "ข้อความแดง + ไอคอน teal" อยู่แล้ว (bug เดิมที่ comment ใน clear-palette ระบุว่าควรแดง) และถ้าเปลี่ยน B ตรงๆ จะกลายเป็น "แดง + ส้ม" พังกว่าเดิม → แก้เพิ่ม `.app-shell .sidebar-logout { --btn-icon: var(--danger-dark) }` (ประกาศทีหลัง rule กลาง specificity เท่ากันจึงชนะ) ให้ไอคอนแดงตรง intent เดิม
+- `scripts/ui-color-standards-regression.mjs`: เพิ่ม guard 3 ตัว — `--icon-accent = #c2410c`, ไอคอน `.stock-catalog-trigger` = `rgb(194,65,12)`, ไอคอน logout = `rgb(185,28,28)`
+- จุดที่ยืนยันแล้วว่า "ไม่เปลี่ยน": export buttons (`--btn-icon: currentColor` per-type), preview-btn (ปุ่ม solid teal + ไอคอนขาว), ปุ่ม 4 ธีมบัตร (`--tone-*` ของตัวเอง), sidebar/active tab (hardcode teal), semantic tones ทั้งหมด
+
+Verification:
+- `npm run build` ผ่าน · tsc 0 errors · vitest 283/283 (37 files)
+- audits 7 ตัว PASS: tmp-iconcheck (ground truth), button-layout-audit, ui-color-standards-regression (รวม guard ใหม่), export-toolbar-review, all-menus-review (54 menu×width), stock-ui-regression, pay-modal-layout-check
+- screenshot ยืนยัน: ไอคอนปุ่ม outline ส้มเด่นบน UI โทนเย็น, logout แดงครบ, semantic row teal/green/amber/red เดิม
+
+Stage Summary:
+- ไอคอนปุ่มรอง/ปุ่มผีทั้งแอปเป็นส้มเข้ม `#c2410c` (contrast 5.18:1 ผ่าน AA) · สีแบรนด์/ปุ่มหลัก/ค่าคงที่ 42 จุดยัง teal `#0f766e` · commit นี้
