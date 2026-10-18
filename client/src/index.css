@@ -5354,9 +5354,6 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .pay-confirm-button { flex: 1; justify-content: center; min-height: 42px; font-size: 12.5px; font-weight: 700; }
 .pay-confirm-button:disabled { opacity: .55; }
 /* เธชเธตเธเธธเนเธกเธ•เธฒเธกเธเธงเธฒเธกเธซเธกเธฒเธข เนเธกเนเธเธนเธเธเธฑเธเธชเธตเธเธตเธก: เน€เธเธตเธขเธง = เธขเธทเธเธขเธฑเธ/เธเธดเธ”เธเธดเธฅเธชเธณเน€เธฃเนเธ */
-.pay-confirm-modal .primary-button.pay-confirm-button:not(:disabled) { background: #16803c !important; color: #fff; border-color: #16803c !important; }
-.pay-confirm-modal .primary-button.pay-confirm-button:not(:disabled):hover { background: #0f6430 !important; border-color: #0f6430 !important; }
-.pay-confirm-modal .pay-confirm-button:focus-visible { outline: 3px solid rgba(22, 128, 60, .3); outline-offset: 2px; }
 /* เธเธดเธฅเธขเธฒเธง: เธฃเธฒเธขเธเธฒเธฃเน€เธฅเธทเนเธญเธเธ เธฒเธขเนเธ เนเธกเนเธ”เธฑเธเนเธกเธ”เธฑเธฅเธชเธนเธเน€เธเธดเธเธเธญ (เธเธฃเธฐเธเธฑเธเธฅเธเธเธฒเธ 236px เนเธซเนเธซเธฑเธง+เธชเธฃเธธเธ+เธเนเธญเธเน€เธเธดเธเธชเธ”เธญเธขเธนเนเธซเธเนเธฒเธเธญเน€เธ”เธตเธขเธงเธเธฑเธ) */
 .pay-confirm-items { max-height: 168px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #c3d6cc transparent; }
 .pay-confirm-items::-webkit-scrollbar { width: 6px; }
@@ -5806,7 +5803,7 @@ body:has(.pay-confirm-modal) [data-sonner-toaster] { z-index: 40; }
 .pay-cash-head small { margin-left: auto; color: #8a8e7d; font-size: 10px; font-weight: 500; }
 .pay-cash-input-row { display: flex; gap: 6px; align-items: stretch; }
 .pay-cash-input-row input { flex: 1; min-width: 0; height: 42px; border: 1px solid #d2e0d8; border-radius: 8px; padding: 0 12px; outline: none; color: #1c2b25; font-size: 18px; font-weight: 700; font-family: "IBM Plex Mono", monospace; background: #fff; text-align: right; }
-.pay-cash-input-row input:focus { border-color: #4a8d77; box-shadow: 0 0 0 3px rgba(40, 161, 122, .18); }
+.pay-cash-input-row input:focus { border-color: var(--control-border); box-shadow: none; }
 .pay-cash-input-row .outline-button { flex: 0 0 auto; }
 .pay-cash-quick { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; }
 .quick-amount-btn { border: 1px solid #c8ddd3; background: #fff; color: #2e6b54; font-size: 12px; font-weight: 600; font-family: "IBM Plex Mono", monospace; padding: 9px 4px; border-radius: 7px; cursor: pointer; transition: .14s ease; min-height: 36px; touch-action: manipulation; }

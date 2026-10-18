@@ -1,3 +1,4 @@
+import { notify } from "@/lib/notifications";
 import { SharedSearch } from "@/components/SharedSearch";
 /**
  * V2-C3 — Extracted from `client/src/pages/Home.tsx` (lines 210-215 + 377-452 + 454-4058).
@@ -550,6 +551,7 @@ export function Reports({
     { placeholderData: previous => previous }
   );
   const salesHistory = salesHistoryQuery.data ?? [];
+  const focusedReceiptQuery = trpc.sales.list.useQuery({ search: focusBill ?? "", limit: 1 }, { enabled: Boolean(focusBill) });
   useEffect(() => {
     const timer = setTimeout(
       () =>
@@ -565,23 +567,26 @@ export function Reports({
     setBillsVisible(100);
   }, [debouncedBillSearch, billMember]);
   // Auto-open the reprint modal for a bill requested from the ⌘K palette.
-  // Waits until the list has loaded (50 newest bills), opens the same modal a
-  // row click uses, and consumes the request exactly once — silently skips if
-  // the bill is not among the loaded rows.
+  // Fetch the requested receipt independently of cached history or active filters.
+  // Consume the request only when its own fetch finishes.
   const consumedBillRef = useRef<string | null>(null);
   useEffect(() => {
     if (!focusBill || consumedBillRef.current === focusBill) return;
-    if (salesHistoryQuery.isLoading || !salesHistoryQuery.isSuccess) return;
-    const match = salesHistory.find(entry => entry.orderNumber === focusBill);
+    if (focusedReceiptQuery.isFetching || (!focusedReceiptQuery.isSuccess && !focusedReceiptQuery.isError)) return;
+    const match = focusedReceiptQuery.data?.find(entry => entry.orderNumber === focusBill);
     consumedBillRef.current = focusBill;
     onFocusBillConsumed();
     setReportTab("bills"); // ⌘K ส่งมาที่บิล — สลับไปแท็บประวัติบิลให้อัตโนมัติ
     if (match) setViewedReceipt(match);
+    else if (focusedReceiptQuery.isError) notify.error("เปิดใบเสร็จไม่สำเร็จ", { description: getErrorMessage(focusedReceiptQuery.error) });
+    else notify.warning("ไม่พบบิลที่เลือก", { description: `ไม่พบใบเสร็จ ${focusBill} กรุณาค้นหาจากประวัติบิลอีกครั้ง` });
   }, [
     focusBill,
-    salesHistoryQuery.isLoading,
-    salesHistoryQuery.isSuccess,
-    salesHistory,
+    focusedReceiptQuery.isFetching,
+    focusedReceiptQuery.isSuccess,
+    focusedReceiptQuery.isError,
+    focusedReceiptQuery.data,
+    focusedReceiptQuery.error,
     onFocusBillConsumed,
   ]);
   const dailyRows = dailyQuery.data ?? [];

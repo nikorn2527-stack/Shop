@@ -1,3 +1,4 @@
+import { notify } from "@/lib/notifications";
 import { useEffect, useState } from "react";
 import { Check, CircleAlert, Crown, Gift, KeyRound, Lock, RefreshCw, Sparkles, X } from "@/lib/icons";
 import { toast } from "sonner";
@@ -106,13 +107,13 @@ export function DevKeygenTool() {
       setResult(data.key);
       toast.success("ออกรหัสลิขสิทธิ์เรียบร้อย", { description: "คัดลอกส่งให้ลูกค้าได้เลย — ใช้ได้กับระบบที่ยังไม่เคยใส่รหัสนี้" });
     },
-    onError: (mutationError) => toast.error("ออกรหัสไม่สำเร็จ", { description: getErrorMessage(mutationError) }),
+    onError: (mutationError) => notify.error("ออกรหัสไม่สำเร็จ", { description: getErrorMessage(mutationError) }),
   });
   const months = monthsText.trim() === "" ? null : Math.max(1, Math.min(48, Math.floor(Number(monthsText) || 0)));
   const copyKey = () => {
     navigator.clipboard?.writeText(result)
       .then(() => toast.success("คัดลอกรหัสแล้ว", { description: result, duration: 4000 }))
-      .catch(() => toast.error("คัดลอกไม่สำเร็จ", { description: `คัดลอกด้วยตนเอง: ${result}` }));
+      .catch(() => notify.error("คัดลอกไม่สำเร็จ", { description: `คัดลอกด้วยตนเอง: ${result}` }));
   };
   return (
     <div className="dev-keygen">
@@ -157,7 +158,7 @@ export function EditionUpgradeModal({ open, onClose, status, focusFeature, onApp
       onApplied?.(next);
       onClose();
     },
-    onError: (mutationError) => toast.error("ใช้รหัสลิขสิทธิ์ไม่สำเร็จ", { description: getErrorMessage(mutationError) }),
+    onError: (mutationError) => notify.error("ใช้รหัสลิขสิทธิ์ไม่สำเร็จ", { description: getErrorMessage(mutationError) }),
   });
   const trialMutation = trpc.edition.startTrial.useMutation({
     onSuccess: (next) => {
@@ -166,7 +167,7 @@ export function EditionUpgradeModal({ open, onClose, status, focusFeature, onApp
       onApplied?.(next);
       onClose();
     },
-    onError: (mutationError) => toast.error("เริ่มทดลองใช้ไม่สำเร็จ", { description: getErrorMessage(mutationError) }),
+    onError: (mutationError) => notify.error("เริ่มทดลองใช้ไม่สำเร็จ", { description: getErrorMessage(mutationError) }),
   });
   useEffect(() => {
     if (open) {

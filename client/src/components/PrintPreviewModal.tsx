@@ -1,3 +1,5 @@
+import { WorkflowDialog } from "./WorkflowDialog";
+import { notify } from "@/lib/notifications";
 import { printElementDocument } from "@/lib/printHelper";
 import { useEffect, useRef, useState } from "react";
 import { Printer, X } from "@/lib/icons";
@@ -102,15 +104,13 @@ export function PrintPreviewModal({
   }, [ready, paper, thermalProfile.printableWidthMm]);
 
   // Esc closes — same affordance as the export preview modal.
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
 
+
+  const printingRef = useRef(false);
+  const [printing, setPrinting] = useState(false);
   const doPrint = async () => {
+    if (printingRef.current) return;
+    printingRef.current = true; setPrinting(true);
     toast.dismiss();
     try {
       await printElementDocument(
@@ -119,21 +119,21 @@ export function PrintPreviewModal({
         paper === "thermal" ? contentMm ?? undefined : undefined,
       );
       onPrint?.();
+      onClose();
     } catch {
-      toast.error("เปิดหน้าต่างพิมพ์ไม่สำเร็จ ลองอีกครั้ง");
-    }
+      notify.error("เปิดหน้าต่างพิมพ์ไม่สำเร็จ ลองอีกครั้ง");
+    } finally { printingRef.current = false; setPrinting(false); }
   };
 
   return (
-    <div className="modal-backdrop print-preview-scope" onClick={onClose} role="dialog" aria-modal="true" aria-label={`พรีวิวก่อนพิมพ์ ${title}`}>
-      <div className={`form-modal print-preview-modal${paper === "a4" ? " export-preview-modal print-preview-a4" : ""}`} onClick={(event) => event.stopPropagation()}>
+    <WorkflowDialog title={`พรีวิวก่อนพิมพ์ ${title}`} onClose={onClose} busy={printing} backdropClassName="print-preview-scope" className={`form-modal print-preview-modal${paper === "a4" ? " export-preview-modal print-preview-a4" : ""}`}>
         <div className="modal-heading">
           <div>
             <span className="eyebrow">ตรวจสอบก่อนพิมพ์</span>
             <h2>{title}</h2>
             {subtitle && <p>{subtitle}</p>}
           </div>
-          <button className="icon-button" onClick={onClose} aria-label="ปิดหน้าต่างพรีวิว"><X size={17} /></button>
+          <button className="icon-button" disabled={printing} onClick={onClose} aria-label="ปิดหน้าต่างพรีวิว"><X size={17} /></button>
         </div>
 
         {(chips.length > 0 || (paper === "thermal" && showContentLength && contentMm != null)) && <div className="export-preview-summary">
@@ -162,17 +162,17 @@ export function PrintPreviewModal({
         {paper === "a4" ? (
           <div className="export-preview-actions">
             <div className="preview-format-list">
-              <button type="button" className="preview-format-btn format-print preferred" onClick={doPrint} disabled={!ready}>
+              <button type="button" className="preview-format-btn format-print preferred" disabled={printing || !ready} onClick={doPrint}>
                 <Printer size={15} /><span><b>พิมพ์</b></span>
                 <i className="preferred-dot" aria-hidden="true" />
               </button>
             </div>
-            <button type="button" className="ghost-button" onClick={onClose}><X size={15} /> ปิด</button>
+            <button type="button" className="ghost-button" disabled={printing} onClick={onClose}><X size={15} /> ปิด</button>
           </div>
         ) : (
         <div className="print-preview-actions">
           <div className="print-preview-buttons">
-            <button type="button" className="ghost-button" onClick={onClose}><X size={15} /> ปิด</button>
+            <button type="button" className="ghost-button" disabled={printing} onClick={onClose}><X size={15} /> ปิด</button>
             <button type="button" className="primary-button" onClick={doPrint}><Printer size={16} /> พิมพ์เลย</button>
           </div>
         </div>
@@ -193,7 +193,6 @@ export function PrintPreviewModal({
             </div>
           )}
         </HelpDisclosure>}
-      </div>
-    </div>
+      </WorkflowDialog>
   );
 }

@@ -1,3 +1,5 @@
+import { useRef as useRequestRef } from "react";
+import { notify } from "@/lib/notifications";
 ﻿import { ActionButton } from "@/components/ActionButton";
 import { useState } from "react";
 import { MemberCardActionsModal } from "@/components/MemberCardActionsModal";
@@ -187,8 +189,10 @@ export function MemberDetail({
       : walletOpen === "refund"
         ? "คืนบัตรเงินสด"
         : "ถอนเงิน";
+  const walletRequestRef = useRequestRef<{ fingerprint: string; id: string } | null>(null);
   const walletMutation = trpc.member.wallet.useMutation({
     onSuccess: result => {
+      walletRequestRef.current = null;
       // ROUND 77 — ไม่ปิดโมดัลทันที: เปลี่ยนเป็นหน้าสลิกให้พิมพ์/ดาวน์โหลดก่อน
       setWalletResult(result);
       setWalletDoneAt(new Date());
@@ -207,7 +211,7 @@ export function MemberDetail({
     onError: mutationError => {
       setError(getErrorMessage(mutationError));
       blocker.error("บันทึกรายการไม่สำเร็จ", getErrorMessage(mutationError), {
-        hint: "รายการนี้ยังไม่ถูกบันทึก — แก้ไขจำนวนแล้วยืนยันใหม่ได้เลย",
+        hint: "หากการเชื่อมต่อขัดข้อง ให้ยืนยันรายการเดิมซ้ำโดยไม่แก้ข้อมูล ระบบจะตรวจผลเดิมเพื่อป้องกันการบันทึกซ้ำ",
       });
     },
   });
@@ -245,7 +249,7 @@ export function MemberDetail({
     onSuccess: result => {
       const member = result?.member;
       if (!member) return;
-      setNotice(
+      notify.completed(
         `${member.status === "suspended" ? "ระงับการใช้งาน" : "คืนสถานะการใช้งาน"} ${memberFullName(member)} แล้ว`
       );
       void utils.member.list.invalidate();
@@ -255,7 +259,7 @@ export function MemberDetail({
   });
   const releaseCardMutation = trpc.card.release.useMutation({
     onSuccess: () => {
-      setNotice("รับคืนบัตรแล้ว · บัตรพร้อมใช้กับสมาชิกใหม่");
+      notify.completed("รับคืนบัตรแล้ว · บัตรพร้อมใช้กับสมาชิกใหม่");
       void utils.member.list.invalidate();
       void utils.member.detail.invalidate();
       void utils.card.list.invalidate();
@@ -267,7 +271,7 @@ export function MemberDetail({
     onSuccess: result => {
       setEditOpen(false);
       setError("");
-      setNotice(
+      notify.completed(
         `บันทึกการแก้ไขข้อมูลสมาชิกเรียบร้อยแล้ว · ${memberFullName(result)}`
       );
       void utils.member.detail.invalidate({
@@ -379,15 +383,18 @@ export function MemberDetail({
       setWalletConfirm(false);
       return;
     }
-    walletMutation.mutate({
-      clientRequestId: crypto.randomUUID(),
+    if (walletMutation.isPending) return;
+    const walletPayload = {
       memberNumber: member.memberNumber,
       type: walletOpen,
       amount: Number(walletAmount),
       note: walletNote.trim() || undefined,
       actor,
       actorRole,
-    });
+    } as Omit<Parameters<typeof walletMutation.mutate>[0], "clientRequestId">;
+    const fingerprint = JSON.stringify(walletPayload);
+    if (walletRequestRef.current?.fingerprint !== fingerprint) walletRequestRef.current = { fingerprint, id: crypto.randomUUID() };
+    walletMutation.mutate({ ...walletPayload, clientRequestId: walletRequestRef.current.id });
   };
   return (
     <>
@@ -1325,6 +1332,7 @@ export function MemberDetail({
                 : "ถอนเงินจากบัญชีสมาชิก",
             `คงเหลือ ${money(walletResult.balanceAfter)}`,
           ]}
+          onPrint={() => { setWalletPrintPreview(false); closeWalletSlip(); }}
           onClose={() => setWalletPrintPreview(false)}
         />
       )}

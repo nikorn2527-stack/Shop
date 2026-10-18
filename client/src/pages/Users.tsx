@@ -1,3 +1,4 @@
+import { notify } from "@/lib/notifications";
 import { ActionButton } from "@/components/ActionButton";
 import { SharedSearch } from "@/components/SharedSearch";
 import { useState } from "react";
@@ -90,7 +91,7 @@ export function Users({ selfUsername }: { selfUsername: string }) {
     onSuccess: (unlocked) => {
       setUnlockTarget(null);
       setError("");
-      setNotice(`ปลดล็อกบัญชี @${unlocked.username} เรียบร้อยแล้ว · ${unlocked.displayName} เข้าสู่ระบบได้ทันที`);
+      notify.completed(`ปลดล็อกบัญชี @${unlocked.username} เรียบร้อยแล้ว · ${unlocked.displayName} เข้าสู่ระบบได้ทันที`);
       refresh();
     },
     onError: (mutationError) => {
@@ -104,7 +105,7 @@ export function Users({ selfUsername }: { selfUsername: string }) {
       setCreateForm(emptyCreateForm);
       setCreateError("");
       setError("");
-      setNotice(`เพิ่มผู้ใช้ ${created.username} เรียบร้อยแล้ว · ${created.displayName} · สิทธิ์ ${ROLE_LABEL[created.role]}`);
+      notify.completed(`เพิ่มผู้ใช้ ${created.username} เรียบร้อยแล้ว · ${created.displayName} · สิทธิ์ ${ROLE_LABEL[created.role]}`);
       refresh();
     },
     onError: (mutationError) => setCreateError(getErrorMessage(mutationError)),
@@ -118,10 +119,10 @@ export function Users({ selfUsername }: { selfUsername: string }) {
       setPasswordError("");
       setStatusTarget(null);
       setError("");
-      if (variables.password) setNotice(`ตั้งรหัสผ่านใหม่ให้ @${updated.username} เรียบร้อยแล้ว`);
-      else if (variables.active === false) setNotice(`ระงับการใช้งาน @${updated.username} เรียบร้อยแล้ว · บัญชีนี้เข้าสู่ระบบไม่ได้จนกว่าจะเปิดใช้งานอีกครั้ง`);
-      else if (variables.active === true) setNotice(`เปิดใช้งาน @${updated.username} อีกครั้งเรียบร้อยแล้ว`);
-      else setNotice(`บันทึกข้อมูลผู้ใช้เรียบร้อยแล้ว · @${updated.username}`);
+      if (variables.password) notify.completed(`ตั้งรหัสผ่านใหม่ให้ @${updated.username} เรียบร้อยแล้ว`);
+      else if (variables.active === false) notify.completed(`ระงับการใช้งาน @${updated.username} เรียบร้อยแล้ว · บัญชีนี้เข้าสู่ระบบไม่ได้จนกว่าจะเปิดใช้งานอีกครั้ง`);
+      else if (variables.active === true) notify.completed(`เปิดใช้งาน @${updated.username} อีกครั้งเรียบร้อยแล้ว`);
+      else notify.completed(`บันทึกข้อมูลผู้ใช้เรียบร้อยแล้ว · @${updated.username}`);
       refresh();
     },
     onError: (mutationError, variables) => {
@@ -176,7 +177,7 @@ export function Users({ selfUsername }: { selfUsername: string }) {
     onSuccess: (revoked) => {
       setRevokeTarget(null);
       setSessionError("");
-      setSessionNotice(`ยกเลิกเซสชันของ @${revoked.username} เรียบร้อยแล้ว · อุปกรณ์นั้นต้องเข้าสู่ระบบใหม่`);
+      notify.completed(`ยกเลิกเซสชันของ @${revoked.username} เรียบร้อยแล้ว · อุปกรณ์นั้นต้องเข้าสู่ระบบใหม่`);
       refreshSessions();
     },
     onError: (mutationError) => { setRevokeTarget(null); setSessionError(getErrorMessage(mutationError)); refreshSessions(); },
@@ -185,7 +186,7 @@ export function Users({ selfUsername }: { selfUsername: string }) {
     onSuccess: (result) => {
       setRevokeOthersOpen(false);
       setSessionError("");
-      setSessionNotice(result.revoked === 0 ? "ไม่พบเซสชันอื่นที่ต้องยกเลิก" : `ยกเลิกเซสชันอื่นอีก ${result.revoked} รายการเรียบร้อยแล้ว · เหลือเฉพาะเซสชันที่คุณใช้อยู่`);
+      notify.completed(result.revoked === 0 ? "ไม่พบเซสชันอื่นที่ต้องยกเลิก" : `ยกเลิกเซสชันอื่นอีก ${result.revoked} รายการเรียบร้อยแล้ว · เหลือเฉพาะเซสชันที่คุณใช้อยู่`);
       refreshSessions();
     },
     onError: (mutationError) => { setRevokeOthersOpen(false); setSessionError(getErrorMessage(mutationError)); refreshSessions(); },

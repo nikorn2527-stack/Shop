@@ -317,6 +317,7 @@ export function ProductScanPicker({
   onSelect,
   autoFocus,
   compactSelected = false,
+  local = false,
   onNotFound,
   placeholder = "ยิงบาร์โค้ดที่ตัวสินค้า หรือคีย์รหัส SKU / ชื่อสินค้า",
 }: {
@@ -325,6 +326,7 @@ export function ProductScanPicker({
   onSelect: (product: SqliteProduct | null) => void;
   autoFocus?: boolean;
   compactSelected?: boolean;
+  local?: boolean;
   onNotFound?: (code: string) => void;
   placeholder?: string;
 }) {
@@ -416,7 +418,7 @@ export function ProductScanPicker({
   };
 
   return (
-    <SharedSearch label="เลือกสินค้า · รับเข้า / นับสต็อก" priority={30} enabled={!selected}>
+    <SharedSearch label="เลือกสินค้า · รับเข้า / นับสต็อก" priority={30} enabled={!selected && !local}>
     <div className="product-scan-wrap" ref={wrapRef}>
       {selected ? (
         <div className={`product-scan-chip${compactSelected ? " product-scan-chip-compact" : ""}`}>

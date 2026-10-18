@@ -1,3 +1,4 @@
+import { WorkflowDialog } from "./WorkflowDialog";
 import { Camera, CameraOff, Check, RefreshCw, Video, X } from "@/lib/icons";
 import { useEffect, useRef, useState } from "react";
 
@@ -124,8 +125,7 @@ export function CameraCaptureModal({ open, title, hint, facing = "user", onClose
   if (!open) return null;
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="form-modal camera-modal" role="dialog" aria-modal="true" aria-label={title} onClick={(event) => event.stopPropagation()}>
+    <WorkflowDialog title={title} onClose={onClose} className="form-modal camera-modal">
         <div className="modal-heading">
           <div>
             <span className="eyebrow">CAMERA CAPTURE · WEBCAM</span>
@@ -170,7 +170,6 @@ export function CameraCaptureModal({ open, title, hint, facing = "user", onClose
             </>
           )}
         </div>
-      </div>
-    </div>
+      </WorkflowDialog>
   );
 }

@@ -1,3 +1,6 @@
+import { WorkflowDialog } from "./WorkflowDialog";
+import { ConfirmDialog } from "@/pages/PagePrimitives";
+import { notify } from "@/lib/notifications";
 import { useEffect, useMemo, useState } from "react";
 import { TRPCClientError } from "@trpc/client";
 import { Check, CircleAlert, Coins, Percent, RotateCcw, Search, SlidersHorizontal, X } from "@/lib/icons";
@@ -48,9 +51,12 @@ export function BulkPriceModal({ open, products, actor, actorRole, onClose, onDo
   const [term, setTerm] = useState("");
   const [markup, setMarkup] = useState("25");
   const [error, setError] = useState("");
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
   const utils = trpc.useUtils();
   const bulkMutation = trpc.product.bulkUpdatePrices.useMutation({
     onSuccess: (result) => {
+      setReviewOpen(false);
       setDrafts({});
       setChecked(new Set());
       setError("");
@@ -61,6 +67,8 @@ export function BulkPriceModal({ open, products, actor, actorRole, onClose, onDo
       void utils.dashboard.stats.invalidate();
     },
     onError: (mutationError) => {
+      setReviewOpen(false);
+      notify.error("ปรับราคาไม่สำเร็จ", { description: mutationError instanceof Error ? mutationError.message : "กรุณาตรวจการเชื่อมต่อแล้วลองใหม่" });
       setError(mutationError instanceof TRPCClientError ? mutationError.message : "เกิดข้อผิดพลาดในการเชื่อมต่อระบบ กรุณาลองอีกครั้ง");
     },
   });
@@ -77,14 +85,6 @@ export function BulkPriceModal({ open, products, actor, actorRole, onClose, onDo
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
-
-  // Esc ปิดหน้าต่าง
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape" && !bulkMutation.isPending) onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose, bulkMutation.isPending]);
 
   const visible = useMemo(() => {
     const needle = term.trim().toLowerCase();
@@ -125,6 +125,11 @@ export function BulkPriceModal({ open, products, actor, actorRole, onClose, onDo
   }, [products, drafts]);
 
   const dirtyCount = payload.length;
+  const requestClose = () => {
+    if (bulkMutation.isPending) return;
+    if (dirtyCount > 0) { setDiscardOpen(true); return; }
+    onClose();
+  };
 
   const setDraft = (productId: number, field: keyof DraftValue, value: string) => {
     setDrafts((previous) => ({ ...previous, [productId]: withDraft(previous, productId, { [field]: value }) }));
@@ -203,21 +208,20 @@ export function BulkPriceModal({ open, products, actor, actorRole, onClose, onDo
     if (invalidIds.length > 0) { setError("มีบางช่องที่กรอกไม่ถูกต้อง (ต้องเป็นตัวเลข 0 ขึ้นไป) — แก้ตัวที่แดงก่อนบันทึก"); return; }
     if (payload.length === 0) { setError("ยังไม่มีรายการที่แก้ — กรอกราคาใหม่หรือต้นทุนใหม่อย่างน้อย 1 ช่อง"); return; }
     setError("");
-    bulkMutation.mutate({ items: payload, actor, actorRole });
+    setReviewOpen(true);
   };
 
   if (!open) return null;
 
   return (
-    <div className="modal-backdrop" onClick={() => { if (!bulkMutation.isPending) onClose(); }}>
-      <div className="form-modal bulk-price-modal" role="dialog" aria-modal="true" aria-label="ปรับราคาหลายรายการพร้อมกัน" onClick={(event) => event.stopPropagation()}>
+    <><WorkflowDialog title="ปรับราคาหลายรายการพร้อมกัน" className="form-modal bulk-price-modal" onClose={requestClose} busy={bulkMutation.isPending}>
         <div className="modal-heading">
           <div>
             <span className="eyebrow">ปรับราคาหลายรายการ</span>
             <h2>ตั้งราคา / ต้นทุนหลายรายการพร้อมกัน</h2>
             <p>กรอกเฉพาะช่องที่ต้องการแก้ แล้วกดบันทึกครั้งเดียว — ระบบบันทึกทั้งชุดในคราวเดียวและลง Log สรุปรายการเดียว</p>
           </div>
-          <button className="icon-button" onClick={onClose} aria-label="ปิดหน้าต่าง" disabled={bulkMutation.isPending}><X size={16} /></button>
+          <button className="icon-button" onClick={requestClose} aria-label="ปิดหน้าต่าง" disabled={bulkMutation.isPending}><X size={16} /></button>
         </div>
 
         <div className="bulk-toolbar">
@@ -347,12 +351,13 @@ export function BulkPriceModal({ open, products, actor, actorRole, onClose, onDo
           <div className="bulk-summary">
             {dirtyCount > 0 ? <><Check size={14} /> พร้อมบันทึก <b>{dirtyCount}</b> รายการ{invalidIds.length > 0 && <span className="bulk-invalid-hint"> · กรอกผิด {invalidIds.length} ช่อง</span>}</> : <span>กรอกราคาใหม่/ต้นทุนใหม่ในตารางเพื่อเริ่ม</span>}
           </div>
-          <button className="outline-button" onClick={onClose} disabled={bulkMutation.isPending} type="button">ปิด</button>
+          <button className="outline-button" onClick={requestClose} disabled={bulkMutation.isPending} type="button">ปิด</button>
           <button className="primary-button" onClick={save} disabled={bulkMutation.isPending || dirtyCount === 0 || invalidIds.length > 0} type="button">
             {bulkMutation.isPending ? "กำลังบันทึก…" : `บันทึก ${dirtyCount > 0 ? `${dirtyCount} รายการ` : ""}`}
           </button>
         </div>
-      </div>
-    </div>
+      </WorkflowDialog>
+ <ConfirmDialog open={reviewOpen} tone="warning" title="ยืนยันปรับราคาและต้นทุน?" description={`กำลังเปลี่ยนข้อมูลสินค้า ${dirtyCount} รายการ ราคาขายใหม่จะใช้กับบิลถัดไป และระบบจะบันทึกประวัติการเปลี่ยนแปลง`} confirmLabel={`ยืนยันบันทึก ${dirtyCount} รายการ`} pending={bulkMutation.isPending} onCancel={() => setReviewOpen(false)} onConfirm={() => { if (!bulkMutation.isPending) bulkMutation.mutate({ items: payload, actor, actorRole }); }} />
+ <ConfirmDialog open={discardOpen} tone="warning" title="ทิ้งราคาที่ยังไม่ได้บันทึก?" description={`มี ${dirtyCount} รายการที่แก้ไขไว้ การปิดจะไม่บันทึกการเปลี่ยนแปลง`} confirmLabel="ทิ้งการแก้ไขและปิด" onCancel={() => setDiscardOpen(false)} onConfirm={() => { setDiscardOpen(false); onClose(); }} /></>
   );
 }

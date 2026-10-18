@@ -1,3 +1,4 @@
+import { WorkflowDialog } from "./WorkflowDialog";
 import { Check, Download, FileImage, Printer, X } from "@/lib/icons";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
@@ -23,12 +24,7 @@ export function SlipViewModal({ open, title, subtitle, slipUrl, loading, onClose
   const [printing, setPrinting] = useState(false);
 
   // ปิดด้วย Esc — มือถือ/แท็บเล็ตปิดด้วยปุ่มได้อยู่แล้ว
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+
 
   if (!open) return null;
 
@@ -53,8 +49,7 @@ export function SlipViewModal({ open, title, subtitle, slipUrl, loading, onClose
   };
 
   return createPortal(
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="form-modal slip-view-modal" role="dialog" aria-modal="true" aria-label={title} onClick={(event) => event.stopPropagation()}>
+    <WorkflowDialog title={title} onClose={onClose} className="form-modal slip-view-modal">
         <div className="modal-heading">
           <div>
             <span className="eyebrow">PAYMENT EVIDENCE · หลักฐานการชำระ</span>
@@ -77,8 +72,7 @@ export function SlipViewModal({ open, title, subtitle, slipUrl, loading, onClose
           <button className="outline-button" onClick={download} disabled={!slipUrl}><Download size={15} /> ดาวน์โหลด</button>
           <button className="primary-button" onClick={onClose}><Check size={15} /> เสร็จสิ้น</button>
         </div>
-      </div>
-    </div>,
+      </WorkflowDialog>,
     document.body,
   );
 }

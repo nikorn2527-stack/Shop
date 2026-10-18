@@ -1,3 +1,4 @@
+import { WorkflowDialog } from "./WorkflowDialog";
 import { useEffect, useRef, useState } from "react";
 import { Camera, CircleAlert, ScanLine, X, Zap, ZapOff } from "@/lib/icons";
 
@@ -146,24 +147,12 @@ export function BarcodeCameraModal({
 
   // Esc ปิดกล้อง (จับตั้งแต่ capture phase — ไม่ให้ Escape handler ของหน้า/โมดัลแม่
   // ทำงานพร้อมกัน เช่น ปิด wallet modal ที่กล้องเปิดอยู่ข้างใน)
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        event.stopPropagation();
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", onKey, true);
-    return () => window.removeEventListener("keydown", onKey, true);
-  }, [open, onClose]);
+
 
   if (!open) return null;
 
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="form-modal barcode-camera-modal" role="dialog" aria-modal="true" aria-label={title} onClick={(event) => event.stopPropagation()}>
+    <WorkflowDialog title={title} onClose={onClose} className="form-modal barcode-camera-modal">
         <div className="modal-heading">
           <div>
             <span className="eyebrow">CAMERA SCANNER</span>
@@ -218,7 +207,6 @@ export function BarcodeCameraModal({
             <ScanLine size={14} /> อ่านล่าสุด: <b>{lastCode}</b>
           </div>
         )}
-      </div>
-    </div>
+      </WorkflowDialog>
   );
 }

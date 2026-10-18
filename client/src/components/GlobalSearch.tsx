@@ -1,3 +1,4 @@
+import { WorkflowDialog } from "./WorkflowDialog";
 import type { ComponentType } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -74,7 +75,7 @@ export function GlobalSearch({ role, open, onClose, onNavigate, onOpenMember, on
   const quickActions = useMemo(() => {
     const actions: { key: string; label: string; icon: ComponentType<any>; view: View }[] = [
       { key: "quick-pos", label: "เปิดหน้าร้าน POS", icon: ShoppingCart, view: "pos" },
-      { key: "quick-receive", label: "เปิดหน้าสต็อกสินค้า", icon: PackageSearch, view: "stock" },
+      { key: "quick-receive", label: "รับเข้าสินค้าและเพิ่มสินค้าใหม่", icon: PackageSearch, view: "receive" },
       { key: "quick-register", label: "ลงทะเบียนสมาชิก", icon: UserPlus, view: "members" },
       { key: "quick-reports", label: "ดูรายงานยอดขาย", icon: BarChart3, view: "reports" },
     ];
@@ -173,7 +174,7 @@ export function GlobalSearch({ role, open, onClose, onNavigate, onOpenMember, on
   const sections = SECTION_ORDER.map((section) => ({ section, entries: items.filter((item) => item.section === section) })).filter((group) => group.entries.length > 0);
   let flatIndex = -1;
 
-  return <div className="command-palette-backdrop" onClick={onClose}><div className="command-palette" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="ค้นหาทั่วไป">
+  return <WorkflowDialog title="ค้นหาทั่วไป" onClose={onClose} className="command-palette" backdropClassName="command-palette-backdrop">
     <div className="command-input-row"><Search size={17} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={onKeyDown} placeholder="ค้นหาเมนู สมาชิก สินค้า หรือเลขที่บิล…" aria-label="ค้นหาเมนู สมาชิก สินค้า หรือเลขที่บิล" /></div>
     <div className="command-results" ref={resultsRef}>
       {loading && <div className="command-loading-row">กำลังโหลดข้อมูล…</div>}
@@ -184,5 +185,5 @@ export function GlobalSearch({ role, open, onClose, onNavigate, onOpenMember, on
       </div>)}
     </div>
     <div className="command-footer"><span><kbd>↑</kbd><kbd>↓</kbd> เลื่อนดู</span><span><kbd>↵</kbd> เลือก</span><span><kbd>esc</kbd> ปิด</span></div>
-  </div></div>;
+  </WorkflowDialog>;
 }

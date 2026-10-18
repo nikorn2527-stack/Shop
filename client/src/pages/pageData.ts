@@ -2,7 +2,7 @@ import { memberNumberHead } from "../../../shared/memberNumber";
 import type { ReactNode } from "react";
 import { SquaresFour, ShoppingCart, Package, Users, FileText, Coins } from "@phosphor-icons/react";
 
-export type View = "dashboard" | "pos" | "stock" | "members" | "reports" | "profit" | "settings" | "logs" | "users";
+export type View = "dashboard" | "pos" | "receive" | "stock" | "members" | "reports" | "profit" | "settings" | "logs" | "users";
 /** ROUND 36 (ข้อ 31) — เพิ่ม "dev": บัญชีผู้พัฒนา มีสิทธิ์ระดับผู้บริหารแต่แสดงตัวตนต่างกัน */
 export type Role = "staff" | "admin" | "dev";
 export type CartItem = { id: number; name: string; price: number; qty: number; unit: string; special?: boolean; variant?: string; step?: number };
@@ -128,6 +128,7 @@ export function formatMemberNumber(mode: "running" | "year" | "manual", sequence
 export const navItems: { id: View; label: string; caption: string; icon: React.ComponentType<any>; tileColor: string }[] = [
   { id: "dashboard", label: "ภาพรวม", caption: "สรุปการดำเนินงาน", icon: SquaresFour, tileColor: "#007a55" },
   { id: "pos", label: "หน้าร้าน / POS", caption: "ขายสินค้าและรับชำระ", icon: ShoppingCart, tileColor: "#d97706" },
+  { id: "receive", label: "รับเข้าสินค้า", caption: "รับเข้าคลังและเพิ่มสินค้าใหม่", icon: Package, tileColor: "#334e9a" },
   { id: "stock", label: "สต็อกสินค้า", caption: "รับเข้าและนับสต็อก", icon: Package, tileColor: "#0f766e" },
   { id: "members", label: "สมาชิกและบัญชี", caption: "สมาชิกและเจ้าหน้าที่", icon: Users, tileColor: "#7c3aed" },
   { id: "reports", label: "รายงาน", caption: "เอกสารสรุปและส่งออก", icon: FileText, tileColor: "#0891b2" },

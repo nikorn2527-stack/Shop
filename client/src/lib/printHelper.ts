@@ -80,44 +80,28 @@ export async function printViaHelper(
   htmlContent: string,
   options: PrintOptions = {},
 ): Promise<PrintResult> {
-  if (!printerName) {
-    await printHtmlDocument(htmlContent);
-    return {
-      ok: true,
-      message: "ใช้ Browser Print Dialog — เลือกเครื่องพิมพ์เองในหน้าต่างพิมพ์",
-      usedFallback: true,
-    };
-  }
-
-  try {
-    const res = await fetch(`${HELPER_BASE}/print`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ printerName, content: htmlContent, ...options }),
-    });
-    if (!res.ok) throw new Error(`Helper HTTP ${res.status}`);
-    const data = await res.json();
-    if (data.ok !== true) {
-      await printHtmlDocument(htmlContent);
-      return {
-        ok: true,
-        message: `เปิดหน้าต่างพิมพ์สำรองแล้ว — ${data.message || "เครื่องพิมพ์ไม่รับงานจาก Local Printer Helper"}`,
-        usedFallback: true,
-      };
+  if (printerName) {
+    try {
+      const res = await fetch(`${HELPER_BASE}/print`, {
+        method: "POST",
+        signal: AbortSignal.timeout(8_000),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ printerName, content: htmlContent, ...options }),
+      });
+      if (!res.ok) throw new Error(`Helper HTTP ${res.status}`);
+      const data = await res.json();
+      if (data.ok !== true) throw new Error(data.message || "เครื่องพิมพ์ไม่รับงาน");
+      return { ok: true, message: data.message ?? "ส่งงานพิมพ์แล้ว", usedFallback: false };
+    } catch {
+      // Only the helper failed. Try the browser once; propagate browser failures to the dialog.
     }
-    return {
-      ok: true,
-      message: data.message ?? "ส่งงานพิมพ์แล้ว",
-      usedFallback: false,
-    };
-  } catch {
-    await printHtmlDocument(htmlContent);
-    return {
-      ok: true,
-      message: "⚠️ สั่งพิมพ์ผ่าน Browser (Helper ไม่ทำงาน) — ตรวจสอบว่า printer-helper รันอยู่",
-      usedFallback: true,
-    };
   }
+  await printHtmlDocument(htmlContent);
+  return {
+    ok: true,
+    message: "ปิดหน้าต่างพิมพ์แล้ว · ตรวจเอกสารที่เครื่องพิมพ์ หรือพิมพ์ซ้ำจากประวัติได้",
+    usedFallback: true,
+  };
 }
 
 /** Print only the supplied document, not the application behind its popup. */
@@ -132,10 +116,12 @@ export async function printHtmlDocument(html: string): Promise<void> {
         if (!win) throw new Error("เปิดหน้าต่างพิมพ์ไม่สำเร็จ");
         await win.document.fonts.ready;
         await Promise.all(Array.from(win.document.images, image => image.complete ? Promise.resolve() : new Promise<void>(done => { image.onload = () => done(); image.onerror = () => done(); })));
-        win.addEventListener("afterprint", () => frame.remove(), { once: true });
+        // Closing/cancelling the browser dialog completes this step, not the sale.
+        // Do not destroy the receipt while the browser is still using its fonts/images.
+        const finish = () => { frame.remove(); resolve(); };
+        win.addEventListener("afterprint", finish, { once: true });
         win.focus();
         win.print();
-        resolve();
       } catch (error) { frame.remove(); reject(error); }
     };
     frame.srcdoc = html;

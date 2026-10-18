@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { WorkflowDialog } from "./WorkflowDialog";
+import { useRef, useState } from "react";
 import { blocker } from "./BlockerAlert";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "./ui/dialog";
+import { DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "./ui/dialog";
 import { trpc } from "@/lib/trpc";
 import {
   Camera,
@@ -12,6 +13,7 @@ import {
   X,
 } from "@/lib/icons";
 import {
+  type MemberLite,
   PRENAME_OPTIONS,
   compressImageToDataUrl,
 } from "@/pages/pageData";
@@ -24,11 +26,13 @@ export function MemberRegistrationModal({
   actorRole,
   onClose,
   onRegistered,
+  onUseExisting,
 }: {
   actor: string;
   actorRole: string;
   onClose: () => void;
   onRegistered: (member: MemberCardData) => void;
+  onUseExisting: (member: MemberLite, cardNumber: string, openDetails: boolean) => void;
 }) {
   const utils = trpc.useUtils();
   const settingsQuery = trpc.settings.get.useQuery(undefined);
@@ -46,6 +50,27 @@ export function MemberRegistrationModal({
   const [checkingExisting, setCheckingExisting] = useState(false);
   const [existingMembers, setExistingMembers] = useState<{ memberNumber: string; name: string; status: string; reason: string }[]>([]);
   const [duplicateOpen, setDuplicateOpen] = useState(false);
+  const [openingMember, setOpeningMember] = useState<string | null>(null);
+  const [existingError, setExistingError] = useState("");
+  const checkSequence = useRef(0);
+  const openingRef = useRef(false);
+  const useExisting = async (memberNumber: string, openDetails = false) => {
+    if (openingRef.current || registerMutation.isPending || checkingExisting) return;
+    openingRef.current = true;
+    ++checkSequence.current;
+    setOpeningMember(memberNumber);
+    setExistingError("");
+    try {
+      // Read current card/status before continuing; never overwrite registration data onto this account.
+      const result = await utils.member.detail.fetch({ memberNumber });
+      onUseExisting({ ...result.member, lastTransactionAt: null }, registerForm.cardNumber.trim(), openDetails);
+    } catch (cause) {
+      setExistingError(`เปิดข้อมูลสมาชิกไม่สำเร็จ: ${getErrorMessage(cause)} กรุณาลองอีกครั้ง ข้อมูลที่กรอกยังอยู่ครบ`);
+    } finally {
+      openingRef.current = false;
+      setOpeningMember(null);
+    }
+  };
   const [registerForm, setRegisterForm] = useState({
     prename: "",
     firstName: "",
@@ -62,14 +87,17 @@ export function MemberRegistrationModal({
   });
   const [registerCameraOpen, setRegisterCameraOpen] = useState(false);
   const checkMemberOnBlur = async () => {
-    if (!registerForm.firstName.trim() || !registerForm.lastName.trim() || duplicateOpen || registerMutation.isPending) return;
+    if (!registerForm.firstName.trim() || !registerForm.lastName.trim() || duplicateOpen || openingRef.current || registerMutation.isPending) return;
+    const sequence = ++checkSequence.current;
     try {
       const matches = await utils.member.checkExisting.fetch({ firstName: registerForm.firstName.trim(), lastName: registerForm.lastName.trim(), citizenId: registerForm.idCard.trim() || undefined, phone: registerForm.phone.trim() || undefined });
+      if (sequence !== checkSequence.current || openingRef.current) return;
       if (matches.length) {
         setExistingMembers(matches);
         setDuplicateOpen(true);
       }
     } catch {
+      if (sequence !== checkSequence.current) return;
       fail("ตรวจรายชื่อสมาชิกเดิมไม่ได้", "อินเทอร์เน็ตขัดข้องชั่วคราว — รอสักครู่แล้วพิมพ์ชื่อใหม่อีกครั้ง ระบบจะตรวจให้เอง");
     }
   };
@@ -109,10 +137,29 @@ export function MemberRegistrationModal({
       });
   };
   const submitRegister = async (confirmedDifferentPerson = false) => {
-    if (registerMutation.isPending || checkingExisting || !settingsQuery.data) return;
+    if (registerMutation.isPending || checkingExisting || openingRef.current || !settingsQuery.data) return;
     if (!registerForm.firstName.trim() || !registerForm.lastName.trim()) {
       fail("ยังกรอกชื่อหรือนามสกุลไม่ครบ", "พิมพ์ชื่อและนามสกุลให้ครบทั้งสองช่อง แล้วกดบันทึกอีกครั้ง");
       return;
+    }
+    ++checkSequence.current;
+    setError("");
+    setCheckingExisting(true);
+    try {
+      const matches = await utils.member.checkExisting.fetch({ firstName: registerForm.firstName.trim(), lastName: registerForm.lastName.trim(), citizenId: registerForm.idCard.trim() || undefined, phone: registerForm.phone.trim() || undefined });
+      if (matches.length && (!confirmedDifferentPerson || matches.some(member => member.reason === "citizenId"))) {
+        setExistingMembers(matches);
+        setError("");
+        setDuplicateOpen(true);
+        return;
+      }
+      setExistingMembers([]);
+      setDuplicateOpen(false);
+    } catch (cause) {
+      fail("ตรวจรายชื่อสมาชิกเดิมไม่สำเร็จ", "ระบบยังเชื่อมต่อฐานข้อมูลไม่ได้ — รอสักครู่แล้วบันทึกใหม่อีกครั้ง");
+      return;
+    } finally {
+      setCheckingExisting(false);
     }
     if (numberMode === "manual" && !registerForm.memberNumber.trim()) {
       fail("โหมดกำหนดหมายเลขเอง — ยังไม่ได้ใส่หมายเลขสมาชิก", "พิมพ์หมายเลขที่ต้องการใช้ เช่น VIP-001 แล้วบันทึกใหม่");
@@ -171,24 +218,6 @@ export function MemberRegistrationModal({
       fail("ยังไม่มีบัตรพร้อมใช้สำหรับสมาชิกใหม่", "สแกนหรือกรอกรหัสบัตรที่ขึ้นทะเบียนแล้ว (สถานะว่าง/คืนแล้ว) — ดูรายการบัตรว่างได้ที่ทะเบียนบัตร แล้วบันทึกใหม่");
       return;
     }
-    setError("");
-    setCheckingExisting(true);
-    try {
-      const matches = await utils.member.checkExisting.fetch({ firstName: registerForm.firstName.trim(), lastName: registerForm.lastName.trim(), citizenId: registerForm.idCard.trim() || undefined, phone: registerForm.phone.trim() || undefined });
-      if (matches.length && (!confirmedDifferentPerson || matches.some(member => member.reason === "citizenId"))) {
-        setExistingMembers(matches);
-        setError("");
-        setDuplicateOpen(true);
-        return;
-      }
-      setExistingMembers([]);
-      setDuplicateOpen(false);
-    } catch (cause) {
-      fail("ตรวจรายชื่อสมาชิกเดิมไม่สำเร็จ", "ระบบยังเชื่อมต่อฐานข้อมูลไม่ได้ — รอสักครู่แล้วบันทึกใหม่อีกครั้ง");
-      return;
-    } finally {
-      setCheckingExisting(false);
-    }
     registerMutation.mutate({
       citizenId: registerForm.idCard.trim() || undefined,
       phone: registerForm.phone.trim() || undefined,
@@ -210,25 +239,6 @@ export function MemberRegistrationModal({
 
   return (
     <>
-      <Dialog open={duplicateOpen} onOpenChange={setDuplicateOpen}>
-        <DialogContent className="member-duplicate-dialog" showCloseButton={false}>
-          <DialogHeader>
-            <DialogTitle>พบข้อมูลสมาชิกเดิม</DialogTitle>
-            <DialogDescription>ข้อมูลที่กรอกตรงกับสมาชิกด้านล่าง ยังไม่ได้บันทึกสมาชิกใหม่ หากเป็นคนเดิม ไม่ต้องสมัครซ้ำ ให้ใช้เลขสมาชิกนี้เพื่อจ่ายบัตร</DialogDescription>
-          </DialogHeader>
-          <div className="member-duplicate-list">
-            {existingMembers.map(member => <div className="notice-bar" key={member.memberNumber} style={{ display: "block" }}>
-              <strong>{member.name}</strong>
-              <p>เลขสมาชิก {member.memberNumber} · {member.status === "active" ? "ใช้งาน" : "ระงับการใช้งาน"}</p>
-              <small>{member.reason === "citizenId" ? "เลขบัตรประชาชนตรงกับสมาชิกนี้ จึงไม่สามารถสมัครซ้ำได้" : member.reason === "phone" ? "เบอร์โทรศัพท์ที่กรอกตรงกับสมาชิกนี้ หากใช้เบอร์ร่วมกันและเป็นคนละคน สามารถยืนยันสมัครใหม่ได้" : member.reason === "card" ? "รหัสบัตรซ้ำกับสมาชิกที่ลงทะเบียนไว้แล้ว กรุณาใช้บัญชีเดิม" : "ชื่อและนามสกุลที่กรอกตรงกับสมาชิกนี้ หากเป็นคนละคนที่ชื่อเหมือนกัน สามารถยืนยันสมัครใหม่ได้"}</small>
-            </div>)}
-          </div>
-          <DialogFooter>
-            <button type="button" className="outline-button" disabled={checkingExisting || registerMutation.isPending} onClick={() => setDuplicateOpen(false)}>ปิดคำเตือน — ยังไม่สมัครใหม่</button>
-            {!existingMembers.some(member => member.reason === "citizenId") && <button type="button" className="primary-button" disabled={checkingExisting || registerMutation.isPending} onClick={() => void submitRegister(true)}>เป็นคนละคน — สมัครใหม่</button>}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
       {registerCameraOpen && (
         <CameraCaptureModal
           open
@@ -240,19 +250,7 @@ export function MemberRegistrationModal({
           }}
         />
       )}
-      <div
-        className="modal-backdrop"
-        onClick={() => {
-          if (!registerMutation.isPending) onClose();
-        }}
-      >
-        <div
-          className="form-modal pos-register-modal"
-          role="dialog"
-          aria-modal="true"
-          aria-label="ลงทะเบียนสมาชิกใหม่"
-          onClick={event => event.stopPropagation()}
-        >
+      <WorkflowDialog title="ลงทะเบียนสมาชิกใหม่" onClose={onClose} busy={registerMutation.isPending || checkingExisting || openingMember !== null} className="form-modal pos-register-modal">
           <div className="modal-heading">
             <div>
               <span className="eyebrow">MEMBER REGISTRATION · POS</span>
@@ -261,7 +259,7 @@ export function MemberRegistrationModal({
             <button
               className="icon-button"
               onClick={() => {
-                if (!registerMutation.isPending) onClose();
+                if (!registerMutation.isPending && !checkingExisting && !openingRef.current) onClose();
               }}
               aria-label="ปิดหน้าต่าง"
             >
@@ -517,8 +515,29 @@ export function MemberRegistrationModal({
                 : "บันทึกสมาชิก"}
             </button>
           </div>
-        </div>
-      </div>
+          {duplicateOpen && <WorkflowDialog title="พบข้อมูลสมาชิกเดิม" onClose={() => { ++checkSequence.current; setDuplicateOpen(false); }} busy={openingMember !== null || checkingExisting || registerMutation.isPending} className="form-modal member-duplicate-dialog" backdropClassName="member-duplicate-backdrop">
+          <DialogHeader>
+            <DialogTitle>พบข้อมูลสมาชิกเดิม</DialogTitle>
+            <DialogDescription>ตรวจสอบชื่อและเลขสมาชิกก่อนเลือก ระบบจะใช้บัญชี ยอดเงิน และประวัติเดิม หากยังไม่มีบัตร จะไปขั้นตอนจ่ายบัตร โดยไม่สมัครซ้ำและไม่เติมเงินเริ่มต้นจากฟอร์มนี้</DialogDescription>
+          </DialogHeader>
+          <div className="member-duplicate-list">
+            {existingMembers.map(member => <div className="existing-member-match" key={member.memberNumber}>
+              <strong>{member.name}</strong>
+              <p>เลขสมาชิก {member.memberNumber} · {member.status === "active" ? "ใช้งาน" : "ระงับการใช้งาน"}</p>
+              <small>{member.reason === "citizenId" ? "เลขบัตรประชาชนตรงกับสมาชิกนี้ จึงไม่สามารถสมัครซ้ำได้" : member.reason === "phone" ? "เบอร์โทรศัพท์ที่กรอกตรงกับสมาชิกนี้ หากใช้เบอร์ร่วมกันและเป็นคนละคน สามารถยืนยันสมัครใหม่ได้" : member.reason === "card" ? "รหัสบัตรซ้ำกับสมาชิกที่ลงทะเบียนไว้แล้ว กรุณาใช้บัญชีเดิม" : "ชื่อและนามสกุลที่กรอกตรงกับสมาชิกนี้ หากเป็นคนละคนที่ชื่อเหมือนกัน สามารถยืนยันสมัครใหม่ได้"}</small>
+              <div className="existing-member-actions">
+                <button type="button" className="primary-button" disabled={openingMember !== null || checkingExisting || registerMutation.isPending} onClick={() => void useExisting(member.memberNumber, member.status !== "active")}>{openingMember === member.memberNumber ? "กำลังเปิดข้อมูล…" : member.status === "active" ? "เลือกสมาชิกเดิม · ทำต่อ" : "เปิดข้อมูลสมาชิกที่ถูกระงับ"}</button>
+                {member.status === "active" && <button type="button" className="outline-button" disabled={openingMember !== null || checkingExisting || registerMutation.isPending} onClick={() => void useExisting(member.memberNumber, true)}>ดูข้อมูลสมาชิก</button>}
+              </div>
+            </div>)}
+          </div>
+          {existingError && <p role="alert" className="notice-bar">{existingError}</p>}
+          <DialogFooter>
+            <button type="button" className="outline-button" disabled={openingMember !== null || checkingExisting || registerMutation.isPending} onClick={() => setDuplicateOpen(false)}>กลับไปแก้ข้อมูล</button>
+            {!existingMembers.some(member => ["citizenId", "card"].includes(member.reason)) && <button type="button" className="outline-button" disabled={openingMember !== null || checkingExisting || registerMutation.isPending} onClick={() => void submitRegister(true)}>เป็นคนละคน — สมัครใหม่</button>}
+          </DialogFooter>
+          </WorkflowDialog>}
+        </WorkflowDialog>
     </>
   );
 }

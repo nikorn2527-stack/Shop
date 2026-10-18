@@ -1,3 +1,4 @@
+import { notify } from "@/lib/notifications";
 /**
  * FIX-5 (user) — Bank accounts panel for Settings → Payment tab.
  *
@@ -124,7 +125,7 @@ export function BankAccountsPanel({
   const commitDraft = () => {
     if (!draft) return;
     if (!isComplete(draft)) {
-      toast.error("ข้อมูลไม่ครบ", {
+      notify.error("ข้อมูลไม่ครบ", {
         description: "ต้องกรอกชื่อธนาคาร ชื่อบัญชี และเลขที่บัญชีอย่างน้อย 7 หลัก",
         duration: 4000,
       });
@@ -170,7 +171,7 @@ export function BankAccountsPanel({
         duration: 2200,
       });
     } catch {
-      toast.error("คัดลอกไม่สำเร็จ", { description: text, duration: 4000 });
+      notify.error("คัดลอกไม่สำเร็จ", { description: text, duration: 4000 });
     }
   };
 

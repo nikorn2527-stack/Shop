@@ -51,6 +51,7 @@ import { KeyboardShortcutsOverlay, ShortcutsFab } from "@/components/KeyboardSho
 import { Dashboard } from "../pages/Dashboard";
 import { Pos } from "../pages/Pos";
 import { Stock } from "../pages/Stock";
+import { ConfirmDialog } from "../pages/PagePrimitives";
 import { Users } from "../pages/Users";
 import { trpc } from "@/lib/trpc";
 import {
@@ -116,7 +117,13 @@ export function AppShell({
   onLogout,
   viewComponents: { Members, Reports, Settings, Logs },
 }: AppShellProps) {
-  const [activeView, setActiveView] = useState<View>("dashboard");
+  const [activeView, commitView] = useState<View>("dashboard");
+  const [receiveDirty, setReceiveDirty] = useState(false);
+  const [pendingView, setPendingView] = useState<View | null>(null);
+  const setActiveView = (view: View) => {
+    if (activeView === "receive" && receiveDirty && view !== "receive") { setPendingView(view); return; }
+    commitView(view);
+  };
   // ROUND 61 — ป้ายเวอร์ชัน sidebar กดแล้วพาไปแท็บ “เวอร์ชันและลิขสิทธิ์” โดยตรง
   const [settingsFocusTab, setSettingsFocusTab] = useState<SettingsTab | null>(
     null
@@ -475,8 +482,9 @@ export function AppShell({
 
   return (
     <SharedSearchProvider>
+      <ConfirmDialog open={pendingView !== null} tone="warning" title="ออกจากรายการรับเข้าที่ยังไม่บันทึก?" description="รายการที่กำลังกรอกจะหายไป หากต้องการเก็บรายการให้กลับไปยืนยันรับเข้าก่อน" confirmLabel="ทิ้งรายการและเปลี่ยนหน้า" onCancel={() => setPendingView(null)} onConfirm={() => { if (pendingView) commitView(pendingView); setPendingView(null); setReceiveDirty(false); }} />
     <div
-      className={safeView === "pos" ? "app-shell pos-terminal" : "app-shell"}
+      className={safeView === "pos" ? "app-shell pos-terminal" : safeView === "receive" ? "app-shell receiving-mode" : "app-shell"}
     >
       {safeView === "pos" && (
         <aside className="pos-rail" aria-label="เมนูด่วนหน้าร้าน">
@@ -730,6 +738,7 @@ export function AppShell({
             <button
               className={safeView === id ? "active" : ""}
               data-nav-item={id}
+              aria-current={safeView === id ? "page" : undefined}
               key={id}
               title={`${label} — ${caption}`}
               onClick={() => {
@@ -865,9 +874,15 @@ export function AppShell({
               userName={profileName}
               focusProductId={pendingProductId}
               onFocusProductConsumed={() => setPendingProductId(null)}
+              onOpenMember={memberNumber => {
+                setPendingMemberNumber(memberNumber);
+                setMemberSection("members");
+                setActiveView("members");
+              }}
             />
           )}
           {safeView === "stock" && <Stock role={role} userName={profileName} />}
+          {safeView === "receive" && <Stock role={role} userName={profileName} receivingPage onDraftChange={setReceiveDirty} onClose={() => commitView("stock")} />}
           {safeView === "members" && (
             <Members
               role={role}

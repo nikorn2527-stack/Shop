@@ -453,7 +453,12 @@ export function Members({
           onClose={() => setBatchCardOpen(false)}
         />
       )}
-      {registrationOpen && <MemberRegistrationModal actor={actor} actorRole={actorRole} onClose={() => setRegistrationOpen(false)} onRegistered={member => {
+      {registrationOpen && <MemberRegistrationModal actor={actor} actorRole={actorRole} onClose={() => setRegistrationOpen(false)} onUseExisting={member => {
+        setRegistrationOpen(false);
+        setQuery("");
+        setStatusFilter("ทั้งหมด");
+        setSelectedMember(member);
+      }} onRegistered={member => {
         setRegistrationOpen(false);
         setQuery("");
         setStatusFilter("ทั้งหมด");

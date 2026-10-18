@@ -1,3 +1,4 @@
+import { notify } from "@/lib/notifications";
 import { ActionButton } from "@/components/ActionButton";
 import { INVENTORY_ACTION_LABELS } from "@/lib/inventoryActions";
 import { SharedSearch } from "@/components/SharedSearch";
@@ -738,7 +739,7 @@ export function Settings({
         })
       )
       .catch(() =>
-        toast.error("คัดลอกไม่สำเร็จ", {
+        notify.error("คัดลอกไม่สำเร็จ", {
           description: `คัดลอกด้วยตนเอง: ${text}`,
         })
       );
@@ -752,14 +753,14 @@ export function Settings({
   const [restoreTarget, setRestoreTarget] = useState<string | null>(null);
   const createBackupMutation = trpc.backup.create.useMutation({
     onSuccess: data => {
-      toast.success("สำรองข้อมูลเรียบร้อย", {
+      notify.completed("สำรองข้อมูลเรียบร้อย", {
         description: `${data.file} · ${formatFileSize(data.sizeBytes)} · ตรวจสอบความถูกต้องผ่าน (เก็บตามจำนวนที่ตั้งไว้ ${data.keepCount} ไฟล์)`,
         duration: 5000,
       });
       void backupQuery.refetch();
     },
     onError: mutationError =>
-      toast.error("สำรองข้อมูลไม่สำเร็จ", {
+      notify.error("สำรองข้อมูลไม่สำเร็จ", {
         description: getErrorMessage(mutationError),
       }),
   });
@@ -781,20 +782,20 @@ export function Settings({
           description: `${data.file} · ${formatFileSize(data.sizeBytes)} — เก็บไว้นอกเครื่อง เช่น USB หรือคลาวด์ กันกรณีเครื่องพัง`,
         });
       } catch {
-        toast.error("เปิดไฟล์สำรองไม่สำเร็จ", {
+        notify.error("เปิดไฟล์สำรองไม่สำเร็จ", {
           description: "ลองดาวน์โหลดอีกครั้ง",
         });
       }
     },
     onError: mutationError =>
-      toast.error("ดาวน์โหลดไม่สำเร็จ", {
+      notify.error("ดาวน์โหลดไม่สำเร็จ", {
         description: getErrorMessage(mutationError),
       }),
   });
   const restoreBackupMutation = trpc.backup.restore.useMutation({
     onSuccess: async data => {
       setRestoreTarget(null);
-      toast.success("กู้คืนข้อมูลเรียบร้อย", {
+      notify.completed("กู้คืนข้อมูลเรียบร้อย", {
         description: `ระบบสำรองไฟล์ป้องกันไว้ก่อน (${data.safetyBackupFile}) แล้วเปลี่ยนฐานข้อมูลเป็นไฟล์ที่เลือก — ข้อมูลทั้งระบบกลับมาเป็นช่วงเวลาของไฟล์สำรองนั้น`,
         duration: 6500,
       });
@@ -803,7 +804,7 @@ export function Settings({
     },
     onError: mutationError => {
       setRestoreTarget(null);
-      toast.error("กู้คืนไม่สำเร็จ", {
+      notify.error("กู้คืนไม่สำเร็จ", {
         description: getErrorMessage(mutationError),
         duration: 5500,
       });
@@ -813,7 +814,7 @@ export function Settings({
   const uploadBackupInputRef = useRef<HTMLInputElement | null>(null);
   const uploadBackupMutation = trpc.backup.upload.useMutation({
     onSuccess: async data => {
-      toast.success("อัปโหลดไฟล์สำเร็จ — ตรวจความถูกต้องผ่านแล้ว", {
+      notify.completed("อัปโหลดไฟล์สำเร็จ — ตรวจความถูกต้องผ่านแล้ว", {
         description: `${data.file} · ${formatFileSize(data.sizeBytes)} — อยู่ใน “ไฟล์สำรองทั้งหมด” ด้านล่างแล้ว กด “กู้คืน” เพื่อนำข้อมูลชุดนี้กลับมาใช้งานทั้งระบบ`,
         duration: 9000,
       });
@@ -821,7 +822,7 @@ export function Settings({
       void backupQuery.refetch();
     },
     onError: mutationError =>
-      toast.error("อัปโหลดไฟล์ไม่สำเร็จ", {
+      notify.error("อัปโหลดไฟล์ไม่สำเร็จ", {
         description: getErrorMessage(mutationError),
         duration: 7000,
       }),
@@ -829,13 +830,13 @@ export function Settings({
   const startUploadBackupFile = (file: File | null | undefined) => {
     if (!file) return;
     if (!/\.sqlite$/i.test(file.name)) {
-      toast.error("รองรับเฉพาะไฟล์ .sqlite", {
+      notify.error("รองรับเฉพาะไฟล์ .sqlite", {
         description: `ได้รับไฟล์ ${file.name} — เลือกไฟล์ welfare-store.sqlite ของระบบเท่านั้น`,
       });
       return;
     }
     if (file.size > 200 * 1024 * 1024) {
-      toast.error("ไฟล์ใหญ่เกิน 200MB", {
+      notify.error("ไฟล์ใหญ่เกิน 200MB", {
         description:
           "ตรวจอีกครั้งว่าเลือกไฟล์ฐานข้อมูลของระบบร้านค้าสวัสดิการถูกตัว",
       });
@@ -845,7 +846,7 @@ export function Settings({
     reader.onload = () => {
       const dataBase64 = String(reader.result ?? "").split(",")[1] ?? "";
       if (!dataBase64) {
-        toast.error("อ่านไฟล์ไม่สำเร็จ", {
+        notify.error("อ่านไฟล์ไม่สำเร็จ", {
           description: "ลองเลือกไฟล์ใหม่อีกครั้ง",
         });
         return;
@@ -899,7 +900,7 @@ export function Settings({
     },
     onError: mutationError => {
       setImportSheets(null);
-      toast.error("อ่านไฟล์ไม่สำเร็จ", {
+      notify.error("อ่านไฟล์ไม่สำเร็จ", {
         description: getErrorMessage(mutationError),
         duration: 5000,
       });
@@ -910,12 +911,12 @@ export function Settings({
       setImportConfirm(false);
       setImportResult(data);
       if (data.errors.length === 0) {
-        toast.success("นำเข้าข้อมูลเรียบร้อย", {
+        notify.completed("นำเข้าข้อมูลเรียบร้อย", {
           description: `เพิ่มใหม่ ${data.inserted.toLocaleString("th-TH")} · อัปเดต ${data.updated.toLocaleString("th-TH")} · ข้าม ${data.skipped.toLocaleString("th-TH")} รายการ — สำรองไฟล์ป้องกันไว้ก่อนนำเข้าแล้ว`,
           duration: 6000,
         });
       } else {
-        toast.warning("นำเข้าเสร็จแล้ว — มีบางแถวที่ผิดพลาด", {
+        notify.warning("นำเข้าเสร็จแล้ว — มีบางแถวที่ผิดพลาด", {
           description: `สำเร็จ ${data.inserted + data.updated} · ข้าม ${data.skipped} · ผิดพลาด ${data.errors.length} แถว — ดูรายละเอียดที่ผลลัพธ์ด้านล่าง`,
           duration: 7000,
         });
@@ -924,7 +925,7 @@ export function Settings({
     },
     onError: mutationError => {
       setImportConfirm(false);
-      toast.error("นำเข้าข้อมูลไม่สำเร็จ", {
+      notify.error("นำเข้าข้อมูลไม่สำเร็จ", {
         description: getErrorMessage(mutationError),
         duration: 6000,
       });
@@ -950,24 +951,24 @@ export function Settings({
           description: `${data.fileName} — เติมข้อมูลตามหัวคอลัมน์ แล้วกลับมาอัปโหลดที่นี่`,
         });
       } catch {
-        toast.error("เปิดไฟล์เทมเพลตไม่สำเร็จ");
+        notify.error("เปิดไฟล์เทมเพลตไม่สำเร็จ");
       }
     },
     onError: mutationError =>
-      toast.error("ดาวน์โหลดเทมเพลตไม่สำเร็จ", {
+      notify.error("ดาวน์โหลดเทมเพลตไม่สำเร็จ", {
         description: getErrorMessage(mutationError),
       }),
   });
   const startImportFile = (file: File | null | undefined) => {
     if (!file) return;
     if (!/\.(xlsx|xls|csv)$/i.test(file.name)) {
-      toast.error("รองรับเฉพาะไฟล์ .xlsx .xls .csv", {
+      notify.error("รองรับเฉพาะไฟล์ .xlsx .xls .csv", {
         description: `ได้รับไฟล์ ${file.name}`,
       });
       return;
     }
     if (file.size > 5_000_000) {
-      toast.error("ไฟล์ใหญ่เกิน 5MB", {
+      notify.error("ไฟล์ใหญ่เกิน 5MB", {
         description: "แบ่งข้อมูลเป็นหลายไฟล์ แล้วนำเข้าทีละไฟล์",
       });
       return;
@@ -976,7 +977,7 @@ export function Settings({
     reader.onload = () => {
       const base64 = String(reader.result ?? "").split(",")[1] ?? "";
       if (!base64) {
-        toast.error("อ่านไฟล์ไม่สำเร็จ", {
+        notify.error("อ่านไฟล์ไม่สำเร็จ", {
           description: "ลองเลือกไฟล์ใหม่อีกครั้ง",
         });
         return;
@@ -1191,7 +1192,7 @@ export function Settings({
     onError: mutationError => {
       const message = getErrorMessage(mutationError);
       setError(message);
-      toast.error("บันทึกไม่สำเร็จ", { description: message, duration: Infinity });
+      notify.error("บันทึกไม่สำเร็จ", { description: message, duration: Infinity });
     },
   });
   const updateForm = (patch: Partial<SettingsForm>) =>
@@ -1239,7 +1240,7 @@ export function Settings({
     if (!form) return;
     const promptpayId = promptPayDraft.trim();
     if (promptpayId && !isValidPromptPayId(promptpayId)) {
-      toast.error("เลขพร้อมเพย์ไม่ถูกต้อง", { description: "ใช้เบอร์โทร 9–10 หลัก หรือเลขประจำตัวประชาชน 13 หลัก" });
+      notify.error("เลขพร้อมเพย์ไม่ถูกต้อง", { description: "ใช้เบอร์โทร 9–10 หลัก หรือเลขประจำตัวประชาชน 13 หลัก" });
       return;
     }
     saveMutation.mutate(
@@ -1263,14 +1264,14 @@ export function Settings({
   const copyPromptPay = async () => {
     const promptpayId = form?.promptpayId.trim() ?? "";
     if (!promptpayId) {
-      toast.error("ยังไม่มีเลขพร้อมเพย์ให้คัดลอก");
+      notify.error("ยังไม่มีเลขพร้อมเพย์ให้คัดลอก");
       return;
     }
     try {
       await navigator.clipboard.writeText(promptpayId);
       toast.success("คัดลอกเลขพร้อมเพย์แล้ว", { duration: 2200 });
     } catch {
-      toast.error("คัดลอกไม่สำเร็จ", { description: promptpayId, duration: 4000 });
+      notify.error("คัดลอกไม่สำเร็จ", { description: promptpayId, duration: 4000 });
     }
   };
   const togglePromptPay = () => {

@@ -1,3 +1,4 @@
+import { WorkflowDialog } from "./WorkflowDialog";
 import { useEffect, useMemo, useState } from "react";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
@@ -213,7 +214,7 @@ export function MemberCardModal({
       document.body.removeChild(link);
     } finally { setBusy(""); }
   };
-  return <div className="modal-backdrop" onClick={onClose}><div className={`member-card-modal${confirmForBill ? " confirm-mode" : ""}`} onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label={confirmForBill ? "ยืนยันข้อมูลสมาชิกก่อนทำรายการ" : "บัตรสมาชิก"}>
+  return <WorkflowDialog title={confirmForBill ? "ยืนยันข้อมูลสมาชิกก่อนทำรายการ" : "บัตรสมาชิก"} onClose={onClose} className={`member-card-modal${confirmForBill ? " confirm-mode" : ""}`}>
     <div className="modal-heading">
       <div>
         <span className="eyebrow">{confirmForBill ? "MEMBER VERIFICATION · SCAN" : "MEMBER WALLET CARD"}</span>
@@ -261,7 +262,7 @@ export function MemberCardModal({
         <button className="outline-button" disabled={busy !== ""} onClick={downloadCardPng} title="ดาวน์โหลดบัตรเป็น PNG ความละเอียดสูง 1440×880px (ส่งไลน์/ตรวจภาพ/พิมพ์ด่วน)"><FileImage size={16} /> {busy === "png" ? "กำลังสร้าง PNG..." : "ดาวน์โหลด PNG"}</button>
       </>}
     </div>
-  </div></div>;
+  </WorkflowDialog>;
 }
 
 /**
@@ -312,7 +313,7 @@ export function MemberCardBatchModal({
     return out.length === 0 ? [[]] : out;
   }, [members, capacity]);
 
-  return <div className="modal-backdrop" onClick={onClose}><div className="member-card-modal member-card-batch-modal" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true" aria-label="พิมพ์บัตรสมาชิกหลายคนพร้อมกัน">
+  return <WorkflowDialog title="พิมพ์บัตรสมาชิกหลายคนพร้อมกัน" onClose={onClose} className="member-card-modal member-card-batch-modal">
     <div className="modal-heading">
       <div>
         <span className="eyebrow">MEMBER CARD · BATCH PRINT</span>
@@ -410,5 +411,5 @@ export function MemberCardBatchModal({
         ))}
       </div>
     )}
-  </div></div>;
+  </WorkflowDialog>;
 }

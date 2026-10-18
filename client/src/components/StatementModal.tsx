@@ -1,3 +1,4 @@
+import { WorkflowDialog } from "./WorkflowDialog";
 import { useEffect, useMemo, useState } from "react";
 import { Download, FileText, Printer, X } from "@/lib/icons";
 import { money } from "../pages/pageData";
@@ -129,26 +130,11 @@ export function StatementModal({ member, transactions, onClose }: { member: Stat
   const downloadPdf = async () => { setBusy(true); try { await downloadReportPdf(config); } finally { setBusy(false); } };
   const printStatement = () => { printReportDoc(config); };
 
-  useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
-      if (event.key !== "Enter") return;
-      const target = event.target as HTMLElement;
-      const tag = target?.tagName?.toLowerCase();
-      if (tag === "input" || tag === "textarea" || tag === "select") return;
-      event.preventDefault();
-      printReportDoc(config);
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [config]);
 
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
 
-  return <div className="modal-backdrop" onClick={onClose}><div className="statement-modal" onClick={(event) => event.stopPropagation()}>
+
+
+  return <WorkflowDialog title="รายการเดินบัญชีสมาชิก" onClose={onClose} className="statement-modal">
     <div className="modal-heading">
       <div>
         <span className="eyebrow">MEMBER STATEMENT</span>
@@ -165,5 +151,5 @@ export function StatementModal({ member, transactions, onClose }: { member: Stat
       <button className="outline-button statement-export-pdf" disabled={busy} onClick={downloadPdf} title="ดาวน์โหลดรายงานเป็น PDF vector (เหมือนรายงานอื่น)"><Download size={16} /> {busy ? "กำลังสร้าง PDF..." : "ดาวน์โหลด PDF"}</button>
       <button className="outline-button statement-export-print" onClick={printStatement} title="พิมพ์รายงาน A4"><Printer size={16} /> พิมพ์รายงาน</button>
     </div>
-  </div></div>;
+  </WorkflowDialog>;
 }

@@ -1,3 +1,4 @@
+import { WorkflowDialog } from "./WorkflowDialog";
 import { useEffect, useMemo } from "react";
 import { FileSpreadsheet, FileText, Printer, Table2, X } from "@/lib/icons";
 import type { ReportDocConfig } from "@/reportDoc";
@@ -52,13 +53,7 @@ export function ExportPreviewModal({
   onClose: () => void;
   onRun: (format: ExportFormat) => void;
 }) {
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+
 
   const docHtml = useMemo(
     () => buildReportDocumentHtml(state.doc, { mode: "preview", stampText: `พรีวิวเมื่อ ${thaiStamp(new Date())}` }),
@@ -66,8 +61,7 @@ export function ExportPreviewModal({
   );
 
   return (
-    <div className="modal-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-label={`พรีวิวก่อนส่งออก ${state.title}`}>
-      <div className="form-modal export-preview-modal" onClick={(event) => event.stopPropagation()}>
+    <WorkflowDialog title={`พรีวิวก่อนส่งออก ${state.title}`} onClose={onClose} className="form-modal export-preview-modal">
         <div className="modal-heading">
           <div>
             <span className="eyebrow">EXPORT PREVIEW</span>
@@ -103,7 +97,6 @@ export function ExportPreviewModal({
             <X size={15} /> ปิด
           </button>
         </div>
-      </div>
-    </div>
+      </WorkflowDialog>
   );
 }
