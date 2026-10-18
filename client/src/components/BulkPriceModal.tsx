@@ -358,6 +358,6 @@ export function BulkPriceModal({ open, products, actor, actorRole, onClose, onDo
         </div>
       </WorkflowDialog>
  <ConfirmDialog open={reviewOpen} tone="warning" title="ยืนยันปรับราคาและต้นทุน?" description={`กำลังเปลี่ยนข้อมูลสินค้า ${dirtyCount} รายการ ราคาขายใหม่จะใช้กับบิลถัดไป และระบบจะบันทึกประวัติการเปลี่ยนแปลง`} confirmLabel={`ยืนยันบันทึก ${dirtyCount} รายการ`} pending={bulkMutation.isPending} onCancel={() => setReviewOpen(false)} onConfirm={() => { if (!bulkMutation.isPending) bulkMutation.mutate({ items: payload, actor, actorRole }); }} />
- <ConfirmDialog open={discardOpen} tone="warning" title="ทิ้งราคาที่ยังไม่ได้บันทึก?" description={`มี ${dirtyCount} รายการที่แก้ไขไว้ การปิดจะไม่บันทึกการเปลี่ยนแปลง`} confirmLabel="ทิ้งการแก้ไขและปิด" onCancel={() => setDiscardOpen(false)} onConfirm={() => { setDiscardOpen(false); onClose(); }} /></>
+ <ConfirmDialog open={discardOpen} tone="danger" title="ทิ้งราคาที่ยังไม่ได้บันทึก?" description={`มี ${dirtyCount} รายการที่แก้ไขไว้ การปิดจะไม่บันทึกการเปลี่ยนแปลง`} confirmLabel="ทิ้งการแก้ไขและปิด" onCancel={() => setDiscardOpen(false)} onConfirm={() => { setDiscardOpen(false); onClose(); }} /></>
   );
 }

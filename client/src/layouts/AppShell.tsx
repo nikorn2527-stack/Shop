@@ -482,7 +482,7 @@ export function AppShell({
 
   return (
     <SharedSearchProvider>
-      <ConfirmDialog open={pendingView !== null} tone="warning" title="ออกจากรายการรับเข้าที่ยังไม่บันทึก?" description="รายการที่กำลังกรอกจะหายไป หากต้องการเก็บรายการให้กลับไปยืนยันรับเข้าก่อน" confirmLabel="ทิ้งรายการและเปลี่ยนหน้า" onCancel={() => setPendingView(null)} onConfirm={() => { if (pendingView) commitView(pendingView); setPendingView(null); setReceiveDirty(false); }} />
+      <ConfirmDialog open={pendingView !== null} tone="danger" title="ออกจากรายการรับเข้าที่ยังไม่บันทึก?" description="รายการที่กำลังกรอกจะหายไป หากต้องการเก็บรายการให้กลับไปยืนยันรับเข้าก่อน" confirmLabel="ทิ้งรายการและเปลี่ยนหน้า" onCancel={() => setPendingView(null)} onConfirm={() => { if (pendingView) commitView(pendingView); setPendingView(null); setReceiveDirty(false); }} />
     <div
       className={safeView === "pos" ? "app-shell pos-terminal" : safeView === "receive" ? "app-shell receiving-mode" : "app-shell"}
     >

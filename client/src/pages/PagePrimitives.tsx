@@ -45,7 +45,7 @@ export function SectionHeader({ eyebrow, title, description, action }: { eyebrow
 
 export type ConfirmDialogTone = "primary" | "warning" | "danger";
 
-export function ConfirmDialog({ open, title, description, confirmLabel, onCancel, onConfirm, pending = false, error, tone = "danger" }: { open: boolean; title: string; description: string; confirmLabel: string; onCancel: () => void; onConfirm: () => void; pending?: boolean; error?: string; tone?: ConfirmDialogTone }) {
+export function ConfirmDialog({ open, title, description, confirmLabel, onCancel, onConfirm, pending = false, error, tone }: { open: boolean; title: string; description: string; confirmLabel: string; onCancel: () => void; onConfirm: () => void; pending?: boolean; error?: string; tone: ConfirmDialogTone }) {
   if (!open) return null;
   return <FeedbackDialog tone={tone === "primary" ? "confirm" : tone} title={title} description={description} onClose={onCancel} onCancel={onCancel} onAction={onConfirm} pending={pending} error={error} actionLabel={confirmLabel} className="confirm-modal" actionClassName="confirm-button" />;
 }

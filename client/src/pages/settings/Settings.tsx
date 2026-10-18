@@ -4293,7 +4293,7 @@ export function Settings({
             onCancel={() => setImportConfirm(false)}
             onConfirm={runImport}
           />
-          <ConfirmDialog
+          <ConfirmDialog tone="danger"
             open={restoreTarget !== null}
             title="ยืนยันการกู้คืนข้อมูลจากไฟล์สำรอง?"
             description={`ข้อมูลทั้งระบบจะกลับไปเป็นช่วงเวลาของไฟล์สำรองนี้ (${restoreTarget ?? ""}) — ทุกอย่างที่ทำหลังจากนั้นจะถูกแทนที่ · ระบบจะสำรองข้อมูลปัจจุบันไว้เป็นไฟล์ป้องกันก่อนเสมอ และบันทึกการกู้คืนลง Log เป็นสีแดง · หากไฟล์สำรองเก่ากว่าเซสชันที่ใช้อยู่ อาจต้องเข้าสู่ระบบใหม่หลังกู้คืน`}

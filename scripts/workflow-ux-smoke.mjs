@@ -88,6 +88,7 @@ async function cashSale() {
   await click('รับตรงยอด', '.pay-confirm-modal');
   assert.equal(await page.$eval('.pay-confirm-button', b => getComputedStyle(b).backgroundColor), 'rgb(255, 237, 213)');
   await click('ยืนยันการชำระเงิน', '.pay-confirm-modal'); await page.waitForSelector('#receipt-paper');
+  assert.equal(await page.$eval('.receipt-finish-action', button => getComputedStyle(button).backgroundColor), 'rgb(6, 199, 85)', 'The completed-sale finish action is LINE green');
 }
 try {
   let ready = false;
@@ -189,6 +190,10 @@ try {
   const inventoryRow = await page.evaluateHandle(name => [...document.querySelectorAll('tr.clickable[title^="ดูล็อตและจัดการ"]')].find(row => row.textContent.includes(name)), product.name);
   assert.ok(inventoryRow.asElement()); await inventoryRow.asElement().click(); await inventoryRow.dispose();
   await page.waitForSelector('.stock-detail-modal');
+  assert.equal(await page.$eval('.stock-detail-modal [data-action-tone="warning"]', button => getComputedStyle(button).backgroundColor), 'rgb(255, 251, 235)');
+  await click('ปิดการขาย', '.stock-detail-modal'); await page.waitForSelector('.feedback-dialog .blocker-icon.warning');
+  await click('ยกเลิก', '.feedback-dialog');
+  assert.equal(query('SELECT active FROM products WHERE id=?', product.id).active, 1, 'Cancelling sale suspension leaves the product active');
   await click('แก้ไขข้อมูล', '.stock-detail-modal'); await page.waitForSelector('.stock-edit-modal');
   assert.equal(await page.$('.stock-detail-modal'), null, 'Inventory detail is replaced rather than covering the editor');
   assert.equal(await page.$$eval('.modal-backdrop', overlays => overlays.filter(overlay => overlay.getClientRects().length).length), 1, 'Only one visible overlay');
@@ -258,6 +263,7 @@ try {
   await fill('.receiving-workspace .member-scan-field input', product.sku); await page.keyboard.press('Enter');
   await page.waitForFunction(() => !!document.querySelector('#receive-editor-qty:not(:disabled)'));
   await page.click('[data-nav-item="reports"]'); await page.waitForSelector('.confirm-modal');
+  assert.equal(await page.$eval('.confirm-modal .confirm-button', button => getComputedStyle(button).backgroundColor), 'rgb(220, 38, 38)', 'Discarding unsaved data is destructive red');
   await click('ยกเลิก', '.confirm-modal'); assert.ok(await page.$('.receiving-workspace'));
   await page.click('[data-nav-item="reports"]'); await page.waitForSelector('.confirm-modal'); await click('ทิ้งรายการ', '.confirm-modal');
   await page.waitForFunction(() => !document.querySelector('.receiving-workspace'));
@@ -305,8 +311,21 @@ try {
   assert.equal(query('SELECT balance FROM members WHERE member_number=?', member.member_number).balance, member.balance + 11);
   await acknowledge(); await click('ยืนยันการทำรายการ', '.wallet-modal'); await page.waitForSelector('.wallet-success');
   assert.equal(query('SELECT balance FROM members WHERE member_number=?', member.member_number).balance, member.balance + 11, 'Retry does not credit the wallet twice');
+  assert.equal(await page.$eval('.wallet-modal [data-action-tone="success"]', button => getComputedStyle(button).backgroundColor), 'rgb(6, 199, 85)');
   await click('เสร็จสิ้น', '.wallet-modal'); await page.waitForFunction(() => !document.querySelector('.wallet-modal'));
   passed('wallet reply loss can retry once without duplicate credit; nested camera closes without dismissing the wallet');
+
+  const beforeWithdrawal = query('SELECT balance FROM members WHERE member_number=?', member.member_number).balance;
+  await click('ถอนเงิน', '.pos-rail'); await page.waitForSelector('.wallet-modal');
+  await fill('.wallet-modal .member-scan-field input', member.member_number); await page.keyboard.press('Enter');
+  await page.waitForSelector('.wallet-modal .member-scan-chip');
+  await fill('.wallet-modal input[type="number"]', 1);
+  await click('ต่อไป: ตรวจสอบรายการ', '.wallet-modal');
+  assert.equal(await page.$eval('.wallet-modal [data-action-tone="warning"]', button => getComputedStyle(button).backgroundColor), 'rgb(255, 251, 235)', 'Withdrawal confirmation uses caution rather than success color');
+  await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.wallet-modal'));
+  assert.equal(query('SELECT balance FROM members WHERE member_number=?', member.member_number).balance, beforeWithdrawal, 'Cancelling withdrawal does not debit the member');
+  passed('function-based actions: suspend is caution, discard is red, completed actions are LINE green, withdrawal cancellation preserves balance');
 
   const lastBill = query('SELECT order_number FROM sales ORDER BY id DESC LIMIT 1').order_number;
   await page.keyboard.down('Control'); await page.keyboard.press('k'); await page.keyboard.up('Control');

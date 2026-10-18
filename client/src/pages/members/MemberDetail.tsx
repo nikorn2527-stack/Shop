@@ -1356,7 +1356,7 @@ export function MemberDetail({
           }}
         />
       )}
-      <ConfirmDialog
+      <ConfirmDialog tone="danger"
         open={confirmDelete}
         title="ยืนยันการลบสมาชิก?"
         description={`ลบ ${displayName} (${member.memberNumber}) ออกจากระบบถาวร · ลบได้เฉพาะบัญชีที่ยอดเงินเป็น 0 และไม่มีประวัติธุรกรรม หากมีประวัติการใช้งาน แนะนำใช้การระงับการใช้งานแทน`}
