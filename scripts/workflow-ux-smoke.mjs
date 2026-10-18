@@ -60,12 +60,12 @@ async function click(text, scope = 'body') {
   await button.click(); await handle.dispose();
 }
 async function fill(selector, value) {
-  const input = await page.waitForSelector(selector); await input.click({ clickCount: 3 }); await input.press('Backspace'); await input.type(String(value));
+  const input = await page.waitForSelector(selector); await input.click(); await page.keyboard.down('Control'); await page.keyboard.press('A'); await page.keyboard.up('Control'); await input.press('Backspace'); await input.type(String(value));
 }
 async function fillLabel(text, value) {
   const handle = await page.evaluateHandle(text => [...document.querySelectorAll('.workflow-dialog label')].find(label => label.textContent.trim().startsWith(text))?.querySelector('input'), text);
   const input = handle.asElement(); assert.ok(input, `Missing field: ${text}`);
-  await input.click({ clickCount: 3 }); await input.press('Backspace'); await input.type(String(value)); await handle.dispose();
+  await input.click(); await page.keyboard.down('Control'); await page.keyboard.press('A'); await page.keyboard.up('Control'); await input.press('Backspace'); await input.type(String(value)); await handle.dispose();
 }
 async function visible(selector) {
   return page.$eval(selector, element => {
@@ -180,6 +180,44 @@ try {
   assert.equal(query('SELECT COUNT(*) n FROM members').n, originalMemberCount);
   assert.ok(await page.evaluate(sku => JSON.parse(localStorage.getItem('png-held-bills-v1') || '[]').some(bill => bill.items.some(item => item.id === sku)), product.id), 'Current cart is preserved before member navigation');
   passed('suspended existing member: open details without reactivation or duplication; preserve current POS cart');
+
+  // Regression: a legacy edit overlay was displayed behind the portalled inventory card.
+  await page.click('[data-nav-item="stock"]');
+  await page.waitForSelector('tr.clickable[title^="ดูล็อตและจัดการ"]');
+  const inventoryRow = await page.evaluateHandle(name => [...document.querySelectorAll('tr.clickable[title^="ดูล็อตและจัดการ"]')].find(row => row.textContent.includes(name)), product.name);
+  assert.ok(inventoryRow.asElement()); await inventoryRow.asElement().click(); await inventoryRow.dispose();
+  await page.waitForSelector('.stock-detail-modal');
+  await click('แก้ไขข้อมูล', '.stock-detail-modal'); await page.waitForSelector('.stock-edit-modal');
+  assert.equal(await page.$('.stock-detail-modal'), null, 'Inventory detail is replaced rather than covering the editor');
+  assert.equal(await page.$$eval('.modal-backdrop', overlays => overlays.filter(overlay => overlay.getClientRects().length).length), 1, 'Only one visible overlay');
+  assert.equal(await page.$eval('.stock-edit-modal', dialog => dialog.contains(document.activeElement)), true, 'Editor receives focus');
+  const editName = await page.waitForSelector('.stock-edit-modal input');
+  const namePoint = await editName.boundingBox();
+  assert.equal(await page.evaluate(({x,y}) => document.elementFromPoint(x,y)?.closest('.stock-edit-modal') !== null, { x: namePoint.x + 8, y: namePoint.y + 8 }), true, 'Editor is actually on top and clickable');
+  const unchangedProduct = query('SELECT name,price,cost,stock FROM products WHERE id=?', product.id);
+  await pause(350); await page.screenshot({ path: path.join(dir, 'stock-edit-visible.png') });
+  await fill('.stock-edit-modal input', 'Cancelled UI edit');
+  const screenColors = await page.$eval('.stock-edit-modal', dialog => {
+    const button = dialog.querySelector('.primary-button');
+    return { actionBackground: getComputedStyle(button).backgroundColor, actionColor: getComputedStyle(button).color, buttonFilter: getComputedStyle(button).filter, overlay: getComputedStyle(dialog.parentElement).backgroundColor, blur: getComputedStyle(dialog.parentElement).backdropFilter };
+  });
+  assert.equal(screenColors.actionBackground, 'rgb(204, 251, 241)');
+  assert.equal(screenColors.overlay, 'rgba(0, 0, 0, 0.4)');
+  assert.equal(screenColors.blur, 'none');
+  fs.writeFileSync(path.join(dir, 'screen-colors.json'), JSON.stringify(screenColors, null, 2));
+  await click('ยกเลิก', '.stock-edit-modal');
+  await page.waitForFunction(() => !document.querySelector('.stock-edit-modal'));
+  assert.deepEqual(query('SELECT name,price,cost,stock FROM products WHERE id=?', product.id), unchangedProduct, 'Cancel changes nothing');
+  const reorderBefore = query('SELECT reorder_point FROM products WHERE id=?', product.id).reorder_point;
+  const rowAgain = await page.evaluateHandle(name => [...document.querySelectorAll('tr.clickable[title^="ดูล็อตและจัดการ"]')].find(row => row.textContent.includes(name)), product.name);
+  await rowAgain.asElement().click(); await rowAgain.dispose();
+  await page.waitForSelector('.stock-detail-modal'); await click('แก้ไขข้อมูล', '.stock-detail-modal');
+  await page.waitForSelector('.stock-edit-modal'); await fillLabel('จุดสั่งซื้อขั้นต่ำ', reorderBefore + 1);
+  await click('บันทึกการแก้ไข', '.stock-edit-modal'); await acknowledge();
+  await page.waitForFunction(() => !document.querySelector('.stock-edit-modal'));
+  assert.equal(query('SELECT reorder_point FROM products WHERE id=?', product.id).reorder_point, reorderBefore + 1, 'Save reaches the original product');
+  assert.deepEqual(query('SELECT name,price,cost,stock FROM products WHERE id=?', product.id), unchangedProduct, 'Save leaves unrelated fields intact');
+  passed('inventory editor is in front with one neutral overlay; cancel preserves data and save updates the selected product');
 
   // Regression: fixed-position receiving controls used to be outside the right edge.
   await page.click('[data-nav-item="stock"]'); await page.waitForSelector('.stock-receive-entry'); await page.click('.stock-receive-entry'); await page.waitForSelector('.workflow-dialog.stock-receive-modal');

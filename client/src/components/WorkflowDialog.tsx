@@ -1,7 +1,8 @@
 import * as Dialog from "@radix-ui/react-dialog";
-import { useId, type ReactNode } from "react";
+import { useEffect, useId, type ReactNode } from "react";
 import { Check, CircleAlert, CircleHelp, Info, X } from "@/lib/icons";
 import { ActionButton } from "./ActionButton";
+import { toast } from "sonner";
 
 /** Portals keep dialogs outside transformed page layouts; Radix owns focus and stacking. */
 export function WorkflowDialog({ title, description, children, onClose, busy = false, className = "form-modal", backdropClassName = "", role = "dialog" }: {
@@ -15,6 +16,8 @@ export function WorkflowDialog({ title, description, children, onClose, busy = f
   role?: "dialog" | "alertdialog";
 }) {
   const descriptionId = useId();
+  // A stale corner message must not cover the active form or its close control.
+  useEffect(() => { toast.dismiss(); }, []);
   return <Dialog.Root open onOpenChange={open => { if (!open && !busy) onClose(); }}>
     <Dialog.Portal>
       <Dialog.Overlay className={`modal-backdrop workflow-backdrop ${backdropClassName}`}>
