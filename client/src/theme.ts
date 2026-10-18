@@ -14,7 +14,7 @@ import { applyThermalPrintProfile, resolveThermalPaperWidth, type ThermalPaperWi
  * (เปลี่ยนสีเน้นแยกทีหลังได้ตามปกติผ่านพาเลตต์สี)
  */
 
-export type BrandSettings = { appName: string; appLogo: string; appTheme: string; appStyle?: string; appBackground?: string };
+export type BrandSettings = { appName: string; appLogo: string; appTheme: string; appStyle?: string; appBackground?: string; loginBackground?: string };
 
 /**
  * สีหลักมาตรฐานของระบบ — ส้มและเขียวสำเร็จ LINE ใช้ชุดเดียวทั้งแอป
@@ -111,8 +111,12 @@ export function applyThemeColor(theme: string | undefined | null): string {
   return base;
 }
 
+export function resolveBackgroundImage(value: string | undefined): string {
+  return value && value.length <= 1_500_000 && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(value) ? value : "";
+}
+
 export function applyBackground(value: string | undefined): string {
-  const background = value && value.length <= 1_500_000 && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(value) ? value : "";
+  const background = resolveBackgroundImage(value);
   document.documentElement.style.setProperty("--workspace-image", background ? `url("${background}")` : "none");
   return background;
 }
@@ -134,6 +138,7 @@ export function applyBrand(brand: Partial<BrandSettings> | null | undefined): Br
     appName: appName || cached?.appName || "ร้านค้าสวัสดิการ",
     appLogo,
     appBackground,
+    loginBackground: resolveBackgroundImage(brand.loginBackground),
     appTheme,
     appStyle: resolveUiStyle(appStyle),
   };
@@ -155,6 +160,7 @@ export function readBrandCache(): BrandSettings | null {
       appName: parsed.appName || "ร้านค้าสวัสดิการ",
       appLogo: parsed.appLogo || "",
       appBackground: parsed.appBackground || "",
+      loginBackground: resolveBackgroundImage(parsed.loginBackground),
       appTheme: normalizeTheme(parsed.appTheme),
       appStyle: resolveUiStyle(parsed.appStyle),
     };

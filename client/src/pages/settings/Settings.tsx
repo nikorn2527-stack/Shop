@@ -164,6 +164,7 @@ type SettingsForm = {
   appName: string;
   appLogo: string;
   appBackground: string;
+  loginBackground: string;
   appTheme: string;
   /** ROUND 38 (ข้อ 38) — บุคลิกการออกแบบทั้งระบบ: shop | apple | microsoft | android */
   appStyle: string;
@@ -227,6 +228,8 @@ const SETTINGS_FIELD_LABELS: [keyof SettingsForm, string][] = [
   ["storeAddress", "ที่อยู่"],
   ["appName", "ชื่อแอป"],
   ["appLogo", "โลโก้"],
+  ["appBackground", "ภาพพื้นหลังพื้นที่ทำงาน"],
+  ["loginBackground", "ภาพพื้นหลังหน้าเข้าสู่ระบบ"],
   ["appTheme", "สีธีม"],
   ["appStyle", "สไตล์หน้าตาแอป"],
   ["posRailHidden", "เมนูลัดหน้าร้าน (POS)"],
@@ -1184,7 +1187,7 @@ export function Settings({
     onSuccess: async () => {
       setError("");
       setSaveReview(null);
-      await utils.settings.get.invalidate();
+      await Promise.all([utils.settings.get.invalidate(), utils.settings.brand.invalidate()]);
       notify.completed("บันทึกการตั้งค่าสำเร็จ", { description: "ใช้การตั้งค่าใหม่แล้ว" });
     },
     onSettled: () => { saveInFlight.current = false; },
@@ -1356,7 +1359,7 @@ export function Settings({
     };
     reader.readAsDataURL(file);
   };
-  const onBackgroundPick = (event: ChangeEvent<HTMLInputElement>) => {
+  const onBackgroundPick = (event: ChangeEvent<HTMLInputElement>, target: "appBackground" | "loginBackground" = "appBackground") => {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
@@ -1370,8 +1373,8 @@ export function Settings({
       try {
         const image = await shrinkLogoToDataUrl(String(reader.result), 1600);
         if (image.length > 1_500_000) throw new Error("ภาพหลังย่อยังใหญ่เกินไป กรุณาเลือกรูปขนาดเล็กลง");
-        updateForm({ appBackground: image });
-        applyBackground(image);
+        updateForm({ [target]: image });
+        if (target === "appBackground") applyBackground(image);
         setError("");
       } catch (error) {
         setError(getErrorMessage(error));
@@ -2051,12 +2054,24 @@ export function Settings({
                 </div>
                 <div className="background-settings">
                   <label>ภาพพื้นหลังพื้นที่ทำงาน
-                    <input type="file" accept="image/png,image/jpeg,image/webp" onChange={onBackgroundPick} disabled={!form} />
+                    <input type="file" accept="image/png,image/jpeg,image/webp" onChange={event => onBackgroundPick(event)} disabled={!form} />
                   </label>
                   <p>PNG JPG WEBP ไม่เกิน 2MB · แสดงหลังการ์ดเท่านั้น ไม่ติดเอกสารพิมพ์ · กดบันทึกเพื่อใช้ครั้งถัดไป</p>
                   {form?.appBackground && <>
                     <img src={form.appBackground} alt="ตัวอย่างภาพพื้นหลัง" style={{ width: "100%", maxHeight: 180, objectFit: "cover", borderRadius: 8 }} />
                     <button type="button" className="outline-button" onClick={() => { updateForm({ appBackground: "" }); applyBackground(""); }}>ลบภาพพื้นหลัง</button>
+                  </>}
+                </div>
+                <div className="background-settings login-background-settings">
+                  <h3>รูปแบบหน้าเข้าสู่ระบบ</h3>
+                  <p>ใช้พื้นเรียบแบบเดิม หรือเลือกภาพโรงพยาบาลเป็นพื้นหลังเฉพาะหน้าเข้าสู่ระบบ ภาพนี้แยกจากพื้นที่ทำงานและเอกสารพิมพ์</p>
+                  <label>เลือกภาพพื้นหลังหน้าเข้าสู่ระบบ
+                    <input type="file" accept="image/png,image/jpeg,image/webp" onChange={event => onBackgroundPick(event, "loginBackground")} disabled={!form} />
+                  </label>
+                  <small>PNG JPG WEBP ไม่เกิน 2MB · ระบบย่อภาพให้ · กดบันทึกการตั้งค่าเพื่อใช้งาน</small>
+                  {form?.loginBackground && <>
+                    <div className="login-background-preview"><img src={form.loginBackground} alt="ตัวอย่างภาพพื้นหลังหน้าเข้าสู่ระบบ" /><div><b>{form.appName || "ร้านค้าสวัสดิการ"}</b><span>เข้าสู่ระบบ</span></div></div>
+                    <button type="button" className="outline-button" onClick={() => updateForm({ loginBackground: "" })}>ใช้พื้นเรียบ · นำภาพหน้าเข้าสู่ระบบออก</button>
                   </>}
                 </div>
                 <div className="brand-live-preview" aria-label="ตัวอย่างหน้าจอ">

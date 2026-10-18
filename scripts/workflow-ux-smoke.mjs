@@ -8,7 +8,7 @@ import net from 'node:net';
 import { spawn } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
 import puppeteer from 'puppeteer';
-import { openWelfareStore, createAppSession, createBlankCards, assignMemberCard } from '../server/sqliteStore.ts';
+import { openWelfareStore, createAppUser, createAppSession, createBlankCards, assignMemberCard } from '../server/sqliteStore.ts';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'shop-workflow-ux-'));
 const target = path.join(dir, 'demo.sqlite');
@@ -20,6 +20,9 @@ if (previous.seed === undefined) delete process.env.SEED_DEMO_DATA; else process
 if (previous.mode === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = previous.mode;
 const admin = db.prepare("SELECT id FROM app_users WHERE role='admin' LIMIT 1").get();
 const session = createAppSession(db, admin.id);
+const loginUser = createAppUser(db, { username: 'ux_login', password: 'FixtureLogin!2026', displayName: 'UX login', role: 'staff', actor: 'UX fixture' });
+db.prepare('UPDATE app_users SET must_change_password=0 WHERE id=?').run(loginUser.id);
+const previousLoginSession = createAppSession(db, loginUser.id);
 const member = db.prepare("SELECT member_number, balance FROM members WHERE status='active' AND card_number IS NULL LIMIT 1").get();
 assert.ok(member, 'An active demo member is available');
 createBlankCards(db, ['UX-WALLET-001'], 'UX fixture');
@@ -424,6 +427,72 @@ try {
   assert.equal(query('SELECT COUNT(*) n FROM members').n, originalMemberCount);
   assert.equal(query('SELECT status FROM members WHERE member_number=?', returning.member_number).status, 'active');
   passed('preserve switch colors; warning and destructive dialogs use distinct functional colors without changing data');
+
+  // Configure a separate login image through the real settings upload/save flow.
+  await page.keyboard.press('Escape');
+  await page.click('[data-nav-item="settings"]');
+  await click('ร้านค้าและหน้าจอ', '.settings-cat-row');
+  await page.waitForSelector('.login-background-settings input[type="file"]');
+  const image = await page.evaluate(() => {
+    const canvas = document.createElement('canvas'); canvas.width = 400; canvas.height = 300;
+    const context = canvas.getContext('2d'); const gradient = context.createLinearGradient(0, 0, 400, 300);
+    gradient.addColorStop(0, '#e2e8f0'); gradient.addColorStop(1, '#94a3b8');
+    context.fillStyle = gradient; context.fillRect(0, 0, 400, 300); return canvas.toDataURL('image/png');
+  });
+  const imagePath = path.join(dir, 'login-background-fixture.png');
+  fs.writeFileSync(imagePath, Buffer.from(image.split(',')[1], 'base64'));
+  await (await page.$('.login-background-settings input[type="file"]')).uploadFile(imagePath);
+  await page.waitForSelector('.login-background-preview img');
+  await page.waitForSelector('.settings-unsaved-note');
+  await click('บันทึกการตั้งค่า'); await page.waitForSelector('.settings-save-review');
+  await click('ยืนยัน', '.settings-save-review'); await page.waitForSelector('.blocker-success'); await acknowledge();
+  passed('a login-only background upload participates in settings review and save');
+
+  const adminPage = page;
+  const loginContext = await browser.createBrowserContext(); page = await loginContext.newPage();
+  page.on('pageerror', error => errors.push(error.message));
+  await page.setViewport({ width: 1366, height: 768 });
+  await page.goto(baseUrl, { waitUntil: 'networkidle2' });
+  await page.waitForSelector('.login-with-background .login-background-image');
+  await page.waitForFunction(() => document.querySelector('.login-background-image')?.naturalWidth > 0);
+  await page.bringToFront(); await pause(500);
+  await page.screenshot({ path: path.join(dir, 'login-with-background.png') });
+  const loginPage = page; page = adminPage; await page.bringToFront();
+  await click('ใช้พื้นเรียบ', '.login-background-settings');
+  await click('บันทึกการตั้งค่า'); await page.waitForSelector('.settings-save-review');
+  await click('ยืนยัน', '.settings-save-review'); await page.waitForSelector('.blocker-success'); await acknowledge();
+  page = loginPage; await page.bringToFront(); await page.reload({ waitUntil: 'networkidle2' });
+  await page.waitForSelector('.login-form');
+  assert.equal(await page.$('.login-background-image'), null, 'Clearing the image restores the plain design');
+  await page.focus('.login-form input[name="username"]');
+  const focus = await page.$eval('.login-form input[name="username"]', input => {
+    const s = getComputedStyle(input); return { border: s.borderTopWidth, color: s.borderTopColor, shadow: s.boxShadow, outline: s.outlineStyle };
+  });
+  assert.deepEqual(focus, { border: '1px', color: 'rgb(148, 163, 184)', shadow: 'none', outline: 'none' });
+  await page.screenshot({ path: path.join(dir, 'login-neutral-focus.png') });
+  await fill('.login-form input[name="username"]', 'ux_login');
+  await fill('.login-form input[name="password"]', 'FixtureLogin!2026');
+  await page.click('.login-submit'); await page.waitForSelector('.login-session-dialog');
+  assert.ok(await page.$('.login-session-dialog .blocker-icon.warning'));
+  assert.equal(await page.$eval('.login-session-dialog .blocker-button.warning', b => getComputedStyle(b).backgroundColor), 'rgb(255, 251, 235)');
+  const cancel = await page.evaluateHandle(() => [...document.querySelectorAll('.login-session-dialog button')].find(b => b.innerText.trim() === 'ยกเลิก'));
+  await page.keyboard.press('Tab'); await cancel.asElement().focus();
+  assert.equal(await page.evaluate(b => getComputedStyle(b).outlineColor, cancel), 'rgb(148, 163, 184)');
+  await cancel.dispose();
+  await pause(500);
+  await page.screenshot({ path: path.join(dir, 'login-transfer-warning.png') });
+  await click('ยกเลิก', '.login-session-dialog');
+  assert.equal(query('SELECT COUNT(*) n FROM app_sessions WHERE id=?', previousLoginSession.sessionId).n, 1, 'Cancelling preserves the other device session');
+  await page.click('.login-submit'); await page.waitForSelector('.login-session-dialog');
+  let transferRequests = 0;
+  page.on('request', request => { if (request.method() === 'POST' && request.url().includes('auth.login') && request.postData()?.includes('replaceSession')) transferRequests++; });
+  await page.$eval('.login-session-dialog .blocker-button.warning', b => { b.click(); b.click(); });
+  await page.waitForSelector('.app-shell');
+  assert.equal(transferRequests, 1, 'Repeated confirmation submits once');
+  assert.equal(query('SELECT COUNT(*) n FROM app_sessions WHERE id=?', previousLoginSession.sessionId).n, 0);
+  assert.equal(query('SELECT COUNT(*) n FROM app_sessions WHERE user_id=?', loginUser.id).n, 1);
+  await loginContext.close(); page = adminPage;
+  passed('login has neutral focus, optional image/plain background, and one warning confirmation before session transfer');
 
   assert.deepEqual(errors, []);
   assert.equal(query('PRAGMA integrity_check').integrity_check, 'ok');

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeTheme, resolveThemeColor, applyThemeColor } from './theme';
+import { normalizeTheme, resolveThemeColor, applyThemeColor, resolveBackgroundImage } from './theme';
 import { vi } from 'vitest';
 
 describe('standard application palette', () => {
@@ -34,6 +34,18 @@ describe('orange and LINE green theme migration', () => {
     for (const theme of ['pastel', 'indigo', 'emerald', 'forest', 'matcha', 'teal', 'coffee', 'amber', 'rose', 'violet', '#00875a', '#4f46b8', undefined]) {
       expect(normalizeTheme(theme)).toBe('orange-line');
       expect(resolveThemeColor(theme)).toBe('#c2410c');
+    }
+  });
+});
+
+describe('background images', () => {
+  it('accepts supported embedded images and falls back to plain for unsafe or oversized input', () => {
+    for (const type of ['png', 'jpeg', 'webp']) {
+      const data = `data:image/${type};base64,YWJj`;
+      expect(resolveBackgroundImage(data)).toBe(data);
+    }
+    for (const value of [undefined, '', 'https://example.com/photo.jpg', 'data:image/svg+xml;base64,YWJj', 'data:image/png;base64,' + 'A'.repeat(1_500_000)]) {
+      expect(resolveBackgroundImage(value)).toBe('');
     }
   });
 });

@@ -29,7 +29,7 @@ export {
 export default function Home() {
   const authQuery = trpc.auth.me.useQuery();
   // ROUND 25 — แบรนด์ (ชื่อ/โลโก้/สี) โหลดจาก settings สาธารณะ ใช้ทั้งก่อน/หลัง login
-  const brandQuery = trpc.settings.get.useQuery(undefined);
+  const brandQuery = trpc.settings.brand.useQuery();
   // ROUND 36 (ข้อ 31) — สถานะลงทะเบียนครั้งแรก (ฐานข้อมูลยังไม่มีบัญชีผู้ใช้เลย)
   // ถามเฉพาะตอนยังไม่มีเซสชัน เพื่อไม่ให้ทุก request ไปนับตาราง app_users
   const setupStatusQuery = trpc.auth.setupStatus.useQuery(undefined, {

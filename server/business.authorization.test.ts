@@ -31,6 +31,13 @@ function caller(appRole?: string) {
 }
 
 describe("business API permissions", () => {
+  it("exposes only branding before login and protects operational settings", async () => {
+    const brand = await caller().settings.brand();
+    expect(Object.keys(brand).sort()).toEqual(["appName", "appLogo", "appTheme", "appStyle", "appBackground", "loginBackground"].sort());
+    expect(brand.loginBackground).toBe("");
+    await expect(caller().settings.get()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
+  });
+
   it("requires authentication to read a stock card", async () => {
     await expect(caller().stock.card({ productId: 1 })).rejects.toMatchObject({ code: "UNAUTHORIZED" });
     expect(store.get).not.toHaveBeenCalled();

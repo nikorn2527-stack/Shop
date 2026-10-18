@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Eye, EyeOff, IdCard, LogIn, ShieldCheck } from "@/lib/icons";
 import { trpc } from "@/lib/trpc";
 import { getErrorMessage } from "@/pages/viewFormat";
-import { brandInitial, type BrandSettings } from "@/theme";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { brandInitial, resolveBackgroundImage, type BrandSettings } from "@/theme";
+import { FeedbackDialog } from "./WorkflowDialog";
 
 /**
  * Full-screen login card shown by the Home auth gate when auth.me returns no
@@ -14,6 +14,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 export function LoginView({ brand, onAuthed }: { brand?: BrandSettings | null | undefined; onAuthed: () => void }) {
   const appName = (brand?.appName ?? "").trim() || "ร้านค้าสวัสดิการ";
   const appLogo = brand?.appLogo ?? "";
+  const backgroundImage = resolveBackgroundImage(brand?.loginBackground);
+  const [failedBackground, setFailedBackground] = useState("");
+  const showBackground = Boolean(backgroundImage && failedBackground !== backgroundImage);
+  const loginInFlight = useRef(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -27,21 +31,24 @@ export function LoginView({ brand, onAuthed }: { brand?: BrandSettings | null | 
       onAuthed();
     },
     onError: (mutationError) => setError(getErrorMessage(mutationError)),
+    onSettled: () => { loginInFlight.current = false; },
   });
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (loginMutation.isPending) return;
+    if (loginMutation.isPending || loginInFlight.current) return;
     if (!username.trim() || !password) {
       setError("กรุณาระบุชื่อผู้ใช้และรหัสผ่านให้ครบถ้วน");
       return;
     }
     setError("");
+    loginInFlight.current = true;
     loginMutation.mutate({ username: username.trim(), password });
   };
 
   return (
-    <div className="login-screen">
+    <div className={`login-screen${showBackground ? " login-with-background" : ""}`}>
+      {showBackground && <><img className="login-background-image" src={backgroundImage} alt="" onError={() => setFailedBackground(backgroundImage)} /><div className="login-background-shade" aria-hidden="true" /></>}
       <i className="login-blob teal" aria-hidden="true" />
       <i className="login-blob amber" aria-hidden="true" />
       <div className="login-card">
@@ -55,6 +62,7 @@ export function LoginView({ brand, onAuthed }: { brand?: BrandSettings | null | 
             ชื่อผู้ใช้
             <input
               name="username"
+              disabled={loginMutation.isPending}
               value={username}
               onChange={(event) => { setUsername(event.target.value); setTransfer(null); }}
               autoComplete="username"
@@ -67,6 +75,7 @@ export function LoginView({ brand, onAuthed }: { brand?: BrandSettings | null | 
             <span className="login-password">
               <input
                 name="password"
+                disabled={loginMutation.isPending}
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(event) => { setPassword(event.target.value); setTransfer(null); }}
@@ -93,23 +102,14 @@ export function LoginView({ brand, onAuthed }: { brand?: BrandSettings | null | 
         </div>
         <p className="login-footer">v1.0.0 · ระบบร้านค้าสวัสดิการ<span className="powered-line">⚡ Powered by <b>PNG TEAM</b></span></p>
       </div>
-      <Dialog open={transfer !== null} onOpenChange={open => { if (!open && !loginMutation.isPending) { setTransfer(null); setError(""); } }}>
-        <DialogContent showCloseButton={false} className="login-session-dialog max-h-[calc(100dvh-2rem)] overflow-y-auto" onEscapeKeyDown={event => { if (loginMutation.isPending) event.preventDefault(); }} onPointerDownOutside={event => event.preventDefault()} onOpenAutoFocus={event => { event.preventDefault(); document.getElementById("cancel-session-transfer")?.focus(); }}>
-          <DialogHeader>
-            <DialogTitle className="text-amber-800">บัญชีนี้เข้าใช้งานอยู่แล้ว</DialogTitle>
-            <DialogDescription>ย้ายมาเครื่องนี้จะออกจากระบบที่เครื่องเดิม ตรวจให้แน่ใจว่างานที่เครื่องเดิมเสร็จแล้วก่อนยืนยัน</DialogDescription>
-          </DialogHeader>
-          <div className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-            <p>เข้าสู่ระบบเมื่อ {transfer?.createdAt}</p>
-            <p>ติดต่อระบบล่าสุด {transfer?.lastSeenAt}</p>
-          </div>
-          {error && <div className="login-error" role="alert">{error}</div>}
-          <DialogFooter>
-            <button id="cancel-session-transfer" type="button" className="outline-button" disabled={loginMutation.isPending} onClick={() => { setTransfer(null); setError(""); }}>ยกเลิก</button>
-            <button type="button" className="primary-button" disabled={loginMutation.isPending} onClick={() => { if (loginMutation.isPending) return; setError(""); loginMutation.mutate({ username: username.trim(), password, replaceSession: true }); }}>{loginMutation.isPending ? "กำลังย้ายเครื่อง…" : "ยืนยันย้ายมาเครื่องนี้"}</button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {transfer && <FeedbackDialog tone="warning" title="บัญชีนี้เข้าใช้งานอยู่แล้ว" description="การย้ายมาเครื่องนี้จะออกจากระบบที่เครื่องเดิม กรุณาตรวจให้แน่ใจว่างานที่เครื่องเดิมเสร็จแล้วก่อนยืนยัน" className="login-session-dialog" pending={loginMutation.isPending} error={error} actionLabel="ยืนยันย้ายมาเครื่องนี้" onAction={() => {
+        if (loginMutation.isPending || loginInFlight.current) return;
+        loginInFlight.current = true;
+        setError("");
+        loginMutation.mutate({ username: username.trim(), password, replaceSession: true });
+      }} onClose={() => { setTransfer(null); setError(""); }} onCancel={() => { setTransfer(null); setError(""); }}>
+        <div className="login-session-context"><p>เข้าสู่ระบบเมื่อ {transfer.createdAt}</p><p>ติดต่อระบบล่าสุด {transfer.lastSeenAt}</p></div>
+      </FeedbackDialog>}
     </div>
   );
 }

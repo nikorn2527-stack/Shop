@@ -261,6 +261,7 @@ export type StoreSettings = {
   /** data-URL รูปโลโก้ (สูงสุด ~512KB) — ว่าง = ใช้อักษรย่อ */
   appLogo: string;
   appBackground: string;
+  loginBackground: string;
   /** สีธีมหลัก: preset id เช่น "emerald" หรือ hex "#007a55" */
   appTheme: string;
   /** ROUND 75 (user) — หน้าแจ้งผลหลังชำระเงิน ไม่เด้งไปหน้าสั่งพิมพ์อีกต่อไป:
@@ -3437,6 +3438,7 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   appName: "ร้านค้าสวัสดิการ",
   appLogo: "",
   appBackground: "",
+  loginBackground: "",
   appTheme: "indigo",
   // ROUND 75 — เมนูลัดหน้าร้าน: "" = เปิดใช้ทุกปุ่มบนรางซ้าย POS
   posRailHidden: "",
@@ -3747,7 +3749,7 @@ export function setSettings(db: SqliteDb, patch: Partial<StoreSettings>, actor =
     db.prepare(`INSERT INTO store_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(SETTINGS_KEY, JSON.stringify(next));
   }
   const changedKeys = Object.entries(patch)
-    .map(([key, value]) => `${key}: ${typeof value === "boolean" ? (value ? "เปิด" : "ปิด") : String(value)}`)
+    .map(([key, value]) => `${key}: ${["appLogo", "appBackground", "loginBackground"].includes(key) ? (value ? "มีภาพ" : "นำภาพออก") : typeof value === "boolean" ? (value ? "เปิด" : "ปิด") : String(value)}`)
     .join(" · ");
   logAction(db, "บันทึกการตั้งค่า", actor, changedKeys || "ไม่มีการเปลี่ยนแปลง", "amber", actorRole ?? null);
   return getSettings(db);

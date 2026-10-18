@@ -507,6 +507,7 @@ const settingsPatchInput = z
     appName: z.string().max(80).optional(),
     appLogo: z.string().max(600_000).optional(),
     appBackground: z.string().max(1_500_000).refine(value => value === "" || /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(value), "รองรับภาพ PNG JPG WEBP เท่านั้น").optional(),
+    loginBackground: z.string().max(1_500_000).refine(value => value === "" || /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(value), "รองรับภาพ PNG JPG WEBP เท่านั้น").optional(),
     appTheme: z.string().max(32).optional(),
     // ROUND 75 (user) — ลบ autoPrintReceipt (ห้ามเด้งหน้าสั่งพิมพ์หลังชำระเงิน) ·
     // เพิ่มเมนูลัดหน้าร้าน: JSON array ของ key ปุ่ม POS ที่ปิดใช้งาน เช่น ["withdraw","special"]
@@ -1358,6 +1359,11 @@ export const appRouter = router({
   }),
 
   settings: router({
+    // Login needs presentation settings before authentication; operational settings stay protected.
+    brand: publicProcedure.query(() => withStoreErrors(() => {
+      const { appName, appLogo, appTheme, appStyle, appBackground, loginBackground } = getSettings(getWelfareDb());
+      return { appName, appLogo, appTheme, appStyle, appBackground, loginBackground };
+    })),
     get: publicProcedure
       .input(z.unknown().optional())
       .query(({ ctx }) => withStoreErrors(() => {
