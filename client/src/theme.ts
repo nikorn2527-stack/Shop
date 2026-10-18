@@ -17,21 +17,21 @@ import { applyThermalPrintProfile, resolveThermalPaperWidth, type ThermalPaperWi
 export type BrandSettings = { appName: string; appLogo: string; appTheme: string; appStyle?: string; appBackground?: string };
 
 /**
- * สีหลักมาตรฐานของระบบ — ส้มอ่อนผสมเทล ใช้ชุดเดียวทั้งแอป
+ * สีหลักมาตรฐานของระบบ — ส้มและเขียวสำเร็จ LINE ใช้ชุดเดียวทั้งแอป
  * ค่าเดิมที่บันทึกไว้ยังอ่านได้ แต่จะถูกย้ายมาใช้พาเลตใหม่นี้อัตโนมัติ
  */
 export const THEME_PRESETS: { id: string; label: string; base: string }[] = [
-  { id: "orange-teal", label: "ส้มอ่อน · เทล", base: "#0f766e" },
+  { id: "orange-line", label: "ส้ม · เขียวสำเร็จ LINE", base: "#c2410c" },
 ];
 
-export const DEFAULT_THEME = "orange-teal";
+export const DEFAULT_THEME = "orange-line";
 const BRAND_CACHE_KEY = "png-brand-v1";
 
 /** ROUND 38 (ข้อ 38) — สไตล์การแสดงผลทั้งระบบ (บุคลิกการออกแบบ)
  *  id ใช้เป็น data-style บน <html> · accent = สีเน้นประจำแพลตฟอร์มที่จะใช้ตอนเลือกสไตล์ */
 export type UiStyleId = "shop" | "apple" | "microsoft" | "android";
 export const UI_STYLE_PRESETS: { id: UiStyleId; label: string; detail: string; accent: string; fontFamily: string }[] = [
-  { id: "shop", label: "ร้านค้า (มาตรฐาน)", detail: "พื้นขาว โทนส้มอ่อนและเทล แยกสีผลสำเร็จชัดเจน", accent: "#0f766e", fontFamily: "Sarabun" },
+  { id: "shop", label: "ร้านค้า (มาตรฐาน)", detail: "พื้นขาว โทนส้ม แยกสีผลสำเร็จชัดเจน", accent: "#0f766e", fontFamily: "Sarabun" },
   { id: "apple", label: "Apple", detail: "ขาวสะอาด ปุ่มทรงแคปซูล ฟอนต์ระบบ Apple — เรียบแบบ iOS/macOS", accent: "#0071e3", fontFamily: "SF / Helvetica" },
   { id: "microsoft", label: "Microsoft", detail: "แบบ Fluent — ขอบคม เรียบตึง ฟอนต์ Segoe UI แบบ Windows 11", accent: "#0f6cbd", fontFamily: "Segoe UI" },
   { id: "android", label: "Android", detail: "แบบ Material You — การ์ดมนมาก โทนม่วงพาสเทล แบบแอปบนมือถือ", accent: "#6750a4", fontFamily: "Roboto / Google Sans" },
@@ -69,7 +69,7 @@ export function normalizeTheme(theme: string | undefined | null): string {
   return DEFAULT_THEME;
 }
 
-/** preset id หรือ hex เดิม → สีเทลมาตรฐานของระบบ */
+/** preset id หรือ hex เดิม → สีส้มมาตรฐานของระบบ */
 export function resolveThemeColor(theme: string | undefined | null): string {
   normalizeTheme(theme);
   return THEME_PRESETS[0].base;
@@ -80,25 +80,25 @@ export function applyThemeColor(theme: string | undefined | null): string {
   // One application palette; legacy saved colors remain readable but no longer
   // override the shared design.
   normalizeTheme(theme);
-  const base = "#0f766e";
+  const base = "#c2410c";
   const rgb = hexToRgb(base);
   if (!rgb) return base;
   const [r, g, b] = rgb;
   const root = document.documentElement;
-  root.dataset.palette = "orange-teal";
+  root.dataset.palette = "orange-line";
   const vars: Record<string, string> = {
     "--teal": base,
-    "--teal-dark": "#115e59",
-    "--teal-soft": "#ccfbf1",
-    "--teal-mist": "#f0fdfa",
-    "--canvas-gradient": "linear-gradient(135deg, #fffaf5 0%, #ffffff 48%, #f0fdfa 100%)",
-    "--workspace-gradient": "linear-gradient(135deg, rgb(255 250 245 / 96%) 0%, rgb(255 255 255 / 96%) 48%, rgb(240 253 250 / 95%) 100%)",
-    "--sidebar-gradient": "linear-gradient(180deg, #ffffff 0%, #f0fdfa 100%)",
-    "--topbar-gradient": "linear-gradient(110deg, #ffffff 0%, #f0fdfa 100%)",
+    "--teal-dark": "#9a3412",
+    "--teal-soft": "#ffedd5",
+    "--teal-mist": "#fff7ed",
+    "--canvas-gradient": "linear-gradient(135deg, #fffaf5 0%, #ffffff 48%, #fff7ed 100%)",
+    "--workspace-gradient": "linear-gradient(135deg, rgb(255 250 245 / 96%) 0%, rgb(255 255 255 / 96%) 48%, rgb(255 247 237 / 95%) 100%)",
+    "--sidebar-gradient": "linear-gradient(180deg, #ffffff 0%, #fff7ed 100%)",
+    "--topbar-gradient": "linear-gradient(110deg, #ffffff 0%, #fff7ed 100%)",
     "--surface-gradient": "linear-gradient(145deg, #ffffff 0%, #ffffff 100%)",
-    "--accent-gradient": "linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%)",
-    "--app-secondary": "#0f766e",
-    "--app-secondary-soft": "#ccfbf1",
+    "--accent-gradient": "linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)",
+    "--app-secondary": "#c2410c",
+    "--app-secondary-soft": "#ffedd5",
     "--app-health": "#15803d",
     "--app-health-soft": "#dcfce7",
     "--rail-a": "#365A78",

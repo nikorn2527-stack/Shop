@@ -1,19 +1,19 @@
-/* Light orange and teal application palette. File types and operation results
+/* Orange brand and LINE green success palette. File types and operation results
    retain their own meaning. Print documents remain independent. */
 @media screen {
   :root:root {
-    --action-primary: #0f766e;
-    --action-bg: #ccfbf1;
-    --action-ink: #115e59;
-    --action-border: #5eead4;
-    --action-hover: #99f6e4;
-    --action-soft: #f0fdfa;
-    --focus-ring: #0d9488;
+    --action-primary: #c2410c;
+    --action-bg: #ffedd5;
+    --action-ink: #9a3412;
+    --action-border: #fdba74;
+    --action-hover: #fed7aa;
+    --action-soft: #fff7ed;
+    --focus-ring: #c2410c;
     --control-border: #cbd5e1;
     --disabled-bg: #e8ecf1;
     --disabled-ink: #596575;
-    --success-bg: #ecfdf3;
-    --success-ink: #166534;
+    --success-bg: #06c755;
+    --success-ink: #052e16;
     --ink: #1F2B38;
     --muted: #526579;
     --canvas: #fafcfb;
@@ -22,23 +22,23 @@
     --red: #b91c1c;
     --amber: #a16207;
     --green: #15803d;
-    --teal: #0f766e;
-    --teal-dark: #115e59;
-    --teal-soft: #ccfbf1;
-    --teal-mist: #f0fdfa;
-    --teal-glow: rgba(15, 118, 110, 0.2);
-    --canvas-gradient: linear-gradient(135deg, #fffaf5 0%, #ffffff 48%, #f0fdfa 100%);
-    --workspace-gradient: linear-gradient(135deg, rgb(255 250 245 / 96%) 0%, rgb(255 255 255 / 96%) 48%, rgb(240 253 250 / 95%) 100%);
-    --sidebar-gradient: linear-gradient(180deg, #ffffff 0%, #f0fdfa 100%);
-    --topbar-gradient: linear-gradient(110deg, #ffffff 0%, #f0fdfa 100%);
+    --teal: #c2410c;
+    --teal-dark: #9a3412;
+    --teal-soft: #ffedd5;
+    --teal-mist: #fff7ed;
+    --teal-glow: rgba(194, 65, 12, 0.16);
+    --canvas-gradient: linear-gradient(135deg, #fffaf5 0%, #ffffff 48%, #fff7ed 100%);
+    --workspace-gradient: linear-gradient(135deg, rgb(255 250 245 / 96%) 0%, rgb(255 255 255 / 96%) 48%, rgb(255 247 237 / 95%) 100%);
+    --sidebar-gradient: linear-gradient(180deg, #ffffff 0%, #fff7ed 100%);
+    --topbar-gradient: linear-gradient(110deg, #ffffff 0%, #fff7ed 100%);
     --surface-gradient: linear-gradient(145deg, #ffffff 0%, #ffffff 100%);
-    --accent-gradient: linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%);
+    --accent-gradient: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
     --rail-a: #365A78;
     --rail-b: #294A66;
-    --rail-solid: #115e59;
+    --rail-solid: #9a3412;
     --rail-edge: #223f57;
-    --app-secondary: #0f766e;
-    --app-secondary-soft: #ccfbf1;
+    --app-secondary: #c2410c;
+    --app-secondary-soft: #ffedd5;
     --app-health: #15803d;
     --app-health-soft: #dcfce7;
     color: var(--ink);
@@ -51,8 +51,8 @@
     background: var(--action-hover); border-color: var(--action-border); color: var(--action-ink);
   }
   /* Function-specific actions override ordinary action styling explicitly. */
-  :root:root :is(.app-shell, .modal-backdrop) [data-action-tone="success"]:not(:disabled) { background: #dcfce7; background-image: none; border: 1px solid #86efac; color: #166534; --btn-icon: #166534; }
-  :root:root :is(.app-shell, .modal-backdrop) [data-action-tone="success"]:not(:disabled):hover { background: #bbf7d0; }
+  :root:root :is(.app-shell, .modal-backdrop) [data-action-tone="success"]:not(:disabled) { background: var(--success-bg); background-image: none; border: 1px solid #06c755; color: var(--success-ink); --btn-icon: var(--success-ink); }
+  :root:root :is(.app-shell, .modal-backdrop) [data-action-tone="success"]:not(:disabled):hover { background: #05b34c; }
   :root:root :is(.app-shell, .modal-backdrop) [data-action-tone="warning"]:not(:disabled) { background: #fffbeb; background-image: none; border: 1px solid #fcd34d; color: #92400e; --btn-icon: #92400e; }
   :root:root :is(.app-shell, .modal-backdrop) [data-action-tone="warning"]:not(:disabled):hover { background: #fef3c7; }
   :root:root :is(.app-shell, .modal-backdrop) .danger-button:not(:disabled) { background: #dc2626; border: 1px solid #dc2626; color: #fff; --btn-icon: #fff; }
@@ -78,16 +78,16 @@
   :root:root .blocker-icon.warning { background: #fff; border-color: #fde68a; color: #d97706; }
   :root:root .blocker-button.warning { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
   :root:root .blocker-button.warning:hover { background: #fef3c7; }
-  :root:root .blocker-icon.success { background: #fff; border-color: #dcf3d0; color: #9bd582; }
+  :root:root .blocker-icon.success { background: #fff; border-color: #06c755; color: #06c755; }
   :root:root .blocker-icon.info { background: #fff; border-color: #99f6e4; color: #0d9488; }
   :root:root .blocker-button.info { background: #ccfbf1; color: #115e59; }
   :root:root .blocker-button.info:hover { background: #99f6e4; }
-  :root:root .blocker-button.success { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
-  :root:root .blocker-button.success:hover { background: #bbf7d0; }
-  :root:root .blocker-icon.confirm { background: #fff; border-color: #99f6e4; color: #0d9488; }
+  :root:root .blocker-button.success { background: var(--success-bg); color: var(--success-ink); border: 1px solid #06c755; }
+  :root:root .blocker-button.success:hover { background: #05b34c; }
+  :root:root .blocker-icon.confirm { background: #fff; border-color: var(--action-border); color: var(--action-primary); }
   :root:root .blocker-icon.danger { background: #fff; border-color: #fecaca; color: #dc2626; }
-  :root:root .blocker-button.confirm { background: #ccfbf1; border-color: #5eead4; color: #115e59; }
-  :root:root .blocker-button.confirm:hover { background: #99f6e4; }
+  :root:root .blocker-button.confirm { background: var(--action-bg); border-color: var(--action-border); color: var(--action-ink); }
+  :root:root .blocker-button.confirm:hover { background: var(--action-hover); }
   :root:root .blocker-button.danger { background: #dc2626; border-color: #dc2626; color: #fff; }
   :root:root .blocker-button.danger:hover { background: #b91c1c; }
   :root:root .notif-badge { background: #dc2626; }
@@ -139,30 +139,31 @@
     border-color: #D8E0E7;
   }
   :root:root .sidebar { border-color: #CAD2DA; }
-  :root:root :is(.sidebar, .login-brand) .brand-mark { background: #115e59; box-shadow: 0 5px 14px rgb(23 40 61 / 25%); }
-  :root:root .app-shell .sidebar nav button:hover:not(.active) { background: #F3F5F7; color: #115e59; }
+  :root:root :is(.sidebar, .login-brand) .brand-mark { background: var(--action-ink); box-shadow: 0 5px 14px rgb(23 40 61 / 25%); }
+  :root:root .app-shell .sidebar nav button:hover:not(.active) { background: #F3F5F7; color: var(--action-ink); }
   :root:root .app-shell .sidebar nav button.active {
-    background: #f0fdfa; background-image: none; color: #115e59; border-color: #99f6e4;
-    box-shadow: inset 3px 0 0 #0f766e, 0 4px 12px rgb(66 107 140 / 10%);
+    background: var(--action-soft); background-image: none; color: var(--action-ink); border-color: var(--action-border);
+    box-shadow: inset 3px 0 0 var(--action-primary), 0 4px 12px rgb(66 107 140 / 10%);
   }
-  :root:root .app-shell .sidebar nav button.active :is(b, small, svg) { color: #115e59; }
+  :root:root .app-shell .sidebar nav button.active :is(b, small, svg) { color: var(--action-ink); }
   :root:root .app-shell .pos-premium-layout .quick-pick-panel,
   :root:root .app-shell .pos-premium-bill :is(.pos-head, .cart-mid, .pos-payment-summary) {
     background-color: #ffffff;
     background-image: var(--surface-gradient);
     border-color: #D8E0E7;
   }
-  :root:root :is(.global-search, .scan-hero, .search-box, input, select, textarea):focus-within { border-color: #0f766e; }
+  :root:root :is(.global-search, .scan-hero, .search-box, input, select, textarea):focus-within { border-color: var(--action-primary); }
   :root:root :is(.onboarding-banner, .setup-banner, .dashboard-ready-card) { background: #F3F5F7; background-image: linear-gradient(135deg, #F5F7F8 0%, #DCE3EA 62%, #FAFBFC 100%); border-color: #AAB7C4; }
-  :root:root :is(.dash-tab.active, .settings-nav button.active, .report-view-pills [aria-selected="true"], .cost-profit-ranges .primary-button) { background: #ccfbf1; background-image: none; border-color: #99f6e4; color: #115e59; }
-  :root:root .quick-pick-panel .product-card.in-bill { border-color: #0f766e; box-shadow: inset 0 0 0 1px #0f766e, 0 2px 4px rgb(31 43 56 / 8%); }
-  /* Teal identifies navigation; green identifies successful operations. */
-  :root:root .pos-rail .rail-btn { color: #1F2B38; --task-ink: #0f766e; --task-tint: #F3F5F7; }
-  :root:root .pos-rail .rail-btn.rail-member { --task-ink: #0f766e; --task-tint: #ccfbf1; }
+  :root:root :is(.dash-tab.active, .settings-nav button.active, .report-view-pills [aria-selected="true"], .cost-profit-ranges .primary-button) { background: var(--action-bg); background-image: none; border-color: var(--action-border); color: var(--action-ink); }
+  :root:root .dash-tab.active small { color: var(--action-ink); }
+  :root:root .quick-pick-panel .product-card.in-bill { border-color: var(--action-primary); box-shadow: inset 0 0 0 1px var(--action-primary), 0 2px 4px rgb(31 43 56 / 8%); }
+  /* Orange identifies navigation; green identifies successful operations. */
+  :root:root .pos-rail .rail-btn { color: #1F2B38; --task-ink: var(--action-primary); --task-tint: #F3F5F7; }
+  :root:root .pos-rail .rail-btn.rail-member { --task-ink: var(--action-primary); --task-tint: var(--action-bg); }
   :root:root .pos-rail .rail-btn > svg { background: var(--task-tint); color: var(--task-ink); }
-  :root:root .pos-rail .rail-btn.active { background: #f0fdfa; border-color: #99f6e4; color: #1F2B38; box-shadow: inset 3px 0 0 #0f766e, 0 2px 4px rgb(31 43 56 / 12%); }
+  :root:root .pos-rail .rail-btn.active { background: var(--action-soft); border-color: var(--action-border); color: #1F2B38; box-shadow: inset 3px 0 0 var(--action-primary), 0 2px 4px rgb(31 43 56 / 12%); }
   :root:root :is(.scan-hero:focus-within, .member-scan-field:focus-within) { border-color: var(--control-border); box-shadow: none; }
-  :root:root :is(.cart-total strong, .cart-totals .total-line strong, .cost-profit-page a) { color: #115e59; }
+  :root:root :is(.cart-total strong, .cart-totals .total-line strong, .cost-profit-page a) { color: var(--action-ink); }
   /* Preserve format recognition in reports and preview dialogs. */
   :root:root :is(.app-shell, .modal-backdrop) :is(.export-csv, .format-csv) { --file-ink: #0e7490; --file-soft: #ecfeff; --file-line: #a5f3fc; }
   :root:root :is(.app-shell, .modal-backdrop) :is(.export-excel, .format-xlsx) { --file-ink: #15803d; --file-soft: #f0fdf4; --file-line: #bbf7d0; }

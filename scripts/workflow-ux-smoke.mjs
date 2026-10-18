@@ -86,7 +86,7 @@ async function cashSale() {
   assert.equal(await page.$eval('.pay-confirm-button', b => b.querySelectorAll('svg').length), 0, 'Unpaid state must not have a success tick');
   await pause(300); await page.screenshot({ path: path.join(dir, 'checkout-not-ready.png') });
   await click('รับตรงยอด', '.pay-confirm-modal');
-  assert.equal(await page.$eval('.pay-confirm-button', b => getComputedStyle(b).backgroundColor), 'rgb(204, 251, 241)');
+  assert.equal(await page.$eval('.pay-confirm-button', b => getComputedStyle(b).backgroundColor), 'rgb(255, 237, 213)');
   await click('ยืนยันการชำระเงิน', '.pay-confirm-modal'); await page.waitForSelector('#receipt-paper');
 }
 try {
@@ -184,6 +184,8 @@ try {
   // Regression: a legacy edit overlay was displayed behind the portalled inventory card.
   await page.click('[data-nav-item="stock"]');
   await page.waitForSelector('tr.clickable[title^="ดูล็อตและจัดการ"]');
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('.dash-tab[aria-selected="true"]')).backgroundColor === 'rgb(255, 237, 213)');
+  await (await page.$('[aria-label="ส่วนการจัดการสต็อก"]')).screenshot({ path: path.join(dir, 'orange-stock-tabs.png') });
   const inventoryRow = await page.evaluateHandle(name => [...document.querySelectorAll('tr.clickable[title^="ดูล็อตและจัดการ"]')].find(row => row.textContent.includes(name)), product.name);
   assert.ok(inventoryRow.asElement()); await inventoryRow.asElement().click(); await inventoryRow.dispose();
   await page.waitForSelector('.stock-detail-modal');
@@ -201,7 +203,7 @@ try {
     const button = dialog.querySelector('.primary-button');
     return { actionBackground: getComputedStyle(button).backgroundColor, actionColor: getComputedStyle(button).color, buttonFilter: getComputedStyle(button).filter, overlay: getComputedStyle(dialog.parentElement).backgroundColor, blur: getComputedStyle(dialog.parentElement).backdropFilter };
   });
-  assert.equal(screenColors.actionBackground, 'rgb(204, 251, 241)');
+  assert.equal(screenColors.actionBackground, 'rgb(255, 237, 213)');
   assert.equal(screenColors.overlay, 'rgba(0, 0, 0, 0.4)');
   assert.equal(screenColors.blur, 'none');
   fs.writeFileSync(path.join(dir, 'screen-colors.json'), JSON.stringify(screenColors, null, 2));
@@ -267,7 +269,7 @@ try {
   await page.waitForFunction(() => !document.querySelector('#receipt-paper'));
   assert.equal(printRequests, 1); assert.equal(query('SELECT COUNT(*) n FROM sales').n, salesBefore + 1);
   await page.waitForFunction(() => document.activeElement === document.querySelector('.scan-hero input'));
-  passed('payment states use neutral/teal actions; print once and return to a ready POS');
+  passed('payment states use neutral/orange actions; print once and return to a ready POS');
 
   await cashSale(); printMode = 'failure'; await page.evaluate(() => { window.__browserPrintMode = 'failure'; });
   await click('พิมพ์และกลับ POS', '.receipt-actions'); await page.waitForSelector('.receipt-document-error');
@@ -348,22 +350,22 @@ try {
   await click('บันทึกการตั้งค่า'); await page.waitForSelector('.settings-save-review');
   const confirmWidth = await page.$eval('.settings-save-review', dialog => dialog.getBoundingClientRect().width);
   assert.ok(await page.$('.settings-save-review .blocker-icon.confirm'));
-  assert.equal(await page.$eval('.settings-save-review .blocker-button', button => getComputedStyle(button).backgroundColor), 'rgb(204, 251, 241)');
+  assert.equal(await page.$eval('.settings-save-review .blocker-button', button => getComputedStyle(button).backgroundColor), 'rgb(255, 237, 213)');
   await pause(200); await page.screenshot({ path: path.join(dir, 'settings-save-confirmation.png') });
   await page.$eval('.settings-save-review .action-button', button => { button.click(); button.click(); });
   await page.waitForSelector('.blocker-success');
   assert.equal(settingsWrites, beforeWrites + 1, 'Rapid repeated clicks must write only once');
   assert.equal(await page.$$eval('[data-sonner-toast][data-type="success"]', notices => notices.length), 0, 'Settings success never uses stacked corner toasts');
   assert.equal(await page.$$eval('.blocker-success', notices => notices.length), 1, 'Exactly one centered success dialog');
-  assert.equal(await page.$eval('.blocker-button.success', button => getComputedStyle(button).backgroundColor), 'rgb(220, 252, 231)', 'Success acknowledgement is light green');
-  assert.equal(await page.$eval('.blocker-button.success', button => getComputedStyle(button).color), 'rgb(22, 101, 52)');
+  assert.equal(await page.$eval('.blocker-button.success', button => getComputedStyle(button).backgroundColor), 'rgb(6, 199, 85)', 'Success acknowledgement uses LINE green');
+  assert.equal(await page.$eval('.blocker-button.success', button => getComputedStyle(button).color), 'rgb(5, 46, 22)');
   assert.equal(await page.$eval('.blocker-success', dialog => getComputedStyle(dialog).backgroundColor), 'rgb(255, 255, 255)');
   assert.equal(await page.$eval('.blocker-success', dialog => dialog.getBoundingClientRect().width), confirmWidth, 'Confirmation and result use the same frame');
   assert.equal(await page.$eval('.blocker-backdrop', backdrop => getComputedStyle(backdrop).backdropFilter), 'none');
   await pause(200); await page.screenshot({ path: path.join(dir, 'settings-save-success.png') });
   await acknowledge();
   await page.waitForFunction(() => !document.querySelector('.settings-unsaved-note'));
-  passed('settings review is centered; cancellation writes nothing; saving once ends with light-green success');
+  passed('settings review is centered; cancellation writes nothing; saving once ends with LINE-green success');
 
   await page.click('[data-nav-item="members"]');
   await fill('input[placeholder="ค้นหาชื่อ เลขสมาชิก หรือพิมพ์เลขบางส่วน/ท้ายเลข"]', returning.member_number);
