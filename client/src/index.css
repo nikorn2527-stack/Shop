@@ -137,6 +137,14 @@ kbd { font-family: "IBM Plex Mono", monospace; font-size: 10px; color: #868b7c; 
 .section-header h1 { margin: 0; color: #243530; font-size: 24px; letter-spacing: -.7px; line-height: 1.15; }
 .section-header p { margin: 4px 0 0; color: #696c61; font-size: 11.5px; }
 .section-actions { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+/* Base layout ของปุ่ม action ทุกปุ่ม — ไอคอนกับข้อความต้องอยู่บรรทัดเดียวกันเสมอ
+   (rule นี้ถูกลบไปตอน refactor สี commit a8e07d4 ทำให้ปุ่มกลายเป็น display:block
+   ไอคอนลอยขึ้นบรรทัดบน ข้อความตกไปอยู่ล่าง — คืนเฉพาะ layout ล้วน สี/เงา/ขอบ
+   ยังจัดการโดย rule semantic ด้านล่างเหมือนเดิม) */
+.outline-button, .primary-button, .scan-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  white-space: nowrap;
+}
 /* ปุ่มระบุความสำคัญตามภารกิจ — ดูแล้วรู้ทันทีว่าปุ่มนี้ทำอะไร */
 .btn { height: 36px; border-radius: 8px; padding: 0 14px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; font-size: 11px; font-weight: 600; transition: all .18s ease; border: 1px solid transparent; cursor: pointer; }
 .btn:active { transform: scale(.97); }
