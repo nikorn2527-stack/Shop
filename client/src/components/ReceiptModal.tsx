@@ -67,7 +67,7 @@ export function ReceiptModal({ receipt, onClose, onNewSale, onPrinted, mode = "n
       if (result.usedFallback) {
         toast.info("กลับจากหน้าต่างพิมพ์แล้ว", { description: "ตรวจเอกสารที่เครื่องพิมพ์ หากยกเลิกการพิมพ์สามารถพิมพ์ซ้ำจากประวัติได้" });
       } else {
-        toast.success("ส่งสลิปเข้าเครื่องพิมพ์แล้ว", { description: result.message });
+        toast.info("ส่งงานพิมพ์แล้ว · ตรวจเอกสารที่เครื่องพิมพ์", { description: result.message });
       }
       onPrinted?.();
       if (mode === "new") onNewSale?.();

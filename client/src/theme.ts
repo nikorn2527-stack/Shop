@@ -4,7 +4,7 @@ import { applyThermalPrintProfile, resolveThermalPaperWidth, type ThermalPaperWi
  * ROUND 25 — ปรับแต่งแอป (แบรนด์ + ธีมสี)
  * สีธีมทั้งแอปควบคุมด้วย CSS variables (--teal กลุ่ม) — ไฟล์นี้เปลี่ยนค่า
  * ตอน runtime พร้อมแคชชื่อ/โลโก้ไว้ใน localStorage โดยสีเดิมที่เคยบันทึก
- * จะถูกย้ายมาใช้ Navy Slate เพื่อให้ทุกหน้ามีมาตรฐานเดียวกัน
+ * จะถูกย้ายมาใช้ ส้ม–เทล เพื่อให้ทุกหน้ามีมาตรฐานเดียวกัน
  * เพื่อให้หน้า login ก็ได้ธีมเดียวกันทันทีในการเข้าใช้ครั้งถัดไป
  *
  * ROUND 38 (ข้อ 38) — สไตล์การแสดงผล (UI Style): นอกจากสีแบรนด์ ยังเลือก
@@ -17,21 +17,21 @@ import { applyThermalPrintProfile, resolveThermalPaperWidth, type ThermalPaperWi
 export type BrandSettings = { appName: string; appLogo: string; appTheme: string; appStyle?: string; appBackground?: string };
 
 /**
- * สีหลักมาตรฐานของระบบ — กรมท่าหม่นผสมเทา ใช้ชุดเดียวทั้งแอป
+ * สีหลักมาตรฐานของระบบ — ส้มอ่อนผสมเทล ใช้ชุดเดียวทั้งแอป
  * ค่าเดิมที่บันทึกไว้ยังอ่านได้ แต่จะถูกย้ายมาใช้พาเลตใหม่นี้อัตโนมัติ
  */
 export const THEME_PRESETS: { id: string; label: string; base: string }[] = [
-  { id: "navy-slate", label: "กรมท่าหม่น · เทาสเลต", base: "#0f766e" },
+  { id: "orange-teal", label: "ส้มอ่อน · เทล", base: "#0f766e" },
 ];
 
-export const DEFAULT_THEME = "navy-slate";
+export const DEFAULT_THEME = "orange-teal";
 const BRAND_CACHE_KEY = "png-brand-v1";
 
 /** ROUND 38 (ข้อ 38) — สไตล์การแสดงผลทั้งระบบ (บุคลิกการออกแบบ)
  *  id ใช้เป็น data-style บน <html> · accent = สีเน้นประจำแพลตฟอร์มที่จะใช้ตอนเลือกสไตล์ */
 export type UiStyleId = "shop" | "apple" | "microsoft" | "android";
 export const UI_STYLE_PRESETS: { id: UiStyleId; label: string; detail: string; accent: string; fontFamily: string }[] = [
-  { id: "shop", label: "ร้านค้า (มาตรฐาน)", detail: "สีเทลเข้มสด ตัดกับพื้นขาวชัดเจน — ทันสมัย อ่านง่าย", accent: "#0f766e", fontFamily: "Sarabun" },
+  { id: "shop", label: "ร้านค้า (มาตรฐาน)", detail: "พื้นขาว โทนส้มอ่อนและเทล แยกสีผลสำเร็จชัดเจน", accent: "#0f766e", fontFamily: "Sarabun" },
   { id: "apple", label: "Apple", detail: "ขาวสะอาด ปุ่มทรงแคปซูล ฟอนต์ระบบ Apple — เรียบแบบ iOS/macOS", accent: "#0071e3", fontFamily: "SF / Helvetica" },
   { id: "microsoft", label: "Microsoft", detail: "แบบ Fluent — ขอบคม เรียบตึง ฟอนต์ Segoe UI แบบ Windows 11", accent: "#0f6cbd", fontFamily: "Segoe UI" },
   { id: "android", label: "Android", detail: "แบบ Material You — การ์ดมนมาก โทนม่วงพาสเทล แบบแอปบนมือถือ", accent: "#6750a4", fontFamily: "Roboto / Google Sans" },
@@ -69,7 +69,7 @@ export function normalizeTheme(theme: string | undefined | null): string {
   return DEFAULT_THEME;
 }
 
-/** preset id หรือ hex เดิม → สีกรมท่าหม่นมาตรฐานของระบบ */
+/** preset id หรือ hex เดิม → สีเทลมาตรฐานของระบบ */
 export function resolveThemeColor(theme: string | undefined | null): string {
   normalizeTheme(theme);
   return THEME_PRESETS[0].base;
@@ -85,18 +85,18 @@ export function applyThemeColor(theme: string | undefined | null): string {
   if (!rgb) return base;
   const [r, g, b] = rgb;
   const root = document.documentElement;
-  root.dataset.palette = "navy-slate";
+  root.dataset.palette = "orange-teal";
   const vars: Record<string, string> = {
     "--teal": base,
     "--teal-dark": "#115e59",
     "--teal-soft": "#ccfbf1",
     "--teal-mist": "#f0fdfa",
-    "--canvas-gradient": "linear-gradient(135deg, #E5EAF0 0%, #F7F8FA 46%, #DDE3E8 100%)",
-    "--workspace-gradient": "linear-gradient(135deg, rgb(229 234 240 / 96%) 0%, rgb(247 248 250 / 94%) 48%, rgb(221 227 232 / 95%) 100%)",
-    "--sidebar-gradient": "linear-gradient(180deg, #F8FAFC 0%, #E9EEF2 52%, #DCE3E9 100%)",
-    "--topbar-gradient": "linear-gradient(110deg, rgb(255 255 255 / 95%) 0%, rgb(229 234 240 / 92%) 100%)",
-    "--surface-gradient": "linear-gradient(145deg, #FFFFFF 0%, #F7F9FA 58%, #E9EEF2 100%)",
-    "--accent-gradient": "linear-gradient(135deg, #ccfbf1 0%, #0f766e 52%, #115e59 100%)",
+    "--canvas-gradient": "linear-gradient(135deg, #fffaf5 0%, #ffffff 48%, #f0fdfa 100%)",
+    "--workspace-gradient": "linear-gradient(135deg, rgb(255 250 245 / 96%) 0%, rgb(255 255 255 / 96%) 48%, rgb(240 253 250 / 95%) 100%)",
+    "--sidebar-gradient": "linear-gradient(180deg, #ffffff 0%, #f0fdfa 100%)",
+    "--topbar-gradient": "linear-gradient(110deg, #ffffff 0%, #f0fdfa 100%)",
+    "--surface-gradient": "linear-gradient(145deg, #ffffff 0%, #ffffff 100%)",
+    "--accent-gradient": "linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%)",
     "--app-secondary": "#0f766e",
     "--app-secondary-soft": "#ccfbf1",
     "--app-health": "#15803d",

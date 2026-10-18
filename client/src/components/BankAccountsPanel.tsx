@@ -147,8 +147,8 @@ export function BankAccountsPanel({
       onChange([...value, cleaned]);
     }
     cancelDraft();
-    toast.success(editingId ? "บันทึกการแก้ไขบัญชีแล้ว" : "เพิ่มบัญชีธนาคารแล้ว", {
-      description: "กด “บันทึกการตั้งค่า” ท้ายหน้าเพื่อใช้งานจริง",
+    toast.info(editingId ? "แก้ไขร่างข้อมูลบัญชีแล้ว" : "เพิ่มบัญชีในร่างแล้ว", {
+      description: "กด “บันทึกการตั้งค่า” ด้านบน แล้วตรวจสอบและยืนยันเพื่อใช้งานจริง",
       duration: 3200,
     });
   };

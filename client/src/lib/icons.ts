@@ -142,3 +142,5 @@ export { ShoppingCartSimple } from "@phosphor-icons/react";
 export { Keyboard } from "@phosphor-icons/react";
 export { Question } from "@phosphor-icons/react";
 export { Lightning } from "@phosphor-icons/react";
+
+export { FileCsv, FilePdf } from "@phosphor-icons/react";

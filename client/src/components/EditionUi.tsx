@@ -151,7 +151,7 @@ export function EditionUpgradeModal({ open, onClose, status, focusFeature, onApp
   const [licenseName, setLicenseName] = useState("");
   const applyMutation = trpc.edition.applyLicense.useMutation({
     onSuccess: (next) => {
-      toast.success(`เปิดใช้${EDITIONS[next.edition].label}เรียบร้อย`, { description: next.licenseExpiresAt ? `ลิขสิทธิ์ถึง ${next.licenseExpiresAt}` : "ลิขสิทธิ์ถาวร" });
+      notify.completed(`เปิดใช้${EDITIONS[next.edition].label}เรียบร้อย`, { description: next.licenseExpiresAt ? `ลิขสิทธิ์ถึง ${next.licenseExpiresAt}` : "ลิขสิทธิ์ถาวร" });
       setKeyText("");
       void utils.edition.status.invalidate();
       void utils.settings.get.invalidate();
@@ -162,7 +162,7 @@ export function EditionUpgradeModal({ open, onClose, status, focusFeature, onApp
   });
   const trialMutation = trpc.edition.startTrial.useMutation({
     onSuccess: (next) => {
-      toast.success(`เริ่มทดลองใช้โปรพลัส ${EDITION_TRIAL_DAYS} วันแล้ว`, { description: "ทุกฟีเจอร์เปิดใช้งานทันที — เมื่อครบกำหนดจะกลับเป็นเวอร์ชันทั่วไป" });
+      notify.completed(`เริ่มทดลองใช้โปรพลัส ${EDITION_TRIAL_DAYS} วันแล้ว`, { description: "ทุกฟีเจอร์เปิดใช้งานทันที — เมื่อครบกำหนดจะกลับเป็นเวอร์ชันทั่วไป" });
       void utils.edition.status.invalidate();
       onApplied?.(next);
       onClose();

@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-import { WorkflowDialog } from "./WorkflowDialog";
-import { CircleAlert, TriangleAlert, Info, Check } from "@/lib/icons";
+import { FeedbackDialog } from "./WorkflowDialog";
 
 /** Centered, queued messages for decisions, failures and important completed operations.
  * General information can continue to use toast without interrupting the workflow.
@@ -41,13 +40,6 @@ export const blocker = {
     emit({ ...extra, level: "info", title, description }),
 };
 
-const LEVEL_META: Record<BlockerLevel, { Icon: typeof CircleAlert; label: string }> = {
-  error: { Icon: CircleAlert, label: "ผิดพลาด" },
-  warning: { Icon: TriangleAlert, label: "แจ้งเตือน" },
-  info: { Icon: Info, label: "แจ้งให้ทราบ" },
-  success: { Icon: Check, label: "สำเร็จ" },
-};
-
 /** One queued, focus-contained notification at a time; important events never expire in a corner. */
 export function BlockerAlert() {
   const [queue, setQueue] = useState<BlockerOptions[]>([]);
@@ -59,16 +51,10 @@ export function BlockerAlert() {
   const current = queue[0];
   if (!current) return null;
   const level = current.level ?? "error";
-  const { Icon } = LEVEL_META[level];
   const close = () => {
     setQueue(items => items.slice(1));
     current.onAcknowledge?.();
   };
-  return <WorkflowDialog title={current.title} description={current.description} role="alertdialog" onClose={close} className="blocker-modal" backdropClassName="blocker-backdrop">
-    <span className={`blocker-icon ${level}`} aria-hidden="true"><Icon size={30} /></span>
-    <h3>{current.title}</h3>
-    {current.description && <p>{current.description}</p>}
-    {current.hint && <span className="blocker-hint">{current.hint}</span>}
-    <button type="button" autoFocus className="blocker-button" onClick={close}>{current.confirmLabel ?? (level === "success" ? "เสร็จสิ้น · กลับไปทำงานต่อ" : "รับทราบ · กลับไปตรวจสอบ")}</button>
-  </WorkflowDialog>;
+  return <FeedbackDialog tone={level} title={current.title} description={current.description} hint={current.hint} onClose={close} onAction={close} className={`blocker-modal blocker-${level}`} backdropClassName="blocker-backdrop"
+    actionLabel={current.confirmLabel ?? (level === "success" || level === "info" ? "ตกลง" : "รับทราบ")} />;
 }

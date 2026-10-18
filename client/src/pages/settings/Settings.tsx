@@ -1,3 +1,4 @@
+import { FeedbackDialog } from "@/components/WorkflowDialog";
 import { notify } from "@/lib/notifications";
 import { ActionButton } from "@/components/ActionButton";
 import { INVENTORY_ACTION_LABELS } from "@/lib/inventoryActions";
@@ -212,7 +213,7 @@ type SettingsForm = {
   helpPhone: string;
 };
 
-/** Round 17 — Thai labels per settings field, used by the unsaved-changes bar. */
+/** Thai labels for reviewing settings before confirmation. */
 const SETTINGS_FIELD_LABELS: [keyof SettingsForm, string][] = [
   ["memberNumberMode", "รูปแบบเลขสมาชิก"],
   ["memberNumberPrefix", "คำนำหน้าเลขสมาชิก"],
@@ -669,7 +670,8 @@ export function Settings({
   // committed into the shared form on every keystroke via updateForm.
   const [thresholdText, setThresholdText] = useState("");
   const [hydrated, setHydrated] = useState(false);
-  const [saved, setSaved] = useState(false);
+  const [saveReview, setSaveReview] = useState<{ form: SettingsForm; labels: string[] } | null>(null);
+  const saveInFlight = useRef(false);
   const [error, setError] = useState("");
   // UI-5 — advanced member-number fields hidden behind a disclosure by default
   const [memberAdvancedOpen, setMemberAdvancedOpen] = useState(false);
@@ -778,7 +780,7 @@ export function Settings({
         link.download = data.file;
         link.click();
         setTimeout(() => URL.revokeObjectURL(link.href), 4000);
-        toast.success("กำลังดาวน์โหลดไฟล์สำรอง", {
+        toast.info("เริ่มดาวน์โหลดไฟล์สำรอง", {
           description: `${data.file} · ${formatFileSize(data.sizeBytes)} — เก็บไว้นอกเครื่อง เช่น USB หรือคลาวด์ กันกรณีเครื่องพัง`,
         });
       } catch {
@@ -947,7 +949,7 @@ export function Settings({
         link.download = data.fileName;
         link.click();
         setTimeout(() => URL.revokeObjectURL(link.href), 4000);
-        toast.success("กำลังดาวน์โหลดเทมเพลต", {
+        toast.info("เริ่มดาวน์โหลดเทมเพลต", {
           description: `${data.fileName} — เติมข้อมูลตามหัวคอลัมน์ แล้วกลับมาอัปโหลดที่นี่`,
         });
       } catch {
@@ -1105,11 +1107,7 @@ export function Settings({
     nextMemberSequence(membersQuery.data ?? [], numberMode, numberFormat),
     numberFormat
   );
-  // Round 17 — dirty-state tracking: compare the working form against the
-  // server settings field by field so the sticky save bar can tell the
-  // user exactly what has changed and is still unsaved (the old UI only
-  // had a far-away save button in the header, which read as "settings
-  // don't work" when toggles were flipped and never saved).
+  // Compare the draft with server values for the centered save review.
   const serverSettings = settingsQuery.data ?? null;
   // ROUND 75 (user) — เมนูลัดหน้าร้าน: ชุดปุ่มที่ถูกปิด (จาก form ที่ยังไม่บันทึกก็เห็นสด ๆ)
   const railHiddenFormSet = useMemo(() => {
@@ -1183,12 +1181,13 @@ export function Settings({
     applyPaperWidth(serverSettings.receiptPaperWidth); // ROUND 42 — ยกเลิกพรีวิวขนาดกระดาษด้วย
   };
   const saveMutation = trpc.settings.set.useMutation({
-    onSuccess: () => {
-      setSaved(false);
+    onSuccess: async () => {
       setError("");
-      toast.success("บันทึกการตั้งค่าแล้ว");
-      void utils.settings.get.invalidate();
+      setSaveReview(null);
+      await utils.settings.get.invalidate();
+      notify.completed("บันทึกการตั้งค่าสำเร็จ", { description: "ใช้การตั้งค่าใหม่แล้ว" });
     },
+    onSettled: () => { saveInFlight.current = false; },
     onError: mutationError => {
       const message = getErrorMessage(mutationError);
       setError(message);
@@ -1232,9 +1231,14 @@ export function Settings({
     updateThermalProfile({ [key]: Number.isFinite(value) ? value : thermalProfile[key] });
   };
   const saveSettings = () => {
-    if (!form) return;
-    setSaved(false);
-    saveMutation.mutate({ ...form, appStyle: "shop" });
+    if (!form || saveMutation.isPending || saveInFlight.current || !dirtyCount) return;
+    toast.dismiss();
+    setSaveReview({ form: { ...form }, labels: [...dirtyKeys] });
+  };
+  const confirmSaveSettings = () => {
+    if (!saveReview || saveMutation.isPending || saveInFlight.current) return;
+    saveInFlight.current = true;
+    saveMutation.mutate({ ...saveReview.form, appStyle: "shop" });
   };
   const savePromptPay = () => {
     if (!form) return;
@@ -1499,7 +1503,7 @@ export function Settings({
         action={
           <button
             className="primary-button"
-            disabled={!form || saveMutation.isPending}
+            disabled={!form || saveMutation.isPending || dirtyCount === 0}
             onClick={saveSettings}
           >
             <Check size={16} />{" "}
@@ -1511,6 +1515,7 @@ export function Settings({
           </button>
         }
       />
+      {dirtyCount > 0 && <div className="settings-unsaved-note" role="status"><span>มีการแก้ไข {dirtyCount} รายการ · กดบันทึกด้านบนเพื่อตรวจสอบและยืนยัน</span><button type="button" className="outline-button compact" disabled={saveMutation.isPending} onClick={discardChanges}>ย้อนการแก้ไข</button></div>}
       <div className="settings-layout">
         <SharedSearch label="ตั้งค่า · ค้นหาเมนู">
           <div className="settings-search-wrap">
@@ -4256,45 +4261,9 @@ export function Settings({
               onClose={() => { setPrinterPreviewOpen(false); setPrinterTestOpen(false); }}
             />
           )}
-          {dirtyCount > 0 && form && (
-            <div className="settings-save-bar" role="status" aria-live="polite">
-              <span className="save-dot" aria-hidden="true" />
-              <div className="save-bar-text">
-                <b>ยังไม่ได้บันทึก · {dirtyCount} รายการ</b>
-                <small>
-                  แก้ไขแล้ว: {dirtyKeys.slice(0, 3).join(" · ")}
-                  {dirtyCount > 3 ? ` และอีก ${dirtyCount - 3} รายการ` : ""}
-                </small>
-              </div>
-              <div className="save-bar-actions">
-                <button
-                  type="button"
-                  className="outline-button"
-                  disabled={saveMutation.isPending}
-                  onClick={discardChanges}
-                >
-                  ย้อนการแก้ไข
-                </button>
-                <ActionButton busy={saveMutation.isPending}
-                  type="button"
-                  className="primary-button"
-                  disabled={saveMutation.isPending}
-                  onClick={saveSettings}
-                >
-                  <Check size={16} />{" "}
-                  {saveMutation.isPending ? "กำลังบันทึก…" : "บันทึกการตั้งค่า"}
-                </ActionButton>
-              </div>
-            </div>
-          )}
-          {saved && (
-            <div className="notice-bar">
-              <Check size={16} /> บันทึกการตั้งค่าเรียบร้อยแล้ว
-              <button onClick={() => setSaved(false)}>
-                <X size={14} />
-              </button>
-            </div>
-          )}
+          {saveReview && <FeedbackDialog tone="confirm" title="ยืนยันการบันทึกการตั้งค่า" description={`ตรวจสอบรายการที่แก้ไขก่อนบันทึก ${saveReview.labels.length} รายการ`} onClose={() => setSaveReview(null)} onCancel={() => setSaveReview(null)} cancelLabel="กลับไปแก้ไข" pending={saveMutation.isPending} className="settings-save-review" actionLabel="ยืนยันบันทึกการตั้งค่า" onAction={confirmSaveSettings}>
+            <ul>{saveReview.labels.map(label => <li key={label}>{label}</li>)}</ul>
+          </FeedbackDialog>}
           {error && (
             <div className="notice-bar error">
               <ShieldCheck size={16} /> {error}

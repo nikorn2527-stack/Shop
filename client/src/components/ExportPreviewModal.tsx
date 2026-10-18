@@ -1,6 +1,6 @@
 import { WorkflowDialog } from "./WorkflowDialog";
 import { useEffect, useMemo } from "react";
-import { FileSpreadsheet, FileText, Printer, Table2, X } from "@/lib/icons";
+import { FileSpreadsheet, FileCsv, FilePdf, Printer, X } from "@/lib/icons";
 import type { ReportDocConfig } from "@/reportDoc";
 import { buildReportDocumentHtml, thaiStamp } from "@shared/reportDoc";
 import { A4DocumentPreview } from "./A4DocumentPreview";
@@ -38,9 +38,9 @@ const FORMAT_META: Record<ExportFormat, { label: string; hint: string }> = {
 };
 
 function formatIcon(format: ExportFormat, size = 15) {
-  if (format === "csv") return <Table2 size={size} />;
+  if (format === "csv") return <FileCsv size={size} />;
   if (format === "xlsx") return <FileSpreadsheet size={size} />;
-  if (format === "pdf") return <FileText size={size} />;
+  if (format === "pdf") return <FilePdf size={size} />;
   return <Printer size={size} />;
 }
 

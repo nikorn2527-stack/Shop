@@ -178,6 +178,7 @@ export function MemberCardActionsModal({ memberNumber, onClose, onSuccess, initi
                       <button
                         type="button"
                         className="primary-button"
+                        data-action-tone="warning"
                         disabled={busy || member.balance < 0 || !session}
                         onClick={prepareReturn}
                       >
@@ -240,6 +241,7 @@ export function MemberCardActionsModal({ memberNumber, onClose, onSuccess, initi
                   <button
                     type="button"
                     className="primary-button"
+                    data-action-tone="warning"
                     disabled={busy || confirm}
                     onClick={submitReturn}
                   >
@@ -326,6 +328,7 @@ export function MemberCardActionsModal({ memberNumber, onClose, onSuccess, initi
                     </button>
                     <button
                       className="primary-button"
+                      data-action-tone="success"
                       onClick={closeReturnSlip}
                     >
                       <Check size={16} /> เสร็จสิ้น · ปิดหน้าต่าง
@@ -363,6 +366,7 @@ export function MemberCardActionsModal({ memberNumber, onClose, onSuccess, initi
   <button
     type="button"
     className="primary-button"
+    data-action-tone={assigning ? undefined : "warning"}
     disabled={!ready || busy}
     onClick={() => {
       if (!confirm) {

@@ -28,6 +28,8 @@ import {
   Download,
   Eye,
   FileBarChart,
+  FileCsv,
+  FilePdf,
   FileSpreadsheet,
   FileText,
   Lock,
@@ -1793,21 +1795,21 @@ export function Reports({
                     onClick={() => void openSalesExportPreview("csv", true)}
                     title="ดาวน์โหลด CSV ตามมุมมองปัจจุบัน — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
-                    <Download size={15} /> CSV
+                    <FileCsv size={15} /> CSV
                   </button>
                   <button
                     className="outline-button compact export-btn export-excel"
                     onClick={() => void openSalesExportPreview("xlsx", true)}
                     title="ดาวน์โหลด Excel ตามมุมมองปัจจุบัน — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
-                    <FileBarChart size={15} /> Excel
+                    <FileSpreadsheet size={15} /> Excel
                   </button>
                   <button
                     className="outline-button compact export-btn export-pdf"
                     onClick={() => void openSalesExportPreview("pdf", true)}
                     title="ดาวน์โหลด PDF (vector) ตามมุมมองปัจจุบัน — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
-                    <FileText size={15} /> PDF
+                    <FilePdf size={15} /> PDF
                   </button>
                   <button
                     className="outline-button compact export-btn export-print"
@@ -2530,21 +2532,21 @@ export function Reports({
                     onClick={() => void openBillsExportPreview("csv", true)}
                     title="ดาวน์โหลด CSV — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
-                    <Download size={15} /> CSV
+                    <FileCsv size={15} /> CSV
                   </button>
                   <button
                     className="outline-button compact export-btn export-excel"
                     onClick={() => void openBillsExportPreview("xlsx", true)}
                     title="ดาวน์โหลด Excel — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
-                    <FileBarChart size={15} /> Excel
+                    <FileSpreadsheet size={15} /> Excel
                   </button>
                   <button
                     className="outline-button compact export-btn export-pdf"
                     onClick={() => void openBillsExportPreview("pdf", true)}
                     title="ดาวน์โหลด PDF (vector) แบบเอกสาร A4 — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
-                    <FileText size={15} /> PDF
+                    <FilePdf size={15} /> PDF
                   </button>
                   <button
                     className="outline-button compact export-btn export-print"
@@ -2821,21 +2823,21 @@ export function Reports({
                     onClick={() => void openTxExportPreview("csv", true)}
                     title="ดาวน์โหลด CSV — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
-                    <Download size={15} /> CSV
+                    <FileCsv size={15} /> CSV
                   </button>
                   <button
                     className="outline-button compact export-btn export-excel"
                     onClick={() => void openTxExportPreview("xlsx", true)}
                     title="ดาวน์โหลด Excel — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
-                    <FileBarChart size={15} /> Excel
+                    <FileSpreadsheet size={15} /> Excel
                   </button>
                   <button
                     className="outline-button compact export-btn export-pdf"
                     onClick={() => void openTxExportPreview("pdf", true)}
                     title="ดาวน์โหลด PDF (vector) แบบเอกสาร A4 — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
-                    <FileText size={15} /> PDF
+                    <FilePdf size={15} /> PDF
                   </button>
                   <button
                     className="outline-button compact export-btn export-print"
@@ -3037,7 +3039,7 @@ export function Reports({
                     onClick={() => void openStockBalanceExportPreview("csv", true)}
                     title="ดาวน์โหลด CSV — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
-                    <Download size={15} /> CSV
+                    <FileCsv size={15} /> CSV
                   </button>
                   <button
                     className="outline-button compact export-btn export-excel"
@@ -3051,7 +3053,7 @@ export function Reports({
                     onClick={() => void openStockBalanceExportPreview("pdf", true)}
                     title="ดาวน์โหลด PDF (vector) แบบเอกสาร A4 — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
-                    <FileText size={15} /> PDF
+                    <FilePdf size={15} /> PDF
                   </button>
                   <button
                     className="outline-button compact export-btn export-print"
@@ -3262,7 +3264,7 @@ export function Reports({
                     onClick={() => void openBalancesExportPreview("csv", true)}
                     title="ดาวน์โหลด CSV — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
-                    <Download size={15} /> CSV
+                    <FileCsv size={15} /> CSV
                   </button>
                   <button
                     className="outline-button compact export-btn export-excel"
@@ -3276,7 +3278,7 @@ export function Reports({
                     onClick={() => void openBalancesExportPreview("pdf", true)}
                     title="ดาวน์โหลด PDF (vector) แบบเอกสาร A4 — ทำตรงๆ ไม่ต้องเข้าพรีวิว"
                   >
-                    <FileText size={15} /> PDF
+                    <FilePdf size={15} /> PDF
                   </button>
                   <button
                     className="outline-button compact export-btn export-print"

@@ -453,7 +453,7 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
     const result = { member };
       setSelectedMemberNumber(result.member.memberNumber);
       setMessage(`ลงทะเบียน ${memberFullName(result.member)} แล้ว · หมายเลข ${result.member.memberNumber} · เลือกเข้าบิลนี้ให้แล้ว${result.member.balance > 0 ? ` · เงินเริ่มต้น ${money(result.member.balance)}` : ""}`);
-      toast.success("ลงทะเบียนสมาชิกใหม่แล้ว", { description: `${memberFullName(result.member)} · ${result.member.memberNumber} · เลือกเข้าบิลนี้ให้แล้ว${result.member.balance > 0 ? ` · เงินเริ่มต้น ${money(result.member.balance)}` : ""}`, duration: 4500 });
+      notify.completed("ลงทะเบียนสมาชิกใหม่แล้ว", { description: `${memberFullName(result.member)} · ${result.member.memberNumber} · เลือกเข้าบิลนี้ให้แล้ว${result.member.balance > 0 ? ` · เงินเริ่มต้น ${money(result.member.balance)}` : ""}`, duration: 4500 });
       void utils.member.list.invalidate();
       void utils.logs.list.invalidate();
   };

@@ -1,6 +1,7 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { useId, type ReactNode } from "react";
-import { Check, X } from "@/lib/icons";
+import { Check, CircleAlert, CircleHelp, Info, X } from "@/lib/icons";
+import { ActionButton } from "./ActionButton";
 
 /** Portals keep dialogs outside transformed page layouts; Radix owns focus and stacking. */
 export function WorkflowDialog({ title, description, children, onClose, busy = false, className = "form-modal", backdropClassName = "", role = "dialog" }: {
@@ -34,6 +35,42 @@ export function WorkflowDialog({ title, description, children, onClose, busy = f
   </Dialog.Root>;
 }
 
+export type FeedbackTone = "confirm" | "success" | "warning" | "danger" | "error" | "info";
+const FEEDBACK_ICONS = { confirm: CircleHelp, success: Check, warning: CircleAlert, danger: CircleAlert, error: X, info: Info };
+
+/** One frame for decisions and results. The operation determines the icon, color and action label. */
+export function FeedbackDialog({ tone, title, description, children, hint, actionLabel, onAction, onClose, cancelLabel = "ยกเลิก", onCancel, pending = false, error, className = "", actionClassName = "", backdropClassName = "" }: {
+  tone: FeedbackTone;
+  title: string;
+  description?: string;
+  children?: ReactNode;
+  hint?: string;
+  actionLabel: string;
+  onAction: () => void;
+  onClose: () => void;
+  cancelLabel?: string;
+  onCancel?: () => void;
+  pending?: boolean;
+  error?: string;
+  className?: string;
+  actionClassName?: string;
+  backdropClassName?: string;
+}) {
+  const Icon = FEEDBACK_ICONS[tone];
+  return <WorkflowDialog title={title} description={description} role="alertdialog" onClose={onClose} busy={pending} className={`feedback-dialog ${className}`} backdropClassName={`feedback-backdrop ${backdropClassName}`}>
+    <span className={`blocker-icon ${tone}`} aria-hidden="true"><Icon size={52} weight="light" /></span>
+    <h2>{title}</h2>
+    {description && <p>{description}</p>}
+    {children && <div className="feedback-details">{children}</div>}
+    {hint && <span className="blocker-hint">{hint}</span>}
+    {error && <div className="notice-bar error" role="alert">{error}</div>}
+    <div className="feedback-actions">
+      {onCancel && <button type="button" className="outline-button" disabled={pending} onClick={onCancel}>{cancelLabel}</button>}
+      <ActionButton className={`blocker-button ${tone} ${actionClassName}`} autoFocus={!onCancel} busy={pending} onClick={() => { if (!pending) onAction(); }}>{actionLabel}</ActionButton>
+    </div>
+  </WorkflowDialog>;
+}
+
 export function WorkflowResult({ title, description, children, actionLabel = "เสร็จสิ้น", onDone }: {
   title: string;
   description?: string;
@@ -41,11 +78,9 @@ export function WorkflowResult({ title, description, children, actionLabel = "�
   actionLabel?: string;
   onDone: () => void;
 }) {
-  return <WorkflowDialog title={title} description={description} onClose={onDone} className="form-modal workflow-result">
-    <div className="modal-heading"><div className="workflow-result-heading"><span className="workflow-success-icon"><Check size={24} /></span><div><h2>{title}</h2>{description && <p>{description}</p>}</div></div><button type="button" className="icon-button" aria-label="ปิดผลรายการ" onClick={onDone}><X size={18} /></button></div>
-    {children && <div className="workflow-result-body">{children}</div>}
-    <div className="modal-actions"><button type="button" className="primary-button" onClick={onDone}>{actionLabel}</button></div>
-  </WorkflowDialog>;
+  return <FeedbackDialog tone="success" title={title} description={description} actionLabel={actionLabel} onAction={onDone} onClose={onDone} className="workflow-result">
+    {children}
+  </FeedbackDialog>;
 }
 
 export function ReceivingSurface({ page, children, onClose, busy }: { page: boolean; children: ReactNode; onClose: () => void; busy: boolean }) {

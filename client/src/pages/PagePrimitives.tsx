@@ -1,5 +1,4 @@
-import { WorkflowDialog } from "@/components/WorkflowDialog";
-import { ShieldCheck, X } from "@/lib/icons";
+import { FeedbackDialog } from "@/components/WorkflowDialog";
 
 export function StatusPill({ tone, children }: { tone: string; children: React.ReactNode }) {
   return <span className={`status-pill ${tone}`}>{children}</span>;
@@ -48,6 +47,5 @@ export type ConfirmDialogTone = "primary" | "warning" | "danger";
 
 export function ConfirmDialog({ open, title, description, confirmLabel, onCancel, onConfirm, pending = false, error, tone = "danger" }: { open: boolean; title: string; description: string; confirmLabel: string; onCancel: () => void; onConfirm: () => void; pending?: boolean; error?: string; tone?: ConfirmDialogTone }) {
   if (!open) return null;
-  return <WorkflowDialog title={title} description={description} onClose={onCancel} busy={pending} role="alertdialog" className={`confirm-modal confirm-${tone}`}><div className={`confirm-icon ${tone}`}><ShieldCheck size={21} /></div><div className="modal-heading"><div><h2>{title}</h2><p>{description}</p></div><button type="button" className="icon-button" disabled={pending} onClick={onCancel} aria-label="ปิด"><X size={17} /></button></div>{error && <div className="notice-bar error" role="alert">{error}</div>}<div className="confirm-actions"><button type="button" className="outline-button" disabled={pending} onClick={onCancel}>ยกเลิก</button><button type="button" className={`confirm-button ${tone}`} disabled={pending} onClick={() => { if (!pending) onConfirm(); }}>{confirmLabel}</button></div></WorkflowDialog>;
+  return <FeedbackDialog tone={tone === "primary" ? "confirm" : tone} title={title} description={description} onClose={onCancel} onCancel={onCancel} onAction={onConfirm} pending={pending} error={error} actionLabel={confirmLabel} className="confirm-modal" actionClassName="confirm-button" />;
 }
-

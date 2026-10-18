@@ -3,12 +3,23 @@
   .workflow-backdrop { position: fixed; inset: 0; z-index: 1300; padding: 16px; display: flex; align-items: center; justify-content: center; background: rgb(15 23 42 / 36%); }
   .workflow-dialog { position: relative; min-width: 0; max-width: 100%; max-height: calc(100dvh - 32px); overflow-y: auto; outline: none; }
   .workflow-backdrop.blocker-backdrop { z-index: 1400; }
+  .workflow-backdrop.feedback-backdrop { background: rgb(0 0 0 / 40%); backdrop-filter: none; -webkit-backdrop-filter: none; }
+  :root:root .feedback-dialog { width: min(512px, 100%); box-sizing: border-box; padding: 36px 32px 28px; border: 1px solid #e5e7eb; border-radius: 8px; background: #fff; box-shadow: 0 16px 48px rgb(0 0 0 / 14%); text-align: center; }
+  .blocker-icon { width: 88px; height: 88px; margin: 0 auto 24px; display: grid; place-items: center; border: 4px solid; border-radius: 50%; }
+  :root:root .feedback-dialog :is(h2, h3) { margin: 0; color: #374151; font-size: 24px; font-weight: 700; line-height: 1.5; overflow-wrap: anywhere; }
+  :root:root .feedback-dialog > p { margin: 12px auto 0; max-width: 420px; color: #64748b; font-size: 15px; line-height: 1.7; white-space: pre-line; overflow-wrap: anywhere; }
+  .blocker-hint { display: block; margin-top: 12px; color: #64748b; font-size: 13px; line-height: 1.6; }
+  .blocker-button { display: inline-flex; align-items: center; justify-content: center; width: auto; max-width: 100%; min-height: 44px; margin-top: 0; padding: 10px 24px; border: 1px solid; border-radius: 6px; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; }
+  @media (max-width: 560px) {
+    :root:root .feedback-dialog { padding: 28px 20px 24px; }
+    :root:root .feedback-dialog :is(h2, h3) { font-size: 21px; }
+  }
   .workflow-dialog .modal-heading { flex: 0 0 auto; }
   .workflow-dialog .modal-actions, .workflow-dialog .confirm-actions { position: sticky; bottom: 0; z-index: 1; background: #fff; padding-top: 16px; }
-  .workflow-result { width: min(520px, 100%); }
-  .workflow-result-heading { display: flex; align-items: center; gap: 12px; }
-  .workflow-success-icon { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 44px; height: 44px; border-radius: 50%; background: var(--success-bg); color: var(--success-ink); }
-  .workflow-result-body { margin-top: 16px; }
+  .feedback-details { margin-top: 16px; text-align: left; }
+  .feedback-actions { display: flex; justify-content: center; align-items: center; flex-wrap: wrap; gap: 12px; margin-top: 24px; }
+  .feedback-actions > .outline-button { min-height: 44px; border-radius: 6px; }
+  .feedback-actions .action-control { display: inline-flex; }
   .stock-receiving-page { min-width: 0; }
   :root .receiving-workspace.stock-receive-modal {
     position: relative; inset: auto; width: 100%; max-width: 100%; height: auto; min-height: min(640px, 80dvh); max-height: none;
@@ -32,19 +43,13 @@
   .workflow-dialog .receipt-success { background: var(--success-bg); }
   .workflow-dialog .receipt-success > span { background: #d8f3e1; color: var(--success-ink); }
 
-  :root:root :is(.app-shell, .modal-backdrop, [data-slot="dialog-content"]) :is(.primary-button, .solid-button, .scan-button):not(:disabled) {
-    background: var(--action-primary); background-image: none; border-color: var(--action-primary); color: #fff; box-shadow: none;
-  }
-  :root:root :is(.app-shell, .modal-backdrop, [data-slot="dialog-content"]) :is(.primary-button, .solid-button, .scan-button):not(:disabled):hover {
-    background: var(--action-hover); border-color: var(--action-hover);
-  }
-  :root:root :is(.app-shell, .modal-backdrop, [data-slot="dialog-content"]) :is(.primary-button, .solid-button, .scan-button, .outline-button, .export-btn, .preview-format-btn, .confirm-button):disabled {
+  :root:root :is(.app-shell, .modal-backdrop, [data-slot="dialog-content"]) :is(.primary-button, .solid-button, .scan-button, .outline-button, .export-btn, .preview-format-btn, .confirm-button, .danger-button, .danger-outline-button, .blocker-button, [data-action-tone]):disabled {
     background: var(--disabled-bg); background-image: none; border-color: var(--control-border); color: var(--disabled-ink); box-shadow: none; opacity: 1; cursor: not-allowed;
   }
-  :root:root :is(.app-shell, .modal-backdrop) :is(.outline-button, .quick-amount-btn):not(:disabled) {
+  :root:root :is(.app-shell, .modal-backdrop) :is(.outline-button, .quick-amount-btn):not(.export-btn, .statement-export-pdf, .statement-export-print, [data-action-tone]):not(:disabled) {
     background: #fff; background-image: none; border: 1px solid var(--control-border); color: var(--ink); box-shadow: none;
   }
-  :root:root :is(.app-shell, .modal-backdrop) :is(.outline-button, .quick-amount-btn):not(:disabled):hover { background: #f1f5f9; border-color: #94a3b8; }
+  :root:root :is(.app-shell, .modal-backdrop) :is(.outline-button, .quick-amount-btn):not(.export-btn, .statement-export-pdf, .statement-export-print, [data-action-tone]):not(:disabled):hover { background: #f1f5f9; border-color: #94a3b8; }
   :root:root :is(.app-shell, .modal-backdrop, [data-slot="dialog-content"]) :is(button, input, select, textarea):focus-visible {
     outline: 2px solid var(--focus-ring); outline-offset: 2px; box-shadow: none;
   }
@@ -53,8 +58,6 @@
   :root:root :is(.app-shell, .modal-backdrop) :is(.pay-confirm-total b, .cart-total strong, .pay-total strong) { color: var(--ink); }
   :root:root .pos-rail .rail-btn > svg { background: #eef2f7; border-color: var(--control-border); color: var(--muted); }
   :root:root .pos-rail .rail-btn.active > svg { background: var(--action-soft); color: var(--action-primary); }
-  :root:root .blocker-button { background: var(--action-primary); color: #fff; }
-  :root:root .blocker-button:hover { background: var(--action-hover); }
   @media (max-width: 900px) {
     .receiving-workspace .receive-split-workspace { grid-template-columns: minmax(0, 1fr); }
   }
@@ -81,3 +84,10 @@
 .existing-member-match { padding: 12px; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; }
 .existing-member-match p { margin: 6px 0; }
 .existing-member-match small { color: #475569; }
+
+@media screen {
+  .settings-unsaved-note { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 0 0 16px; padding: 10px 14px; background: #fff7ed; color: #9a3412; border: 1px solid #fed7aa; border-radius: 10px; }
+  .settings-unsaved-note button { margin-left: auto; }
+  .settings-save-review ul { margin: 16px 0; padding-left: 24px; max-height: 36dvh; overflow: auto; }
+  .settings-save-review li { margin-bottom: 8px; }
+}

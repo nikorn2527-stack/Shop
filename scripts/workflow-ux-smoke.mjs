@@ -48,7 +48,7 @@ const server = spawn(process.execPath, ['dist/index.js'], {
 let browser, page;
 const errors = [];
 const results = [];
-let printMode = 'success', printRequests = 0;
+let printMode = 'success', printRequests = 0, settingsWrites = 0;
 const query = (sql, ...args) => {
   const connection = new DatabaseSync(target, { readOnly: true });
   try { return connection.prepare(sql).get(...args); } finally { connection.close(); }
@@ -86,7 +86,7 @@ async function cashSale() {
   assert.equal(await page.$eval('.pay-confirm-button', b => b.querySelectorAll('svg').length), 0, 'Unpaid state must not have a success tick');
   await pause(300); await page.screenshot({ path: path.join(dir, 'checkout-not-ready.png') });
   await click('รับตรงยอด', '.pay-confirm-modal');
-  assert.equal(await page.$eval('.pay-confirm-button', b => getComputedStyle(b).backgroundColor), 'rgb(51, 78, 154)');
+  assert.equal(await page.$eval('.pay-confirm-button', b => getComputedStyle(b).backgroundColor), 'rgb(204, 251, 241)');
   await click('ยืนยันการชำระเงิน', '.pay-confirm-modal'); await page.waitForSelector('#receipt-paper');
 }
 try {
@@ -120,6 +120,7 @@ try {
   });
   await page.setRequestInterception(true);
   page.on('request', request => {
+    if (request.method() === 'POST' && request.url().includes('settings.set')) settingsWrites++;
     if (request.url().startsWith('http://127.0.0.1:3031/print')) {
       if (request.method() === 'POST') printRequests++;
       request.respond({ status: printMode === 'success' ? 200 : 503, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type', 'Access-Control-Allow-Methods': 'POST,OPTIONS' }, body: JSON.stringify({ ok: printMode === 'success', message: 'Mock print job accepted' }) });
@@ -228,7 +229,7 @@ try {
   await page.waitForFunction(() => !document.querySelector('#receipt-paper'));
   assert.equal(printRequests, 1); assert.equal(query('SELECT COUNT(*) n FROM sales').n, salesBefore + 1);
   await page.waitForFunction(() => document.activeElement === document.querySelector('.scan-hero input'));
-  passed('payment states use neutral/blue actions; print once and return to a ready POS');
+  passed('payment states use neutral/teal actions; print once and return to a ready POS');
 
   await cashSale(); printMode = 'failure'; await page.evaluate(() => { window.__browserPrintMode = 'failure'; });
   await click('พิมพ์และกลับ POS', '.receipt-actions'); await page.waitForSelector('.receipt-document-error');
@@ -277,6 +278,71 @@ try {
   assert.equal(query('SELECT COUNT(*) n FROM sales').n, salesBefore + 4);
   assert.equal(await page.$eval('[data-nav-item="reports"]', button => button.getAttribute('aria-current')), 'page');
   passed('reprint returns to reports and does not create or reset a POS sale');
+
+  // Real page checks for format colors and the settings review -> success sequence.
+  const fileColors = { '.export-csv': 'rgb(14, 116, 144)', '.export-excel': 'rgb(21, 128, 61)', '.export-pdf': 'rgb(185, 28, 28)', '.export-print': 'rgb(109, 40, 217)' };
+  for (const [selector, color] of Object.entries(fileColors)) {
+    await page.waitForSelector(selector);
+    assert.equal(await page.$eval(`${selector} svg`, icon => getComputedStyle(icon).color), color, `File icon ${selector}`);
+  }
+  await page.waitForFunction(() => !document.querySelector('[data-sonner-toast][data-type="success"]'));
+  await pause(250); await page.screenshot({ path: path.join(dir, 'report-file-colors.png') });
+  await (await page.$('.report-export-actions')).screenshot({ path: path.join(dir, 'file-type-toolbar.png') });
+  passed('CSV, Excel, PDF and print retain distinct file-type icons and colors');
+
+  await page.click('[data-nav-item="settings"]');
+  await click('เมนูลัดหน้าร้าน', '.settings-nav');
+  await page.waitForSelector('.pos-rail-manage-row .toggle');
+  assert.equal(await page.$eval('.pos-rail-manage-row .toggle.on', toggle => getComputedStyle(toggle).backgroundColor), 'rgb(158, 217, 183)', 'Preserve the existing soft green enabled switch');
+  const beforeWrites = settingsWrites;
+  await page.click('.pos-rail-manage-row .toggle');
+  await page.waitForSelector('.settings-unsaved-note');
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('.pos-rail-manage-row .toggle:not(.on)')).backgroundColor === 'rgb(220, 226, 234)');
+  assert.equal(await page.$eval('.pos-rail-manage-row .toggle:not(.on)', toggle => getComputedStyle(toggle).backgroundColor), 'rgb(220, 226, 234)', 'Preserve the existing gray disabled switch');
+  assert.equal(await page.$('.settings-save-bar'), null, 'No floating bottom confirmation');
+  assert.equal(settingsWrites, beforeWrites, 'Editing does not persist automatically');
+  await pause(200); await page.screenshot({ path: path.join(dir, 'settings-orange-teal.png') });
+  await click('บันทึกการตั้งค่า'); await page.waitForSelector('.settings-save-review');
+  assert.equal(settingsWrites, beforeWrites, 'Review must precede the mutation');
+  await click('กลับไปแก้ไข', '.settings-save-review');
+  await page.waitForFunction(() => !document.querySelector('.settings-save-review'));
+  assert.equal(settingsWrites, beforeWrites, 'Cancelling review writes nothing');
+  await click('บันทึกการตั้งค่า'); await page.waitForSelector('.settings-save-review');
+  const confirmWidth = await page.$eval('.settings-save-review', dialog => dialog.getBoundingClientRect().width);
+  assert.ok(await page.$('.settings-save-review .blocker-icon.confirm'));
+  assert.equal(await page.$eval('.settings-save-review .blocker-button', button => getComputedStyle(button).backgroundColor), 'rgb(204, 251, 241)');
+  await pause(200); await page.screenshot({ path: path.join(dir, 'settings-save-confirmation.png') });
+  await page.$eval('.settings-save-review .action-button', button => { button.click(); button.click(); });
+  await page.waitForSelector('.blocker-success');
+  assert.equal(settingsWrites, beforeWrites + 1, 'Rapid repeated clicks must write only once');
+  assert.equal(await page.$$eval('[data-sonner-toast][data-type="success"]', notices => notices.length), 0, 'Settings success never uses stacked corner toasts');
+  assert.equal(await page.$$eval('.blocker-success', notices => notices.length), 1, 'Exactly one centered success dialog');
+  assert.equal(await page.$eval('.blocker-button.success', button => getComputedStyle(button).backgroundColor), 'rgb(220, 252, 231)', 'Success acknowledgement is light green');
+  assert.equal(await page.$eval('.blocker-button.success', button => getComputedStyle(button).color), 'rgb(22, 101, 52)');
+  assert.equal(await page.$eval('.blocker-success', dialog => getComputedStyle(dialog).backgroundColor), 'rgb(255, 255, 255)');
+  assert.equal(await page.$eval('.blocker-success', dialog => dialog.getBoundingClientRect().width), confirmWidth, 'Confirmation and result use the same frame');
+  assert.equal(await page.$eval('.blocker-backdrop', backdrop => getComputedStyle(backdrop).backdropFilter), 'none');
+  await pause(200); await page.screenshot({ path: path.join(dir, 'settings-save-success.png') });
+  await acknowledge();
+  await page.waitForFunction(() => !document.querySelector('.settings-unsaved-note'));
+  passed('settings review is centered; cancellation writes nothing; saving once ends with light-green success');
+
+  await page.click('[data-nav-item="members"]');
+  await fill('input[placeholder="ค้นหาชื่อ เลขสมาชิก หรือพิมพ์เลขบางส่วน/ท้ายเลข"]', returning.member_number);
+  await page.waitForFunction(() => document.querySelector('.rows-members tbody tr')?.textContent.includes('Returning'));
+  await page.click('.rows-members tbody tr'); await page.waitForSelector('.member-detail-actions');
+  assert.equal(await page.$eval('.member-detail-actions .danger-outline-button', button => getComputedStyle(button).color), 'rgb(185, 28, 28)', 'Deletion is red, not muted pink or brand teal');
+  await click('ระงับการใช้งาน', '.member-detail-actions'); await page.waitForSelector('.feedback-dialog .blocker-icon.warning');
+  assert.equal(await page.$eval('.feedback-dialog .blocker-button.warning', button => getComputedStyle(button).backgroundColor), 'rgb(255, 251, 235)');
+  await pause(200); await page.screenshot({ path: path.join(dir, 'semantic-warning.png') });
+  await click('ยกเลิก', '.feedback-dialog');
+  await click('ลบสมาชิก', '.member-detail-actions'); await page.waitForSelector('.feedback-dialog .blocker-icon.danger');
+  assert.equal(await page.$eval('.feedback-dialog .blocker-button.danger', button => getComputedStyle(button).backgroundColor), 'rgb(220, 38, 38)');
+  await pause(200); await page.screenshot({ path: path.join(dir, 'semantic-danger.png') });
+  await click('ยกเลิก', '.feedback-dialog');
+  assert.equal(query('SELECT COUNT(*) n FROM members').n, originalMemberCount);
+  assert.equal(query('SELECT status FROM members WHERE member_number=?', returning.member_number).status, 'active');
+  passed('preserve switch colors; warning and destructive dialogs use distinct functional colors without changing data');
 
   assert.deepEqual(errors, []);
   assert.equal(query('PRAGMA integrity_check').integrity_check, 'ok');

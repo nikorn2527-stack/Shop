@@ -449,6 +449,7 @@ export function MemberDetail({
           </button>
           <button
             className="outline-button"
+            data-action-tone="warning"
             disabled={profile.status !== "active" || !cardReady}
             title={!profile.cardNumber ? "กรุณาจ่ายบัตรก่อนถอนเงิน" : !cardReady ? "บัตรยังไม่พร้อมใช้งาน กรุณาตรวจสอบสถานะบัตร" : undefined}
             onClick={() => {
@@ -462,6 +463,7 @@ export function MemberDetail({
           </button>
           <button
             className="outline-button"
+            data-action-tone="warning"
             disabled={profile.status !== "active" || !cardReady}
             onClick={() => setCardAction("return")}
             title={!profile.cardNumber ? "เธชเธกเธฒเธเธดเธเธขเธฑเธเนเธกเนเธกเธตเธเธฑเธ•เธฃเธ—เธตเนเธ•เนเธญเธเธเธทเธ" : !cardReady ? "เธเธฑเธ•เธฃเธขเธฑเธเนเธกเนเธเธฃเนเธญเธกเนเธเนเธเธฒเธ เธเธฃเธธเธ“เธฒเธ•เธฃเธงเธเธชเธญเธเธชเธ–เธฒเธเธฐเธเธฑเธ•เธฃ" : "เธฃเธฑเธเธเธฑเธ•เธฃเธเธทเธ เธเธทเธเธขเธญเธ”เธเธเน€เธซเธฅเธทเธญเธ—เธฑเนเธเธซเธกเธ” เนเธฅเธฐเธเธดเธ”เธฃเธญเธเธเธฑเธ•เธฃ"}
@@ -470,7 +472,8 @@ export function MemberDetail({
           </button>
           {profile.status === "active" ? (
             <button
-              className="danger-outline-button"
+              className="outline-button"
+              data-action-tone="warning"
               onClick={() => setConfirmStatus(true)}
             >
               <LockKeyhole size={15} /> ระงับการใช้งาน
@@ -868,6 +871,7 @@ export function MemberDetail({
                     </button>
                     <button
                       className="primary-button"
+                      data-action-tone="success"
                       onClick={closeWalletSlip}
                     >
                       <Check size={16} /> เสร็จสิ้น · ปิดหน้าต่าง
@@ -957,6 +961,7 @@ export function MemberDetail({
                     disabledReason="กรอกข้อมูลให้ครบ"
                     busy={walletMutation.isPending}
                     className="primary-button"
+                    data-action-tone={walletOpen === "deposit" ? undefined : "warning"}
                     disabled={
                       walletMutation.isPending || balanceAfterWallet < 0
                     }
@@ -1047,6 +1052,7 @@ export function MemberDetail({
                     disabledReason="กรอกข้อมูลให้ครบ"
                     busy={walletMutation.isPending}
                     className="primary-button"
+                    data-action-tone={walletOpen === "deposit" ? undefined : "warning"}
                     disabled={
                       walletMutation.isPending ||
                       !(Number(walletAmount) > 0) ||

@@ -1,11 +1,14 @@
-/* Navy Slate screen palette. Status dots and alerts retain their semantic
-   colours. Print documents remain independent from the application theme. */
+/* Light orange and teal application palette. File types and operation results
+   retain their own meaning. Print documents remain independent. */
 @media screen {
   :root:root {
-    --action-primary: #334e9a;
-    --action-hover: #263b78;
-    --action-soft: #eef2ff;
-    --focus-ring: #435b93;
+    --action-primary: #0f766e;
+    --action-bg: #ccfbf1;
+    --action-ink: #115e59;
+    --action-border: #5eead4;
+    --action-hover: #99f6e4;
+    --action-soft: #f0fdfa;
+    --focus-ring: #0d9488;
     --control-border: #cbd5e1;
     --disabled-bg: #e8ecf1;
     --disabled-ink: #596575;
@@ -13,7 +16,7 @@
     --success-ink: #166534;
     --ink: #1F2B38;
     --muted: #526579;
-    --canvas: #F1F3F5;
+    --canvas: #fafcfb;
     --surface: #ffffff;
     --line: #CAD2DA;
     --red: #b91c1c;
@@ -24,12 +27,12 @@
     --teal-soft: #ccfbf1;
     --teal-mist: #f0fdfa;
     --teal-glow: rgba(15, 118, 110, 0.2);
-    --canvas-gradient: linear-gradient(135deg, #E5EAF0 0%, #F7F8FA 46%, #DDE3E8 100%);
-    --workspace-gradient: linear-gradient(135deg, rgb(229 234 240 / 96%) 0%, rgb(247 248 250 / 94%) 48%, rgb(221 227 232 / 95%) 100%);
-    --sidebar-gradient: linear-gradient(180deg, #F8FAFC 0%, #E9EEF2 52%, #DCE3E9 100%);
-    --topbar-gradient: linear-gradient(110deg, rgb(255 255 255 / 95%) 0%, rgb(229 234 240 / 92%) 100%);
-    --surface-gradient: linear-gradient(145deg, #FFFFFF 0%, #F7F9FA 58%, #E9EEF2 100%);
-    --accent-gradient: linear-gradient(135deg, #0f766e 0%, #0f766e 52%, #115e59 100%);
+    --canvas-gradient: linear-gradient(135deg, #fffaf5 0%, #ffffff 48%, #f0fdfa 100%);
+    --workspace-gradient: linear-gradient(135deg, rgb(255 250 245 / 96%) 0%, rgb(255 255 255 / 96%) 48%, rgb(240 253 250 / 95%) 100%);
+    --sidebar-gradient: linear-gradient(180deg, #ffffff 0%, #f0fdfa 100%);
+    --topbar-gradient: linear-gradient(110deg, #ffffff 0%, #f0fdfa 100%);
+    --surface-gradient: linear-gradient(145deg, #ffffff 0%, #ffffff 100%);
+    --accent-gradient: linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%);
     --rail-a: #365A78;
     --rail-b: #294A66;
     --rail-solid: #115e59;
@@ -41,12 +44,21 @@
     color: var(--ink);
     background: var(--canvas-gradient);
   }
-  :root:root :is(.primary-button, .scan-button, .login-submit) {
-    background: var(--action-primary); background-image: none; border-color: var(--action-primary); color: #ffffff;
+  :root:root :is(.app-shell, .modal-backdrop, .login-screen, [data-slot="dialog-content"]) :is(.primary-button, .solid-button, .scan-button, .login-submit):not(:disabled) {
+    background: var(--action-bg); background-image: none; border-color: var(--action-border); color: var(--action-ink); box-shadow: none;
   }
-  :root:root :is(.primary-button, .scan-button, .login-submit):not(:disabled):hover {
-    background: var(--action-hover); background-image: none; border-color: var(--action-hover);
+  :root:root :is(.app-shell, .modal-backdrop, .login-screen, [data-slot="dialog-content"]) :is(.primary-button, .solid-button, .scan-button, .login-submit):not(:disabled):hover {
+    background: var(--action-hover); border-color: var(--action-border); color: var(--action-ink);
   }
+  /* Function-specific actions override ordinary action styling explicitly. */
+  :root:root :is(.app-shell, .modal-backdrop) [data-action-tone="success"]:not(:disabled) { background: #dcfce7; background-image: none; border: 1px solid #86efac; color: #166534; --btn-icon: #166534; }
+  :root:root :is(.app-shell, .modal-backdrop) [data-action-tone="success"]:not(:disabled):hover { background: #bbf7d0; }
+  :root:root :is(.app-shell, .modal-backdrop) [data-action-tone="warning"]:not(:disabled) { background: #fffbeb; background-image: none; border: 1px solid #fcd34d; color: #92400e; --btn-icon: #92400e; }
+  :root:root :is(.app-shell, .modal-backdrop) [data-action-tone="warning"]:not(:disabled):hover { background: #fef3c7; }
+  :root:root :is(.app-shell, .modal-backdrop) .danger-button:not(:disabled) { background: #dc2626; border: 1px solid #dc2626; color: #fff; --btn-icon: #fff; }
+  :root:root :is(.app-shell, .modal-backdrop) .danger-button:not(:disabled):hover { background: #b91c1c; }
+  :root:root :is(.app-shell, .modal-backdrop) .danger-outline-button:not(:disabled) { background: #fff; border: 1px solid #f87171; color: #b91c1c; --btn-icon: #b91c1c; }
+  :root:root :is(.app-shell, .modal-backdrop) .danger-outline-button:not(:disabled):hover { background: #fef2f2; }
   :root:root :is(.status-pill.green, .status-badge.green, .card-inventory-status.is-blank, .card-inventory-status.is-returned_vacant) { --status-color: #15803d; }
   :root:root :is(.status-pill.blue, .status-badge.blue, .card-inventory-status.is-assigned) { --status-color: #0f766e; }
   :root:root :is(.status-pill.amber, .status-badge.amber) { --status-color: #a16207; }
@@ -60,13 +72,24 @@
   :root:root :is(.notice-bar.error, .inline-message.error, .login-error, [data-sonner-toast][data-type="error"]) {
     background: #fef2f2; border: 1px solid #efc5c5; color: #991b1b;
   }
-  :root:root .blocker-icon.error { background: #fecaca; color: #dc2626; }
-  :root:root .blocker-button.error { background: #dc2626; color: #ffffff; }
-  :root:root .blocker-button.error:hover { background: #b91c1c; }
-  :root:root .blocker-icon.warning { background: #fef08a; color: #854d0e; }
-  :root:root .blocker-button.warning { background: #facc15; color: #422006; }
-  :root:root .blocker-icon.success { background: #bbf7d0; color: #15803d; }
-  :root:root .blocker-button.success { background: #15803d; color: #ffffff; }
+  :root:root .blocker-icon.error { background: #fff; border-color: #fecaca; color: #ef4444; }
+  :root:root .blocker-button.error { background: #fef2f2; color: #991b1b; border: 1px solid #fecaca; }
+  :root:root .blocker-button.error:hover { background: #fee2e2; }
+  :root:root .blocker-icon.warning { background: #fff; border-color: #fde68a; color: #d97706; }
+  :root:root .blocker-button.warning { background: #fffbeb; color: #92400e; border: 1px solid #fde68a; }
+  :root:root .blocker-button.warning:hover { background: #fef3c7; }
+  :root:root .blocker-icon.success { background: #fff; border-color: #dcf3d0; color: #9bd582; }
+  :root:root .blocker-icon.info { background: #fff; border-color: #99f6e4; color: #0d9488; }
+  :root:root .blocker-button.info { background: #ccfbf1; color: #115e59; }
+  :root:root .blocker-button.info:hover { background: #99f6e4; }
+  :root:root .blocker-button.success { background: #dcfce7; color: #166534; border: 1px solid #86efac; }
+  :root:root .blocker-button.success:hover { background: #bbf7d0; }
+  :root:root .blocker-icon.confirm { background: #fff; border-color: #99f6e4; color: #0d9488; }
+  :root:root .blocker-icon.danger { background: #fff; border-color: #fecaca; color: #dc2626; }
+  :root:root .blocker-button.confirm { background: #ccfbf1; border-color: #5eead4; color: #115e59; }
+  :root:root .blocker-button.confirm:hover { background: #99f6e4; }
+  :root:root .blocker-button.danger { background: #dc2626; border-color: #dc2626; color: #fff; }
+  :root:root .blocker-button.danger:hover { background: #b91c1c; }
   :root:root .notif-badge { background: #dc2626; }
   :root:root .notif-bell.has-alert { color: #dc2626; }
   :root:root .login-blob.teal { background: linear-gradient(135deg, #8799AA, #0f766e); }
@@ -119,7 +142,7 @@
   :root:root :is(.sidebar, .login-brand) .brand-mark { background: #115e59; box-shadow: 0 5px 14px rgb(23 40 61 / 25%); }
   :root:root .app-shell .sidebar nav button:hover:not(.active) { background: #F3F5F7; color: #115e59; }
   :root:root .app-shell .sidebar nav button.active {
-    background: #DCE3EA; background-image: linear-gradient(110deg, #E7ECF1 0%, #D4DDE5 58%, #F1F4F6 100%); color: #115e59; border-color: #AAB7C4;
+    background: #f0fdfa; background-image: none; color: #115e59; border-color: #99f6e4;
     box-shadow: inset 3px 0 0 #0f766e, 0 4px 12px rgb(66 107 140 / 10%);
   }
   :root:root .app-shell .sidebar nav button.active :is(b, small, svg) { color: #115e59; }
@@ -131,31 +154,24 @@
   }
   :root:root :is(.global-search, .scan-hero, .search-box, input, select, textarea):focus-within { border-color: #0f766e; }
   :root:root :is(.onboarding-banner, .setup-banner, .dashboard-ready-card) { background: #F3F5F7; background-image: linear-gradient(135deg, #F5F7F8 0%, #DCE3EA 62%, #FAFBFC 100%); border-color: #AAB7C4; }
-  :root:root :is(.dash-tab.active, .settings-nav button.active, .report-view-pills [aria-selected="true"], .cost-profit-ranges .primary-button) { background: #0f766e; background-image: var(--accent-gradient); border-color: #0f766e; color: #ffffff; }
+  :root:root :is(.dash-tab.active, .settings-nav button.active, .report-view-pills [aria-selected="true"], .cost-profit-ranges .primary-button) { background: #ccfbf1; background-image: none; border-color: #99f6e4; color: #115e59; }
   :root:root .quick-pick-panel .product-card.in-bill { border-color: #0f766e; box-shadow: inset 0 0 0 1px #0f766e, 0 2px 4px rgb(31 43 56 / 8%); }
-  /* POS shortcuts use one restrained navy-slate system; semantic green remains for success. */
+  /* Teal identifies navigation; green identifies successful operations. */
   :root:root .pos-rail .rail-btn { color: #1F2B38; --task-ink: #0f766e; --task-tint: #F3F5F7; }
   :root:root .pos-rail .rail-btn.rail-member { --task-ink: #0f766e; --task-tint: #ccfbf1; }
   :root:root .pos-rail .rail-btn > svg { background: var(--task-tint); color: var(--task-ink); }
-  :root:root .pos-rail .rail-btn.active { background: #DCE3EA; border-color: #0f766e; color: #1F2B38; box-shadow: inset 3px 0 0 #0f766e, 0 2px 4px rgb(31 43 56 / 12%); }
+  :root:root .pos-rail .rail-btn.active { background: #f0fdfa; border-color: #99f6e4; color: #1F2B38; box-shadow: inset 3px 0 0 #0f766e, 0 2px 4px rgb(31 43 56 / 12%); }
   :root:root :is(.scan-hero:focus-within, .member-scan-field:focus-within) { border-color: var(--control-border); box-shadow: none; }
   :root:root :is(.cart-total strong, .cart-totals .total-line strong, .cost-profit-page a) { color: #115e59; }
-  /* ปุ่มส่งออกมีธีมสีรายชนิดอยู่แล้ว — ไอคอนใช้สีข้อความปุ่ม (ธีม) ไม่ใช่สีแบรนด์ */
-  :root:root :is(.app-shell, .modal-backdrop) .export-btn { --btn-icon: currentColor; }
-
-  /* Report exports keep the screen palette restrained, but remain recognizable by file type. */
-  :root:root .app-shell .report-export-actions .export-btn:not(:disabled) {
-    font-weight: 700; box-shadow: 0 1px 2px rgb(15 23 42 / 6%);
-  }
-  :root:root :is(.app-shell .report-export-actions .export-btn, .modal-backdrop .preview-format-btn, .modal-backdrop .statement-export-pdf, .modal-backdrop .statement-export-print) {
-    background: #fff; background-image: none; color: var(--ink); border: 1px solid var(--control-border); box-shadow: none;
-  }
-  :root:root :is(.app-shell .report-export-actions .preview-btn, .modal-backdrop .preview-format-btn.preferred):not(:disabled) {
-    background: var(--action-soft); color: var(--action-primary); border-color: #aab8dc;
-  }
-  :root:root :is(.app-shell .report-export-actions .export-btn, .modal-backdrop .preview-format-btn):not(:disabled):hover {
-    background: #f1f5f9; border-color: #94a3b8;
-  }
+  /* Preserve format recognition in reports and preview dialogs. */
+  :root:root :is(.app-shell, .modal-backdrop) :is(.export-csv, .format-csv) { --file-ink: #0e7490; --file-soft: #ecfeff; --file-line: #a5f3fc; }
+  :root:root :is(.app-shell, .modal-backdrop) :is(.export-excel, .format-xlsx) { --file-ink: #15803d; --file-soft: #f0fdf4; --file-line: #bbf7d0; }
+  :root:root :is(.app-shell, .modal-backdrop) :is(.export-pdf, .format-pdf, .statement-export-pdf) { --file-ink: #b91c1c; --file-soft: #fef2f2; --file-line: #fecaca; }
+  :root:root :is(.app-shell, .modal-backdrop) :is(.export-print, .format-print, .statement-export-print) { --file-ink: #6d28d9; --file-soft: #f5f3ff; --file-line: #ddd6fe; }
+  :root:root :is(.app-shell, .modal-backdrop) :is(.export-btn, .preview-format-btn, .statement-export-pdf, .statement-export-print):not(:disabled) { --btn-icon: var(--file-ink, #0f766e); background: var(--file-soft, #f0fdfa); color: var(--file-ink, #0f766e); border-color: var(--file-line, #99f6e4); }
+  :root:root :is(.app-shell, .modal-backdrop) :is(.export-btn, .preview-format-btn, .statement-export-pdf, .statement-export-print):not(:disabled) svg { color: var(--file-ink, #0f766e); }
+  :root:root :is(.app-shell, .modal-backdrop) :is(.export-btn, .preview-format-btn):not(:disabled):hover { background: #fff; border-color: var(--file-ink, #0f766e); }
+  :root:root .modal-backdrop .preview-format-btn.preferred { box-shadow: none; border-color: var(--file-ink); }
 
   /* Logout remains an outlined secondary action, but its label and icon use the
      destructive colour so it cannot be mistaken for ordinary navigation. */
@@ -194,39 +210,6 @@
     }
   }
 
-  /* Confirmation color communicates impact: navy normal, amber caution, red destructive. */
-  :root:root .modal-backdrop .confirm-icon.primary { background: var(--action-soft); color: var(--action-primary); }
-  :root:root .modal-backdrop .confirm-icon.warning { background: #fef3c7; color: #a16207; }
-  :root:root .modal-backdrop .confirm-icon.danger { background: #fee2e2; color: #b91c1c; }
-  :root:root .modal-backdrop .confirm-button {
-    display: inline-flex; align-items: center; justify-content: center; min-height: 40px;
-    border: 1px solid transparent; border-radius: 8px; padding: 9px 14px;
-    color: #fff; font: inherit; font-weight: 700; cursor: pointer;
-  }
-  :root:root .modal-backdrop .confirm-button.primary { background: var(--action-primary); border-color: var(--action-primary); }
-  :root:root .modal-backdrop .confirm-button.primary:not(:disabled):hover { background: var(--action-hover); border-color: var(--action-hover); }
-  :root:root .modal-backdrop .confirm-button.warning { background: #b45309; border-color: #b45309; }
-  :root:root .modal-backdrop .confirm-button.warning:not(:disabled):hover { background: #92400e; border-color: #92400e; }
-  :root:root .modal-backdrop .confirm-button.danger { background: #b91c1c; border-color: #b91c1c; }
-  :root:root .modal-backdrop .confirm-button.danger:not(:disabled):hover { background: #991b1b; border-color: #991b1b; }
-  :root:root .modal-backdrop .confirm-button:disabled { cursor: wait; opacity: .6; }
-
-  /* Unsaved settings stay visible without interrupting every reversible field change. */
-  :root:root .app-shell .settings-save-bar {
-    left: 50%; right: auto; bottom: max(18px, env(safe-area-inset-bottom));
-    transform: translateX(-50%); width: min(calc(100% - 32px), 620px);
-    border-color: #aab7c4; box-shadow: 0 16px 40px rgb(15 23 42 / 22%);
-  }
-  :root:root .app-shell .settings-save-bar .save-dot { background: #d97706; box-shadow: 0 0 0 4px rgb(217 119 6 / 16%); }
-  :root:root .app-shell .settings-save-bar .save-bar-actions .primary-button {
-    background: var(--action-primary); background-image: none; border-color: var(--action-primary); color: #fff;
-  }
-  :root:root .app-shell .settings-save-bar .save-bar-actions .primary-button:not(:disabled):hover {
-    background: var(--action-hover); background-image: none; border-color: var(--action-hover); color: #fff;
-  }
-  @media (max-width: 560px) {
-    :root:root .app-shell .settings-save-bar { left: 12px; right: 12px; width: auto; transform: none; }
-  }
   :root:root :is(.status-pill, .status-badge, .card-inventory-status) {
     background: transparent !important; border: 0 !important;
     color: var(--status-color, #475569) !important;
