@@ -1,4 +1,4 @@
-.report-summary-footer { margin-top: 12px; padding-top: 10px; border-top: 2px solid #94a3b8; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 6px 24px; }
+﻿.report-summary-footer { margin-top: 12px; padding-top: 10px; border-top: 2px solid #94a3b8; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 6px 24px; }
 .report-summary-footer > div { display: grid; grid-template-columns: 1fr auto; align-items: baseline; gap: 2px 12px; padding: 4px 0; }
 .report-summary-footer small { font-size: 12px; color: #334155; }
 .report-summary-footer strong { font-size: 15px; font-variant-numeric: tabular-nums; text-align: right; }
@@ -423,8 +423,8 @@
 .card-inventory-actions .card-action-lost { background: var(--tone-amber-bg); border-color: var(--tone-amber-line); color: var(--tone-amber); }
 .card-inventory-actions .card-action-damaged { background: var(--tone-red-bg); border-color: var(--tone-red-line); color: var(--tone-red); }
 .card-inventory-actions .outline-button:disabled { opacity: .55; }
-/* ปุ่ม 4 การกระทำในตารางบัตร — สีธีมต้องชนะ rule กลาง Navy Slate (0,5,0) และไม่ถูกต้มเป็นเทาตอน disabled
-   ไอคอนในปุ่มใช้สีธีมเดียวกับตัวอักษร (--btn-icon) */
+/* เธเธธเนเธก 4 เธเธฒเธฃเธเธฃเธฐเธ—เธณเนเธเธ•เธฒเธฃเธฒเธเธเธฑเธ•เธฃ โ€” เธชเธตเธเธตเธกเธ•เนเธญเธเธเธเธฐ rule เธเธฅเธฒเธ Navy Slate (0,5,0) เนเธฅเธฐเนเธกเนเธ–เธนเธเธ•เนเธกเน€เธเนเธเน€เธ—เธฒเธ•เธญเธ disabled
+   เนเธญเธเธญเธเนเธเธเธธเนเธกเนเธเนเธชเธตเธเธตเธกเน€เธ”เธตเธขเธงเธเธฑเธเธ•เธฑเธงเธญเธฑเธเธฉเธฃ (--btn-icon) */
 @media screen {
   :root:root .app-shell .card-inventory-actions .card-action-history { background: var(--tone-teal-bg); border-color: var(--tone-teal-line); color: var(--tone-teal); --btn-icon: var(--tone-teal); }
   :root:root .app-shell .card-inventory-actions .card-action-history:hover { background: #ccfbf1; border-color: #5eead4; color: #115e59; --btn-icon: #115e59; }
@@ -664,7 +664,7 @@
     box-shadow: none; font-size: 12px;
     position: relative; overflow: visible;
   }
-  /* ปุ่มแจ้งเตือนท้ายเมนู POS: จำกัดกรอบเฉพาะปุ่มของตัวเอง — ห้ามแผ่ทับปุ่มทางลัดข้างเคียง (ตรวจสอบด้วยสคริปต์ pos-layout-audit) */
+  /* เธเธธเนเธกเนเธเนเธเน€เธ•เธทเธญเธเธ—เนเธฒเธขเน€เธกเธเธน POS: เธเธณเธเธฑเธ”เธเธฃเธญเธเน€เธเธเธฒเธฐเธเธธเนเธกเธเธญเธเธ•เธฑเธงเน€เธญเธ โ€” เธซเนเธฒเธกเนเธเนเธ—เธฑเธเธเธธเนเธกเธ—เธฒเธเธฅเธฑเธ”เธเนเธฒเธเน€เธเธตเธขเธ (เธ•เธฃเธงเธเธชเธญเธเธ”เนเธงเธขเธชเธเธฃเธดเธเธ•เน pos-layout-audit) */
   :root .app-shell .pos-rail .shell-account-footer .notif-bell::after,
   :root .app-shell .pos-rail .shell-account-footer .notif-bell::before { content: none; }
   :root .app-shell .shell-account-footer .notif-bell:hover {
@@ -732,7 +732,7 @@
   :root .pos-premium-bill .total-line strong { font-size: 30px; color: #0f172a; }
   :root .pos-premium-bill .payment-actions { display: flex; flex-direction: column; gap: 12px; width: min(100%, 240px); align-self: center; }
   :root .pos-premium-bill .pay-button { order: 2; }
-  :root .pos-premium-bill .pay-split button { border: 1px solid var(--teal-soft); border-radius: 999px; background: var(--teal-mist); color: var(--teal-dark); box-shadow: none; }
+  :root .pos-premium-bill .pay-split button { border: 1px solid var(--neutral-200); border-radius: 999px; background: var(--neutral-100); color: var(--neutral-700); box-shadow: none; }
   :root .pos-premium-bill .pay-button { background: var(--teal); background-image: none; color: #fff; border: 0; border-radius: 16px; box-shadow: 0 2px 5px rgb(15 23 42 / 10%); }
   :root .pos-premium-bill .pay-button:hover:not(:disabled) { background: var(--teal-dark); }
   :root .pos-premium-bill .pay-button:disabled { opacity: .5; box-shadow: none; }
@@ -762,7 +762,7 @@
     background: #f8fafc; color: #475569;
   }
   :root .app-shell .pos-premium-layout .category-tabs button.active {
-    background: var(--teal-mist); color: var(--teal-dark); border-color: var(--teal-soft);
+    background: var(--primary-50); color: var(--teal-dark); border-color: var(--teal-soft);
   }
   :root .app-shell .pos-premium-layout .quick-pick-panel .panel-heading { flex-wrap: wrap; gap: 8px; }
   :root .app-shell .pos-premium-layout .quick-pick-panel .panel-heading p { display: none; }
