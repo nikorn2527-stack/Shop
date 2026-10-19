@@ -3020,12 +3020,18 @@ function resolveRangeDates(input: DailyRangeInput): { fromDate: Date; toDate: Da
 }
 
 /**
- * Cost used by profit reports. A product whose sale-time cost is zero has not
- * been costed yet, so treating it as free would overstate profit. Estimate its
- * cost from the sale price instead, making that line's provisional profit zero.
- * Special lines are excluded because they are not products with a cost field.
+ * Cost used by profit reports. A zero catalog snapshot can mean either unknown
+ * cost or a genuine zero-cost receipt. When receipt allocations cover every
+ * sold unit, their recorded total is authoritative, including zero. Only
+ * uncosted legacy products retain the selling-price estimate. Special lines
+ * are excluded because they are not products with a cost field.
  */
 const REPORT_COGS_SQL = `CASE
+  WHEN si.product_id IS NOT NULL AND COALESCE(si.cost, 0) <= 0
+    AND si.cost_total_satang IS NOT NULL
+    AND (SELECT COALESCE(SUM(allocation.qty), 0) FROM sale_lot_allocations allocation
+      WHERE allocation.sale_item_id = si.id AND allocation.valuation_source = 'receipt') = si.qty
+    THEN si.cost_total_satang / 100.0
   WHEN si.product_id IS NOT NULL AND COALESCE(si.cost, 0) <= 0 THEN si.qty * si.price
   ELSE COALESCE(si.cost_total_satang / 100.0, si.qty * si.cost, 0)
 END`;
