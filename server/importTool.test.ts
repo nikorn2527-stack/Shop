@@ -56,6 +56,23 @@ describe("importTool — เทมเพลต + parse วนกลับ", () =
     expect(overrideParsed.sheets[0].headers[0]).toContain("รายชื่อสมาชิก");
   });
 
+  it("preserves leading-zero identifiers through CSV preview and execution", () => {
+    const base64 = Buffer.from("\uFEFFบาร์โค้ด,ชื่อสินค้า,ราคาขาย,สต็อกคงเหลือ\n00001,สินค้า,5,100\n02,อีกชิ้น,10,50\n").toString("base64");
+    const parsed = parseSpreadsheetBase64(base64,"products");
+    expect(parsed.sheets[0].sampleRows[0][0]).toBe("00001");
+    expect(readSheetRows(base64,parsed.sheets[0].name,0).rows.map(row => row[0])).toEqual(["00001","02"]);
+  });
+
+  it("preserves Excel's displayed zero-padded barcodes", () => {
+    const workbook = XLSX.utils.book_new();
+    const sheet = XLSX.utils.aoa_to_sheet([["บาร์โค้ด","ชื่อสินค้า"],[1,"สินค้า"]]);
+    sheet.A2.z = "00000";
+    XLSX.utils.book_append_sheet(workbook,sheet,"สินค้า");
+    const base64 = Buffer.from(XLSX.write(workbook,{type:"buffer",bookType:"xlsx"}) as Buffer).toString("base64");
+    expect(parseSpreadsheetBase64(base64,"products").sheets[0].sampleRows[0][0]).toBe("00001");
+    expect(readSheetRows(base64,"สินค้า",0).rows[0][0]).toBe("00001");
+  });
+
   it("readSheetRows คืนแถวข้อมูลหลังหัวตาราง ตัดแถวว่าง", () => {
     const base64 = sheetBase64([["a", "b"], ["1", "2"], [null, null], ["3", "4"]]);
     const { rows } = readSheetRows(base64, "Sheet1", 0);

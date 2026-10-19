@@ -270,3 +270,13 @@
 @media screen {
   :root:root .card-return-modal .card-return-search .member-scan-field input:is(:focus, :focus-visible) { border: 0; outline: 0; box-shadow: none; }
 }
+
+:root:root .opening-stock-review.feedback-dialog { width: min(760px, calc(100vw - 32px)); max-width: 760px; }
+.opening-stock-review .feedback-details { width: 100%; min-width: 0; text-align: left; }
+.opening-stock-table { max-height: 38vh; overflow: auto; margin: 12px 0; border: 1px solid #e2e8f0; border-radius: 12px; }
+.opening-stock-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.opening-stock-table th { position: sticky; top: 0; background: #f8fafc; }
+.opening-stock-table th, .opening-stock-table td { padding: 10px; border-bottom: 1px solid #e2e8f0; text-align: right; white-space: nowrap; }
+.opening-stock-table th:first-child, .opening-stock-table td:first-child { text-align: left; white-space: normal; min-width: 150px; }
+.opening-stock-table td small { display: block; color: #64748b; }
+.opening-stock-table > p { padding: 8px 12px; color: #b91c1c; }

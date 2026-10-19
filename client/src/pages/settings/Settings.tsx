@@ -360,6 +360,8 @@ type ImportSheetLite = {
   totalRows: number;
   suggestedMapping: Record<string, number>;
 };
+type OpeningStockReview = { openingDate?: string; stockPreviewToken?: string; stockAdjustments?: { row: number; name: string; barcode: string | null; sku: string; openingQty: number; soldTodayQty: number; remainingQty: number }[]; errors: { row: number; message: string }[] };
+
 type ImportResultLite = {
   total: number;
   inserted: number;
@@ -886,6 +888,9 @@ export function Settings({
     null
   );
   const [importConfirm, setImportConfirm] = useState(false);
+  const [productStockMode, setProductStockMode] = useState<"current" | "openingToday">("openingToday");
+  const [openingReview, setOpeningReview] = useState<OpeningStockReview | null>(null);
+  const openingImport = importKind === "products" && productStockMode === "openingToday";
   const importInputRef = useRef<HTMLInputElement>(null);
   const currentSheet = importSheets?.[importSheetIndex] ?? null;
   const importFields =
@@ -916,9 +921,14 @@ export function Settings({
       });
     },
   });
+  const openingPreviewMutation = trpc.importData.execute.useMutation({
+    onSuccess: data => setOpeningReview(data),
+    onError: error => notify.error("ตรวจสอบยอดตั้งต้นไม่สำเร็จ", { description: getErrorMessage(error) }),
+  });
   const importExecuteMutation = trpc.importData.execute.useMutation({
     onSuccess: async data => {
       setImportConfirm(false);
+      setOpeningReview(null);
       setImportResult(data);
       if (data.errors.length === 0) {
         notify.completed("นำเข้าข้อมูลเรียบร้อย", {
@@ -935,6 +945,7 @@ export function Settings({
     },
     onError: mutationError => {
       setImportConfirm(false);
+      setOpeningReview(null);
       notify.error("นำเข้าข้อมูลไม่สำเร็จ", {
         description: getErrorMessage(mutationError),
         duration: 6000,
@@ -1038,8 +1049,8 @@ export function Settings({
       return next;
     });
   };
-  const runImport = () => {
-    if (!importFile || !currentSheet) return;
+  const runImport = (dryRun = false) => {
+    if (!importFile || !currentSheet || importExecuteMutation.isPending || openingPreviewMutation.isPending) return;
     const memberMappingPayload = {
       firstName: importMapping.firstName ?? -1,
       memberNumber: importMapping.memberNumber ?? -1,
@@ -1063,13 +1074,17 @@ export function Settings({
       reorderPoint: importMapping.reorderPoint ?? -1,
       size: importMapping.size ?? -1,
     };
-    importExecuteMutation.mutate({
+    const mutation = dryRun ? openingPreviewMutation : importExecuteMutation;
+    mutation.mutate({
       kind: importKind,
       fileName: importFile.name,
       base64: importFile.base64,
       sheetName: currentSheet.name,
       headerRowIndex: importHeaderRow,
-      duplicateMode,
+      duplicateMode: openingImport ? "replace" : duplicateMode,
+      stockMode: productStockMode,
+      dryRun,
+      ...(openingImport && !dryRun ? { openingDate: openingReview?.openingDate, stockPreviewToken: openingReview?.stockPreviewToken } : {}),
       ...(importKind === "members"
         ? { memberMapping: memberMappingPayload }
         : { productMapping: productMappingPayload }),
@@ -1082,6 +1097,7 @@ export function Settings({
     setImportHeaderRow(0);
     setImportMapping({});
     setImportResult(null);
+    setOpeningReview(null);
   };
   useEffect(() => {
     if (settingsQuery.data && !hydrated) {
@@ -3237,6 +3253,14 @@ export function Settings({
                       </table>
                     </div>
                   </div>
+                  {importKind === "products" && <div className="import-duplicate-row">
+                    <div><b>จำนวนสต็อกในไฟล์หมายถึง</b><small>ปรับเฉพาะสินค้าในไฟล์ โดยเก็บรหัสสินค้า บิล และยอดเงินเดิมไว้</small></div>
+                    <div className="import-duplicate-options" role="radiogroup" aria-label="ความหมายของจำนวนสต็อก">
+                      {([["openingToday", "ยอดตั้งต้นก่อนขายวันนี้", "คงเหลือ = ยอดในไฟล์ − ขายวันนี้ (ไม่รวมบิลยกเลิก)"], ["current", "ยอดคงเหลือปัจจุบัน", "ใช้จำนวนในไฟล์โดยตรง ไม่หักยอดขายซ้ำ"]] as const).map(([value,title,detail]) => <button type="button" key={value} role="radio" aria-checked={productStockMode === value} className={productStockMode === value ? "selected" : ""} onClick={() => setProductStockMode(value)}><span className="number-radio">{productStockMode === value && <i />}</span><span><b>{title}</b><small>{detail}</small></span></button>)}
+                    </div>
+                  </div>}
+                  {openingImport && <div className="notice-bar">โหมดยอดตั้งต้นจะอัปเดตสินค้าเดิมจากบาร์โค้ดหรือรหัสสินค้าเท่านั้น ต้องระบุคอลัมน์จำนวนสต็อก · หากไม่ระบุต้นทุน จะบันทึกเป็นไม่ทราบต้นทุน (0) และไม่ใช้ราคาขายแทนต้นทุน</div>}
+                  {!openingImport && <>
                   <div className="import-duplicate-row">
                     <div>
                       <b>รายการที่ซ้ำกับข้อมูลในระบบ</b>
@@ -3284,6 +3308,7 @@ export function Settings({
                       ))}
                     </div>
                   </div>
+                  </>}
                   <div className="import-run-row">
                     <div>
                       <b>
@@ -3299,17 +3324,18 @@ export function Settings({
                       type="button"
                       className="primary-button"
                       disabled={
-                        importExecuteMutation.isPending ||
+                        importExecuteMutation.isPending || openingPreviewMutation.isPending ||
+                        (openingImport && ((importMapping.stock ?? -1) < 0 || ((importMapping.barcode ?? -1) < 0 && (importMapping.sku ?? -1) < 0))) ||
                         (importMapping[
                           importFields.find(f => f.required)?.key ?? ""
                         ] ?? -1) < 0
                       }
-                      onClick={() => setImportConfirm(true)}
+                      onClick={() => openingImport ? runImport(true) : setImportConfirm(true)}
                     >
                       <Check size={16} />{" "}
-                      {importExecuteMutation.isPending
-                        ? "กำลังนำเข้า…"
-                        : "นำเข้าข้อมูล"}
+                      {importExecuteMutation.isPending || openingPreviewMutation.isPending
+                        ? "กำลังตรวจสอบ…"
+                        : openingImport ? "ตรวจสอบยอดก่อนนำเข้า" : "นำเข้าข้อมูล"}
                     </button>
                   </div>
                 </section>
@@ -4331,6 +4357,13 @@ export function Settings({
               updateForm({ devAccess: true });
             }}
           />
+          {openingReview && <FeedbackDialog tone="warning" title="ตรวจสอบยอดตั้งต้นสินค้า" description={`วันที่ ${openingReview.openingDate ?? ""} · ยอดตั้งต้น − ขายวันนี้ = คงเหลือ · บิลและยอดเงินเดิมยังคงอยู่`} className="opening-stock-review" pending={importExecuteMutation.isPending} onClose={() => setOpeningReview(null)} onCancel={openingReview.errors.length ? undefined : () => setOpeningReview(null)} cancelLabel="กลับไปแก้ไข" actionLabel={openingReview.errors.length ? "กลับไปแก้ไขไฟล์" : "ยืนยันนำเข้ายอดตั้งต้น"} onAction={() => openingReview.errors.length ? setOpeningReview(null) : runImport()}>
+            {openingReview.errors.length > 0 && <div role="alert" className="notice-bar error">ยังไม่นำเข้าทั้งไฟล์ กรุณาแก้ไข {openingReview.errors.length} แถว</div>}
+            <div className="opening-stock-table"><table><thead><tr><th>สินค้า / บาร์โค้ด</th><th>ตั้งต้น</th><th>ขายวันนี้</th><th>คงเหลือ</th></tr></thead><tbody>{openingReview.stockAdjustments?.map(p => <tr key={p.row}><td>{p.name}<small>{p.barcode || p.sku}</small></td><td>{p.openingQty}</td><td>{p.soldTodayQty}</td><td>{p.remainingQty}</td></tr>)}</tbody></table>
+              {openingReview.errors.map(e => <p key={e.row}>แถว {e.row}: {e.message}</p>)}
+            </div>
+            <small>สำรองข้อมูลก่อนบันทึก · เปลี่ยนเฉพาะสินค้าในไฟล์ · การนำเข้าซ้ำไม่หักยอดขายซ้ำ · ไม่แก้ราคาหรือต้นทุนในบิลเก่า</small>
+          </FeedbackDialog>}
           <ConfirmDialog
             open={importConfirm}
             tone="warning"

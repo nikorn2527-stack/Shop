@@ -1,3 +1,4 @@
+import { replaceImportedLots } from "./openingStockImport";
 /**
  * ROUND 40 (ข้อ 32) — เครื่องมือนำเข้าข้อมูลจาก Excel/CSV
  * ---------------------------------------------------------------
@@ -100,12 +101,12 @@ function normalizeHeaders(width: number, headerRow: string[]): string[] {
 export function parseSpreadsheetBase64(base64: string, kind: ImportKind, headerRowOverride?: number): { sheets: ParsedSheet[] } {
   let workbook: XLSX.WorkBook;
   try {
-    workbook = XLSX.read(Buffer.from(base64, "base64"), { type: "buffer", raw: false });
+    workbook = XLSX.read(Buffer.from(base64, "base64"), { type: "buffer", raw: true });
   } catch {
     throw new StoreError("อ่านไฟล์ไม่สำเร็จ — รองรับ .xlsx .xls .csv เท่านั้น และไฟล์ต้องไม่เสียหาย");
   }
   const sheets = workbook.SheetNames.map((name): ParsedSheet => {
-    const matrix = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[name], { header: 1, blankrows: false, defval: null })
+    const matrix = XLSX.utils.sheet_to_json<unknown[]>(workbook.Sheets[name], { header: 1, blankrows: false, defval: null, raw: false })
       .map((row) => (Array.isArray(row) ? row : [row]))
       .map((row) => row.map(cellToText));
     const headerRowIndex = headerRowOverride !== undefined ? Math.max(0, Math.min(headerRowOverride, matrix.length - 1)) : detectHeaderRow(matrix);
@@ -133,13 +134,13 @@ export function parseSpreadsheetBase64(base64: string, kind: ImportKind, headerR
 export function readSheetRows(base64: string, sheetName: string, headerRowIndex: number): { headers: string[]; rows: string[][] } {
   let workbook: XLSX.WorkBook;
   try {
-    workbook = XLSX.read(Buffer.from(base64, "base64"), { type: "buffer", raw: false });
+    workbook = XLSX.read(Buffer.from(base64, "base64"), { type: "buffer", raw: true });
   } catch {
     throw new StoreError("อ่านไฟล์ไม่สำเร็จ — ไฟล์อาจเสียหาย");
   }
   const sheet = workbook.Sheets[sheetName];
   if (!sheet) throw new StoreError(`ไม่พบชีต "${sheetName}" ในไฟล์`);
-  const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, blankrows: false, defval: null })
+  const matrix = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, blankrows: false, defval: null, raw: false })
     .map((row) => (Array.isArray(row) ? row : [row]))
     .map((row) => row.map(cellToText));
   const safeHeader = Math.max(0, Math.min(headerRowIndex, matrix.length - 1));
@@ -456,7 +457,10 @@ export function importProducts(db: SqliteDb, options: ImportProductsOptions): Im
           db.prepare(
             `UPDATE products SET name = ?, barcode = COALESCE(?, barcode), category = ?, unit = ?, price = ?, cost = ?, reorder_point = ?, size = COALESCE(?, size) WHERE id = ?`,
           ).run(name, barcode, category, unit, round2(price), round2(cost), reorderPoint, size, existing.id);
-          if (stock !== existing.stock) {
+          if (mapping.stock !== undefined) {
+            replaceImportedLots(db, existing.id, stock, round2(cost), lotLabel, actor, createdAt);
+          }
+          if (mapping.stock !== undefined && stock !== existing.stock) {
             db.prepare(`UPDATE products SET stock = ? WHERE id = ?`).run(stock, existing.id);
             logAction(db, "ปรับสต็อกจากการนำเข้า", actor?.trim() || "ผู้บริหาร", `${name} · เดิม ${existing.stock} → ${stock} ${unit}`, existing.stock > stock ? "red" : "green", actorRole ?? null);
           }

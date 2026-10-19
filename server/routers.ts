@@ -1,3 +1,4 @@
+import { previewOpeningStock, importOpeningStock } from "./openingStockImport";
 import { QR_BANKS, validateBankPaymentQr } from "@shared/paymentQr";
 import { previewGeneratedCards, generateBlankCards } from "./sqliteStore";
 import { z } from "zod";
@@ -1701,6 +1702,10 @@ export const appRouter = router({
           sheetName: z.string().min(1).max(200),
           headerRowIndex: z.number().int().min(0).max(9),
           duplicateMode: z.enum(["skip", "replace"]),
+          stockMode: z.enum(["current", "openingToday"]).optional(),
+          dryRun: z.boolean().optional(),
+          openingDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+          stockPreviewToken: z.string().length(64).optional(),
           memberMapping: z
             .object({
               firstName: z.number().int().min(-1).max(99),
@@ -1747,6 +1752,13 @@ export const appRouter = router({
           if (rows.length === 0) {
             throw new TRPCError({ code: "BAD_REQUEST", message: "ชีตที่เลือกไม่มีแถวข้อมูลให้นำเข้า" });
           }
+          const openingOptions = { rows, mapping: sanitizeMapping(input.productMapping ?? {}) as ProductFieldMapping, duplicateMode: input.duplicateMode, actor, actorRole, openingDate: input.openingDate, stockPreviewToken: input.stockPreviewToken };
+          const openingMode = input.kind === "products" && input.stockMode === "openingToday";
+          if (input.dryRun) {
+            if (!openingMode) throw new TRPCError({ code: "BAD_REQUEST", message: "พรีวิวคำนวณยอดใช้ได้กับยอดตั้งต้นสินค้าเท่านั้น" });
+            return { ...previewOpeningStock(getWelfareDb(), openingOptions), safetyBackupFile: "", fileName: input.fileName };
+          }
+          if (openingMode && !input.stockPreviewToken) throw new TRPCError({ code: "BAD_REQUEST", message: "กรุณาพรีวิวยอดตั้งต้นก่อนนำเข้า" });
           // 1) สำรองไฟล์ป้องกันก่อนนำเข้าเสมอ — ถ้าผลไม่ตามที่คิด กู้คืนกลับได้ทันที
           let safetyBackupFile = "";
           try {
@@ -1758,8 +1770,9 @@ export const appRouter = router({
           const db = getWelfareDb();
           const summary =
             input.kind === "members"
-              ? importMembers(db, { rows, mapping: sanitizeMapping(input.memberMapping!) as MemberFieldMapping, duplicateMode: input.duplicateMode, actor, actorRole })
-              : importProducts(db, { rows, mapping: sanitizeMapping(input.productMapping!) as ProductFieldMapping, duplicateMode: input.duplicateMode, actor, actorRole });
+              ? { ...importMembers(db, { rows, mapping: sanitizeMapping(input.memberMapping!) as MemberFieldMapping, duplicateMode: input.duplicateMode, actor, actorRole }), stockAdjustments: undefined, openingDate: undefined, stockPreviewToken: undefined }
+              : openingMode ? importOpeningStock(db, openingOptions)
+              : { ...importProducts(db, { rows, mapping: sanitizeMapping(input.productMapping!) as ProductFieldMapping, duplicateMode: input.duplicateMode, actor, actorRole }), stockAdjustments: undefined, openingDate: undefined, stockPreviewToken: undefined };
           return { ...summary, safetyBackupFile, fileName: input.fileName };
         });
       }),
