@@ -266,10 +266,14 @@ try {
   await page.waitForSelector('tr.clickable[title^="ดูล็อตและจัดการ"]');
   await page.waitForFunction(() => getComputedStyle(document.querySelector('.dash-tab[aria-selected="true"]')).backgroundColor === 'rgb(255, 237, 213)');
   await (await page.$('[aria-label="ส่วนการจัดการสต็อก"]')).screenshot({ path: path.join(dir, 'orange-stock-tabs.png') });
-  assert.equal(await page.$('.catalog-menu-receive'), null);
-  await click('จัดการสินค้า', '.section-header');
-  assert.equal(await page.$$eval('.stock-catalog-menu button', buttons => buttons.length), 1, 'Receiving is not duplicated in the product menu');
-  await page.keyboard.press('Escape');
+  assert.equal(await page.$('.stock-catalog-trigger'), null, 'No single-option management menu');
+  assert.equal(await page.$$eval('.section-header .stock-receive-entry', buttons => buttons.length), 1, 'One visible receiving entry');
+  const countBeforeAdd = query('SELECT COUNT(*) n FROM products').n;
+  await click('เพิ่มสินค้าใหม่', '.section-header');
+  await page.waitForFunction(() => [...document.querySelectorAll('.workflow-dialog h2')].some(h => h.textContent.includes('เพิ่มสินค้าใหม่')));
+  await page.keyboard.press('Escape'); await page.waitForFunction(() => !document.querySelector('.workflow-dialog'));
+  assert.equal(query('SELECT COUNT(*) n FROM products').n, countBeforeAdd, 'Cancelling direct product creation writes nothing');
+  await (await page.$('.section-header .section-actions')).screenshot({ path: path.join(dir, 'stock-direct-actions.png') });
   await click('ใบนับสต๊อก', '.section-header');
   await page.waitForSelector('.print-preview-paper .stock-count-sheet .scs-table');
   assert.ok(await page.$eval('.print-preview-paper .stock-count-sheet', sheet => sheet.getBoundingClientRect().height > 100 && getComputedStyle(sheet).display !== 'none'));
