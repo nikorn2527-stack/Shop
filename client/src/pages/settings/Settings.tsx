@@ -2548,7 +2548,7 @@ export function Settings({
                     <button type="button" className="icon-button" onClick={startEditPromptPay} disabled={!form || saveMutation.isPending} title="แก้ไขเลขพร้อมเพย์" aria-label="แก้ไขเลขพร้อมเพย์">
                       <Pencil size={15} />
                     </button>
-                    <button type="button" className="icon-button danger-outline-button" onClick={openDeletePromptPay} disabled={!form?.promptpayId.trim() || saveMutation.isPending || deletePromptPayMutation.isPending} title="ลบข้อมูลพร้อมเพย์" aria-label="ลบข้อมูลพร้อมเพย์">
+                    <button type="button" className="icon-button danger" onClick={openDeletePromptPay} disabled={!form?.promptpayId.trim() || saveMutation.isPending || deletePromptPayMutation.isPending} title="ลบข้อมูลพร้อมเพย์" aria-label="ลบข้อมูลพร้อมเพย์">
                       <Trash2 size={15} />
                     </button>
                     <button type="button" className={`toggle promptpay-row-toggle ${form?.promptpayActive !== false ? "on" : ""}`} onClick={togglePromptPay} disabled={!form?.promptpayId.trim() || saveMutation.isPending || deletePromptPayMutation.isPending} aria-pressed={form?.promptpayActive !== false} aria-label={form?.promptpayActive !== false ? "ปิดรับเงินผ่านพร้อมเพย์" : "เปิดรับเงินผ่านพร้อมเพย์"} title={form?.promptpayActive !== false ? "ปิดรับเงินผ่านพร้อมเพย์" : "เปิดรับเงินผ่านพร้อมเพย์"}><span /></button>
