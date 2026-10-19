@@ -170,6 +170,24 @@ try {
   await page.setViewport({ width: 1366, height: 768 });
   passed('POS layout fits desktop and mobile: subtle scanner focus, bottom payment buttons and one-column product rows');
 
+  // A missing-card warning must finish before mounting the card assignment dialog.
+  for (const dismiss of ['click', 'Enter', 'Escape']) {
+    await fill('.scan-hero input', returning.member_number); await page.keyboard.press('Enter');
+    await page.waitForSelector('#member-card'); await click('ยืนยันใช้กับบิลนี้', '.member-card-modal');
+    await page.waitForSelector('.blocker-warning');
+    assert.equal(await page.$$eval('.workflow-dialog', dialogs => dialogs.filter(d => d.getClientRects().length).length), 1, 'Do not mount a competing card form under the warning');
+    assert.equal(await page.$eval('.blocker-button', button => { const r = button.getBoundingClientRect(); return button.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); }), true, 'Acknowledge receives pointer events');
+    if (dismiss === 'click') {
+      await pause(300); await page.screenshot({ path: path.join(dir, 'missing-card-warning.png') });
+      await page.click('.blocker-button');
+    } else { await page.focus('.blocker-button'); await page.keyboard.press(dismiss); }
+    await page.waitForFunction(() => !document.querySelector('.blocker-modal') && [...document.querySelectorAll('.workflow-dialog')].some(dialog => dialog.textContent.includes('จ่ายบัตรให้สมาชิกเดิม')));
+    assert.equal(await page.$$eval('.workflow-dialog', dialogs => dialogs.filter(d => d.getClientRects().length).length), 1);
+    await page.keyboard.press('Escape'); await page.waitForFunction(() => !document.querySelector('.workflow-dialog'));
+    assert.equal(query('SELECT card_number FROM members WHERE member_number=?', returning.member_number).card_number, null, 'Cancelling assignment changes no card');
+  }
+  passed('missing-card warning acknowledges by mouse, Enter and Escape before opening a usable card form');
+
   async function detectExisting(firstName, cardNumber = "") {
     await page.keyboard.press('F6'); await page.waitForSelector('.pos-register-modal');
     await page.waitForFunction(() => document.querySelector('.pos-register-modal input[name="firstName"]')?.dataset.fieldState === 'missing');
@@ -392,6 +410,14 @@ try {
   assert.equal(query('SELECT COUNT(*) n FROM sales').n, salesBefore + 4);
   assert.equal(await page.$eval('[data-nav-item="reports"]', button => button.getAttribute('aria-current')), 'page');
   passed('reprint returns to reports and does not create or reset a POS sale');
+  await page.waitForSelector('.report-filter-select select[data-field-state="filled"]');
+  assert.equal(await page.$eval('.report-filter-select', label => {
+    const field = label.querySelector('select'), caption = label.querySelector('span');
+    const r = field.getBoundingClientRect(), l = label.getBoundingClientRect(), c = caption.getBoundingClientRect();
+    return Math.abs(r.width - l.width) < 1 && r.top >= c.bottom && getComputedStyle(field).borderTopWidth === '1px';
+  }), true, 'Report label sits above one full-width status-colored select');
+  await (await page.$('.report-filter-select')).screenshot({ path: path.join(dir, 'report-select-single-surface.png') });
+
 
   // Real page checks for format colors and the settings review -> success sequence.
   const fileColors = { '.export-csv': 'rgb(14, 116, 144)', '.export-excel': 'rgb(21, 128, 61)', '.export-pdf': 'rgb(185, 28, 28)', '.export-print': 'rgb(109, 40, 217)' };

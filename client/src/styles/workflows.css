@@ -172,3 +172,11 @@
   :root:root .payment-actions .pay-icon.qr { background: #f5f3ff; color: #6d28d9; }
   :root:root .payment-actions .pay-icon.member { background: #f0fdfa; color: #0f766e; }
 }
+
+@media screen {
+  /* Separate the field label from a full-width select, rather than two inline color blocks. */
+  :root:root .report-filter-bar:has(> .report-filter-select) { background: transparent; border: 0; padding: 12px 0; }
+  :root:root .report-filter-select { display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; width: min(100%, 360px); min-width: 0; }
+  :root:root .report-filter-select > select { display: block; width: 100%; min-height: 40px; padding: 8px 12px; border-radius: 8px; box-sizing: border-box; }
+  :root:root .report-filter-select[data-field-caption]::after { margin-top: 0; }
+}

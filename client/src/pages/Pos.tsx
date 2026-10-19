@@ -481,12 +481,14 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
     if (!member.cardNumber || !member.cardUsable) {
       const hasCardNumber = Boolean(member.cardNumber);
       setError(hasCardNumber ? `บัตรของสมาชิก ${member.memberNumber} ไม่พร้อมใช้งาน` : `สมาชิก ${member.memberNumber} ยังไม่มีบัตรที่พร้อมใช้งาน`);
-      blocker.warning(hasCardNumber ? "บัตรสมาชิกไม่พร้อมใช้งาน" : "สมาชิกยังไม่มีบัตร", hasCardNumber ? `${memberFullName(member)} มีเลขบัตรอยู่ แต่สถานะบัตรหรือรอบใช้งานไม่ถูกต้อง กรุณาตรวจสอบและจ่ายบัตรใหม่` : `${memberFullName(member)} ต้องได้รับบัตรก่อนผูกกับบิลหรือทำธุรกรรมสมาชิก`);
-      setCardActionMember(member);
-      setCardInitialAction(undefined);
-      setCardIntent("bill");
-      setCardActionsOpen(true);
-      focusScan();
+      blocker.warning(hasCardNumber ? "บัตรสมาชิกไม่พร้อมใช้งาน" : "สมาชิกยังไม่มีบัตร", hasCardNumber ? `${memberFullName(member)} มีเลขบัตรอยู่ แต่สถานะบัตรหรือรอบใช้งานไม่ถูกต้อง กรุณาตรวจสอบและจ่ายบัตรใหม่` : `${memberFullName(member)} ต้องได้รับบัตรก่อนผูกกับบิลหรือทำธุรกรรมสมาชิก`, {
+        onAcknowledge: () => {
+          setCardActionMember(member);
+          setCardInitialAction(undefined);
+          setCardIntent("bill");
+          setCardActionsOpen(true);
+        },
+      });
       return;
     }
     setSelectedMemberNumber(member.memberNumber);
@@ -838,8 +840,11 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
     if (!target?.cardNumber || !target.cardUsable) {
       const hasCardNumber = Boolean(target?.cardNumber);
       setError(hasCardNumber ? "บัตรสมาชิกไม่พร้อมใช้งาน กรุณาตรวจสอบหรือจ่ายบัตรใหม่" : "สมาชิกยังไม่มีบัตร กรุณาจ่ายบัตรก่อนทำรายการ");
-      blocker.warning(hasCardNumber ? "บัตรสมาชิกไม่พร้อมใช้งาน" : "กรุณาจ่ายบัตรก่อน", hasCardNumber ? "บัตรที่ผูกอยู่ไม่มีสถานะหรือรอบใช้งานที่พร้อมทำรายการ กรุณาตรวจสอบและจ่ายบัตรใหม่" : "เติมหรือถอนเงินได้เมื่อสมาชิกมีบัตรที่ผูกและพร้อมใช้งานแล้ว");
-      if (target) { setCardActionMember(target); setCardInitialAction(undefined); setCardIntent("wallet"); setCardActionsOpen(true); }
+      blocker.warning(hasCardNumber ? "บัตรสมาชิกไม่พร้อมใช้งาน" : "กรุณาจ่ายบัตรก่อน", hasCardNumber ? "บัตรที่ผูกอยู่ไม่มีสถานะหรือรอบใช้งานที่พร้อมทำรายการ กรุณาตรวจสอบและจ่ายบัตรใหม่" : "เติมหรือถอนเงินได้เมื่อสมาชิกมีบัตรที่ผูกและพร้อมใช้งานแล้ว", {
+        onAcknowledge: () => {
+          if (target) { setCardActionMember(target); setCardInitialAction(undefined); setCardIntent("wallet"); setCardActionsOpen(true); }
+        },
+      });
       return;
     }
     const amount = Number(walletAmount);
