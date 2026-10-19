@@ -1,3 +1,4 @@
+import { QR_BANKS, validateBankPaymentQr } from "@shared/paymentQr";
 import { previewGeneratedCards, generateBlankCards } from "./sqliteStore";
 import { z } from "zod";
 import { loginRateLimiter, loginRequestSource } from "./loginRateLimit";
@@ -549,6 +550,7 @@ const settingsPatchInput = z
     promptpayId: z.string().max(20).optional(),
     // เปิด/ปิด PromptPay โดยเก็บหมายเลขเดิมไว้ พร้อมเปิดกลับมาใช้ได้ทันที
     promptpayActive: z.boolean().optional(),
+    paymentQrSource: z.string().max(80).optional(),
     // FIX-5 (user) — บัญชีธนาคารร้าน (รับเงินโอน): หลายบัญชีได้ · ผู้บริหารเพิ่ม/ลบ/แก้ที่ ตั้งค่า → การชำระเงิน
     // รูปแบบเดียวกับ BankAccount ใน server/sqliteStore.ts (id/bankCode/bankName/accountNumber/accountName/branch/active/note)
     bankAccounts: z
@@ -566,7 +568,11 @@ const settingsPatchInput = z
           branch: z.string().max(80).optional(),
           active: z.boolean(),
           note: z.string().max(160).optional(),
-        }),
+          qrPayload: z.string().max(2048).refine(value => {
+            if (!value) return true;
+            try { validateBankPaymentQr(value); return true; } catch { return false; }
+          }, "ใช้ QR รับเงินธนาคารไทยแบบไม่ระบุยอดที่ถูกต้อง").optional(),
+        }).refine(account => !account.qrPayload || QR_BANKS.some(bank => bank.code === account.bankCode), "QR บัญชีรองรับกรุงไทย กสิกรไทย ไทยพาณิชย์ และออมสิน"),
       )
       .max(20, "บัญชีธนาคารเกิน 20 บัญชี — เกินความจำเป็น")
       .optional(),

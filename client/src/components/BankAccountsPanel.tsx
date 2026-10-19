@@ -1,3 +1,5 @@
+import { QR_BANKS } from "@shared/paymentQr";
+import { BankQrInput } from "./BankQrInput";
 import { notify } from "@/lib/notifications";
 /**
  * FIX-5 (user) — Bank accounts panel for Settings → Payment tab.
@@ -28,10 +30,8 @@ import type { BankAccount } from "../../../server/sqliteStore";
 
 /** Preset list of Thai banks — quick pick, but admin can type custom too. */
 const THAI_BANK_PRESETS: { code: string; name: string }[] = [
+  ...QR_BANKS,
   { code: "BBL", name: "ธนาคารกรุงเทพ" },
-  { code: "KBANK", name: "ธนาคารกสิกรไทย" },
-  { code: "SCB", name: "ธนาคารไทยพาณิชย์" },
-  { code: "KTB", name: "ธนาคารกรุงไทย" },
   { code: "BAY", name: "ธนาคารกรุงศรีอยุธยา" },
   { code: "TTB", name: "ธนาคารทหารไทย" },
   { code: "TCD", name: "ธนาคารธนชาติ" },
@@ -53,6 +53,7 @@ type DraftState = {
   branch: string;
   active: boolean;
   note: string;
+  qrPayload: string;
 };
 
 const EMPTY_DRAFT = (): DraftState => ({
@@ -64,6 +65,7 @@ const EMPTY_DRAFT = (): DraftState => ({
   branch: "",
   active: true,
   note: "",
+  qrPayload: "",
 });
 
 const isComplete = (draft: DraftState): boolean =>
@@ -105,6 +107,7 @@ export function BankAccountsPanel({
       branch: account.branch ?? "",
       active: account.active,
       note: account.note ?? "",
+      qrPayload: account.qrPayload ?? "",
     });
     setEditingId(account.id);
   };
@@ -119,6 +122,7 @@ export function BankAccountsPanel({
       ...draft,
       bankCode: preset.code,
       bankName: preset.name,
+      qrPayload: preset.code === draft.bankCode ? draft.qrPayload : "",
     });
   };
 
@@ -140,6 +144,7 @@ export function BankAccountsPanel({
       branch: draft.branch.trim() || undefined,
       active: draft.active,
       note: draft.note.trim() || undefined,
+      qrPayload: draft.qrPayload || undefined,
     };
     if (editingId) {
       onChange(value.map(a => (a.id === editingId ? cleaned : a)));
@@ -180,6 +185,7 @@ export function BankAccountsPanel({
       <div className="settings-heading">
         <div>
           <h2>บัญชีธนาคารรับโอน</h2>
+          <p>QR รับเงินรองรับกรุงไทย กสิกรไทย ไทยพาณิชย์ และออมสิน</p>
         </div>
         {!draft && <button type="button" className="outline-button" onClick={startAdd} disabled={disabled}><Plus size={15} /> เพิ่มบัญชี</button>}
       </div>
@@ -212,6 +218,7 @@ export function BankAccountsPanel({
               <small>
                 เลขที่ <i>{account.accountNumber}</i> · ชื่อบัญชี{" "}
                 <i>{account.accountName}</i>
+                {account.qrPayload ? " · มี QR รับเงิน" : " · ยังไม่มี QR รับเงิน"}
                 {account.branch ? ` · สาขา ${account.branch}` : ""}
                 {account.note ? ` · ${account.note}` : ""}
               </small>
@@ -289,7 +296,7 @@ export function BankAccountsPanel({
           <div className="form-grid">
             <label>เลือกธนาคาร
               <select value={THAI_BANK_PRESETS.some(p => p.code === draft.bankCode) ? draft.bankCode : ""} disabled={disabled}
-                onChange={e => { const preset = THAI_BANK_PRESETS.find(p => p.code === e.target.value); if (preset) pickPreset(preset); else setDraft({ ...draft, bankCode: "" }); }}>
+                onChange={e => { const preset = THAI_BANK_PRESETS.find(p => p.code === e.target.value); if (preset) pickPreset(preset); else setDraft({ ...draft, bankCode: "", qrPayload: "" }); }}>
                 <option value="">ระบุเอง</option>
                 {THAI_BANK_PRESETS.map(p => <option key={p.code} value={p.code}>{p.name}</option>)}
               </select>
@@ -311,6 +318,7 @@ export function BankAccountsPanel({
                   setDraft({
                     ...draft,
                     accountNumber: sanitizeAccount(e.target.value),
+                    qrPayload: "",
                   })
                 }
                 placeholder="เช่น 123-4-56789-0 หรือ 1234567890"
@@ -347,6 +355,12 @@ export function BankAccountsPanel({
               />
             </label>
           </div>
+          {QR_BANKS.some(bank => bank.code === draft.bankCode) && <BankQrInput
+            key={`${draft.id}:${draft.bankCode}:${draft.accountNumber}`}
+            value={draft.qrPayload}
+            disabled={disabled || !isComplete(draft)}
+            onChange={qrPayload => setDraft(current => current ? { ...current, qrPayload } : null)}
+          />}
           {!isComplete(draft) && draft.accountNumber.length > 0 && (
             <div className="settings-inline-note amber">
               <CircleAlert size={16} />

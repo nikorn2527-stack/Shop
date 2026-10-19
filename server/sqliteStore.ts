@@ -243,6 +243,8 @@ export type BankAccount = {
   active: boolean;
   /** หมายเหตุ (ถ้ามี) เช่น "บัญชีออมทรัพย์" "เฉพาะโอนภายในเวลาทำการ" */
   note?: string;
+  /** Reusable receiving QR exported by the bank, decoded and validated before saving. */
+  qrPayload?: string;
 };
 
 export type StoreSettings = {
@@ -323,6 +325,8 @@ export type StoreSettings = {
   promptpayId: string;
   /** เปิด/ปิดการรับเงินพร้อมเพย์ โดยไม่ต้องลบหมายเลขที่ตั้งค่าไว้ */
   promptpayActive: boolean;
+  /** Preferred receiving QR: promptpay or a bank account id. */
+  paymentQrSource: string;
   /** FIX-5 (user) — บัญชีธนาคารของร้าน (รับเงินโอน) · เก็บเป็น JSON array ใน store_settings
    *  แสดงที่หน้ายืนยันการชำระ POS (ควบคู่กับ QR) และท้ายใบเสร็จเมื่อชำระด้วย QR / สแกน ·
    *  [] = ยังไม่มีบัญชี (ลูกค้าไม่เห็นตัวเลือกโอนผ่านธนาคาร) */
@@ -3470,6 +3474,7 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   promptpayId: "",
   // ค่าเริ่มต้นเปิดอยู่ เพื่อให้ร้านที่เคยตั้งพร้อมเพย์ใช้งานต่อได้หลังอัปเดต
   promptpayActive: true,
+  paymentQrSource: "promptpay",
   // FIX-5 — บัญชีธนาคารร้าน (รับเงินโอน) เริ่มต้นว่าง → ลูกค้าเห็นเฉพาะ QR เท่านั้น
   // ผู้บริหารเพิ่มได้ที่ ตั้งค่า → การชำระเงิน → บัญชีธนาคารร้าน
   bankAccounts: [],

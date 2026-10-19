@@ -8,6 +8,12 @@ import net from 'node:net';
 import { spawn } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
 import puppeteer from 'puppeteer';
+import QRCode from 'qrcode';
+import { createRequire } from 'node:module';
+import { QRCodeReader, RGBLuminanceSource, HybridBinarizer, BinaryBitmap } from '@zxing/library';
+const { PNG } = createRequire(import.meta.resolve('qrcode'))('pngjs');
+import { QR_BANKS } from '../shared/paymentQr.ts';
+import { buildPromptPayPayload } from '../client/src/promptpay.ts';
 import { buildBrowserPrintHtml } from '../client/src/lib/printHelper.ts';
 import { openWelfareStore, setSettings, setEditionSettings, createAppUser, createAppSession, createBlankCards, assignMemberCard } from '../server/sqliteStore.ts';
 
@@ -17,7 +23,13 @@ const previous = { seed: process.env.SEED_DEMO_DATA, mode: process.env.NODE_ENV 
 process.env.SEED_DEMO_DATA = '1';
 process.env.NODE_ENV = 'development';
 const db = openWelfareStore(target);
-setSettings(db, { receiptPaperWidth: "80" });
+const bankFixtures = QR_BANKS.map((bank, index) => ({ id: `bank-qr-${index}`, bankCode: bank.code, bankName: bank.name, accountName: `UX QR account ${index}`, accountNumber: `123456789${index}`, active: true, qrPayload: buildPromptPayPayload({ promptpayId: `081234567${index}` }) }));
+setSettings(db, { receiptPaperWidth: "80", promptpayId: "0899999999", paymentQrSource: bankFixtures[0].id, bankAccounts: [...bankFixtures, { ...bankFixtures[3], id: "bank-qr-missing", accountNumber: "1234500000", qrPayload: undefined }] });
+const replacementQr = buildPromptPayPayload({ promptpayId: '0822222222' });
+const qrUploadPath = path.join(dir, 'bank-qr-upload.png');
+const invalidQrPath = path.join(dir, 'bank-qr-invalid.png');
+await QRCode.toFile(qrUploadPath, replacementQr, { width: 500, margin: 4 });
+await QRCode.toFile(invalidQrPath, 'https://example.com/not-a-payment', { width: 500, margin: 4 });
 setEditionSettings(db, { trialStart: new Date().toISOString().slice(0, 10) });
 if (previous.seed === undefined) delete process.env.SEED_DEMO_DATA; else process.env.SEED_DEMO_DATA = previous.seed;
 if (previous.mode === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = previous.mode;
@@ -66,7 +78,7 @@ const printedDocuments = [];
 let printMode = 'success', printRequests = 0, settingsWrites = 0;
 const query = (sql, ...args) => {
   const connection = new DatabaseSync(target, { readOnly: true });
-  try { return connection.prepare(sql).get(...args); } finally { connection.close(); }
+  try { connection.exec("PRAGMA busy_timeout=5000"); return connection.prepare(sql).get(...args); } finally { connection.close(); }
 };
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function click(text, scope = 'body') {
@@ -88,8 +100,25 @@ async function visible(selector) {
     return r.width > 0 && r.height > 0 && r.left >= 0 && r.top >= 0 && r.right <= innerWidth + 1 && r.bottom <= innerHeight + 1;
   });
 }
+async function waitQr(selector, payload) {
+  await page.waitForSelector(selector);
+  let decoded = '';
+  for (let retry = 0; retry < 40; retry++) {
+    const url = await page.$eval(selector, image => image.src).catch(() => '');
+    if (url.startsWith('data:image/png;base64,')) {
+      const image = PNG.sync.read(Buffer.from(url.split(',')[1], 'base64'));
+      const gray = new Uint8ClampedArray(image.width * image.height);
+      for (let i = 0; i < gray.length; i++) gray[i] = (image.data[i * 4] + 2 * image.data[i * 4 + 1] + image.data[i * 4 + 2]) / 4;
+      decoded = new QRCodeReader().decode(new BinaryBitmap(new HybridBinarizer(new RGBLuminanceSource(gray, image.width, image.height)))).getText();
+      if (decoded === payload) return url;
+    }
+    await pause(100);
+  }
+  assert.equal(decoded, payload, 'Rendered QR must decode to the selected account payload');
+}
 function passed(name) { results.push(name); console.log('PASS', name); }
 async function acknowledge() { await page.waitForSelector('.blocker-button'); await page.click('.blocker-button'); await page.waitForFunction(() => !document.querySelector('.blocker-modal')); }
+let qrSourcesTested = false;
 async function cashSale() {
   if (!await page.$('.scan-hero input')) await page.click('[data-nav-item="pos"]');
   await page.waitForSelector('.scan-hero input');
@@ -104,6 +133,41 @@ async function cashSale() {
   await page.screenshot({ path: path.join(dir, 'toast-close-inside.png') });
   await page.click('[data-sonner-toast][data-type="info"] [data-close-button]');
   assert.equal(await page.$$eval('.payment-actions button', buttons => buttons.every(b => b.disabled || getComputedStyle(b).backgroundColor === 'rgb(255, 255, 255)')), true, 'Payment methods share a neutral surface');
+  if (!qrSourcesTested) {
+    const countBefore = query('SELECT COUNT(*) n FROM sales').n;
+    await click('QR / สแกน', '.payment-actions'); await page.waitForSelector('.payment-qr-source select');
+    assert.equal(await page.$eval('.payment-qr-source select', e => e.value), bankFixtures[0].id, 'Configured bank is selected by default');
+    for (const [index, bank] of bankFixtures.entries()) {
+      await page.select('.payment-qr-source select', bank.id);
+      let expected = await waitQr('.payment-qr-panel img', bank.qrPayload);
+      assert.ok((await page.$eval('.pay-qr-caption', e => e.textContent)).includes(bank.bankName));
+      await page.click('.pay-verify-checkbox input');
+      await page.select('.payment-qr-source select', 'promptpay');
+      assert.equal(await page.$eval('.pay-verify-checkbox input', e => e.checked), false, 'Changing receiving account clears verification');
+      const amount = Number(await page.$eval('.pay-confirm-total b', e => e.textContent.replace(/[^0-9.]/g, '')));
+      await waitQr('.payment-qr-panel img', buildPromptPayPayload({ promptpayId: '0899999999', amount }));
+      if (index === 0) {
+        await page.select('.payment-qr-source select', bank.id);
+        expected = await waitQr('.payment-qr-panel img', bank.qrPayload);
+        await click('พิมพ์ใบแจ้งชำระ', '.pay-confirm-modal'); await page.waitForSelector('#payment-notice-paper img');
+        assert.equal(await page.$eval('#payment-notice-paper img', e => e.src), expected, 'Payment request uses the currently selected bank QR');
+        await page.click('[aria-label="ปิดใบแจ้งชำระ"]');
+        await page.screenshot({ path: path.join(dir, 'bank-qr-selected.png') });
+        await page.setViewport({width:390,height:844}); await pause(200);
+        assert.ok(await visible('.payment-qr-panel img'), 'The bank QR fits a mobile screen');
+        await page.screenshot({ path: path.join(dir, 'bank-qr-mobile.png') });
+        await page.setViewport({width:1366,height:768});
+      }
+    }
+    await page.select('.payment-qr-source select', 'bank-qr-missing');
+    await page.waitForFunction(() => document.querySelector('.payment-qr-panel [role="status"]')?.textContent.includes('ยังไม่ได้ตั้ง QR'));
+    assert.equal(await page.$('.payment-qr-panel img'), null, 'Missing bank QR never falls back to the previous recipient image');
+    assert.equal(await page.$eval('.payment-notice-trigger', e => e.disabled), true);
+    assert.equal(query('SELECT COUNT(*) n FROM sales').n, countBefore, 'Selecting QR or previewing a payment request never records a sale');
+    await click('ย้อนกลับแก้ไข', '.pay-confirm-modal');
+    qrSourcesTested = true;
+    passed('four bank QRs and PromptPay switch to the exact selected payload, reset verification and print the selected QR without recording a sale');
+  }
   await click('เงินสด'); await page.waitForSelector('.pay-confirm-modal');
   assert.equal(await page.$eval('.pay-confirm-button', b => b.disabled), true);
   assert.equal(await page.$eval('.pay-confirm-button', b => getComputedStyle(b).backgroundColor), 'rgb(232, 236, 241)');
@@ -488,6 +552,25 @@ try {
   await acknowledge();
   await page.waitForFunction(() => !document.querySelector('.settings-unsaved-note'));
   passed('settings review is centered; cancellation writes nothing; saving once ends with soft-green success');
+  await click('การชำระเงิน', '.settings-nav'); await page.waitForSelector('.bank-row');
+  await page.$eval('.bank-row [aria-label^="แก้ไข"]', e => e.click()); await page.waitForSelector('.bank-draft-panel .bank-qr-input');
+  const bankOptions = await page.$$eval('.bank-draft-panel select option', list => list.map(e => e.value));
+  assert.ok(['KTB', 'KBANK', 'SCB', 'GSB'].every(code => bankOptions.includes(code)));
+  await (await page.$('.bank-qr-input input[type="file"]')).uploadFile(invalidQrPath);
+  await page.waitForSelector('.bank-qr-input [role="alert"]');
+  assert.equal(JSON.parse(query("SELECT value FROM store_settings WHERE key='app_settings'").value).bankAccounts[0].qrPayload, bankFixtures[0].qrPayload);
+  await (await page.$('.bank-qr-input input[type="file"]')).uploadFile(qrUploadPath);
+  await waitQr('.bank-qr-input img', replacementQr);
+  await page.screenshot({ path: path.join(dir, 'bank-qr-settings.png') });
+  await click('บันทึก', '.bank-draft-panel');
+  await page.select('[aria-label="ช่องทาง QR เริ่มต้น"]', bankFixtures[3].id);
+  await click('บันทึกการตั้งค่า'); await page.waitForSelector('.settings-save-review');
+  await click('ยืนยันบันทึก', '.settings-save-review'); await page.waitForSelector('.blocker-success'); await acknowledge();
+  const bankSaved = JSON.parse(query("SELECT value FROM store_settings WHERE key='app_settings'").value);
+  assert.equal(bankSaved.bankAccounts[0].qrPayload, replacementQr);
+  assert.equal(bankSaved.paymentQrSource, bankFixtures[3].id);
+  passed('bank QR settings decode a real image, reject a website QR, save the exact bank payload and persist the default source');
+
   await click('เลขสมาชิก', '.settings-nav'); await page.waitForSelector('.member-mode-segmented');
   assert.equal(await page.$('.member-mode-slider'), null, 'Selection paints the full button instead of an incorrectly sized slider');
   await page.$eval('.member-mode-segmented button[aria-selected="false"]', button => button.click());

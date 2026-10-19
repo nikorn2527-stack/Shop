@@ -209,6 +209,7 @@ type SettingsForm = {
   promptpayId: string;
   /** เปิด/ปิดพร้อมเพย์โดยไม่ลบหมายเลขที่เคยตั้ง */
   promptpayActive: boolean;
+  paymentQrSource: string;
   /** FIX-5 (user) — บัญชีธนาคารร้าน (รับเงินโอน) หลายบัญชีได้ · แสดงที่หน้า POS + ใบเสร็จ */
   bankAccounts: BankAccount[];
   /** ROUND 68 (user) — เบอร์โทรศูนย์ช่วยเหลือ แสดงท้ายหน้าจอ (footer) · ว่าง = ไม่แสดง */
@@ -245,6 +246,7 @@ const SETTINGS_FIELD_LABELS: [keyof SettingsForm, string][] = [
   ["dailyCutOffTime", "เวลาตัดยอดรายวัน"],
   ["promptpayId", "บัญชีพร้อมเพย์ร้าน"],
   ["promptpayActive", "เปิดใช้พร้อมเพย์"],
+  ["paymentQrSource", "ช่องทาง QR เริ่มต้น"],
   ["bankAccounts", "บัญชีธนาคารร้าน"],
   ["helpPhone", "เบอร์ศูนย์ช่วยเหลือ"],
   ["devAccess", "การเข้าใช้งานสำหรับผู้พัฒนา"],
@@ -2483,6 +2485,16 @@ export function Settings({
           )}
           {tab === "payment" && (
             <div className="settings-single payment-settings-compact">
+              <section className="panel settings-card payment-qr-default">
+                <h2>ช่องทาง QR เริ่มต้น</h2>
+                <label>เลือกช่องทางที่แสดงก่อนเมื่อเปิดหน้าชำระเงิน
+                  <select aria-label="ช่องทาง QR เริ่มต้น" value={form?.paymentQrSource ?? "promptpay"} disabled={!form} onChange={event => updateForm({ paymentQrSource: event.target.value })}>
+                    <option value="promptpay">พร้อมเพย์</option>
+                    {(form?.bankAccounts ?? []).filter(account => account.active).map(account => <option key={account.id} value={account.id}>{account.bankName} · {account.accountNumber}</option>)}
+                  </select>
+                </label>
+                <small>เปลี่ยนช่องทางเฉพาะบิลได้ที่หน้าชำระเงิน · กดบันทึกการตั้งค่าเพื่อใช้ค่าเริ่มต้นนี้</small>
+              </section>
               <section className="panel settings-card">
                 <div className="settings-heading">
                   <div>

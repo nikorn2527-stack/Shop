@@ -39,7 +39,8 @@ export function PaymentNotice({ storeName, total, qr, items, onClose, paperWidth
         <h2>ใบแจ้งชำระ</h2><p>{storeName}</p>
         {items.map((item, index) => <div className="payment-notice-item" key={index}><span>{item.name}</span><b>{item.qty}</b></div>)}
         <div className="payment-notice-total">ยอดชำระ {money(total)}</div>
-        <img src={qr} alt="QR พร้อมเพย์สำหรับชำระบิลนี้" style={{ width: `${qrMm}mm`, height: `${qrMm}mm` }} />
+        <img src={qr} alt="QR รับเงินสำหรับชำระบิลนี้" style={{ width: `${qrMm}mm`, height: `${qrMm}mm` }} />
+        <small>ตรวจชื่อผู้รับและยอดในแอปธนาคารก่อนโอน</small>
         <small>ยังไม่ได้รับชำระ · ไม่ใช่ใบเสร็จรับเงิน</small>
       </div>
       {error && <p role="alert">{error}</p>}
