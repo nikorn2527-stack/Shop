@@ -155,7 +155,8 @@
   :root:root :is(.global-search, .scan-hero, .search-box, input, select, textarea):focus-within { border-color: var(--action-primary); }
   :root:root :is(.onboarding-banner, .setup-banner, .dashboard-ready-card) { background: #F3F5F7; background-image: linear-gradient(135deg, #F5F7F8 0%, #DCE3EA 62%, #FAFBFC 100%); border-color: #AAB7C4; }
   :root:root :is(.dash-tab.active, .settings-nav button.active, .report-view-pills [aria-selected="true"], .cost-profit-ranges .primary-button) { background: var(--action-bg); background-image: none; border-color: var(--action-border); color: var(--action-ink); }
-  :root:root .dash-tab.active small { color: var(--action-ink); }
+  :root:root .dash-tab.active small,
+  :root:root .app-shell .stock-workbench .dash-tab.active small { color: var(--action-ink); }
   :root:root .quick-pick-panel .product-card.in-bill { border-color: var(--action-primary); box-shadow: inset 0 0 0 1px var(--action-primary), 0 2px 4px rgb(31 43 56 / 8%); }
   /* Orange identifies navigation; green identifies successful operations. */
   :root:root .pos-rail .rail-btn { color: #1F2B38; --task-ink: var(--action-primary); --task-tint: #F3F5F7; }
