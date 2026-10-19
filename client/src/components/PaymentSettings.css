@@ -186,7 +186,7 @@
    selects and text inputs must share a baseline even when captions differ. */
 :root:root .app-shell .payment-settings-compact :is(.bank-draft-panel .form-grid > label, .promptpay-edit-panel > label, .payment-qr-default > label) {
   display: grid;
-  grid-template-rows: 20px 42px minmax(16px, auto);
+  grid-template-rows: 20px 42px;
   align-content: start;
   gap: 6px;
   min-width: 0;

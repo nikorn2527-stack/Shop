@@ -3,7 +3,7 @@ import { useEffect } from "react";
 type Field = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
 const selector = 'input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]):not([type="color"]):not([type="button"]):not([type="submit"]), select, textarea';
 const excluded = '.print-preview-paper, .report-doc, .receipt-paper, .member-card-document, .search-field, .search-box, .global-search, .scan-hero, .member-scan-field, [role="search"], [data-field-feedback="off"]';
-const captions = { filled: "มีข้อมูล", empty: "ยังไม่กรอก", missing: "จำเป็นต้องกรอก", invalid: "ตรวจสอบข้อมูล" };
+const captions = { missing: "จำเป็นต้องกรอก", invalid: "ตรวจสอบข้อมูล" };
 
 /** Presentation only: never changes values, native constraints or submission behavior. */
 export function AppFieldFeedback() {
@@ -24,8 +24,13 @@ export function AppFieldFeedback() {
         const invalid = field.getAttribute('aria-invalid') === 'true' || (touched.has(field) && (!field.validity.valid || (required && !filled)));
         const state = invalid ? 'invalid' : filled ? 'filled' : required ? 'missing' : 'empty';
         field.dataset.fieldState = state;
-        // A group label containing several controls must not get an ambiguous caption.
-        if (label && label.querySelectorAll(selector).length === 1) label.dataset.fieldCaption = captions[state];
+        // Routine filled/optional-empty states use color only. Text is reserved
+        // for missing required information and validation errors.
+        const caption = state === 'missing' ? captions.missing : state === 'invalid' ? captions.invalid : '';
+        if (label) {
+          if (caption && label.querySelectorAll(selector).length === 1) label.dataset.fieldCaption = caption;
+          else label.removeAttribute('data-field-caption');
+        }
       });
     };
     const schedule = () => { if (!frame) frame = requestAnimationFrame(refresh); };
