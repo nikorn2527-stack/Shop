@@ -37,6 +37,14 @@ const suspended = db.prepare("SELECT member_number FROM members WHERE member_num
 assert.ok(suspended);
 db.prepare("UPDATE members SET first_name='Suspended', last_name='Customer', status='suspended' WHERE member_number=?").run(suspended.member_number);
 createBlankCards(db, ['UX-RETURN-001'], 'UX fixture');
+const returnFixtures = db.prepare("SELECT member_number FROM members WHERE status='active' AND card_number IS NULL AND member_number NOT IN (?,?,?) LIMIT 2").all(member.member_number, returning.member_number, suspended.member_number);
+assert.equal(returnFixtures.length, 2);
+for (const [index, fixture] of returnFixtures.entries()) {
+  const card = `UX-REFUND-00${index + 1}`;
+  createBlankCards(db, [card], 'UX fixture');
+  assignMemberCard(db, { memberNumber: fixture.member_number, cardNumber: card, expectedCardNumber: null, actor: 'UX fixture' });
+  db.prepare('UPDATE members SET first_name=?,last_name=?,balance=? WHERE member_number=?').run('Return', index === 0 ? 'Balance' : 'Zero', index === 0 ? 45.5 : 0, fixture.member_number);
+}
 const originalMemberCount = db.prepare('SELECT COUNT(*) n FROM members').get().n;
 const originalTransactionCount = db.prepare('SELECT COUNT(*) n FROM member_transactions WHERE member_number=?').get(returning.member_number).n;
 const product = db.prepare("SELECT id,sku,name,stock FROM products WHERE stock>0 AND price>0 AND (sell_mode IS NULL OR sell_mode<>'money') LIMIT 1").get();
@@ -102,10 +110,10 @@ async function cashSale() {
   assert.equal(await page.$eval('.pay-confirm-button', b => b.querySelectorAll('svg').length), 0, 'Unpaid state must not have a success tick');
   await pause(300); await page.screenshot({ path: path.join(dir, 'checkout-not-ready.png') });
   await click('รับตรงยอด', '.pay-confirm-modal');
-  assert.equal(await page.$eval('.pay-confirm-button', b => getComputedStyle(b).backgroundColor), 'rgb(77, 214, 136)');
+  assert.equal(await page.$eval('.pay-confirm-button', b => getComputedStyle(b).backgroundColor), 'rgb(101, 220, 152)');
   await page.screenshot({ path: path.join(dir, 'checkout-green-confirmation.png') });
   await click('ยืนยันการชำระเงิน', '.pay-confirm-modal'); await page.waitForSelector('#receipt-paper');
-  assert.equal(await page.$eval('.receipt-finish-action', button => getComputedStyle(button).backgroundColor), 'rgb(77, 214, 136)', 'The completed-sale finish action is soft green');
+  assert.equal(await page.$eval('.receipt-finish-action', button => getComputedStyle(button).backgroundColor), 'rgb(101, 220, 152)', 'The completed-sale finish action is soft green');
 }
 try {
   let ready = false;
@@ -328,6 +336,7 @@ try {
   const newName = 'UX receiving new product';
   await fillLabel('ชื่อสินค้า', newName); await fillLabel('ราคาขาย', 9); await click('ใช้สินค้านี้ในรายการรับเข้า', '.workflow-dialog');
   await page.waitForFunction(name => document.querySelector('.receive-item-editor h3')?.textContent.includes(name), {}, newName);
+  await pause(120); // Let the receive editor's delayed scan focus settle before typing amounts.
   await fill('#receive-editor-qty', 2); await fill('#receive-editor-paid', 10); await click('เพิ่มลงรายการ', '.receive-item-editor');
   assert.equal(query('SELECT COUNT(*) n FROM products WHERE name=?', newName).n, 0, 'New product stays a draft');
   await click('บันทึกทั้งหมด', '.receiving-workspace'); await page.waitForSelector('.confirm-modal');
@@ -393,7 +402,7 @@ try {
   assert.equal(query('SELECT balance FROM members WHERE member_number=?', member.member_number).balance, member.balance + 11);
   await acknowledge(); await click('ยืนยันการทำรายการ', '.wallet-modal'); await page.waitForSelector('.wallet-success');
   assert.equal(query('SELECT balance FROM members WHERE member_number=?', member.member_number).balance, member.balance + 11, 'Retry does not credit the wallet twice');
-  assert.equal(await page.$eval('.wallet-modal [data-action-tone="success"]', button => getComputedStyle(button).backgroundColor), 'rgb(77, 214, 136)');
+  assert.equal(await page.$eval('.wallet-modal [data-action-tone="success"]', button => getComputedStyle(button).backgroundColor), 'rgb(101, 220, 152)');
   await click('เสร็จสิ้น', '.wallet-modal'); await page.waitForFunction(() => !document.querySelector('.wallet-modal'));
   passed('wallet reply loss can retry once without duplicate credit; nested camera closes without dismissing the wallet');
 
@@ -466,7 +475,7 @@ try {
   assert.equal(settingsWrites, beforeWrites + 1, 'Rapid repeated clicks must write only once');
   assert.equal(await page.$$eval('[data-sonner-toast][data-type="success"]', notices => notices.length), 0, 'Settings success never uses stacked corner toasts');
   assert.equal(await page.$$eval('.blocker-success', notices => notices.length), 1, 'Exactly one centered success dialog');
-  assert.equal(await page.$eval('.blocker-button.success', button => getComputedStyle(button).backgroundColor), 'rgb(77, 214, 136)', 'Success acknowledgement uses soft green');
+  assert.equal(await page.$eval('.blocker-button.success', button => getComputedStyle(button).backgroundColor), 'rgb(101, 220, 152)', 'Success acknowledgement uses soft green');
   assert.equal(await page.$eval('.blocker-button.success', button => getComputedStyle(button).color), 'rgb(5, 46, 22)');
   assert.equal(await page.$eval('.blocker-success', dialog => getComputedStyle(dialog).backgroundColor), 'rgb(255, 255, 255)');
   assert.equal(await page.$eval('.blocker-success', dialog => dialog.getBoundingClientRect().width), confirmWidth, 'Confirmation and result use the same frame');
@@ -573,6 +582,58 @@ try {
   assert.equal(query('SELECT COUNT(*) n FROM app_sessions WHERE user_id=?', loginUser.id).n, 1);
   await loginContext.close(); page = adminPage;
   passed('login has neutral focus, optional image/plain background, and one warning confirmation before session transfer');
+
+  await page.click('[data-nav-item="pos"]'); await page.waitForSelector('.scan-hero input');
+  const refundRequests = [];
+  page.on('request', request => { if (request.method() === 'POST' && request.url().includes('card.return')) refundRequests.push(request); });
+  await click('คืนบัตร', '.pos-rail'); await page.waitForSelector('.card-return-modal #pos-return-card');
+  for (const viewport of [{width:1366,height:768}, {width:390,height:844}]) {
+    await page.setViewport(viewport); await pause(250);
+    assert.ok(await visible('.card-return-modal'), 'Return dialog stays inside the viewport');
+    assert.equal(await page.$eval('#pos-return-card', field => { const s = getComputedStyle(field); return s.borderTopWidth === '0px' && s.outlineStyle === 'none'; }), true);
+    await page.screenshot({ path: path.join(dir, `return-card-start-${viewport.width}.png`) });
+  }
+  await page.setViewport({width:1366,height:768});
+  await fill('#pos-return-card', 'Return');
+  await page.waitForSelector('.card-return-modal .member-scan-list');
+  assert.equal(await page.$eval('.card-return-modal .member-scan-list', list => list.textContent.includes('บุคคลทั่วไป')), false);
+  await fill('#pos-return-card', 'UX-REFUND-001'); await page.keyboard.press('Enter');
+  await page.waitForSelector('.card-return-received input');
+  assert.equal(await page.$eval('.card-return-modal .action-button', button => button.disabled), true, 'Receiving the actual card must be acknowledged');
+  await page.click('.card-return-received input'); await click('ตรวจสอบการคืนบัตร', '.card-return-modal');
+  await page.waitForSelector('.card-return-confirm');
+  assert.equal(query('SELECT balance FROM members WHERE member_number=?', returnFixtures[0].member_number).balance, 45.5);
+  await click('กลับไปตรวจสอบ', '.card-return-confirm');
+  assert.equal(refundRequests.length, 0, 'Cancelling review never returns money');
+  await page.setViewport({width:390,height:844}); await pause(200);
+  await page.screenshot({ path: path.join(dir, 'return-card-review-mobile.png') });
+  await page.setViewport({width:1366,height:768}); await page.screenshot({ path: path.join(dir, 'return-card-review.png') });
+  await click('ตรวจสอบการคืนบัตร', '.card-return-modal'); await page.waitForSelector('.card-return-confirm');
+  await pause(250); await page.screenshot({ path: path.join(dir, 'return-card-confirmation.png') });
+  await page.$eval('.card-return-confirm .blocker-button', b => { b.click(); b.click(); });
+  await page.waitForSelector('.blocker-success'); await acknowledge();
+  assert.equal(refundRequests.length, 1, 'A repeated click submits exactly once');
+  assert.deepEqual({...query('SELECT balance,card_number FROM members WHERE member_number=?', returnFixtures[0].member_number)}, {balance:0,card_number:null});
+  assert.equal(query("SELECT COUNT(*) n FROM member_transactions WHERE member_number=? AND type='refund'", returnFixtures[0].member_number).n, 1);
+  await click('คืนบัตร', '.pos-rail'); await page.waitForSelector('#pos-return-card');
+  await fill('#pos-return-card', 'UX-REFUND-002'); await page.keyboard.press('Enter');
+  await page.waitForSelector('.card-return-received input'); await page.click('.card-return-received input');
+  await click('ตรวจสอบการคืนบัตร', '.card-return-modal'); await page.waitForSelector('.card-return-confirm');
+  await click('ยืนยันคืนบัตร', '.card-return-confirm'); await page.waitForSelector('.blocker-success'); await acknowledge();
+  assert.equal(query('SELECT card_number FROM members WHERE member_number=?', returnFixtures[1].member_number).card_number, null);
+  assert.equal(query("SELECT COUNT(*) n FROM member_transactions WHERE member_number=? AND type='refund'", returnFixtures[1].member_number).n, 0, 'Zero-balance cards return without a money transaction');
+  passed('redesigned card return fits mobile, reviews before refund, preserves data on cancellation, and handles funded and zero-balance cards once');
+  await click('เมนู', '.pos-rail');
+  await page.waitForSelector('[data-nav-item="members"]', {visible:true});
+  await page.click('[data-nav-item="members"]');
+  await fill('input[placeholder="ค้นหาชื่อ เลขสมาชิก หรือพิมพ์เลขบางส่วน/ท้ายเลข"]', member.member_number);
+  await page.waitForFunction(number => document.querySelector('.rows-members tbody tr')?.textContent.includes(number), {}, member.member_number);
+  await page.click('.rows-members tbody tr'); await page.waitForSelector('.member-detail-actions');
+  await click('คืนบัตร', '.member-detail-actions'); await page.waitForSelector('.card-return-modal .card-return-received input');
+  assert.equal(await page.$('.card-return-member button'), null, 'Member details reuse the return design without switching to another member');
+  await click('ยกเลิก', '.card-return-modal');
+  assert.equal(query('SELECT card_number FROM members WHERE member_number=?', member.member_number).card_number, 'UX-WALLET-001', 'Cancelling from member details preserves its card');
+
 
   // Exercise the real generated print HTML, independently of a physical printer model.
   const printPage = await browser.newPage();

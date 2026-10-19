@@ -44,6 +44,9 @@ export function MemberScanPicker({
   emptyHint = "ยังไม่มีสมาชิกในระบบ · ลงทะเบียนก่อนใช้งาน",
   requireConfirm = false,
   confirmContext = "บิลนี้",
+  allowGeneralCustomer = true,
+  inputLabel = "เลขสมาชิกสำหรับบิลนี้ (คีย์หรือสแกน)",
+  autoFocus = false,
 }: {
   members: MemberLite[];
   selectedNumber: string | null;
@@ -53,6 +56,9 @@ export function MemberScanPicker({
   emptyHint?: string;
   requireConfirm?: boolean;
   confirmContext?: string;
+  allowGeneralCustomer?: boolean;
+  inputLabel?: string;
+  autoFocus?: boolean;
 }) {
   const [term, setTerm] = useState("");
   const [open, setOpen] = useState(false);
@@ -203,7 +209,8 @@ export function MemberScanPicker({
                 }
               }}
               placeholder={placeholder}
-              aria-label="เลขสมาชิกสำหรับบิลนี้ (คีย์หรือสแกน)"
+              aria-label={inputLabel}
+              autoFocus={autoFocus}
             />
             <button
               type="button"
@@ -236,12 +243,12 @@ export function MemberScanPicker({
       )}
       {open && !selected && !pending && (
         <div className="member-scan-list" role="listbox" aria-label="รายการสมาชิกที่ตรงกับที่คีย์">
-          <button type="button" className="member-option" onClick={() => pick(null)}>
+          {allowGeneralCustomer && <button type="button" className="member-option" onClick={() => pick(null)}>
             <div>
               <b>บุคคลทั่วไป</b>
               <small>ชำระเงินสดหรือ QR</small>
             </div>
-          </button>
+          </button>}
           {members.length === 0 ? (
             <div className="member-option disabled">
               <div>

@@ -5,7 +5,7 @@ const readSource = (relativePath: string) =>
   readFileSync(new URL(relativePath, import.meta.url), "utf8");
 
 describe("member card workflow UI", () => {
-  it("opens the shared card modal directly in return-card mode", () => {
+  it("opens the dedicated return-card workflow from POS and member detail", () => {
     const detailSource = readSource("./pages/members/MemberDetail.tsx");
     const membersSource = readSource("./pages/members/Members.tsx");
     const posSource = readSource("./pages/Pos.tsx");
@@ -14,7 +14,8 @@ describe("member card workflow UI", () => {
     const modalSource = readSource("./components/MemberCardActionsModal.tsx");
 
     expect(detailSource).toContain('setCardAction("return")');
-    expect(detailSource).toContain('initialAction="return"');
+    expect(detailSource).toContain("<ReturnCardModal");
+    expect(detailSource).toContain("allowMemberChange={false}");
     expect(detailSource).not.toContain('setCardAction("manage")');
     expect(detailSource).not.toContain('> จัดการบัตร');
     expect(membersSource).toContain("จัดการบัตรสมาชิก");
@@ -26,7 +27,7 @@ describe("member card workflow UI", () => {
     expect(shellSource).toContain('new CustomEvent("pos-rail", { detail: "card" })');
     expect(posSource).toContain('setCardInitialAction("return")');
     expect(posSource).toContain('initialAction={cardInitialAction}');
-    expect(posSource).toContain('confirmContext="คืนบัตร"');
+    expect(posSource).toContain("<ReturnCardModal");
     expect(modalSource).toContain('export type InitialMemberCardAction = "return" | "close"');
     expect(modalSource).toContain('initialAction === "return" ? "return"');
   });

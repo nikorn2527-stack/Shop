@@ -2,7 +2,7 @@ import { useRef as useRequestRef } from "react";
 import { notify } from "@/lib/notifications";
 ﻿import { ActionButton } from "@/components/ActionButton";
 import { useState } from "react";
-import { MemberCardActionsModal } from "@/components/MemberCardActionsModal";
+import { ReturnCardModal } from "@/components/ReturnCardModal";
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -433,7 +433,7 @@ export function MemberDetail({
           </div>
         </div>
         <div className="member-detail-actions">
-          {cardAction && <MemberCardActionsModal memberNumber={member.memberNumber} initialAction="return" onClose={() => setCardAction(null)} onSuccess={() => { void detailQuery.refetch(); setNotice("รับบัตรคืนและคืนเงินคงเหลือเรียบร้อยแล้ว"); }} />}
+          {cardAction && <ReturnCardModal members={[member]} initialMember={member} allowMemberChange={false} onClose={() => setCardAction(null)} onReturned={(_number, amount) => { setCardAction(null); void detailQuery.refetch(); notify.completed("คืนบัตรสำเร็จ", { description: `คืนเงิน ${money(amount)} แล้ว · บัตรพร้อมจ่ายใหม่` }); }} />}
           <button
             className="primary-button"
             disabled={profile.status !== "active" || !cardReady}

@@ -3,6 +3,7 @@ import { useRef as useRequestRef } from "react";
 import { WorkflowDialog } from "@/components/WorkflowDialog";
 import "../styles/pos-depth-preview.css";
 import { MemberRegistrationModal } from "@/components/MemberRegistrationModal";
+import { ReturnCardModal } from "@/components/ReturnCardModal";
 import { MemberCardActionsModal } from "@/components/MemberCardActionsModal";
 import type { MemberCardData } from "@/components/MemberCardModal";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -226,15 +227,6 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
   // จุดประสงค์ที่เปิดหน้าจ่ายบัตร — เสร็จแล้วเดินหน้าต่ออัตโนมัติ
   // "bill" = ยืนยันบัตรเข้าบิล / "wallet" = เติมหรือถอนเงิน ที่ติดขัดเพราะยังไม่มีบัตร
   const [cardIntent, setCardIntent] = useState<"bill" | "wallet" | null>(null);
-  useEffect(() => {
-    const inputId = cardActionsOpen && !cardActionMember ? "pos-card-member" : null;
-    if (!inputId) return;
-    // Wait for the shared search to mount inside the dialog before focusing it.
-    const timer = window.setTimeout(() => {
-      document.getElementById(inputId)?.focus();
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [cardActionsOpen, cardActionMember]);
   const [registerOpen, setRegisterOpen] = useState(false);
   const [cardForNew, setCardForNew] = useState<{ memberNumber: string; prename?: string | null; firstName: string; lastName: string; type: string; balance: number; status: "active" | "suspended"; createdAt: string; photoUrl: string | null; gender: string | null } | null>(null);
   // ROUND 38 (ข้อ 37) — ถ่ายรูปสมาชิกจากกล้อง ตอนลงทะเบียนสมาชิกใหม่
@@ -1202,7 +1194,13 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
       }
       onOpenMember(pendingExistingMember);
     }} />}
-    {cardActionsOpen && (cardActionMember ? <MemberCardActionsModal memberNumber={cardActionMember.memberNumber} initialAction={cardInitialAction} initialCardNumber={existingCardDraft} onClose={() => { setExistingCardDraft(""); setCardIntent(null); setCardInitialAction(undefined); setCardActionsOpen(false); }} onSuccess={onCardActionSuccess} /> : <div className="modal-backdrop"><section className="form-modal member-selection-modal" role="dialog" aria-modal="true" aria-label="เลือกสมาชิกเพื่อคืนบัตร"><div className="modal-heading"><h2>เลือกสมาชิกเพื่อคืนบัตร</h2><button className="icon-button" aria-label="ปิดหน้าต่าง" onClick={() => { setCardInitialAction(undefined); setCardActionsOpen(false); }}><X size={17} /></button></div><MemberScanPicker members={members} selectedNumber={null} onSelect={setCardActionMember} requireConfirm confirmContext="คืนบัตร" inputId="pos-card-member" /></section></div>)}
+    {cardActionsOpen && (cardInitialAction === "return" || !cardActionMember ? <ReturnCardModal members={members} initialMember={cardActionMember} onClose={() => { setCardInitialAction(undefined); setCardActionsOpen(false); focusScan(); }} onReturned={(memberNumber, amount) => {
+      setSelectedMemberNumber(current => current === memberNumber ? null : current);
+      setCardInitialAction(undefined); setCardIntent(null); setCardActionsOpen(false);
+      clearNotices();
+      notify.completed("คืนบัตรสำเร็จ", { description: `คืนเงิน ${money(amount)} ให้สมาชิก ${memberNumber} แล้ว · บัตรพร้อมจ่ายใหม่` });
+      focusScan();
+    }} /> : <MemberCardActionsModal memberNumber={cardActionMember.memberNumber} initialAction={cardInitialAction} initialCardNumber={existingCardDraft} onClose={() => { setExistingCardDraft(""); setCardIntent(null); setCardInitialAction(undefined); setCardActionsOpen(false); }} onSuccess={onCardActionSuccess} />)}
     {cart.length > 0 && !receiptOpen && <div className="pos-mobile-bar"><span className="pos-mobile-count"><ShoppingCart size={15} /> {cartPieces} รายการ</span><strong>{money(payable)}</strong><button onClick={() => cartPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}><CreditCard size={16} /> ชำระเงิน</button></div>}
     {receiptOpen && receipt && <ReceiptModal receipt={receipt} onClose={startNewSale} onNewSale={startNewSale} onPrinted={() => setMessage(`สั่งพิมพ์บิล ${receipt.orderNumber} แล้ว`)} />}{cardForNew && <MemberCardModal member={cardForNew} onClose={() => setCardForNew(null)} />}{scanMember && <MemberCardModal member={scanMember} confirmForBill onClose={() => { setScanMember(null); focusScan(); }} onConfirm={confirmScanMember} />}{registerOpen && <MemberRegistrationModal actor={cashier} actorRole={actorRole} onClose={() => setRegisterOpen(false)} onUseExisting={(member, cardNumber, openDetails) => {
       setRegisterOpen(false);
