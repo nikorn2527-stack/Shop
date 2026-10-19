@@ -672,6 +672,8 @@ export function Settings({
   const [form, setForm] = useState<SettingsForm | null>(null);
   const [promptPayEditing, setPromptPayEditing] = useState(false);
   const [promptPayDraft, setPromptPayDraft] = useState("");
+  const [promptPayDeleteOpen, setPromptPayDeleteOpen] = useState(false);
+  const promptPayDeleteInFlight = useRef(false);
   // Threshold input keeps raw digits while typing (cleared field = 0) —
   // committed into the shared form on every keystroke via updateForm.
   const [thresholdText, setThresholdText] = useState("");
@@ -1245,9 +1247,31 @@ export function Settings({
     saveInFlight.current = true;
     saveMutation.mutate({ ...saveReview.form, appStyle: "shop" });
   };
+  const deletePromptPayMutation = trpc.settings.set.useMutation({
+    onSuccess: async () => {
+      setPromptPayDeleteOpen(false);
+      setPromptPayEditing(false);
+      setPromptPayDraft("");
+      updateForm({ promptpayId: "", promptpayActive: false });
+      await utils.settings.get.invalidate();
+      notify.completed("ลบข้อมูลพร้อมเพย์แล้ว", { description: "นำหมายเลขพร้อมเพย์ออกและปิดรับเงินผ่านพร้อมเพย์แล้ว บัญชีธนาคารยังคงเดิม" });
+    },
+    onSettled: () => { promptPayDeleteInFlight.current = false; },
+  });
+  const openDeletePromptPay = () => {
+    if (!form?.promptpayId.trim() || saveMutation.isPending || deletePromptPayMutation.isPending) return;
+    deletePromptPayMutation.reset();
+    setPromptPayDeleteOpen(true);
+  };
+  const confirmDeletePromptPay = () => {
+    if (!promptPayDeleteOpen || saveMutation.isPending || deletePromptPayMutation.isPending || promptPayDeleteInFlight.current) return;
+    promptPayDeleteInFlight.current = true;
+    deletePromptPayMutation.mutate({ promptpayId: "", promptpayActive: false });
+  };
   const savePromptPay = () => {
     if (!form) return;
     const promptpayId = promptPayDraft.trim();
+    if (!promptpayId && form.promptpayId.trim()) { openDeletePromptPay(); return; }
     if (promptpayId && !isValidPromptPayId(promptpayId)) {
       notify.error("เลขพร้อมเพย์ไม่ถูกต้อง", { description: "ใช้เบอร์โทร 9–10 หลัก หรือเลขประจำตัวประชาชน 13 หลัก" });
       return;
@@ -2524,7 +2548,10 @@ export function Settings({
                     <button type="button" className="icon-button" onClick={startEditPromptPay} disabled={!form || saveMutation.isPending} title="แก้ไขเลขพร้อมเพย์" aria-label="แก้ไขเลขพร้อมเพย์">
                       <Pencil size={15} />
                     </button>
-                    <button type="button" className={`toggle promptpay-row-toggle ${form?.promptpayActive !== false ? "on" : ""}`} onClick={togglePromptPay} disabled={!form || saveMutation.isPending} aria-pressed={form?.promptpayActive !== false} aria-label={form?.promptpayActive !== false ? "ปิดรับเงินผ่านพร้อมเพย์" : "เปิดรับเงินผ่านพร้อมเพย์"} title={form?.promptpayActive !== false ? "ปิดรับเงินผ่านพร้อมเพย์" : "เปิดรับเงินผ่านพร้อมเพย์"}><span /></button>
+                    <button type="button" className="icon-button danger-outline-button" onClick={openDeletePromptPay} disabled={!form?.promptpayId.trim() || saveMutation.isPending || deletePromptPayMutation.isPending} title="ลบข้อมูลพร้อมเพย์" aria-label="ลบข้อมูลพร้อมเพย์">
+                      <Trash2 size={15} />
+                    </button>
+                    <button type="button" className={`toggle promptpay-row-toggle ${form?.promptpayActive !== false ? "on" : ""}`} onClick={togglePromptPay} disabled={!form?.promptpayId.trim() || saveMutation.isPending || deletePromptPayMutation.isPending} aria-pressed={form?.promptpayActive !== false} aria-label={form?.promptpayActive !== false ? "ปิดรับเงินผ่านพร้อมเพย์" : "เปิดรับเงินผ่านพร้อมเพย์"} title={form?.promptpayActive !== false ? "ปิดรับเงินผ่านพร้อมเพย์" : "เปิดรับเงินผ่านพร้อมเพย์"}><span /></button>
                   </div>
                 </div>
                 {promptPayEditing && (
@@ -4280,6 +4307,7 @@ export function Settings({
               onClose={() => { setPrinterPreviewOpen(false); setPrinterTestOpen(false); }}
             />
           )}
+          {promptPayDeleteOpen && <FeedbackDialog tone="danger" title="ลบข้อมูลพร้อมเพย์?" description={`หมายเลข ${form?.promptpayId} จะถูกนำออกจากแอปและปิดรับเงินผ่านพร้อมเพย์ บัญชีธนาคารและประวัติการชำระเงินยังคงเดิม`} actionLabel="ยืนยันลบข้อมูลพร้อมเพย์" onAction={confirmDeletePromptPay} onClose={() => setPromptPayDeleteOpen(false)} onCancel={() => setPromptPayDeleteOpen(false)} pending={deletePromptPayMutation.isPending} error={deletePromptPayMutation.error ? getErrorMessage(deletePromptPayMutation.error) : undefined} className="promptpay-delete-confirm" />}
           {saveReview && <FeedbackDialog tone="confirm" title="ยืนยันการบันทึกการตั้งค่า" description={`ตรวจสอบรายการที่แก้ไขก่อนบันทึก ${saveReview.labels.length} รายการ`} onClose={() => setSaveReview(null)} onCancel={() => setSaveReview(null)} cancelLabel="กลับไปแก้ไข" pending={saveMutation.isPending} className="settings-save-review" actionLabel="ยืนยันบันทึกการตั้งค่า" onAction={confirmSaveSettings}>
             <ul>{saveReview.labels.map(label => <li key={label}>{label}</li>)}</ul>
           </FeedbackDialog>}

@@ -570,6 +570,30 @@ try {
   assert.equal(bankSaved.bankAccounts[0].qrPayload, replacementQr);
   assert.equal(bankSaved.paymentQrSource, bankFixtures[3].id);
   passed('bank QR settings decode a real image, reject a website QR, save the exact bank payload and persist the default source');
+  const beforePromptPayDelete = JSON.parse(query("SELECT value FROM store_settings WHERE key='app_settings'").value);
+  const writesBeforePromptPayDelete = settingsWrites;
+  const salesBeforePromptPayDelete = query('SELECT COUNT(*) n FROM sales').n;
+  await page.click('[aria-label="ลบข้อมูลพร้อมเพย์"]'); await page.waitForSelector('.promptpay-delete-confirm');
+  assert.equal(await page.$eval('.promptpay-delete-confirm .blocker-button', button => getComputedStyle(button).backgroundColor), 'rgb(220, 38, 38)');
+  await page.screenshot({ path: path.join(dir, 'promptpay-delete-confirm.png') });
+  await click('ยกเลิก', '.promptpay-delete-confirm');
+  assert.equal(settingsWrites, writesBeforePromptPayDelete);
+  assert.deepEqual(JSON.parse(query("SELECT value FROM store_settings WHERE key='app_settings'").value), beforePromptPayDelete, 'Cancelling deletion changes no saved settings');
+  await page.click('[aria-label="ลบข้อมูลพร้อมเพย์"]'); await page.waitForSelector('.promptpay-delete-confirm');
+  await page.$eval('.promptpay-delete-confirm .blocker-button', button => { button.click(); button.click(); });
+  await page.waitForSelector('.blocker-success'); await acknowledge();
+  const afterPromptPayDelete = JSON.parse(query("SELECT value FROM store_settings WHERE key='app_settings'").value);
+  assert.equal(settingsWrites, writesBeforePromptPayDelete + 1, 'Repeated deletion confirmation writes exactly once');
+  assert.equal(afterPromptPayDelete.promptpayId, '');
+  assert.equal(afterPromptPayDelete.promptpayActive, false);
+  assert.deepEqual(afterPromptPayDelete.bankAccounts, beforePromptPayDelete.bankAccounts);
+  assert.equal(afterPromptPayDelete.paymentQrSource, beforePromptPayDelete.paymentQrSource);
+  assert.equal(query('SELECT COUNT(*) n FROM sales').n, salesBeforePromptPayDelete);
+  assert.equal(await page.$eval('[aria-label="ลบข้อมูลพร้อมเพย์"]', button => button.disabled), true);
+  assert.equal(await page.$eval('.promptpay-row-toggle', button => button.disabled), true);
+  assert.ok((await page.$eval('.promptpay-details-info', info => info.textContent)).includes('ยังไม่ได้ตั้งค่าเลขพร้อมเพย์'));
+  passed('PromptPay deletion requires confirmation, cancellation preserves settings, repeated clicks delete once, and bank accounts and sales remain intact');
+
 
   await click('เลขสมาชิก', '.settings-nav'); await page.waitForSelector('.member-mode-segmented');
   assert.equal(await page.$('.member-mode-slider'), null, 'Selection paints the full button instead of an incorrectly sized slider');
