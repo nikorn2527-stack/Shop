@@ -180,3 +180,16 @@
   :root:root .report-filter-select > select { display: block; width: 100%; min-height: 40px; padding: 8px 12px; border-radius: 8px; box-sizing: border-box; }
   :root:root .report-filter-select[data-field-caption]::after { margin-top: 0; }
 }
+
+@media screen {
+  /* A selected segment paints its actual button, so unequal labels are fully covered. */
+  :root:root .member-mode-segmented { display: inline-flex; max-width: 100%; gap: 3px; padding: 3px; }
+  :root:root .member-mode-segmented .member-mode-seg { flex: 1 1 auto; min-width: 0; min-height: 40px; white-space: normal; padding: 8px 14px; background: transparent; }
+  :root:root .member-mode-segmented .member-mode-seg.active { background: #fff; box-shadow: 0 1px 3px rgb(15 23 42 / 10%); }
+  .settings-save-controls { display: grid; justify-items: end; gap: 8px; }
+  :root:root .settings-save-controls .settings-unsaved-note { margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent; color: #64748b; font-size: 12px; gap: 10px; }
+  :root:root .member-card-code-field { display: grid; gap: 8px; margin-top: 20px; }
+  :root:root .member-card-code-field .member-card-code-input { display: block; width: 100%; box-sizing: border-box; min-height: 52px; padding: 12px 14px; border-radius: 12px; font-size: 17px; }
+  :root:root .member-card-code-field[data-field-caption]::after { margin-top: 0; }
+  :root:root .workflow-dialog .receipt-success :is(b, small) { color: var(--success-ink); }
+}

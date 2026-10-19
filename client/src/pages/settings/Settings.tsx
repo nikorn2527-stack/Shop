@@ -1090,7 +1090,6 @@ export function Settings({
   const automaticMemberNumbers = numberMode !== "manual";
   // The UI presents one automatic mode. The saved backend mode remains
   // running/year and is derived from whether the selected format includes a year.
-  const memberModeIndex = automaticMemberNumbers ? 0 : 1;
   const memberYearMode = numberMode === "running"
     ? "none"
     : form?.memberNumberYearMode === "gregorian"
@@ -1505,21 +1504,23 @@ export function Settings({
         title="ตั้งค่า"
         description=""
         action={
-          <button
-            className="primary-button"
-            disabled={!form || saveMutation.isPending || dirtyCount === 0}
-            onClick={saveSettings}
-          >
-            <Check size={16} />{" "}
-            {saveMutation.isPending
-              ? "กำลังบันทึก…"
-              : dirtyCount > 0
-                ? `บันทึกการตั้งค่า · ${dirtyCount} รายการ`
-                : "บันทึกการตั้งค่า"}
-          </button>
+          <div className="settings-save-controls">
+            <button
+              className="primary-button"
+              disabled={!form || saveMutation.isPending || dirtyCount === 0}
+              onClick={saveSettings}
+            >
+              <Check size={16} />{" "}
+              {saveMutation.isPending
+                ? "กำลังบันทึก…"
+                : dirtyCount > 0
+                  ? `บันทึกการตั้งค่า · ${dirtyCount} รายการ`
+                  : "บันทึกการตั้งค่า"}
+            </button>
+            {dirtyCount > 0 && <div className="settings-unsaved-note" role="status"><span>ยังไม่บันทึก · {dirtyCount} รายการ</span><button type="button" className="outline-button compact" disabled={saveMutation.isPending} onClick={discardChanges}>ย้อนการแก้ไข</button></div>}
+          </div>
         }
       />
-      {dirtyCount > 0 && <div className="settings-unsaved-note" role="status"><span>มีการแก้ไข {dirtyCount} รายการ · กดบันทึกด้านบนเพื่อตรวจสอบและยืนยัน</span><button type="button" className="outline-button compact" disabled={saveMutation.isPending} onClick={discardChanges}>ย้อนการแก้ไข</button></div>}
       <div className="settings-layout">
         <SharedSearch label="ตั้งค่า · ค้นหาเมนู">
           <div className="settings-search-wrap">
@@ -2265,13 +2266,6 @@ export function Settings({
                   role="tablist"
                   aria-label="รูปแบบเลขสมาชิก"
                 >
-                  <span
-                    className="member-mode-slider"
-                    aria-hidden="true"
-                    style={{
-                      transform: `translateX(${memberModeIndex * 100}%)`,
-                    }}
-                  />
                   {[
                     { value: "automatic" as const, label: "ระบบออกเลขให้อัตโนมัติ" },
                     { value: "manual" as const, label: "กรอกเลขเอง" },

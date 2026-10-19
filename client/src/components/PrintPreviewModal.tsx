@@ -121,7 +121,6 @@ export function PrintPreviewModal({
       await printElementDocument(
         targetId,
         paper === "thermal" ? thermalProfile.paperWidthMm : undefined,
-        paper === "thermal" ? contentMm ?? undefined : undefined,
       );
       onPrint?.();
       onClose();

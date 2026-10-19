@@ -8,7 +8,8 @@ import net from 'node:net';
 import { spawn } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
 import puppeteer from 'puppeteer';
-import { openWelfareStore, setEditionSettings, createAppUser, createAppSession, createBlankCards, assignMemberCard } from '../server/sqliteStore.ts';
+import { buildBrowserPrintHtml } from '../client/src/lib/printHelper.ts';
+import { openWelfareStore, setSettings, setEditionSettings, createAppUser, createAppSession, createBlankCards, assignMemberCard } from '../server/sqliteStore.ts';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'shop-workflow-ux-'));
 const target = path.join(dir, 'demo.sqlite');
@@ -16,6 +17,7 @@ const previous = { seed: process.env.SEED_DEMO_DATA, mode: process.env.NODE_ENV 
 process.env.SEED_DEMO_DATA = '1';
 process.env.NODE_ENV = 'development';
 const db = openWelfareStore(target);
+setSettings(db, { receiptPaperWidth: "80" });
 setEditionSettings(db, { trialStart: new Date().toISOString().slice(0, 10) });
 if (previous.seed === undefined) delete process.env.SEED_DEMO_DATA; else process.env.SEED_DEMO_DATA = previous.seed;
 if (previous.mode === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = previous.mode;
@@ -52,6 +54,7 @@ const server = spawn(process.execPath, ['dist/index.js'], {
 let browser, page;
 const errors = [];
 const results = [];
+const printedDocuments = [];
 let printMode = 'success', printRequests = 0, settingsWrites = 0;
 const query = (sql, ...args) => {
   const connection = new DatabaseSync(target, { readOnly: true });
@@ -99,10 +102,10 @@ async function cashSale() {
   assert.equal(await page.$eval('.pay-confirm-button', b => b.querySelectorAll('svg').length), 0, 'Unpaid state must not have a success tick');
   await pause(300); await page.screenshot({ path: path.join(dir, 'checkout-not-ready.png') });
   await click('รับตรงยอด', '.pay-confirm-modal');
-  assert.equal(await page.$eval('.pay-confirm-button', b => getComputedStyle(b).backgroundColor), 'rgb(6, 199, 85)');
+  assert.equal(await page.$eval('.pay-confirm-button', b => getComputedStyle(b).backgroundColor), 'rgb(77, 214, 136)');
   await page.screenshot({ path: path.join(dir, 'checkout-green-confirmation.png') });
   await click('ยืนยันการชำระเงิน', '.pay-confirm-modal'); await page.waitForSelector('#receipt-paper');
-  assert.equal(await page.$eval('.receipt-finish-action', button => getComputedStyle(button).backgroundColor), 'rgb(6, 199, 85)', 'The completed-sale finish action is LINE green');
+  assert.equal(await page.$eval('.receipt-finish-action', button => getComputedStyle(button).backgroundColor), 'rgb(77, 214, 136)', 'The completed-sale finish action is soft green');
 }
 try {
   let ready = false;
@@ -137,7 +140,7 @@ try {
   page.on('request', request => {
     if (request.method() === 'POST' && request.url().includes('settings.set')) settingsWrites++;
     if (request.url().startsWith('http://127.0.0.1:3031/print')) {
-      if (request.method() === 'POST') printRequests++;
+      if (request.method() === 'POST') { printRequests++; printedDocuments.push(JSON.parse(request.postData())); }
       request.respond({ status: printMode === 'success' ? 200 : 503, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'content-type', 'Access-Control-Allow-Methods': 'POST,OPTIONS' }, body: JSON.stringify({ ok: printMode === 'success', message: 'Mock print job accepted' }) });
     } else request.continue();
   });
@@ -183,6 +186,12 @@ try {
     } else { await page.focus('.blocker-button'); await page.keyboard.press(dismiss); }
     await page.waitForFunction(() => !document.querySelector('.blocker-modal') && [...document.querySelectorAll('.workflow-dialog')].some(dialog => dialog.textContent.includes('จ่ายบัตรให้สมาชิกเดิม')));
     assert.equal(await page.$$eval('.workflow-dialog', dialogs => dialogs.filter(d => d.getClientRects().length).length), 1);
+    await page.waitForSelector('.member-card-code-input');
+    assert.equal(await page.$eval('.member-card-code-input', input => {
+      const r = input.getBoundingClientRect(), dialog = input.closest('.workflow-dialog').getBoundingClientRect();
+      return parseFloat(getComputedStyle(input).minHeight) >= 52 && r.width > dialog.width * 0.8 && parseFloat(getComputedStyle(input).borderTopLeftRadius) >= 12;
+    }), true, 'Card scanner is full width, comfortably tall and rounded');
+    if (dismiss === 'click') await page.screenshot({ path: path.join(dir, 'card-assignment-large-input.png') });
     await page.keyboard.press('Escape'); await page.waitForFunction(() => !document.querySelector('.workflow-dialog'));
     assert.equal(query('SELECT card_number FROM members WHERE member_number=?', returning.member_number).card_number, null, 'Cancelling assignment changes no card');
   }
@@ -384,7 +393,7 @@ try {
   assert.equal(query('SELECT balance FROM members WHERE member_number=?', member.member_number).balance, member.balance + 11);
   await acknowledge(); await click('ยืนยันการทำรายการ', '.wallet-modal'); await page.waitForSelector('.wallet-success');
   assert.equal(query('SELECT balance FROM members WHERE member_number=?', member.member_number).balance, member.balance + 11, 'Retry does not credit the wallet twice');
-  assert.equal(await page.$eval('.wallet-modal [data-action-tone="success"]', button => getComputedStyle(button).backgroundColor), 'rgb(6, 199, 85)');
+  assert.equal(await page.$eval('.wallet-modal [data-action-tone="success"]', button => getComputedStyle(button).backgroundColor), 'rgb(77, 214, 136)');
   await click('เสร็จสิ้น', '.wallet-modal'); await page.waitForFunction(() => !document.querySelector('.wallet-modal'));
   passed('wallet reply loss can retry once without duplicate credit; nested camera closes without dismissing the wallet');
 
@@ -398,7 +407,7 @@ try {
   await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('.wallet-modal'));
   assert.equal(query('SELECT balance FROM members WHERE member_number=?', member.member_number).balance, beforeWithdrawal, 'Cancelling withdrawal does not debit the member');
-  passed('function-based actions: suspend is caution, discard is red, completed actions are LINE green, withdrawal cancellation preserves balance');
+  passed('function-based actions: suspend is caution, discard is red, completed actions are soft green, withdrawal cancellation preserves balance');
 
   const lastBill = query('SELECT order_number FROM sales ORDER BY id DESC LIMIT 1').order_number;
   await page.keyboard.down('Control'); await page.keyboard.press('k'); await page.keyboard.up('Control');
@@ -457,7 +466,7 @@ try {
   assert.equal(settingsWrites, beforeWrites + 1, 'Rapid repeated clicks must write only once');
   assert.equal(await page.$$eval('[data-sonner-toast][data-type="success"]', notices => notices.length), 0, 'Settings success never uses stacked corner toasts');
   assert.equal(await page.$$eval('.blocker-success', notices => notices.length), 1, 'Exactly one centered success dialog');
-  assert.equal(await page.$eval('.blocker-button.success', button => getComputedStyle(button).backgroundColor), 'rgb(6, 199, 85)', 'Success acknowledgement uses LINE green');
+  assert.equal(await page.$eval('.blocker-button.success', button => getComputedStyle(button).backgroundColor), 'rgb(77, 214, 136)', 'Success acknowledgement uses soft green');
   assert.equal(await page.$eval('.blocker-button.success', button => getComputedStyle(button).color), 'rgb(5, 46, 22)');
   assert.equal(await page.$eval('.blocker-success', dialog => getComputedStyle(dialog).backgroundColor), 'rgb(255, 255, 255)');
   assert.equal(await page.$eval('.blocker-success', dialog => dialog.getBoundingClientRect().width), confirmWidth, 'Confirmation and result use the same frame');
@@ -465,7 +474,19 @@ try {
   await pause(200); await page.screenshot({ path: path.join(dir, 'settings-save-success.png') });
   await acknowledge();
   await page.waitForFunction(() => !document.querySelector('.settings-unsaved-note'));
-  passed('settings review is centered; cancellation writes nothing; saving once ends with LINE-green success');
+  passed('settings review is centered; cancellation writes nothing; saving once ends with soft-green success');
+  await click('เลขสมาชิก', '.settings-nav'); await page.waitForSelector('.member-mode-segmented');
+  assert.equal(await page.$('.member-mode-slider'), null, 'Selection paints the full button instead of an incorrectly sized slider');
+  await page.$eval('.member-mode-segmented button[aria-selected="false"]', button => button.click());
+  await page.waitForSelector('.settings-save-controls .settings-unsaved-note');
+  assert.equal(await page.$('.workflow-dialog'), null, 'A routine option change never opens a dialog');
+  assert.equal(await page.$eval('.settings-unsaved-note', note => getComputedStyle(note).backgroundColor), 'rgba(0, 0, 0, 0)');
+  assert.equal(await page.$eval('.member-mode-seg.active', button => getComputedStyle(button).backgroundColor), 'rgb(255, 255, 255)');
+  await (await page.$('.member-mode-segmented')).screenshot({ path: path.join(dir, 'member-number-full-selection.png') });
+  await page.screenshot({ path: path.join(dir, 'settings-local-unsaved-status.png') });
+  await click('ย้อนการแก้ไข', '.settings-unsaved-note');
+  await page.waitForFunction(() => !document.querySelector('.settings-unsaved-note'));
+
 
   await page.click('[data-nav-item="members"]');
   await fill('input[placeholder="ค้นหาชื่อ เลขสมาชิก หรือพิมพ์เลขบางส่วน/ท้ายเลข"]', returning.member_number);
@@ -552,6 +573,20 @@ try {
   assert.equal(query('SELECT COUNT(*) n FROM app_sessions WHERE user_id=?', loginUser.id).n, 1);
   await loginContext.close(); page = adminPage;
   passed('login has neutral focus, optional image/plain background, and one warning confirmation before session transfer');
+
+  // Exercise the real generated print HTML, independently of a physical printer model.
+  const printPage = await browser.newPage();
+  const firstReceipt = printedDocuments[0];
+  assert.ok(firstReceipt?.content);
+  fs.writeFileSync(path.join(dir, 'receipt-helper.html'), firstReceipt.content);
+  await printPage.setContent(buildBrowserPrintHtml(firstReceipt.content), { waitUntil: 'networkidle0' });
+  await printPage.evaluate(() => document.fonts.ready);
+  const driverPdf = await printPage.pdf({ width: '80mm', height: '200mm', preferCSSPageSize: false, printBackground: true, displayHeaderFooter: false });
+  fs.writeFileSync(path.join(dir, 'receipt-driver-80x200.pdf'), driverPdf);
+  const driverPages = (Buffer.from(driverPdf).toString('latin1').match(/\/Type\s*\/Page\b/g) || []).length;
+  console.log('THERMAL_DRIVER_PAGES', driverPages, firstReceipt.paperHeightMm);
+  assert.equal(driverPages, 1, 'A short receipt must fit one 80 × 200 mm driver page');
+  await printPage.close();
 
   assert.deepEqual(errors, []);
   assert.equal(query('PRAGMA integrity_check').integrity_check, 'ok');

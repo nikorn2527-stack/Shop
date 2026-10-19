@@ -124,29 +124,75 @@ export async function printHtmlDocument(html: string): Promise<void> {
         win.print();
       } catch (error) { frame.remove(); reject(error); }
     };
-    frame.srcdoc = html;
+    frame.srcdoc = buildBrowserPrintHtml(html);
     document.body.appendChild(frame);
   });
 }
 
-export function printElementDocument(targetId: string, widthMm?: number, measuredHeightMm?: number): Promise<PrintResult> {
+/** Browser page length belongs to the selected driver paper, not a screen estimate. */
+export function buildBrowserPrintHtml(html: string): string {
+  if (!/<html\b[^>]*\bdata-thermal-paper-width=/i.test(html)) return html;
+  return html.replace('</head>', '<style id="browser-driver-page">@page{size:auto;margin:0}</style></head>');
+}
+
+/** Measure using the same print rules, fonts and millimetre width sent to the printer. */
+async function measureThermalDocument(html: string, targetId: string, widthMm: number): Promise<number> {
+  const frame = document.createElement('iframe');
+  frame.title = 'เตรียมขนาดเอกสารพิมพ์';
+  frame.setAttribute('aria-hidden', 'true');
+  frame.style.cssText = `position:fixed;left:-10000px;top:0;width:${widthMm}mm;height:1000px;border:0;visibility:hidden;pointer-events:none`;
+  try {
+    await new Promise<void>((resolve, reject) => {
+      frame.onload = () => resolve();
+      frame.onerror = () => reject(new Error('เตรียมเอกสารพิมพ์ไม่สำเร็จ'));
+      frame.srcdoc = html;
+      document.body.appendChild(frame);
+    });
+    const doc = frame.contentDocument;
+    if (!doc) throw new Error('อ่านขนาดเอกสารพิมพ์ไม่สำเร็จ');
+    // Activate print-only CSS and suppress screen-only CSS in this isolated measuring frame.
+    // Only CSSOM is changed; the HTML ultimately sent to the helper retains its original media rules.
+    const usePrintMedia = (rules: CSSRuleList) => {
+      for (const rule of Array.from(rules)) {
+        if (rule.type === CSSRule.MEDIA_RULE) {
+          const media = rule as CSSMediaRule;
+          media.media.mediaText = media.media.mediaText.split(',').map(query => /\bscreen\b/i.test(query) ? 'not all' : query.replace(/\bprint\b/gi, 'all')).join(',');
+        }
+        if ('cssRules' in rule) usePrintMedia((rule as CSSGroupingRule).cssRules);
+      }
+    };
+    for (const sheet of Array.from(doc.styleSheets)) {
+      try { usePrintMedia(sheet.cssRules); } catch { /* Cross-origin CSS is not used by local document layouts. */ }
+    }
+    doc.getElementById(targetId)?.getBoundingClientRect(); // Flush the print layout before waiting for its fonts.
+    await doc.fonts.ready;
+    await Promise.all(Array.from(doc.images, image => image.decode().catch(() => undefined)));
+    const target = doc.getElementById(targetId);
+    if (!target) throw new Error('ไม่พบเอกสารสำหรับวัดขนาดพิมพ์');
+    const pixels = Math.max(target.scrollHeight, target.getBoundingClientRect().height);
+    if (pixels <= 0) throw new Error('เอกสารพิมพ์ไม่มีเนื้อหาที่แสดงได้');
+    return pixels * 25.4 / 96;
+  } finally { frame.remove(); }
+}
+
+export async function printElementDocument(targetId: string, widthMm?: number): Promise<PrintResult> {
   const source = document.getElementById(targetId);
-  if (!source) return Promise.reject(new Error("ไม่พบเอกสารสำหรับพิมพ์"));
+  if (!source) throw new Error("ไม่พบเอกสารสำหรับพิมพ์");
   const thermalProfile = widthMm ? getThermalPrintProfile(widthMm) : null;
   const clone = source.cloneNode(true) as HTMLElement;
   clone.style.cssText = thermalProfile ? `width:${thermalProfile.printableWidthMm}mm;box-sizing:border-box;margin:0;height:auto;max-height:none;overflow:visible` : "";
   const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'), el => el.outerHTML).join("");
-  // เอกสารบางชนิดซ่อนต้นฉบับบนหน้าจอด้วย display:none ทำให้ขนาดที่อ่านได้เป็น 0
-  // รับความสูงจาก clone ในพรีวิวเพื่อไม่ให้ browser ใช้หน้ากระดาษสั้นแล้วแบ่งเอกสาร
-  const contentWidthMm = thermalProfile?.printableWidthMm ?? 210;
-  const measuredSourceHeightMm = Math.ceil(source.scrollHeight * contentWidthMm / Math.max(1, source.offsetWidth));
-  const heightMm = thermalProfile
-    ? Math.max(30, Math.ceil(measuredHeightMm ?? measuredSourceHeightMm) + thermalProfile.bottomFeedMm)
-    : 297;
-  const runtimeCss = thermalProfile
-    ? buildThermalPageCss(thermalProfile, heightMm, targetId)
+  let heightMm = 297;
+  let runtimeCss = thermalProfile
+    ? buildThermalPageCss(thermalProfile, 1000, targetId)
     : `@page{size:A4;margin:8mm}html,body{margin:0;padding:0;background:white}#${targetId}{position:static!important;transform:none!important;box-shadow:none!important;height:auto!important;max-height:none!important;overflow:visible!important}`;
-  const html = `<!doctype html><html><head><meta charset="utf-8"><base href="${location.origin}/">${styles}<style>${runtimeCss}body>*{display:block!important;visibility:visible!important}</style></head><body>${clone.outerHTML}</body></html>`;
+  const marker = thermalProfile ? ` data-thermal-paper-width="${thermalProfile.paperWidthMm}" data-paper-width="${thermalProfile.paperWidthMm}"` : '';
+  let html = `<!doctype html><html lang="th"${marker}><head><meta charset="utf-8"><base href="${location.origin}/">${styles}<style>${runtimeCss}body>*{display:block!important;visibility:visible!important}</style></head><body>${clone.outerHTML}</body></html>`;
+  if (thermalProfile) {
+    const measured = await measureThermalDocument(html, targetId, thermalProfile.paperWidthMm);
+    heightMm = Math.max(30, Math.ceil(measured + thermalProfile.bottomFeedMm));
+    html = html.replace(runtimeCss, buildThermalPageCss(thermalProfile, heightMm, targetId));
+  }
   return printViaHelper(getPrinterName(widthMm ? "receipt" : "report"), html, {
     paperWidthMm: thermalProfile?.paperWidthMm,
     paperHeightMm: thermalProfile ? heightMm : undefined,

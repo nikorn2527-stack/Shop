@@ -122,5 +122,5 @@ export function thermalContentLeftMm(profile: ThermalPrintProfile): number {
 
 export function buildThermalPageCss(profile: ThermalPrintProfile, heightMm: number, targetId: string): string {
   const left = thermalContentLeftMm(profile);
-  return `@page{size:${profile.paperWidthMm}mm ${heightMm}mm;margin:0}html,body{margin:0;padding:0;background:white;width:${profile.paperWidthMm}mm}#${targetId}{position:static!important;transform:none!important;box-shadow:none!important;box-sizing:border-box!important;width:${profile.printableWidthMm}mm!important;margin:0 0 0 ${left}mm!important;height:auto!important;max-height:none!important;overflow:visible!important}`;
+  return `@page{size:${profile.paperWidthMm}mm ${heightMm}mm;margin:0}html,body{margin:0;padding:0;background:white;width:${profile.paperWidthMm}mm}#${targetId}{position:static!important;transform:none!important;box-shadow:none!important;box-sizing:border-box!important;width:${profile.printableWidthMm}mm!important;margin:0 0 0 ${left}mm!important;height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important;break-inside:auto!important;page-break-inside:auto!important;animation:none!important}`;
 }
