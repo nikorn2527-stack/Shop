@@ -143,3 +143,32 @@
   :root:root .app-shell .pos-premium-layout .quick-pick-panel .product-card { grid-template-columns: 40px minmax(0, 1fr); }
   :root:root .app-shell .pos-premium-layout .quick-pick-panel .product-card-info { padding: 8px; column-gap: 6px; }
 }
+
+@media screen {
+  .background-settings { display: grid; gap: 12px; margin-top: 24px; }
+  .background-settings > :is(h3, p) { margin: 0; }
+  .background-image-upload { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; padding: 20px; border: 1px dashed #cbd5e1; border-radius: 12px; background: #f8fafc; }
+  .background-image-upload > svg { flex: 0 0 auto; color: #9a3412; }
+  .background-image-upload > div { flex: 1 1 200px; min-width: 0; }
+  .background-image-upload p { margin: 4px 0; color: #475569; font-size: 13px; }
+  .background-image-upload small { color: #64748b; }
+  :root:root .background-image-upload .background-upload-button { min-height: 44px; background: #ffedd5; border: 1px solid #fdba74; color: #9a3412; }
+  /* Keep Sonner's close affordance inside the card, clear of text and clipping. */
+  :root:root [data-sonner-toast][data-styled="true"] { padding-right: 52px; }
+  :root:root [data-sonner-toast][data-styled="true"] [data-close-button] {
+    position: absolute; top: 10px; right: 10px; left: auto; bottom: auto; transform: none;
+    width: 28px; height: 28px; margin: 0; border: 1px solid #cbd5e1; border-radius: 8px;
+    display: grid; place-items: center; background: #fff; color: #475569;
+  }
+  :root:root [data-sonner-toast][data-type="info"]::before { background: #94a3b8; }
+  :root:root [data-sonner-toast][data-type="info"] [data-icon] { background: #f1f5f9; color: #475569; }
+  :root:root [data-sonner-toast][data-type="info"] [data-icon] svg { color: #475569; }
+  /* These controls choose a payment method; the final payment action is green. */
+  :root:root .app-shell .pos-premium-bill .payment-actions :is(.pay-button, .pay-split button):not(:disabled) {
+    background: #fff; background-image: none; border: 1px solid #cbd5e1; color: #334155; box-shadow: none;
+  }
+  :root:root .app-shell .pos-premium-bill .payment-actions :is(.pay-button, .pay-split button):not(:disabled):hover { background: #fff7ed; border-color: #fdba74; color: #9a3412; }
+  :root:root .payment-actions .pay-icon.cash { background: #fffbeb; color: #92400e; }
+  :root:root .payment-actions .pay-icon.qr { background: #f5f3ff; color: #6d28d9; }
+  :root:root .payment-actions .pay-icon.member { background: #f0fdfa; color: #0f766e; }
+}

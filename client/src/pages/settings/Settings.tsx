@@ -1,3 +1,4 @@
+import { BackgroundImageUpload } from "@/components/BackgroundImageUpload";
 import { FeedbackDialog } from "@/components/WorkflowDialog";
 import { notify } from "@/lib/notifications";
 import { ActionButton } from "@/components/ActionButton";
@@ -2053,9 +2054,8 @@ export function Settings({
                   </label>
                 </div>
                 <div className="background-settings">
-                  <label>ภาพพื้นหลังพื้นที่ทำงาน
-                    <input type="file" accept="image/png,image/jpeg,image/webp" onChange={event => onBackgroundPick(event)} disabled={!form} />
-                  </label>
+                  <h3>ภาพพื้นหลังพื้นที่ทำงาน</h3>
+                  <BackgroundImageUpload target="workspace" hasImage={Boolean(form?.appBackground)} disabled={!form} onChange={event => onBackgroundPick(event)} />
                   <p>PNG JPG WEBP ไม่เกิน 2MB · แสดงหลังการ์ดเท่านั้น ไม่ติดเอกสารพิมพ์ · กดบันทึกเพื่อใช้ครั้งถัดไป</p>
                   {form?.appBackground && <>
                     <img src={form.appBackground} alt="ตัวอย่างภาพพื้นหลัง" style={{ width: "100%", maxHeight: 180, objectFit: "cover", borderRadius: 8 }} />
@@ -2065,9 +2065,7 @@ export function Settings({
                 <div className="background-settings login-background-settings">
                   <h3>รูปแบบหน้าเข้าสู่ระบบ</h3>
                   <p>ใช้พื้นเรียบแบบเดิม หรือเลือกภาพโรงพยาบาลเป็นพื้นหลังเฉพาะหน้าเข้าสู่ระบบ ภาพนี้แยกจากพื้นที่ทำงานและเอกสารพิมพ์</p>
-                  <label>เลือกภาพพื้นหลังหน้าเข้าสู่ระบบ
-                    <input type="file" accept="image/png,image/jpeg,image/webp" onChange={event => onBackgroundPick(event, "loginBackground")} disabled={!form} />
-                  </label>
+                  <BackgroundImageUpload target="login" hasImage={Boolean(form?.loginBackground)} disabled={!form} onChange={event => onBackgroundPick(event, "loginBackground")} />
                   <small>PNG JPG WEBP ไม่เกิน 2MB · ระบบย่อภาพให้ · กดบันทึกการตั้งค่าเพื่อใช้งาน</small>
                   {form?.loginBackground && <>
                     <div className="login-background-preview"><img src={form.loginBackground} alt="ตัวอย่างภาพพื้นหลังหน้าเข้าสู่ระบบ" /><div><b>{form.appName || "ร้านค้าสวัสดิการ"}</b><span>เข้าสู่ระบบ</span></div></div>

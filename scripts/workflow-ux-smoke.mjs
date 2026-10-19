@@ -84,13 +84,23 @@ async function cashSale() {
   await page.waitForSelector('.scan-hero input');
   await fill('.scan-hero input', product.sku); await page.keyboard.press('Enter');
   await page.waitForFunction(name => document.querySelector('.cart-items')?.textContent.includes(name), {}, product.name);
+  await page.waitForSelector('[data-sonner-toast][data-type="info"] [data-close-button]');
+  await pause(300);
+  assert.equal(await page.$eval('[data-sonner-toast][data-type="info"] [data-close-button]', button => {
+    const b = button.getBoundingClientRect(), t = button.closest('[data-sonner-toast]').getBoundingClientRect();
+    return b.left >= t.left && b.top >= t.top && b.right <= t.right && b.bottom <= t.bottom;
+  }), true, 'Toast close control is fully inside its card');
+  await page.screenshot({ path: path.join(dir, 'toast-close-inside.png') });
+  await page.click('[data-sonner-toast][data-type="info"] [data-close-button]');
+  assert.equal(await page.$$eval('.payment-actions button', buttons => buttons.every(b => b.disabled || getComputedStyle(b).backgroundColor === 'rgb(255, 255, 255)')), true, 'Payment methods share a neutral surface');
   await click('เงินสด'); await page.waitForSelector('.pay-confirm-modal');
   assert.equal(await page.$eval('.pay-confirm-button', b => b.disabled), true);
   assert.equal(await page.$eval('.pay-confirm-button', b => getComputedStyle(b).backgroundColor), 'rgb(232, 236, 241)');
   assert.equal(await page.$eval('.pay-confirm-button', b => b.querySelectorAll('svg').length), 0, 'Unpaid state must not have a success tick');
   await pause(300); await page.screenshot({ path: path.join(dir, 'checkout-not-ready.png') });
   await click('รับตรงยอด', '.pay-confirm-modal');
-  assert.equal(await page.$eval('.pay-confirm-button', b => getComputedStyle(b).backgroundColor), 'rgb(255, 237, 213)');
+  assert.equal(await page.$eval('.pay-confirm-button', b => getComputedStyle(b).backgroundColor), 'rgb(6, 199, 85)');
+  await page.screenshot({ path: path.join(dir, 'checkout-green-confirmation.png') });
   await click('ยืนยันการชำระเงิน', '.pay-confirm-modal'); await page.waitForSelector('#receipt-paper');
   assert.equal(await page.$eval('.receipt-finish-action', button => getComputedStyle(button).backgroundColor), 'rgb(6, 199, 85)', 'The completed-sale finish action is LINE green');
 }
@@ -461,7 +471,10 @@ try {
   });
   const imagePath = path.join(dir, 'login-background-fixture.png');
   fs.writeFileSync(imagePath, Buffer.from(image.split(',')[1], 'base64'));
-  await (await page.$('.login-background-settings input[type="file"]')).uploadFile(imagePath);
+  assert.equal(await page.$eval('.login-background-settings .background-upload-button', button => button.getBoundingClientRect().height >= 44), true);
+  await page.screenshot({ path: path.join(dir, 'background-upload-controls.png') });
+  const [chooser] = await Promise.all([page.waitForFileChooser(), click('เลือกรูปภาพ', '.login-background-settings')]);
+  await chooser.accept([imagePath]);
   await page.waitForSelector('.login-background-preview img');
   await page.waitForSelector('.settings-unsaved-note');
   await click('บันทึกการตั้งค่า'); await page.waitForSelector('.settings-save-review');
