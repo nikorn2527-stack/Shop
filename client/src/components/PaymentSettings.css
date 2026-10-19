@@ -181,3 +181,58 @@
   .bank-accounts-compact .bank-draft-head { align-items: flex-start; flex-wrap: wrap; }
   .bank-accounts-compact .bank-draft-head .compact-edit-actions { width: 100%; }
 }
+
+/* Reserve separate rows for the title, control and feedback caption. Native
+   selects and text inputs must share a baseline even when captions differ. */
+:root:root .app-shell .payment-settings-compact :is(.bank-draft-panel .form-grid > label, .promptpay-edit-panel > label, .payment-qr-default > label) {
+  display: grid;
+  grid-template-rows: 20px 42px minmax(16px, auto);
+  align-content: start;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  font-size: 12px;
+  line-height: 20px;
+}
+:root:root .app-shell .payment-settings-compact :is(.bank-draft-panel .form-grid > label, .promptpay-edit-panel > label, .payment-qr-default > label) > :is(input, select) {
+  box-sizing: border-box;
+  width: 100%;
+  height: 42px;
+  min-height: 42px;
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 13px;
+  line-height: normal;
+}
+:root:root .app-shell .payment-settings-compact :is(.bank-draft-panel .form-grid > label, .promptpay-edit-panel > label, .payment-qr-default > label)::after {
+  min-height: 16px;
+  margin: 0;
+  line-height: 16px;
+}
+:root:root .app-shell .payment-settings-compact .bank-draft-panel .form-grid {
+  align-items: start;
+  gap: 16px 12px;
+}
+:root:root .app-shell .payment-settings-compact .promptpay-edit-panel {
+  align-items: start;
+  gap: 12px;
+}
+:root:root .app-shell .payment-settings-compact .promptpay-edit-panel > .compact-edit-actions {
+  align-self: start;
+  margin-top: 26px;
+}
+:root:root .app-shell .payment-settings-compact .compact-edit-actions > button {
+  height: 42px;
+  min-height: 42px;
+  margin: 0;
+}
+@media (min-width: 721px) and (max-width: 1100px) {
+  :root:root .app-shell .payment-settings-compact .bank-draft-panel .form-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 720px) {
+  :root:root .app-shell .payment-settings-compact .promptpay-edit-panel > .compact-edit-actions {
+    margin-top: 0;
+  }
+}
