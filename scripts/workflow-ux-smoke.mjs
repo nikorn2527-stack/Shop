@@ -8,7 +8,7 @@ import net from 'node:net';
 import { spawn } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
 import puppeteer from 'puppeteer';
-import { openWelfareStore, createAppUser, createAppSession, createBlankCards, assignMemberCard } from '../server/sqliteStore.ts';
+import { openWelfareStore, setEditionSettings, createAppUser, createAppSession, createBlankCards, assignMemberCard } from '../server/sqliteStore.ts';
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'shop-workflow-ux-'));
 const target = path.join(dir, 'demo.sqlite');
@@ -16,6 +16,7 @@ const previous = { seed: process.env.SEED_DEMO_DATA, mode: process.env.NODE_ENV 
 process.env.SEED_DEMO_DATA = '1';
 process.env.NODE_ENV = 'development';
 const db = openWelfareStore(target);
+setEditionSettings(db, { trialStart: new Date().toISOString().slice(0, 10) });
 if (previous.seed === undefined) delete process.env.SEED_DEMO_DATA; else process.env.SEED_DEMO_DATA = previous.seed;
 if (previous.mode === undefined) delete process.env.NODE_ENV; else process.env.NODE_ENV = previous.mode;
 const admin = db.prepare("SELECT id FROM app_users WHERE role='admin' LIMIT 1").get();
@@ -141,6 +142,7 @@ try {
   for (const viewport of [{ width: 1920, height: 1080 }, { width: 1366, height: 768 }, { width: 390, height: 844 }]) {
     await page.setViewport(viewport); await pause(200);
     await page.focus('.scan-hero input');
+    if (viewport.width > 1100) assert.ok(await page.$eval('.quick-pick-panel', panel => panel.getBoundingClientRect().width <= 300), 'Single-column shortcuts use a compact width');
     const geometry = await page.evaluate(() => {
       const rect = selector => { const r = document.querySelector(selector).getBoundingClientRect(); return { x: r.x, y: r.y, right: r.right, bottom: r.bottom, width: r.width, height: r.height }; };
       const cards = [...document.querySelectorAll('.quick-pick-panel .product-card[role="button"]')].slice(0, 2).map(card => { const r = card.getBoundingClientRect(); return { x: r.x, y: r.y, bottom: r.bottom }; });
@@ -160,9 +162,16 @@ try {
 
   async function detectExisting(firstName, cardNumber = "") {
     await page.keyboard.press('F6'); await page.waitForSelector('.pos-register-modal');
+    await page.waitForFunction(() => document.querySelector('.pos-register-modal input[name="firstName"]')?.dataset.fieldState === 'missing');
+    await page.focus('.pos-register-modal input[name="firstName"]');
+    await page.keyboard.press('Tab');
+    await page.waitForFunction(() => document.querySelector('.pos-register-modal input[name="firstName"]')?.dataset.fieldState === 'invalid');
     if (cardNumber) await fill('.pos-register-modal input[name="cardNumber"]', cardNumber);
     await fill('.pos-register-modal input[name="initialDeposit"]', '777');
     await fill('.pos-register-modal input[name="firstName"]', firstName);
+    await page.waitForFunction(() => document.querySelector('.pos-register-modal input[name="firstName"]')?.dataset.fieldState === 'filled');
+    assert.deepEqual(await page.$eval('.pos-register-modal input[name="firstName"]', input => { const s = getComputedStyle(input); return [s.borderTopWidth, s.boxShadow, s.outlineStyle]; }), ['1px', 'none', 'none']);
+    await page.screenshot({ path: path.join(dir, 'field-completion-states.png') });
     await fill('.pos-register-modal input[name="lastName"]', 'Customer');
     await page.keyboard.press('Tab'); await page.waitForSelector('.member-duplicate-dialog');
   }
@@ -212,6 +221,17 @@ try {
   await page.waitForSelector('tr.clickable[title^="ดูล็อตและจัดการ"]');
   await page.waitForFunction(() => getComputedStyle(document.querySelector('.dash-tab[aria-selected="true"]')).backgroundColor === 'rgb(255, 237, 213)');
   await (await page.$('[aria-label="ส่วนการจัดการสต็อก"]')).screenshot({ path: path.join(dir, 'orange-stock-tabs.png') });
+  assert.equal(await page.$('.catalog-menu-receive'), null);
+  await click('จัดการสินค้า', '.section-header');
+  assert.equal(await page.$$eval('.stock-catalog-menu button', buttons => buttons.length), 1, 'Receiving is not duplicated in the product menu');
+  await page.keyboard.press('Escape');
+  await click('ใบนับสต๊อก', '.section-header');
+  await page.waitForSelector('.print-preview-paper .stock-count-sheet .scs-table');
+  assert.ok(await page.$eval('.print-preview-paper .stock-count-sheet', sheet => sheet.getBoundingClientRect().height > 100 && getComputedStyle(sheet).display !== 'none'));
+  assert.ok(await page.$eval('.print-preview-paper', (paper, name) => paper.textContent.includes(name), product.name));
+  await pause(300); await page.screenshot({ path: path.join(dir, 'stock-count-sheet-preview.png') });
+  await page.click('[aria-label="ปิดหน้าต่างพรีวิว"]');
+  passed('receiving has one toolbar entry and the stock count sheet preview displays real product rows');
   const inventoryRow = await page.evaluateHandle(name => [...document.querySelectorAll('tr.clickable[title^="ดูล็อตและจัดการ"]')].find(row => row.textContent.includes(name)), product.name);
   assert.ok(inventoryRow.asElement()); await inventoryRow.asElement().click(); await inventoryRow.dispose();
   await page.waitForSelector('.stock-detail-modal');

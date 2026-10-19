@@ -51,7 +51,7 @@
   }
   :root:root :is(.app-shell, .modal-backdrop) :is(.outline-button, .quick-amount-btn):not(.export-btn, .statement-export-pdf, .statement-export-print, [data-action-tone]):not(:disabled):hover { background: #f1f5f9; border-color: #94a3b8; }
   :root:root :is(.app-shell, .modal-backdrop, [data-slot="dialog-content"]) :is(button, input, select, textarea):focus-visible {
-    outline: 2px solid var(--focus-ring); outline-offset: 2px; box-shadow: none;
+    outline: 1px solid #94a3b8; outline-offset: 2px; box-shadow: none;
   }
   :root:root :is(.app-shell, .modal-backdrop) :is(.scan-hero, .member-scan-field):focus-within { border: 1px solid var(--control-border); box-shadow: none; }
   :root:root :is(.app-shell, .modal-backdrop) :is(.pay-cash-input-row input, .scan-hero input, .member-scan-field input) { border: 1px solid var(--control-border); box-shadow: none; }
@@ -114,4 +114,32 @@
   .login-background-preview > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
   .login-background-preview > div { position: relative; display: grid; gap: 16px; width: min(220px, 75%); padding: 24px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; text-align: center; box-shadow: 0 8px 20px rgb(0 0 0 / 12%); }
   .login-background-preview span { padding: 8px; background: var(--action-bg); color: var(--action-ink); border-radius: 6px; }
+}
+
+@media screen {
+  /* One quiet boundary across forms, including native selects. No stacked focus rings. */
+  :root:root :is(.app-shell, .modal-backdrop, .login-screen, [data-slot="dialog-content"]) :is(input, select, textarea):not([type="checkbox"], [type="radio"], [type="range"], [type="color"]) {
+    border-width: 1px; border-color: #cbd5e1; box-shadow: none;
+  }
+  :root:root :is(.app-shell, .modal-backdrop, .login-screen, [data-slot="dialog-content"]) :is(input, select, textarea):is(:focus, :focus-visible):not([type="checkbox"], [type="radio"], [type="range"], [type="color"]) {
+    border: 1px solid #94a3b8; outline: none; box-shadow: none;
+  }
+  :root:root :is(.app-shell, .modal-backdrop, .login-screen, [data-slot="dialog-content"]) :is(input, select, textarea)[data-field-state] {
+    background: #fff; border: 1px solid #cbd5e1;
+  }
+  :root:root :is(.app-shell, .modal-backdrop, .login-screen, [data-slot="dialog-content"]) :is(input, select, textarea)[data-field-state="filled"] { background: #f0fdf4; border-color: #bbdfc8; }
+  :root:root :is(.app-shell, .modal-backdrop, .login-screen, [data-slot="dialog-content"]) :is(input, select, textarea)[data-field-state="missing"] { background: #fffbeb; border-color: #f1d798; }
+  :root:root :is(.app-shell, .modal-backdrop, .login-screen, [data-slot="dialog-content"]) :is(input, select, textarea)[data-field-state="invalid"] { background: #fff5f5; border-color: #e8aaaa; }
+  :root:root label[data-field-caption]::after { content: attr(data-field-caption); display: block; margin-top: 4px; font-size: 10px; line-height: 1.4; font-weight: 400; color: #64748b; }
+  :root:root label:has([data-field-state="filled"])::after { color: #15803d; }
+  :root:root label:has([data-field-state="missing"])::after { color: #92400e; }
+  :root:root label:has([data-field-state="invalid"])::after { color: #b91c1c; }
+  :root:root .app-shell .scan-hero input:is(:focus, :focus-visible),
+  :root:root .app-shell .scan-hero input { border: 0; outline: 0; box-shadow: none; }
+  :root:root :is(.workflow-dialog, .form-modal) .modal-actions { margin-top: 16px; padding-top: 16px; gap: 8px; }
+  :root:root .member-duplicate-list { margin-top: 16px; margin-bottom: 16px; }
+  :root:root .workflow-dialog .modal-heading { margin-bottom: 16px; }
+  :root:root .app-shell .pos-premium-layout .quick-pick-panel .product-art { width: 40px; height: 48px; font-size: 22px; }
+  :root:root .app-shell .pos-premium-layout .quick-pick-panel .product-card { grid-template-columns: 40px minmax(0, 1fr); }
+  :root:root .app-shell .pos-premium-layout .quick-pick-panel .product-card-info { padding: 8px; column-gap: 6px; }
 }

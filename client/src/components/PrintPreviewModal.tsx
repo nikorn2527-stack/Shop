@@ -1,7 +1,7 @@
 import { WorkflowDialog } from "./WorkflowDialog";
 import { notify } from "@/lib/notifications";
 import { printElementDocument } from "@/lib/printHelper";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Printer, X } from "@/lib/icons";
 import { toast } from "sonner";
 import { HelpDisclosure } from "./HelpDisclosure";
@@ -66,13 +66,18 @@ export function PrintPreviewModal({
   // ROUND 80 — ความสูงเนื้อหาจริง (มม.) เพื่อบอกความยาวสลิป + ใส่ @page size
   const [contentMm, setContentMm] = useState<number | null>(null);
   const paperRef = useRef<HTMLDivElement | null>(null);
+  const [paperHolder, setPaperHolder] = useState<HTMLDivElement | null>(null);
+  const attachPaper = useCallback((node: HTMLDivElement | null) => {
+    paperRef.current = node;
+    setPaperHolder(node);
+  }, []);
   const thermalProfile = getThermalPrintProfile();
 
   // Clone the live document — always reflects the current render (photos,
   // barcodes are data-URL <img> so cloneNode keeps them perfectly).
   useEffect(() => {
     const source = document.getElementById(targetId);
-    const holder = paperRef.current;
+    const holder = paperHolder;
     if (!source || !holder) return;
     const copy = source.cloneNode(true) as HTMLElement;
     copy.removeAttribute("id");
@@ -81,7 +86,7 @@ export function PrintPreviewModal({
     holder.replaceChildren(copy);
     setReady(true);
     return () => setReady(false);
-  }, [targetId]);
+  }, [targetId, paperHolder]);
 
   // ROUND 80 — วัดความสูงของเอกสารโคลนแล้วคำนวณเป็นมิลลิเมตร
   // (stage สลิปกว้าง 300px = ความกว้างกระดาษจริง · A4 กว้าง 800px = 210 มม.)
@@ -149,12 +154,12 @@ export function PrintPreviewModal({
 
         {paper === "a4" ? (
           <A4DocumentPreview label={`พรีวิว ${title}`}>
-            <div className="print-preview-paper" ref={paperRef} />
+            <div className="print-preview-paper" ref={attachPaper} />
             {!ready && <div className="print-preview-empty">กำลังเตรียมตัวอย่างเอกสาร…</div>}
           </A4DocumentPreview>
         ) : (
         <div className={`print-preview-stage paper-${paper}`}>
-          <div className="print-preview-paper" ref={paperRef} style={paper === "thermal" ? { width: `${thermalProfile.printableWidthMm * 3.78}px` } : undefined} />
+          <div className="print-preview-paper" ref={attachPaper} style={paper === "thermal" ? { width: `${thermalProfile.printableWidthMm * 3.78}px` } : undefined} />
           {!ready && <div className="print-preview-empty">กำลังเตรียมตัวอย่างเอกสาร…</div>}
         </div>
         )}

@@ -690,7 +690,7 @@
     pointer-events: auto;
   }
   :root .app-shell .pos-premium-layout {
-    display: grid; grid-template-columns: minmax(0, 1fr) clamp(340px, 30vw, 420px);
+    display: grid; grid-template-columns: minmax(0, 1fr) clamp(240px, 20vw, 300px);
     gap: 16px; align-items: start;
   }
   :root .app-shell .pos-premium-bill {

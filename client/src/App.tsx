@@ -6,6 +6,7 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
+import { AppFieldFeedback } from "./components/AppFieldFeedback";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -39,6 +40,7 @@ function App() {
               (สต็อกไม่พอ · เงินไม่พอ · บัตรถูกระงับ · ชำระเงินไม่สำเร็จ)
               toast มุมขวาล่างผู้ใช้มองไม่เห็น — ต้องขึ้นกลางจอให้ชัด */}
           <BlockerAlert />
+          <AppFieldFeedback />
           <Router />
         </TooltipProvider>
       </ThemeProvider>
