@@ -25,14 +25,15 @@ and id, and snapshots each sale's price and exact allocated cost. Receiving or
 changing prices does not rewrite historical sale prices, costs or allocations.
 The catalog's weighted average cost remains a separate existing calculation.
 
-Existing and new products share a single receipt table on both entry points.
-Scanning a known code fills the product details in the draft row and loads the
+Both receiving entry points use the same two-pane desktop layout: a 360px form
+pane on the left and a wider receipt review on the right.
+Scanning a known code fills the product details in the form and loads the
 last documented cost and current selling price. An unknown barcode opens new
-product fields in that same row, preserving the scanned code. Name, category,
+product fields in that same form, preserving the scanned code. Name, category,
 unit, optional size, selling price, quantities, paid amount, lot and expiry can
 be entered without opening a second dialog. Adding the row queues it only.
 
-Queued rows allow direct edits to quantities, amount, price, lot and expiry.
+Queued rows show a compact summary; their Edit action enables direct edits to quantities, amount, price, lot and expiry.
 The totals and receipt unit cost update immediately. Product creation, receipts,
 catalog price changes and audit logs commit in one transaction after whole-batch
 confirmation. Cancellation writes nothing. An unfinished row blocks submission.

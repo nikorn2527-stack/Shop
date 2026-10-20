@@ -98,7 +98,7 @@ try {
   const inspect = () => page.evaluate(() => {
     const root=document.querySelector('.stock-receive-modal');
     const read=selector=>{ const node=root.querySelector(selector),style=getComputedStyle(node);return {fontSize:style.fontSize,lineHeight:style.lineHeight,padding:style.padding,background:style.backgroundColor,borderRadius:style.borderRadius,boxShadow:style.boxShadow,color:style.color}; };
-    return {heading:read('.modal-heading'), title:read('.modal-heading h2'), footer:read('.modal-actions'), quantity:read('#receive-editor-qty'), lot:read('#receive-editor-lot'), scanner:read('.receive-draft-row .member-scan-field input'), disabled:[...root.querySelectorAll('.receive-draft-row input')].map(e=>e.disabled)};
+    return {heading:read('.modal-heading'), title:read('.modal-heading h2'), footer:read('.modal-actions'), quantity:read('#receive-editor-qty'), lot:read('#receive-editor-lot'), scanner:read('.receive-entry-form .member-scan-field input'), entryWidth:root.querySelector(".receive-entry-side").getBoundingClientRect().width, disabled:[...root.querySelectorAll('.receive-entry-form input')].map(e=>e.disabled)};
   });
   const snapshots=[];
   for(const mode of ['page','dialog']) {
@@ -106,10 +106,20 @@ try {
     else {await page.click('[data-nav-item="stock"]');await page.waitForSelector('.stock-receive-entry');await page.click('.stock-receive-entry');await page.waitForSelector('.workflow-dialog.stock-receive-modal');}
     await pause(200);
     snapshots.push(await inspect());
-    assert.equal(await page.$$(".receive-input-table").then(rows=>rows.length),1,"One shared input table on both entry points");
+    assert.equal(snapshots.at(-1).entryWidth,360,"Both entry points share the same form width");
+    assert.equal(await page.$$(".receive-split-workspace").then(rows=>rows.length),1,"One shared two-pane workspace on both entry points");
     assert.equal(await page.$eval('#receive-editor-qty',e=>e.disabled),true);
     for(const viewport of [{width:1920,height:1080},{width:1366,height:768},{width:1139,height:334},{width:390,height:844}]) {
       await page.setViewport(viewport);await pause(100);
+      if(viewport.width>=1366){
+        const layout=await page.$eval('.receive-split-workspace',node=>{
+          const form=node.querySelector('.receive-entry-side').getBoundingClientRect(),list=node.querySelector('.receive-review-side').getBoundingClientRect();
+          return {formWidth:form.width,listWidth:list.width,aligned:Math.abs(form.top-list.top)<2,separate:list.left>=form.right};
+        });
+        assert.equal(layout.formWidth,360);assert.ok(layout.listWidth>layout.formWidth,'Review is wider than the form');
+        assert.ok(layout.aligned && layout.separate,'Both panes align at the top without overlap');
+      }
+
       assert.ok(await visible('.stock-receive-modal .modal-actions .action-button'),`${mode} save fits ${viewport.width}`);
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'No horizontal overflow');
       await page.screenshot({path:path.join(dir,`receiving-${mode}-${viewport.width}.png`)});
@@ -120,8 +130,10 @@ try {
     await fill('.stock-receive-modal .member-scan-field input',product.sku);await page.keyboard.press('Enter');
     await page.waitForFunction(()=>!!document.querySelector('#receive-editor-qty:not(:disabled)'));
     await pause(150);await fill('#receive-editor-qty',2);await fill('#receive-editor-free',1);await fill('#receive-editor-paid',10);
-    await click('เพิ่มลงรายการ','.receive-draft-row');
+    await click('เพิ่มลงรายการ','.receive-entry-form');
     await page.waitForSelector('.receive-main-row');
+    await page.waitForFunction(()=>document.querySelector('.receive-form-body')?.scrollTop===0);
+    assert.ok(await visible('.receive-entry-form [data-add-receipt]'),'Add action stays visible while the form scrolls');
     assert.ok((await page.$eval('.receive-simple-table',e=>e.textContent)).includes(product.name));
     assert.equal(query('SELECT stock FROM products WHERE id=?',product.id).stock,product.stock,'Draft does not write stock');
     await page.screenshot({path:path.join(dir,`receiving-${mode}-draft.png`)});
