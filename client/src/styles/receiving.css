@@ -63,3 +63,34 @@
     .receive-new-quantity .receive-item-editor { grid-template-columns: repeat(2,minmax(0,1fr)); }
   }
 }
+
+/* Existing and new products share a single editable receipt table on both entry points. */
+@media screen {
+  :root:root .stock-receive-modal.receiving-workspace > .receive-table-workspace { min-width:0; width:100%; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-table-workspace .receive-entry-table-wrap { overflow:auto; max-height:calc(100dvh - 240px); }
+  :root:root .stock-receive-modal.receiving-workspace .receive-input-table { min-width:960px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-input-table th:nth-child(1) { width:29%; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-input-table th:nth-child(2) { width:11%; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-input-table th:nth-child(3) { width:17%; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-input-table th:nth-child(4) { width:12%; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-input-table th:nth-child(5) { width:20%; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-input-table th:nth-child(6) { width:11%; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-input-table label { display:grid; gap:5px; font-size:11px; margin-bottom:8px; font-weight:500; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-input-table :is(input,select) { width:100%; border:1px solid var(--control-border); background:white; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-input-table .member-scan-field { gap:4px; padding:6px; border-radius:10px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-input-table .member-scan-field > input { width:0; flex:1; padding:6px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-input-table .product-scan-wrap { margin-bottom:10px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-input-table .product-scan-list { position:static; max-height:180px; overflow-y:auto; margin-top:6px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-input-table .product-scan-chip { padding:8px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-input-table .product-scan-chip .product-thumb { display:none; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-draft-row { background:#fffaf3; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-draft-actions { display:grid; gap:8px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-draft-actions button { padding:8px 6px; white-space:normal; font-size:11px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-new-fields { display:grid; gap:4px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-new-pair { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-price-context { padding:8px; gap:0; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-cart-head { gap:8px; flex-wrap:wrap; }
+  @media(max-width:600px) {
+    :root:root .stock-receive-modal.receiving-workspace .receive-table-workspace .receive-entry-table-wrap { max-height:none; }
+  }
+}

@@ -25,19 +25,20 @@ and id, and snapshots each sale's price and exact allocated cost. Receiving or
 changing prices does not rewrite historical sale prices, costs or allocations.
 The catalog's weighted average cost remains a separate existing calculation.
 
-New-product receipt quantities, free units, actual amount, lot and expiry can be
-entered in the new-product dialog. Its button queues the entire entry immediately.
-Product creation, receipts, catalog price changes and audit logs commit in one
-transaction after the whole-batch confirmation. Cancellation writes nothing. Any
-invalid entry or stale price rolls back the batch. Conflicting prices for the same
-product are rejected; only administrators can create products or reprice them.
+Existing and new products share a single receipt table on both entry points.
+Scanning a known code fills the product details in the draft row and loads the
+last documented cost and current selling price. An unknown barcode opens new
+product fields in that same row, preserving the scanned code. Name, category,
+unit, optional size, selling price, quantities, paid amount, lot and expiry can
+be entered without opening a second dialog. Adding the row queues it only.
 
-Both receiving entry points use the same two-pane desktop layout: a 320px input
-pane and a wider review pane using the remaining space. The receipt review uses
-one row per entry, with related details grouped into six columns: product/code,
-purchased/free quantities, actual amount, previous and new unit costs, final
-selling price, lot, expiry, and edit/remove actions. Small screens scroll inside
-the table rather than widening the page.
+Queued rows allow direct edits to quantities, amount, price, lot and expiry.
+The totals and receipt unit cost update immediately. Product creation, receipts,
+catalog price changes and audit logs commit in one transaction after whole-batch
+confirmation. Cancellation writes nothing. An unfinished row blocks submission.
+Any invalid entry or stale price rolls back the batch. Conflicting prices for the
+same product are rejected; only administrators can create products or reprice.
+Small screens scroll inside the table rather than widening the page.
 
 Validation: stockIntake tests cover historical-cost context, free units, zero/unknown
 cost, same-label receipt separation, immediate increases and reductions, immutable

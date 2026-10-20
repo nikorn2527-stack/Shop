@@ -396,15 +396,15 @@ try {
 
   await page.setViewport({ width: 1366, height: 768 }); await page.click('[data-nav-item="receive"]'); await page.waitForSelector('.receiving-workspace');
   await fill('.receiving-workspace .member-scan-field input', product.sku); await page.keyboard.press('Enter');
-  await page.waitForFunction(name => document.querySelector('.receive-item-editor h3')?.textContent.includes(name), {}, product.name);
-  await click('เพิ่มลงรายการ', '.receive-item-editor'); await acknowledge();
-  assert.equal(await page.$eval('.receive-item-editor h3', e => e.textContent), product.name, 'Validation preserves the selected product');
-  await fill('#receive-editor-qty', 3); await fill('#receive-editor-paid', 12); await click('เพิ่มลงรายการ', '.receive-item-editor');
-  await click('เพิ่มสินค้าใหม่', '.receiving-workspace'); await page.waitForSelector('.workflow-dialog input');
+  await page.waitForFunction(name => document.querySelector('.receive-draft-row .product-scan-chip')?.textContent.includes(name), {}, product.name);
+  await click('เพิ่มลงรายการ', '.receive-draft-row'); await acknowledge();
+  assert.equal(await page.$eval('.receive-draft-row .product-scan-chip', (e,name) => e.textContent.includes(name), product.name), true, 'Validation preserves the selected product');
+  await fill('#receive-editor-qty', 3); await fill('#receive-editor-paid', 12); await click('เพิ่มลงรายการ', '.receive-draft-row');
+  await click('เพิ่มสินค้าใหม่', '.receiving-workspace'); await page.waitForSelector('#receive-new-name');
   const newName = 'UX receiving new product';
-  await fillLabel('ชื่อสินค้า', newName); await fillLabel('ราคาขาย', 9);
-  await fill('.receive-new-quantity #receive-editor-qty', 2); await fill('.receive-new-quantity #receive-editor-paid', 10);
-  await click('ใช้สินค้านี้ในรายการรับเข้า', '.workflow-dialog');
+  await fill('#receive-new-name', newName); await fill('#receive-editor-selling-price', 9);
+  await fill('#receive-editor-qty', 2); await fill('#receive-editor-paid', 10);
+  await click('เพิ่มลงรายการ', '.receive-draft-row');
   await page.waitForFunction(name => document.querySelector('.receive-simple-table')?.textContent.includes(name), {}, newName);
   assert.equal(query('SELECT COUNT(*) n FROM products WHERE name=?', newName).n, 0, 'New product stays a draft');
   await click('บันทึกทั้งหมด', '.receiving-workspace'); await page.waitForSelector('.confirm-modal');

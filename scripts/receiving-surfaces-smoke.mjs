@@ -98,7 +98,7 @@ try {
   const inspect = () => page.evaluate(() => {
     const root=document.querySelector('.stock-receive-modal');
     const read=selector=>{ const node=root.querySelector(selector),style=getComputedStyle(node);return {fontSize:style.fontSize,lineHeight:style.lineHeight,padding:style.padding,background:style.backgroundColor,borderRadius:style.borderRadius,boxShadow:style.boxShadow,color:style.color}; };
-    return {heading:read('.modal-heading'), title:read('.modal-heading h2'), footer:read('.modal-actions'), quantity:read('#receive-editor-qty'), lot:read('#receive-editor-lot'), scanner:read('.receive-scan-toolbar input'), entryWidth:root.querySelector(".receive-entry-side").getBoundingClientRect().width, qtyWidth:root.querySelector("#receive-editor-qty").getBoundingClientRect().width, disabled:[...root.querySelectorAll('.receive-item-editor input')].map(e=>e.disabled)};
+    return {heading:read('.modal-heading'), title:read('.modal-heading h2'), footer:read('.modal-actions'), quantity:read('#receive-editor-qty'), lot:read('#receive-editor-lot'), scanner:read('.receive-draft-row .member-scan-field input'), disabled:[...root.querySelectorAll('.receive-draft-row input')].map(e=>e.disabled)};
   });
   const snapshots=[];
   for(const mode of ['page','dialog']) {
@@ -106,7 +106,7 @@ try {
     else {await page.click('[data-nav-item="stock"]');await page.waitForSelector('.stock-receive-entry');await page.click('.stock-receive-entry');await page.waitForSelector('.workflow-dialog.stock-receive-modal');}
     await pause(200);
     snapshots.push(await inspect());
-    assert.equal(snapshots.at(-1).entryWidth,320,"Both entry points use the same fixed-width input pane");
+    assert.equal(await page.$$(".receive-input-table").then(rows=>rows.length),1,"One shared input table on both entry points");
     assert.equal(await page.$eval('#receive-editor-qty',e=>e.disabled),true);
     for(const viewport of [{width:1920,height:1080},{width:1366,height:768},{width:1139,height:334},{width:390,height:844}]) {
       await page.setViewport(viewport);await pause(100);
@@ -115,10 +115,12 @@ try {
       await page.screenshot({path:path.join(dir,`receiving-${mode}-${viewport.width}.png`)});
     }
     await page.setViewport({width:1366,height:768});
+    await fill('.stock-receive-modal .member-scan-field input',product.name.slice(0,2));
+    await page.waitForFunction(sku=>[...document.querySelectorAll('.product-scan-option')].some(node=>node.textContent.includes(sku)),{},product.sku);
     await fill('.stock-receive-modal .member-scan-field input',product.sku);await page.keyboard.press('Enter');
     await page.waitForFunction(()=>!!document.querySelector('#receive-editor-qty:not(:disabled)'));
     await pause(150);await fill('#receive-editor-qty',2);await fill('#receive-editor-free',1);await fill('#receive-editor-paid',10);
-    await click('เพิ่มลงรายการ','.receive-item-editor');
+    await click('เพิ่มลงรายการ','.receive-draft-row');
     await page.waitForSelector('.receive-main-row');
     assert.ok((await page.$eval('.receive-simple-table',e=>e.textContent)).includes(product.name));
     assert.equal(query('SELECT stock FROM products WHERE id=?',product.id).stock,product.stock,'Draft does not write stock');

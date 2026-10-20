@@ -105,26 +105,38 @@ try {
   await page.click('[data-nav-item="receive"]');await page.waitForSelector('.receiving-workspace');
   await fill('.receiving-workspace .member-scan-field input',product.sku);await page.keyboard.press('Enter');
   await page.waitForFunction(()=>document.querySelector('.receive-price-context')?.textContent.includes('5.0000'));
-  assert.ok((await page.$eval('.receive-price-context',e=>e.textContent)).includes('10.00'));
+  assert.ok((await page.$eval('.receive-draft-row',e=>e.textContent)).includes('10.00'));
   await fill('#receive-editor-qty',4);await fill('#receive-editor-free',1);await fill('#receive-editor-paid',30);await fill('#receive-editor-selling-price',8);
   await page.waitForSelector('.receive-price-warning');
   assert.ok((await page.$eval('.receive-price-warning',e=>e.textContent)).includes('ลดราคา'));
   assert.equal(query('SELECT price FROM products WHERE id=?',product.id).price,10,'No repricing while drafting');
-  await click('เพิ่มลงรายการ','.receive-item-editor');await page.waitForSelector('.receive-main-row');
+  await click('เพิ่มลงรายการ','.receive-draft-row');await page.waitForSelector('.receive-main-row');
   assert.equal(await page.$$eval('.receive-main-row td',nodes=>nodes.length),6);
-  await click('แก้ไข','.receive-row-actions');await page.waitForSelector('.receive-entry-edit-modal');
-  await fill('.receive-entry-edit-modal input[aria-label="จำนวนซื้อรายการ 1"]',5);
-  await click('บันทึกแก้ไข','.receive-entry-edit-modal');await page.waitForFunction(()=>!document.querySelector('.receive-entry-edit-modal'));
-  assert.ok((await page.$eval('.receive-main-row',e=>e.textContent)).includes('5.0000'),'Edited quantity recalculates unit cost');
-  await click('เพิ่มสินค้าใหม่','.receiving-workspace');await page.waitForSelector('.receive-new-quantity');
+  await fill('.receive-main-row input[aria-label="จำนวนซื้อรายการ 1"]',5);
+  assert.ok((await page.$eval('.receive-main-row',e=>e.textContent)).includes('5.0000'),'Inline quantity recalculates unit cost');
+  // Unknown barcode opens new-product fields inside the same table, without a dialog.
+  await fill('.receive-draft-row .member-scan-field input','880000009999');await page.keyboard.press('Enter');
+  await page.waitForSelector('#receive-new-name');
+  assert.equal(await page.$('.receive-new-quantity'),null,'No separate new-product dialog');
   const newName='New receipt with quantities';
-  await fill('.receive-new-quantity #receive-editor-qty',3);await fill('.receive-new-quantity #receive-editor-free',1);await fill('.receive-new-quantity #receive-editor-paid',20);
-  await fillLabel('ชื่อสินค้า',newName);await fillLabel('ราคาขาย',12);
+  await fill('#receive-editor-qty',3);await fill('#receive-editor-free',1);await fill('#receive-editor-paid',20);
+  await fill('#receive-new-name',newName);await fill('#receive-editor-selling-price',11);
   await page.screenshot({path:path.join(dir,'new-product-quantity.png')});
   assert.equal(query('SELECT COUNT(*) n FROM products WHERE name=?',newName).n,0);
-  await click('ใช้สินค้านี้ในรายการรับเข้า','.workflow-dialog');
+  await click('บันทึกทั้งหมด','.receiving-workspace');
+  await page.waitForSelector('.blocker-button');assert.equal(await page.$('.confirm-modal'),null,'Unqueued new item blocks saving');
+  await page.click('.blocker-button');await page.waitForFunction(()=>!document.querySelector('.blocker-modal'));
+  await click('เพิ่มลงรายการ','.receive-draft-row');
   await page.waitForFunction(name=>document.querySelector('.receive-simple-table')?.textContent.includes(name),{},newName);
   assert.equal(await page.$$eval('.receive-main-row',rows=>rows.length),2,'New item joins receipt directly');
+  await fill('.receive-main-row input[aria-label="ราคาขายรายการ 2"]',12);
+  await fill('.receive-main-row input[aria-label="จำนวนซื้อรายการ 1"]',0);
+  await click('บันทึกทั้งหมด','.receiving-workspace');await pause(100);
+  assert.equal(await page.$('.confirm-modal'),null,'Invalid inline quantity blocks confirmation');
+  assert.equal(query('SELECT stock FROM products WHERE id=?',product.id).stock,10,'Invalid inline edit writes nothing');
+  await page.waitForSelector('.blocker-button');await page.click('.blocker-button');await page.waitForFunction(()=>!document.querySelector('.blocker-modal'));
+  await fill('.receive-main-row input[aria-label="จำนวนซื้อรายการ 1"]',5);
+
   assert.equal(query('SELECT COUNT(*) n FROM products WHERE name=?',newName).n,0,'New item remains a draft');
   for(const width of [1920,1366]){
     await page.setViewport({width,height:900});await pause(100);
@@ -147,6 +159,7 @@ try {
   assert.equal(query('SELECT price FROM products WHERE id=?',product.id).price,8);
   assert.equal(query('SELECT stock FROM products WHERE name=?',newName).stock,4);
   assert.equal(query('SELECT cost FROM products WHERE name=?',newName).cost,5);
+  assert.equal(query('SELECT price FROM products WHERE name=?',newName).price,12,'Inline new-product price is saved');
   assert.equal(query('SELECT json_group_array(json_object(\'id\',id,\'price\',price,\'cost\',cost_total_satang)) snapshot FROM sale_items').snapshot,saleBefore,'Old sale remains unchanged');
   assert.deepEqual(errors,[]);
   console.log('RECEIVING_PRICING_PASS',dir);
