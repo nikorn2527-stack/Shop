@@ -3746,7 +3746,8 @@ export function listDayClosures(db: SqliteDb, limit = 30): DayClosureRow[] {
 export function getSettings(db: SqliteDb): StoreSettings {
   const row = db.prepare(`SELECT value FROM store_settings WHERE key = ?`).get(SETTINGS_KEY) as { value: string } | undefined;
   const stored = row ? (JSON.parse(row.value) as Partial<StoreSettings>) : {};
-  return { ...DEFAULT_STORE_SETTINGS, ...stored, memberNumberMode: getMemberNumberMode(db) };
+  const settings = { ...DEFAULT_STORE_SETTINGS, ...stored, memberNumberMode: getMemberNumberMode(db) };
+  return { ...settings, promptpayActive: !!settings.promptpayId.trim() && settings.promptpayActive !== false };
 }
 
 export function setSettings(db: SqliteDb, patch: Partial<StoreSettings>, actor = "ผู้บริหาร", actorRole?: string | null): StoreSettings {
@@ -3763,6 +3764,7 @@ export function setSettings(db: SqliteDb, patch: Partial<StoreSettings>, actor =
   const { memberNumberMode: _mode, licenseKey: _licenseKey, licenseName: _licenseName, trialStart: _trialStart, ...rest } = patch;
   if (Object.keys(rest).length > 0) {
     const next = { ...getSettings(db), ...rest };
+    if (!next.promptpayId.trim()) next.promptpayActive = false;
     db.prepare(`INSERT INTO store_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value`).run(SETTINGS_KEY, JSON.stringify(next));
   }
   const changedKeys = Object.entries(patch)

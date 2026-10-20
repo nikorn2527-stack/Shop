@@ -24,7 +24,7 @@ process.env.SEED_DEMO_DATA = '1';
 process.env.NODE_ENV = 'development';
 const db = openWelfareStore(target);
 const bankFixtures = QR_BANKS.map((bank, index) => ({ id: `bank-qr-${index}`, bankCode: bank.code, bankName: bank.name, accountName: `UX QR account ${index}`, accountNumber: `123456789${index}`, active: true, qrPayload: buildPromptPayPayload({ promptpayId: `081234567${index}` }) }));
-setSettings(db, { receiptPaperWidth: "80", promptpayId: "0899999999", paymentQrSource: bankFixtures[0].id, bankAccounts: [...bankFixtures, { ...bankFixtures[3], id: "bank-qr-missing", accountNumber: "1234500000", qrPayload: undefined }] });
+setSettings(db, { receiptPaperWidth: "80", promptpayId: "0899999999", promptpayActive: true, paymentQrSource: bankFixtures[0].id, bankAccounts: [...bankFixtures, { ...bankFixtures[3], id: "bank-qr-missing", accountNumber: "1234500000", qrPayload: undefined }] });
 const replacementQr = buildPromptPayPayload({ promptpayId: '0822222222' });
 const qrUploadPath = path.join(dir, 'bank-qr-upload.png');
 const invalidQrPath = path.join(dir, 'bank-qr-invalid.png');
@@ -612,6 +612,8 @@ try {
   assert.equal(query('SELECT COUNT(*) n FROM sales').n, salesBeforePromptPayDelete);
   assert.equal(await page.$eval('[aria-label="ลบข้อมูลพร้อมเพย์"]', button => button.disabled), true);
   assert.equal(await page.$eval('.promptpay-row-toggle', button => button.disabled), true);
+  assert.equal(await page.$eval('.promptpay-row-toggle', button => button.classList.contains('on')), false);
+  assert.equal(await page.$eval('.promptpay-row-toggle', button => button.getAttribute('aria-pressed')), 'false');
   assert.ok((await page.$eval('.promptpay-details-info', info => info.textContent)).includes('ยังไม่ได้ตั้งค่าเลขพร้อมเพย์'));
   passed('PromptPay deletion requires confirmation, cancellation preserves settings, repeated clicks delete once, and bank accounts and sales remain intact');
 

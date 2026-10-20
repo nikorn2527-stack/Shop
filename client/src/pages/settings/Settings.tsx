@@ -1303,8 +1303,8 @@ export function Settings({
     saveMutation.mutate(
       { promptpayId },
       {
-        onSuccess: () => {
-          updateForm({ promptpayId });
+        onSuccess: data => {
+          updateForm({ promptpayId: data.promptpayId, promptpayActive: data.promptpayActive });
           setPromptPayEditing(false);
         },
       }
@@ -1331,11 +1331,12 @@ export function Settings({
       notify.error("คัดลอกไม่สำเร็จ", { description: promptpayId, duration: 4000 });
     }
   };
+  const promptPayEnabled = !!form?.promptpayId.trim() && form?.promptpayActive !== false;
   const togglePromptPay = () => {
-    if (!form) return;
-    const promptpayActive = !form.promptpayActive;
-    updateForm({ promptpayActive });
-    saveMutation.mutate({ promptpayActive });
+    if (!form?.promptpayId.trim() || saveMutation.isPending || deletePromptPayMutation.isPending) return;
+    saveMutation.mutate({ promptpayActive: !promptPayEnabled }, {
+      onSuccess: data => updateForm({ promptpayActive: data.promptpayActive }),
+    });
   };
   const chooseFontScale = (id: FontScaleId) => {
     setFontScale(id);
@@ -2550,7 +2551,7 @@ export function Settings({
                     <p>เปิดหรือปิดได้ทันที โดยไม่ต้องลบเลขพร้อมเพย์</p>
                   </div>
                 </div>
-                <div className={`promptpay-details-row${form?.promptpayActive === false ? " inactive" : ""}`}>
+                <div className={`promptpay-details-row${!promptPayEnabled ? " inactive" : ""}`}>
                   <div className="bank-row-ico">
                     <QrCode size={18} />
                   </div>
@@ -2558,7 +2559,7 @@ export function Settings({
                     <b>พร้อมเพย์</b>
                     <small>
                       {(form?.promptpayId ?? "").trim() || "ยังไม่ได้ตั้งค่าเลขพร้อมเพย์"}
-                      {form?.promptpayActive === false
+                      {!promptPayEnabled
                         ? " · ปิดรับเงินอยู่"
                         : (form?.promptpayId ?? "").trim()
                           ? " · พร้อมสร้าง QR ตามยอดบิล"
@@ -2575,7 +2576,7 @@ export function Settings({
                     <button type="button" className="icon-button danger" onClick={openDeletePromptPay} disabled={!form?.promptpayId.trim() || saveMutation.isPending || deletePromptPayMutation.isPending} title="ลบข้อมูลพร้อมเพย์" aria-label="ลบข้อมูลพร้อมเพย์">
                       <Trash2 size={15} />
                     </button>
-                    <button type="button" className={`toggle promptpay-row-toggle ${form?.promptpayActive !== false ? "on" : ""}`} onClick={togglePromptPay} disabled={!form?.promptpayId.trim() || saveMutation.isPending || deletePromptPayMutation.isPending} aria-pressed={form?.promptpayActive !== false} aria-label={form?.promptpayActive !== false ? "ปิดรับเงินผ่านพร้อมเพย์" : "เปิดรับเงินผ่านพร้อมเพย์"} title={form?.promptpayActive !== false ? "ปิดรับเงินผ่านพร้อมเพย์" : "เปิดรับเงินผ่านพร้อมเพย์"}><span /></button>
+                    <button type="button" className={`toggle promptpay-row-toggle ${promptPayEnabled ? "on" : ""}`} onClick={togglePromptPay} disabled={!form?.promptpayId.trim() || saveMutation.isPending || deletePromptPayMutation.isPending} aria-pressed={promptPayEnabled} aria-label={promptPayEnabled ? "ปิดรับเงินผ่านพร้อมเพย์" : "เปิดรับเงินผ่านพร้อมเพย์"} title={promptPayEnabled ? "ปิดรับเงินผ่านพร้อมเพย์" : "เปิดรับเงินผ่านพร้อมเพย์"}><span /></button>
                   </div>
                 </div>
                 {promptPayEditing && (
