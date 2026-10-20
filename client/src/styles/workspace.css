@@ -876,3 +876,9 @@
   .stock-receive-modal .receive-entry-side .receive-scan-toolbar > button { justify-self: start; margin: 0; }
   .stock-receive-modal .receive-entry-side .receive-item-editor { margin-top: 16px; }
 }
+
+@media screen {
+  .stock-category-filter, .stock-count-category-picker { display: grid; gap: 5px; color: #334155; font-size: 12px; }
+  .stock-category-filter select, .stock-count-category-picker select { min-height: 40px; min-width: 150px; padding: 8px 10px; border: 1px solid #cbd5e1; border-radius: 8px; background: white; color: #334155; }
+  .stock-count-category-picker { margin: 12px 0; padding: 0 4px; }
+}

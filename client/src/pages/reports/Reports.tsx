@@ -1298,8 +1298,8 @@ export function Reports({
       : ["วันที่ · เวลา", "เลขที่บัตร", "เลขสมาชิก", "ชื่อสมาชิก", "รายการ", "ยอด (บาท)", "คงเหลือ (บาท)", "ผู้ทำรายการ"],
     columnWidths: hospitalTxPreset
       ? ["16%", "16%", "15%", "15%", "19%", "19%"]
-      : ["14%", "13%", "12%", "14%", "9%", "10%", "12%", "16%"],
-    nowrapCols: hospitalTxPreset ? [0, 1, 2, 3] : [0, 1, 2, 4, 5, 6],
+      : ["17%", "14%", "10%", "15%", "11%", "10%", "10%", "13%"],
+    nowrapCols: hospitalTxPreset ? [0, 1, 2, 3] : [5, 6],
     numericCols: hospitalTxPreset ? [2] : [5, 6],
     rows: txRows.map(row => hospitalTxPreset
       ? [

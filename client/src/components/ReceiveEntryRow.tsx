@@ -27,13 +27,10 @@ export function ReceiveEntryRow({ entry, index, name, code, unit, sellingPrice, 
   return <>
     <tr className="receive-main-row">
       <td><b title={name}>{name}</b>{code && <small> · {code}</small>}</td>
-      <td>{entry.purchaseQty} {unit || "หน่วย"}</td>
-      <td>{entry.freeQty || "0"} {unit || "หน่วย"}</td>
-      <td>฿{Number(entry.paidAmount).toFixed(2)}</td>
-      <td>{entry.previousCost == null ? "—" : `฿${entry.previousCost.toFixed(4)}`}</td>
-      <td>฿{total > 0 ? (Number(entry.paidAmount)/total).toFixed(4) : "0.0000"}</td>
+      <td><span>ซื้อ {entry.purchaseQty} {unit || "หน่วย"}</span><small>แถม {entry.freeQty || "0"}</small></td>
+      <td><b>฿{Number(entry.paidAmount).toFixed(2)}</b><small>ก่อน {entry.previousCost == null ? "—" : `฿${entry.previousCost.toFixed(4)}`}</small><small>รอบนี้ ฿{total > 0 ? (Number(entry.paidAmount)/total).toFixed(4) : "0.0000"}</small></td>
       <td>฿{sellingPrice.toFixed(2)}{entry.sellingPrice.trim() && <small className="receive-price-changed">ราคาใหม่</small>}</td>
-      <td>{entry.lot || "อัตโนมัติ"}</td><td>{entry.expiry || "ไม่ระบุ"}</td>
+      <td><span>{entry.lot || "อัตโนมัติ"}</span><small>หมดอายุ {entry.expiry || "ไม่ระบุ"}</small></td>
       <td><div className="receive-row-actions"><button type="button" className="outline-button" disabled={busy} aria-label={`แก้ไขรายการ ${row}`} onClick={() => { setDraft({ ...entry }); setError(""); }}>แก้ไข</button><button type="button" className="icon-button" disabled={busy} aria-label={`นำรายการ ${row} ออก`} onClick={onRemove}>×</button></div></td>
     </tr>
     <Dialog open={draft !== null} onOpenChange={open => { if (!open && !busy) { setDraft(null); setError(""); } }}>

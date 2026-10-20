@@ -3389,12 +3389,13 @@ export function stockBalanceReport(db: SqliteDb, input: StockBalanceInput = {}):
   const where = search ? ` WHERE (name LIKE ? OR sku LIKE ? OR COALESCE(barcode, '') LIKE ?)` : "";
   const params = search ? [`%${search}%`, `%${search}%`, `%${search}%`] : [];
   const products = db.prepare(`SELECT id, sku, barcode, name, unit, category, stock, price, active FROM products${where} ORDER BY id`).all(...params) as unknown as { id: number; sku: string; barcode: string | null; name: string; unit: string; category: string; stock: number; price: number; active: number }[];
+  const codeOrder = new Intl.Collator("th", {numeric: true, sensitivity: "base"});
   return products.map((product) => {
     const sold = soldByProduct.get(product.id) ?? 0;
     const received = receivedByProduct.get(product.id) ?? 0;
     return {
       productId: product.id,
-      code: product.barcode ?? product.sku,
+      code: product.barcode?.trim() || product.sku,
       sku: product.sku,
       barcode: product.barcode,
       name: product.name,
@@ -3408,7 +3409,7 @@ export function stockBalanceReport(db: SqliteDb, input: StockBalanceInput = {}):
       sellingPrice: product.price,
       sellingValue: reportSellingValue(product.stock, product.price),
     };
-  });
+  }).sort((left,right)=>codeOrder.compare(left.code,right.code) || left.productId-right.productId);
 }
 
 export function dashboardStats(db: SqliteDb, rangeDays = 30): DashboardStats {

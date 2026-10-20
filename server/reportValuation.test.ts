@@ -25,6 +25,14 @@ const range = () => ({
   to: formatDateTime().slice(0, 10),
 });
 describe("general report valuation versus financial cost", () => {
+  it("sorts stock reports by displayed product code naturally, preserving leading zeros", () => {
+    for(const code of ["02","01","10","5","8850000000017"]) createProduct(db,{name:`Code ${code}`,sku:`SKU-${code}`,barcode:code,price:10});
+    const rows=stockBalanceReport(db,range());
+    expect(rows.map(row=>row.code)).toEqual(["01","02","5","10","8850000000017"]);
+    expect(rows.find(row=>row.code==="01")?.barcode).toBe("01");
+    expect(stockBalanceReport(db,{...range(),search:"Code 0"}).map(row=>row.code)).toEqual(["01","02"]);
+  });
+
   it("values inventory, receipts and order quantities at selling prices while profit retains real cost", () => {
     const product = createProduct(db, {
       name: "Report basis",

@@ -32,7 +32,9 @@ transaction after the whole-batch confirmation. Cancellation writes nothing. Any
 invalid entry or stale price rolls back the batch. Conflicting prices for the same
 product are rejected; only administrators can create products or reprice them.
 
-The receipt review uses one row per entry across the workspace: product/code,
+Both receiving entry points use the same two-pane desktop layout: a 320px input
+pane and a wider review pane using the remaining space. The receipt review uses
+one row per entry, with related details grouped into six columns: product/code,
 purchased/free quantities, actual amount, previous and new unit costs, final
 selling price, lot, expiry, and edit/remove actions. Small screens scroll inside
 the table rather than widening the page.

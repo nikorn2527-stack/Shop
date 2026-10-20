@@ -15,6 +15,7 @@ import { normalizeProductCategory } from "@shared/productCategories";
 // ใน server/sqliteStore.ts: DRK/HYG/SNK/FD/HH/ST) เรียงตามลำดับเดินชั้นวาง:
 // เครื่องดื่ม → ขนม → อาหาร → ของใช้ส่วนตัว → ของใช้ในครัวเรือน → เครื่องเขียน
 // ("ของใช้" เก็บไว้ท้ายสุดให้ข้อมูลรุ่นเก่า และหมวดที่ไม่รู้จักยังเข้า "อื่นๆ" ตามเดิม)
+const codeOrder = new Intl.Collator("th", {numeric:true,sensitivity:"base"});
 const CATEGORY_ORDER = ["เครื่องดื่ม", "ขนม", "อาหาร", "ของใช้", "เครื่องเขียน"];
 
 function countSheetDate() {
@@ -24,7 +25,7 @@ function countSheetDate() {
 }
 
 export function StockCountSheet({ products }: { products: SqliteProduct[] }) {
-  const active = products.filter((product) => product.active === 1).map(product => ({ ...product, category: normalizeProductCategory(product.category) }));
+  const active = products.filter((product) => product.active === 1).map(product => ({ ...product, category: normalizeProductCategory(product.category) })).sort((a,b)=>codeOrder.compare(a.barcode?.trim() || a.sku,b.barcode?.trim() || b.sku));
   const groups = CATEGORY_ORDER.map((category) => ({ category, items: active.filter((product) => product.category === category) }));
   const etc = active.filter((product) => !CATEGORY_ORDER.includes(product.category));
   if (etc.length > 0) groups.push({ category: "อื่นๆ", items: etc });

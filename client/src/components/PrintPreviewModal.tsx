@@ -1,7 +1,7 @@
 import { WorkflowDialog } from "./WorkflowDialog";
 import { notify } from "@/lib/notifications";
 import { printElementDocument } from "@/lib/printHelper";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { Printer, X } from "@/lib/icons";
 import { toast } from "sonner";
 import { HelpDisclosure } from "./HelpDisclosure";
@@ -46,9 +46,13 @@ export function PrintPreviewModal({
   showPrintHelp = true,
   onPrint,
   onClose,
+  documentVersion,
+  renderControls,
 }: {
   /** id ของ element เอกสารที่จะพิมพ์ (ต้องถูก mount ไว้ใน DOM ขณะเปิดพรีวิว) */
   targetId: string;
+  documentVersion?: string;
+  renderControls?: (busy:boolean)=>ReactNode;
   title: string;
   subtitle?: string;
   paper?: PrintPreviewPaper;
@@ -86,7 +90,7 @@ export function PrintPreviewModal({
     holder.replaceChildren(copy);
     setReady(true);
     return () => setReady(false);
-  }, [targetId, paperHolder]);
+  }, [targetId, paperHolder, documentVersion]);
 
   // ROUND 80 — วัดความสูงของเอกสารโคลนแล้วคำนวณเป็นมิลลิเมตร
   // (stage สลิปกว้าง 300px = ความกว้างกระดาษจริง · A4 กว้าง 800px = 210 มม.)
@@ -106,7 +110,7 @@ export function PrintPreviewModal({
     };
     const frame = window.requestAnimationFrame(() => { measure(); });
     return () => { cancelled = true; window.cancelAnimationFrame(frame); };
-  }, [ready, paper, thermalProfile.printableWidthMm]);
+  }, [ready, paper, thermalProfile.printableWidthMm, documentVersion]);
 
   // Esc closes — same affordance as the export preview modal.
 
@@ -151,6 +155,7 @@ export function PrintPreviewModal({
           ))}
         </div>}
 
+        {renderControls?.(printing)}
         {paper === "a4" ? (
           <A4DocumentPreview label={`พรีวิว ${title}`}>
             <div className="print-preview-paper" ref={attachPaper} />

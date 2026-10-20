@@ -111,7 +111,7 @@ try {
   assert.ok((await page.$eval('.receive-price-warning',e=>e.textContent)).includes('ลดราคา'));
   assert.equal(query('SELECT price FROM products WHERE id=?',product.id).price,10,'No repricing while drafting');
   await click('เพิ่มลงรายการ','.receive-item-editor');await page.waitForSelector('.receive-main-row');
-  assert.equal(await page.$$eval('.receive-main-row td',nodes=>nodes.length),10);
+  assert.equal(await page.$$eval('.receive-main-row td',nodes=>nodes.length),6);
   await click('แก้ไข','.receive-row-actions');await page.waitForSelector('.receive-entry-edit-modal');
   await fill('.receive-entry-edit-modal input[aria-label="จำนวนซื้อรายการ 1"]',5);
   await click('บันทึกแก้ไข','.receive-entry-edit-modal');await page.waitForFunction(()=>!document.querySelector('.receive-entry-edit-modal'));
