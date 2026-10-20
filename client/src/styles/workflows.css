@@ -285,3 +285,9 @@
   .pos-rail-manage-row > .pos-shortcut-error { grid-column: 2 / -1; margin: 0; color: #b91c1c; font-size: 12px; }
   :root:root .pos-rail-key-input[aria-invalid="true"] { border: 1px solid #dc2626; }
 }
+
+@media screen {
+  .bulk-price-file-upload { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 14px 20px; border-bottom: 1px solid #e2e8f0; }
+  .bulk-price-file-upload small { color: #64748b; }
+  .bulk-price-file-upload p { flex-basis: 100%; margin: 0; color: #334155; font-size: 13px; }
+}

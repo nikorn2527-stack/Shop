@@ -1,7 +1,8 @@
+import { preparePriceImport } from "@/lib/priceImport";
 import { WorkflowDialog } from "./WorkflowDialog";
 import { ConfirmDialog } from "@/pages/PagePrimitives";
 import { notify } from "@/lib/notifications";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { TRPCClientError } from "@trpc/client";
 import { Check, CircleAlert, Coins, Percent, RotateCcw, Search, SlidersHorizontal, X } from "@/lib/icons";
 import type { SqliteProduct } from "../../../server/sqliteStore";
@@ -51,6 +52,9 @@ export function BulkPriceModal({ open, products, actor, actorRole, onClose, onDo
   const [term, setTerm] = useState("");
   const [markup, setMarkup] = useState("25");
   const [error, setError] = useState("");
+  const [fileBusy, setFileBusy] = useState(false);
+  const [fileNotice, setFileNotice] = useState("");
+  const priceFileRef = useRef<HTMLInputElement>(null);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
   const utils = trpc.useUtils();
@@ -81,6 +85,7 @@ export function BulkPriceModal({ open, products, actor, actorRole, onClose, onDo
       setFilter(products.some((product) => product.price === 0) ? "noPrice" : "all");
       setTerm("");
       setError("");
+      setFileNotice("");
       bulkMutation.reset();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -125,13 +130,16 @@ export function BulkPriceModal({ open, products, actor, actorRole, onClose, onDo
   }, [products, drafts]);
 
   const dirtyCount = payload.length;
+  const priceOnly = payload.every(item => item.cost === undefined);
   const requestClose = () => {
+    if (fileBusy) return;
     if (bulkMutation.isPending) return;
     if (dirtyCount > 0) { setDiscardOpen(true); return; }
     onClose();
   };
 
   const setDraft = (productId: number, field: keyof DraftValue, value: string) => {
+    if (fileBusy) return;
     setDrafts((previous) => ({ ...previous, [productId]: withDraft(previous, productId, { [field]: value }) }));
   };
 
@@ -148,6 +156,7 @@ export function BulkPriceModal({ open, products, actor, actorRole, onClose, onDo
 
   /** ตั้งราคาขาย = ต้นทุน (ค่าใหม่ถ้ากรอก ไม่งั้นค่าเดิม) × (1 + markup%) สำหรับรายการที่ติดเลือก (ไม่เลือก = ทุกที่แสดง) */
   const applyMarkup = () => {
+    if (fileBusy) return;
     const percent = Number(markup);
     if (!Number.isFinite(percent) || percent < 0) { setError("ส่วนต่างต้องเป็นตัวเลข 0 ขึ้นไป เช่น 25 = บวก 25% จากต้นทุน"); return; }
     setError("");
@@ -168,6 +177,7 @@ export function BulkPriceModal({ open, products, actor, actorRole, onClose, onDo
 
   /** คัดลอกต้นทุน (ค่าใหม่ถ้ากรอก) ไปเป็นราคาขาย — สำหรับรายการที่ติดเลือก */
   const copyCostToPrice = () => {
+    if (fileBusy) return;
     const next: Record<number, DraftValue> = { ...drafts };
     let applied = 0;
     for (const id of targetIds()) {
@@ -185,6 +195,7 @@ export function BulkPriceModal({ open, products, actor, actorRole, onClose, onDo
 
   /** ปัดราคาที่กรอกไว้ให้จบด้วย .00 / .50 — ทำให้ราคาหน้าร้านดูเรียบร้อย */
   const roundPrices = () => {
+    if (fileBusy) return;
     const next: Record<number, DraftValue> = { ...drafts };
     for (const [id, draft] of Object.entries(drafts)) {
       const price = parseMoneyInput(draft.price);
@@ -199,31 +210,61 @@ export function BulkPriceModal({ open, products, actor, actorRole, onClose, onDo
   };
 
   const clearAll = () => {
+    if (fileBusy) return;
+    setFileNotice("");
     setDrafts({});
     setChecked(new Set());
     setError("");
   };
 
   const save = () => {
+    if (fileBusy) return;
     if (invalidIds.length > 0) { setError("มีบางช่องที่กรอกไม่ถูกต้อง (ต้องเป็นตัวเลข 0 ขึ้นไป) — แก้ตัวที่แดงก่อนบันทึก"); return; }
     if (payload.length === 0) { setError("ยังไม่มีรายการที่แก้ — กรอกราคาใหม่หรือต้นทุนใหม่อย่างน้อย 1 ช่อง"); return; }
     setError("");
     setReviewOpen(true);
   };
 
+  const loadPriceFile = async (file: File | undefined) => {
+    if (!file || fileBusy || bulkMutation.isPending) return;
+    if (Object.values(drafts).some(draft => draft.price.trim() || draft.cost.trim())) {
+      setError("กรุณาล้างค่าที่กรอกก่อนอัปโหลดไฟล์ เพื่อไม่ให้ทับการแก้ไขที่ยังไม่บันทึก"); return;
+    }
+    if (file.size > 5 * 1024 * 1024) { setError("ไฟล์ต้องมีขนาดไม่เกิน 5 MB"); return; }
+    setFileBusy(true); setError(""); setFileNotice("");
+    try {
+      const XLSX = await import("xlsx");
+      const workbook = XLSX.read(await file.arrayBuffer(), {type: "array", raw: true});
+      if (workbook.SheetNames.length !== 1) throw new Error("ใช้ไฟล์ราคาขายที่มีเพียง 1 ชีต เพื่อป้องกันนำเข้าผิดชีต");
+      const rows = XLSX.utils.sheet_to_json<string[]>(workbook.Sheets[workbook.SheetNames[0]], {header: 1, raw: false, defval: "", blankrows: false});
+      const result = preparePriceImport(rows,products);
+      if (result.errors.length) throw new Error(`ยังไม่นำราคาจากไฟล์มาใช้ พบ ${result.errors.length} ข้อผิดพลาด: ${result.errors.slice(0,8).join(" · ")}${result.errors.length > 8 ? " · ตรวจและแก้ไขไฟล์ก่อนอัปโหลดใหม่" : ""}`);
+      setDrafts(Object.fromEntries(result.items.map(item => [item.productId,{price: item.price.toFixed(2),cost: ""}])));
+      setChecked(new Set()); setFilter("all"); setTerm("");
+      setFileNotice(`${file.name}: จับคู่ ${result.items.length} รายการ · ราคาเดิมตรงแล้ว ${result.unchanged} · ตรวจราคาใหม่ในตารางก่อนกดบันทึก เปลี่ยนเฉพาะราคาขาย ไม่แก้ต้นทุน สต็อก หรือบิลเดิม`);
+    } catch (cause) { setError(cause instanceof Error ? cause.message : "อ่านไฟล์ราคาขายไม่สำเร็จ"); }
+    finally { setFileBusy(false); }
+  };
+
   if (!open) return null;
 
   return (
-    <><WorkflowDialog title="ปรับราคาหลายรายการพร้อมกัน" className="form-modal bulk-price-modal" onClose={requestClose} busy={bulkMutation.isPending}>
+    <><WorkflowDialog title="ปรับราคาหลายรายการพร้อมกัน" className="form-modal bulk-price-modal" onClose={requestClose} busy={bulkMutation.isPending || fileBusy}>
         <div className="modal-heading">
           <div>
             <span className="eyebrow">ปรับราคาหลายรายการ</span>
             <h2>ตั้งราคา / ต้นทุนหลายรายการพร้อมกัน</h2>
             <p>กรอกเฉพาะช่องที่ต้องการแก้ แล้วกดบันทึกครั้งเดียว — ระบบบันทึกทั้งชุดในคราวเดียวและลง Log สรุปรายการเดียว</p>
           </div>
-          <button className="icon-button" onClick={requestClose} aria-label="ปิดหน้าต่าง" disabled={bulkMutation.isPending}><X size={16} /></button>
+          <button className="icon-button" onClick={requestClose} aria-label="ปิดหน้าต่าง" disabled={bulkMutation.isPending || fileBusy}><X size={16} /></button>
         </div>
 
+        <div className="bulk-price-file-upload">
+          <button type="button" className="outline-button" disabled={fileBusy || bulkMutation.isPending} onClick={() => priceFileRef.current?.click()}>{fileBusy ? "กำลังตรวจไฟล์…" : "อัปโหลดไฟล์ราคาขาย"}</button>
+          <small>Excel / CSV · 2 คอลัมน์: บาร์โค้ด, ราคาขาย · ไม่เปลี่ยนต้นทุนหรือสต็อก</small>
+          <input ref={priceFileRef} type="file" accept=".xlsx,.xls,.csv" aria-label="ไฟล์ปรับราคาขาย" hidden onChange={event => { const file = event.target.files?.[0]; event.target.value = ""; void loadPriceFile(file); }} />
+          {fileNotice && <p role="status">{fileNotice}</p>}
+        </div>
         <div className="bulk-toolbar">
           <div className="bulk-filter-group" role="group" aria-label="กรองรายการ">
             {(Object.keys(FILTER_LABELS) as FilterMode[]).map((mode) => {
@@ -303,7 +344,7 @@ export function BulkPriceModal({ open, products, actor, actorRole, onClose, onDo
                     </td>
                     <td className="col-name">
                       <b>{product.name}</b>
-                      <small>{product.sku}{product.size ? ` · ${product.size}` : ""}</small>
+                      <small>{product.sku}{product.barcode ? ` · ${product.barcode}` : ""}{product.size ? ` · ${product.size}` : ""}</small>
                       {product.price === 0 && <em className="bulk-flag-no-price">ยังไม่มีราคา</em>}
                     </td>
                     <td className="col-money"><span className="bulk-current">{product.price === 0 ? "—" : money(product.price)}</span></td>
@@ -315,7 +356,7 @@ export function BulkPriceModal({ open, products, actor, actorRole, onClose, onDo
                         inputMode="decimal"
                         placeholder={product.price === 0 ? "ยังไม่มีราคา" : money(product.price)}
                         aria-label={`ราคาขายใหม่ของ ${product.name}`}
-                        disabled={bulkMutation.isPending}
+                        disabled={bulkMutation.isPending || fileBusy}
                       />
                     </td>
                     <td className="col-money"><span className="bulk-current">{product.cost === 0 ? "—" : money(product.cost)}</span></td>
@@ -327,7 +368,7 @@ export function BulkPriceModal({ open, products, actor, actorRole, onClose, onDo
                         inputMode="decimal"
                         placeholder={product.cost === 0 ? "ยังไม่มีต้นทุน" : money(product.cost)}
                         aria-label={`ต้นทุนใหม่ของ ${product.name}`}
-                        disabled={bulkMutation.isPending}
+                        disabled={bulkMutation.isPending || fileBusy}
                       />
                     </td>
                     <td className="col-margin">
@@ -351,13 +392,13 @@ export function BulkPriceModal({ open, products, actor, actorRole, onClose, onDo
           <div className="bulk-summary">
             {dirtyCount > 0 ? <><Check size={14} /> พร้อมบันทึก <b>{dirtyCount}</b> รายการ{invalidIds.length > 0 && <span className="bulk-invalid-hint"> · กรอกผิด {invalidIds.length} ช่อง</span>}</> : <span>กรอกราคาใหม่/ต้นทุนใหม่ในตารางเพื่อเริ่ม</span>}
           </div>
-          <button className="outline-button" onClick={requestClose} disabled={bulkMutation.isPending} type="button">ปิด</button>
-          <button className="primary-button" onClick={save} disabled={bulkMutation.isPending || dirtyCount === 0 || invalidIds.length > 0} type="button">
+          <button className="outline-button" onClick={requestClose} disabled={bulkMutation.isPending || fileBusy} type="button">ปิด</button>
+          <button className="primary-button" onClick={save} disabled={bulkMutation.isPending || fileBusy || dirtyCount === 0 || invalidIds.length > 0} type="button">
             {bulkMutation.isPending ? "กำลังบันทึก…" : `บันทึก ${dirtyCount > 0 ? `${dirtyCount} รายการ` : ""}`}
           </button>
         </div>
       </WorkflowDialog>
- <ConfirmDialog open={reviewOpen} tone="warning" title="ยืนยันปรับราคาและต้นทุน?" description={`กำลังเปลี่ยนข้อมูลสินค้า ${dirtyCount} รายการ ราคาขายใหม่จะใช้กับบิลถัดไป และระบบจะบันทึกประวัติการเปลี่ยนแปลง`} confirmLabel={`ยืนยันบันทึก ${dirtyCount} รายการ`} pending={bulkMutation.isPending} onCancel={() => setReviewOpen(false)} onConfirm={() => { if (!bulkMutation.isPending) bulkMutation.mutate({ items: payload, actor, actorRole }); }} />
+ <ConfirmDialog open={reviewOpen} tone="warning" title={priceOnly ? "ยืนยันปรับราคาขาย?" : "ยืนยันปรับราคาและต้นทุน?"} description={`กำลังเปลี่ยนข้อมูลสินค้า ${dirtyCount} รายการ ${priceOnly ? "เปลี่ยนเฉพาะราคาขาย ไม่เปลี่ยนต้นทุน สต็อก หรือบิลเดิม" : "ราคาขายใหม่จะใช้กับบิลถัดไป"} และระบบจะบันทึกประวัติการเปลี่ยนแปลง`} confirmLabel={`ยืนยันบันทึก ${dirtyCount} รายการ`} pending={bulkMutation.isPending} onCancel={() => setReviewOpen(false)} onConfirm={() => { if (!bulkMutation.isPending) bulkMutation.mutate({ items: payload, actor, actorRole }); }} />
  <ConfirmDialog open={discardOpen} tone="danger" title="ทิ้งราคาที่ยังไม่ได้บันทึก?" description={`มี ${dirtyCount} รายการที่แก้ไขไว้ การปิดจะไม่บันทึกการเปลี่ยนแปลง`} confirmLabel="ทิ้งการแก้ไขและปิด" onCancel={() => setDiscardOpen(false)} onConfirm={() => { setDiscardOpen(false); onClose(); }} /></>
   );
 }
