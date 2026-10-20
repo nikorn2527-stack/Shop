@@ -74,9 +74,9 @@ export function StockReceiptHistory({ canExport, onUpgrade, expanded = false }: 
     {open && <>
       <h2>ประวัติรับเข้าสินค้า</h2>
       <div className="receipt-history-filters">
-        <label className="receipt-date-filter">ช่วงวันที่<ThaiDateRangePicker from={from} to={to} onChange={(nextFrom, nextTo) => { setFrom(nextFrom); setTo(nextTo); }} ariaLabel="เลือกช่วงวันที่ประวัติรับเข้า" /></label>
-        <label className="receipt-product-filter">สินค้า / SKU / Lot<input aria-label="ค้นหาสินค้า SKU หรือ Lot ในประวัติรับเข้า" value={search} onChange={e => setSearch(e.target.value)} placeholder="ค้นหาสินค้าหรือ Lot" /></label>
-        <label className="receipt-actor-filter">เจ้าหน้าที่<input aria-label="ค้นหาชื่อเจ้าหน้าที่ในประวัติรับเข้า" value={actor} onChange={e => setActor(e.target.value)} placeholder="ค้นหาชื่อเจ้าหน้าที่" /></label>
+        <label className="receipt-date-filter"><span>ช่วงวันที่</span><ThaiDateRangePicker from={from} to={to} onChange={(nextFrom, nextTo) => { setFrom(nextFrom); setTo(nextTo); }} ariaLabel="เลือกช่วงวันที่ประวัติรับเข้า" /></label>
+        <label className="receipt-product-filter"><span>สินค้า / SKU / Lot</span><input aria-label="ค้นหาสินค้า SKU หรือ Lot ในประวัติรับเข้า" value={search} onChange={e => setSearch(e.target.value)} placeholder="ค้นหาสินค้าหรือ Lot" /></label>
+        <label className="receipt-actor-filter"><span>เจ้าหน้าที่</span><input aria-label="ค้นหาชื่อเจ้าหน้าที่ในประวัติรับเข้า" value={actor} onChange={e => setActor(e.target.value)} placeholder="ค้นหาชื่อเจ้าหน้าที่" /></label>
         <div className="report-export-actions stock-export-actions receipt-export-actions" aria-label="ส่งออกประวัติรับเข้าสินค้า">
           <button type="button" className="outline-button compact export-btn export-csv" onClick={() => void openExport("csv", true)} title="ดาวน์โหลด CSV"><Download size={15} /> CSV</button>
           <button type="button" className="outline-button compact export-btn export-excel" onClick={() => void openExport("xlsx", true)} title="ดาวน์โหลด Excel"><FileBarChart size={15} /> Excel</button>

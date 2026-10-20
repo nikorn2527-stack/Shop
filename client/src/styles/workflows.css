@@ -157,7 +157,7 @@
   :root:root :is(.app-shell, .modal-backdrop, .login-screen, [data-slot="dialog-content"]) :is(input, select, textarea)[data-field-state="filled"] { background: #f0fdf4; border-color: #bbdfc8; }
   :root:root :is(.app-shell, .modal-backdrop, .login-screen, [data-slot="dialog-content"]) :is(input, select, textarea)[data-field-state="missing"] { background: #fffbeb; border-color: #f1d798; }
   :root:root :is(.app-shell, .modal-backdrop, .login-screen, [data-slot="dialog-content"]) :is(input, select, textarea)[data-field-state="invalid"] { background: #fff5f5; border-color: #e8aaaa; }
-  :root:root label[data-field-caption]::after { content: attr(data-field-caption); display: block; margin-top: 4px; font-size: 10px; line-height: 1.4; font-weight: 400; color: #64748b; }
+  :root:root label:is([data-field-caption="จำเป็นต้องกรอก"], [data-field-caption="ตรวจสอบข้อมูล"])::after { content: attr(data-field-caption); display: block; margin-top: 4px; font-size: 10px; line-height: 1.4; font-weight: 400; color: #64748b; }
   :root:root label:has([data-field-state="filled"])::after { color: #15803d; }
   :root:root label:has([data-field-state="missing"])::after { color: #92400e; }
   :root:root label:has([data-field-state="invalid"])::after { color: #b91c1c; }
