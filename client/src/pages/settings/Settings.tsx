@@ -2077,8 +2077,7 @@ export function Settings({
                           )}
                         </div>
                         <small>
-                          รองรับ PNG JPG WEBP SVG · ระบบย่อเป็น 256px อัตโนมัติ
-                          · ไม่ใส่ก็ได้ จะใช้อักษรย่อแทน
+                          รองรับ PNG JPG WEBP SVG
                         </small>
                       </div>
                       <input
@@ -2108,7 +2107,6 @@ export function Settings({
                 <div className="background-settings">
                   <h3>ภาพพื้นหลังพื้นที่ทำงาน</h3>
                   <BackgroundImageUpload target="workspace" hasImage={Boolean(form?.appBackground)} disabled={!form} onChange={event => onBackgroundPick(event)} />
-                  <p>PNG JPG WEBP ไม่เกิน 2MB · แสดงหลังการ์ดเท่านั้น ไม่ติดเอกสารพิมพ์ · กดบันทึกเพื่อใช้ครั้งถัดไป</p>
                   {form?.appBackground && <>
                     <img src={form.appBackground} alt="ตัวอย่างภาพพื้นหลัง" style={{ width: "100%", maxHeight: 180, objectFit: "cover", borderRadius: 8 }} />
                     <button type="button" className="outline-button" onClick={() => { updateForm({ appBackground: "" }); applyBackground(""); }}>ลบภาพพื้นหลัง</button>
@@ -2116,9 +2114,7 @@ export function Settings({
                 </div>
                 <div className="background-settings login-background-settings">
                   <h3>รูปแบบหน้าเข้าสู่ระบบ</h3>
-                  <p>ใช้พื้นเรียบแบบเดิม หรือเลือกภาพโรงพยาบาลเป็นพื้นหลังเฉพาะหน้าเข้าสู่ระบบ ภาพนี้แยกจากพื้นที่ทำงานและเอกสารพิมพ์</p>
                   <BackgroundImageUpload target="login" hasImage={Boolean(form?.loginBackground)} disabled={!form} onChange={event => onBackgroundPick(event, "loginBackground")} />
-                  <small>PNG JPG WEBP ไม่เกิน 2MB · ระบบย่อภาพให้ · กดบันทึกการตั้งค่าเพื่อใช้งาน</small>
                   {form?.loginBackground && <>
                     <div className="login-background-preview"><img src={form.loginBackground} alt="ตัวอย่างภาพพื้นหลังหน้าเข้าสู่ระบบ" /><div><b>{form.appName || "ร้านค้าสวัสดิการ"}</b><span>เข้าสู่ระบบ</span></div></div>
                     <button type="button" className="outline-button" onClick={() => updateForm({ loginBackground: "" })}>ใช้พื้นเรียบ · นำภาพหน้าเข้าสู่ระบบออก</button>

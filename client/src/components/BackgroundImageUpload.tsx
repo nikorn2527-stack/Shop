@@ -12,7 +12,7 @@ export function BackgroundImageUpload({ target, hasImage, disabled, onChange }: 
   const label = target === "login" ? "หน้าเข้าสู่ระบบ" : "พื้นที่ทำงาน";
   return <div className="background-image-upload">
     <ImagePlus size={30} aria-hidden="true" />
-    <div><b>{hasImage ? "เปลี่ยนภาพพื้นหลัง" : "เพิ่มภาพพื้นหลัง"}{label}</b><p>เลือกภาพจากเครื่อง เช่น ภาพโรงพยาบาลหรืออาคาร</p><small>PNG, JPG หรือ WEBP · ขนาดไม่เกิน 2MB</small></div>
+    <div><b>{hasImage ? "เปลี่ยนภาพพื้นหลัง" : "เพิ่มภาพพื้นหลัง"}{label}</b><small>PNG, JPG หรือ WEBP · ขนาดไม่เกิน 2MB</small></div>
     <button type="button" className="outline-button background-upload-button" disabled={disabled} onClick={() => input.current?.click()}><ImagePlus size={17} />{hasImage ? "เปลี่ยนรูป" : "เลือกรูปภาพ"}</button>
     <input ref={input} type="file" accept="image/png,image/jpeg,image/webp" aria-label={`เลือกภาพพื้นหลัง${label}`} hidden disabled={disabled} onChange={onChange} />
   </div>;
