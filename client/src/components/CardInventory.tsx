@@ -1,3 +1,4 @@
+import { MemberBarcodePrintModal } from "./MemberBarcodePrintModal";
 import { useEffect, useRef, useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { getErrorMessage } from "@/pages/viewFormat";
@@ -17,6 +18,8 @@ function staffName(value: string | null | undefined) {
 export function CardInventory({ canManage }: { canManage: boolean }) {
   const utils = trpc.useUtils();
   const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [printCodes, setPrintCodes] = useState<string[]>([]);
   const [builderOpen, setBuilderOpen] = useState(false);
   const [codes, setCodes] = useState("");
   const [creationMode, setCreationMode] = useState<"auto" | "existing">("auto");
@@ -40,6 +43,8 @@ export function CardInventory({ canManage }: { canManage: boolean }) {
     { search },
     { refetchOnMount: "always" }
   );
+  const printable = cards.data?.filter(card => card.status !== "lost" && card.status !== "damaged") ?? [];
+  const selectedCodes = printable.filter(card => selected.has(card.cardNumber)).map(card => card.cardNumber);
   const refresh = () => {
     setError("");
     setNotice("บันทึกแล้ว");
@@ -92,6 +97,8 @@ export function CardInventory({ canManage }: { canManage: boolean }) {
       </label>
       {canManage && <button type="button" className="outline-button" aria-expanded={builderOpen} aria-controls="card-inventory-builder" disabled={pending} onClick={() => setBuilderOpen(open => !open)}>{builderOpen ? "ซ่อนส่วนเพิ่มบัตร" : "เพิ่มบัตรเปล่า"}</button>}
       </div>
+      <p>หากไม่ได้จัดทำบัตร ให้สร้างเลขบัตรเปล่าแล้วพิมพ์บาร์โค้ดลงสลิป จากนั้นสแกนเพื่อจ่ายบัตรให้สมาชิกตามปกติ</p>
+      {selectedCodes.length > 0 && <div className="batch-print-bar"><b>เลือก {selectedCodes.length} ใบ</b><div className="batch-print-actions"><button className="outline-button" onClick={() => setSelected(new Set())}>ล้างที่เลือก</button><button className="primary-button" onClick={() => setPrintCodes(selectedCodes)}>พิมพ์บาร์โค้ดที่เลือก</button></div></div>}
       {canManage && builderOpen && (
         <div className="card-inventory-builder" id="card-inventory-builder">
           <div role="tablist" aria-label="วิธีเพิ่มบัตร">
@@ -143,6 +150,7 @@ export function CardInventory({ canManage }: { canManage: boolean }) {
           <table>
             <thead>
               <tr>
+                <th><input type="checkbox" aria-label="เลือกบัตรที่พิมพ์ได้ทั้งหมด" checked={printable.length > 0 && selectedCodes.length === printable.length} disabled={!printable.length} onChange={e => setSelected(e.target.checked ? new Set(printable.map(card => card.cardNumber)) : new Set())} /></th>
                 <th>รหัสบัตร</th>
                 <th>สมาชิก</th>
                 <th>เจ้าหน้าที่ลงทะเบียน / วันที่</th>
@@ -154,11 +162,13 @@ export function CardInventory({ canManage }: { canManage: boolean }) {
             <tbody>
               {cards.data?.map(card => (
                 <tr key={card.cardNumber}>
+                  <td><input type="checkbox" aria-label={`เลือกพิมพ์บัตร ${card.cardNumber}`} disabled={card.status === "lost" || card.status === "damaged"} checked={selected.has(card.cardNumber)} onChange={e => setSelected(current => { const next = new Set(current); if (e.target.checked) next.add(card.cardNumber); else next.delete(card.cardNumber); return next; })} /></td>
                   <td>{card.cardNumber}</td>
                   <td>{card.assignedMemberNumber || "—"}</td>
                   <td>{staffName(card.createdBy)}<br />{card.createdAt}</td>
                   <td>{staffName(card.updatedBy)}</td>
                   <td><div className="card-inventory-actions" data-card-status={card.status}>
+                    {card.status !== "lost" && card.status !== "damaged" && <button type="button" className="outline-button" onClick={() => setPrintCodes([card.cardNumber])}>พิมพ์บาร์โค้ด</button>}
                     <button type="button" className="outline-button card-action-history" onClick={() => { setHistoryCard(card.cardNumber); setSessionId(null); }}>ประวัติการใช้บัตร</button>
                     {card.status === "assigned" && (
                       <button
@@ -225,6 +235,7 @@ export function CardInventory({ canManage }: { canManage: boolean }) {
           {cards.data?.length === 0 && <p>ไม่พบบัตร</p>}
         </div>
       )}
+      {printCodes.length > 0 && <MemberBarcodePrintModal cards={printCodes} onClose={() => setPrintCodes([])} />}
       {historyCard && <dialog ref={historyDialog} className="card-history-dialog" aria-labelledby="card-history-title" onCancel={() => { setHistoryCard(""); setSessionId(null); }}>
         <div className="card-history-heading">
         <h3 id="card-history-title">ประวัติการใช้บัตร · {historyCard}</h3>

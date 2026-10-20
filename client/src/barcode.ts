@@ -62,7 +62,7 @@ export function code128Canvas(value: string, options: BarcodeOptions = {}) {
   const label = (options.label ?? text).toString();
 
   const codes = [START_CODE_B, ...Array.from(text, charToCode), 0, STOP_CODE];
-  codes[codes.length - 2] = checksum(codes.slice(0, -2));
+  codes[codes.length - 2] = checksum(codes.slice(1, -2));
 
   // Flatten bars into [x, width] pairs (module units).
   const bars: { x: number; w: number }[] = [];

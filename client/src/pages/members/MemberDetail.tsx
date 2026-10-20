@@ -30,6 +30,7 @@ import {
 } from "@/lib/icons";
 import { blocker } from "@/components/BlockerAlert";
 import { CameraCaptureModal } from "@/components/CameraCaptureModal";
+import { MemberBarcodePrintModal } from "@/components/MemberBarcodePrintModal";
 import { MemberCardModal } from "@/components/MemberCardModal";
 import { PrintPreviewModal } from "@/components/PrintPreviewModal";
 import { SlipViewButton } from "@/components/SlipViewModal";
@@ -146,6 +147,7 @@ export function MemberDetail({
   const [walletConfirm, setWalletConfirm] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [cardOpen, setCardOpen] = useState(false);
+  const [barcodeOpen, setBarcodeOpen] = useState(false);
   const [cardAction, setCardAction] = useState<"return" | null>(null);
   const [statementOpen, setStatementOpen] = useState(false);
   const actor = userName || "ผู้ใช้ระบบ";
@@ -499,6 +501,7 @@ export function MemberDetail({
           <button className="outline-button" onClick={() => setCardOpen(true)}>
             <IdCard size={15} /> บัตรสมาชิก
           </button>
+          <button className="outline-button" onClick={() => setBarcodeOpen(true)}><Printer size={15} /> พิมพ์บาร์โค้ด</button>
           {isAdminRole(role) && (
             <button
               className="danger-outline-button"
@@ -1371,6 +1374,7 @@ export function MemberDetail({
           });
         }}
       />
+      {barcodeOpen && <MemberBarcodePrintModal members={[detailQuery.data?.member ?? member]} onClose={() => setBarcodeOpen(false)} />}
       {cardOpen && (
         <MemberCardModal
           member={

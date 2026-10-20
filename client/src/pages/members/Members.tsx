@@ -14,6 +14,7 @@ import {
 } from "@/lib/icons";
 import { trpc } from "@/lib/trpc";
 import { HelpDisclosure } from "@/components/HelpDisclosure";
+import { MemberBarcodePrintModal } from "@/components/MemberBarcodePrintModal";
 import { MemberCardBatchModal, type MemberCardData } from "@/components/MemberCardModal";
 import type { MemberLite, Role } from "../pageData";
 import {
@@ -69,6 +70,7 @@ export function Members({
   // so the user can tick many rows and send them all to the printer at once.
   const [selectedForPrint, setSelectedForPrint] = useState<Set<string>>(new Set());
   const [batchCardOpen, setBatchCardOpen] = useState(false);
+  const [barcodeOpen, setBarcodeOpen] = useState(false);
   // Round 32-16 — ลงทะเบียนสมาชิกใหม่+พิมพ์บัตร อยู่ที่ POS จุดเดียว (F6) แล้ว
   // หน้านี้คงไว้เฉพาะการจัดการสมาชิกที่มีอยู่ (ดูรายละเอียด เติม/ถอน ระงับ พิมพ์บัตร)
   const [selectedMember, setSelectedMember] = useState<MemberLite | null>(null);
@@ -428,10 +430,11 @@ export function Members({
           <div className="batch-print-bar">
             <div>
               <b>เลือก {selectedForPrint.size} ราย</b>
-              <small>ดูบัตรสมาชิกที่เลือกและดาวน์โหลด PDF</small>
+              <small>พิมพ์บาร์โค้ดลงสลิป หรือดาวน์โหลดบัตรสมาชิก PDF</small>
             </div>
             <div className="batch-print-actions">
               <button className="outline-button" onClick={clearPrintSelection}>ล้างที่เลือก</button>
+              <button className="outline-button" disabled={!batchCardMembers.length} onClick={() => setBarcodeOpen(true)}><Printer size={15} /> พิมพ์บาร์โค้ด</button>
               <button className="primary-button" onClick={() => setBatchCardOpen(true)} disabled={batchCardMembers.length === 0}>
                 <Printer size={15} /> บัตรสมาชิก {selectedForPrint.size} ใบ
               </button>
@@ -447,6 +450,7 @@ export function Members({
           </div>
         )}
       </section>
+      {barcodeOpen && batchCardMembers.length > 0 && <MemberBarcodePrintModal members={batchCardMembers} onClose={() => setBarcodeOpen(false)} />}
       {batchCardOpen && batchCardMembers.length > 0 && (
         <MemberCardBatchModal
           members={batchCardMembers}
