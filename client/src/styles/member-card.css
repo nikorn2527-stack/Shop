@@ -15,8 +15,8 @@
 .wallet-art-brand b { display: block; font-size: 11px; line-height: 15px; max-height: 30px; overflow: hidden; overflow-wrap: anywhere; }
 .wallet-art-brand small { display: block; font-size: 8px; line-height: 11px; color: #52665e; }
 .wallet-art-type { flex-shrink: 0; font-size: 9px; border: 1px solid #d7e5de; padding: 3px 8px; border-radius: 20px; }
-.wallet-art-main { display: grid; grid-template-columns: 52px minmax(0, 1fr) 58px; align-items: center; gap: 10px; }
-.wallet-art-photo { width: 52px; height: 70px; overflow: hidden; border: 1px solid #d7e5de; border-radius: 4px; background: #f8faf9; }
+.wallet-art-main { display: grid; grid-template-columns: 60px minmax(0, 1fr) 58px; align-items: center; gap: 10px; }
+.wallet-art-photo { width: 60px; height: 70px; overflow: hidden; border: 1px solid #d7e5de; border-radius: 4px; background: #f8faf9; }
 .wallet-art-photo :is(.member-photo, .member-photo-blank) { display: block !important; width: 100% !important; height: 100% !important; object-fit: cover; border: 0; border-radius: 0 !important; background: transparent; }
 .wallet-art-photo :is(.member-photo, .member-photo-blank)::after { display: none !important; }
 .wallet-art-identity { min-width: 0; text-align: center; }

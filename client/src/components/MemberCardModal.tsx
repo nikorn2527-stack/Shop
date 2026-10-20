@@ -91,7 +91,7 @@ export function MemberCardArt({
       <span className="wallet-art-type">{member.type}</span>
     </div>
     <div className="wallet-art-main">
-      <div className="wallet-art-photo"><MemberAvatar member={member} size={52} rounded={false} /></div>
+      <div className="wallet-art-photo"><MemberAvatar member={member} size={60} rounded={false} /></div>
       <div className="wallet-art-identity">
         <b className={`wallet-art-name${displayName.length > 32 ? " wallet-art-name-long" : ""}`}>{displayName}</b>
         <strong className="wallet-art-number">{member.memberNumber}</strong>
