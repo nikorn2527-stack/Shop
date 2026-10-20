@@ -1,0 +1,35 @@
+/* One receiving form for the navigation page and the dialog opened from stock/POS. */
+@media screen {
+  :root:root .stock-receive-modal.receiving-workspace {
+    box-sizing: border-box; display: flex; flex-direction: column; padding: 20px;
+    background: white; color: var(--ink); border: 1px solid var(--control-border); border-radius: 14px;
+  }
+  :root:root .stock-receive-modal.receiving-workspace > .modal-heading {
+    position: static; display: flex; align-items: flex-start; justify-content: space-between;
+    flex: 0 0 auto; margin: 0 0 20px; padding: 0; gap: 12px;
+    border: 0; border-radius: 0; background: white; box-shadow: none;
+  }
+  :root:root .stock-receive-modal.receiving-workspace > .modal-heading h2 { margin: 0; font-size: 22px; line-height: 1.4; font-weight: 700; color: var(--ink); }
+  :root:root .stock-receive-modal.receiving-workspace > .modal-heading p { margin: 5px 0 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
+  :root:root .stock-receive-modal.receiving-workspace > .receive-split-workspace { margin-top: 0; gap: 16px; }
+  :root:root .stock-receive-modal.receiving-workspace :is(input:not([type="checkbox"]), select, textarea) {
+    box-sizing: border-box; min-width: 0; min-height: 42px; padding: 8px 10px; border-radius: 8px; color: var(--ink);
+  }
+  :root:root .stock-receive-modal.receiving-workspace :is(input, select, textarea):disabled {
+    background: #f1f5f9; color: var(--disabled-ink); border-color: var(--control-border); opacity: 1;
+  }
+  :root:root .stock-receive-modal.receiving-workspace > .modal-actions {
+    position: sticky; bottom: 0; z-index: 1; flex: 0 0 auto; display: flex; justify-content: space-between;
+    flex-wrap: wrap; gap: 12px; margin: 16px 0 0; padding: 16px 0 0;
+    border-top: 1px solid #edf2f0; border-radius: 0; background: white; box-shadow: none;
+  }
+  :root:root .stock-receive-modal.receiving-workspace .receive-simple-table { min-width: 980px; table-layout: fixed; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-simple-table th:nth-child(1) { width: 25%; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-simple-table th:nth-child(2) { width: 10%; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-simple-table th:nth-child(3) { width: 13%; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-simple-table th:nth-child(4) { width: 8%; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-simple-table th:nth-child(5) { width: 16%; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-simple-table th:nth-child(6) { width: 17%; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-simple-table th:nth-child(7) { width: 11%; }
+  @media (max-width: 600px) { :root:root .stock-receive-modal.receiving-workspace { padding: 14px; } }
+}

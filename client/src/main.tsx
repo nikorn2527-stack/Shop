@@ -17,6 +17,7 @@ import "./styles/clear-palette.css";
 import "./styles/motion.css";
 import "./styles/workflows.css";
 import "./styles/member-card.css";
+import "./styles/receiving.css";
 
 const queryClient = new QueryClient();
 

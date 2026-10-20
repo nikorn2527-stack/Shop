@@ -38,7 +38,7 @@
   .feedback-actions > .outline-button { min-height: 44px; border-radius: 6px; }
   .feedback-actions .action-control { display: inline-flex; }
   .stock-receiving-page { min-width: 0; }
-  :root .receiving-workspace.stock-receive-modal {
+  :root .receiving-page-surface.stock-receive-modal {
     position: relative; inset: auto; width: 100%; max-width: 100%; height: auto; min-height: min(640px, 80dvh); max-height: none;
     display: flex; flex-direction: column; box-sizing: border-box; padding: 20px; margin: 0; background: #fff; border: 1px solid var(--control-border); border-radius: 14px; overflow: visible;
   }
@@ -95,7 +95,7 @@
   @media (max-width: 600px) {
     .workflow-backdrop { padding: 12px; }
     .workflow-dialog { max-height: calc(100dvh - 24px); }
-    :root .receiving-workspace.stock-receive-modal { padding: 14px; }
+    :root .receiving-page-surface.stock-receive-modal { padding: 14px; }
     :root .workflow-dialog.stock-receive-modal { left: 12px; right: 12px; top: 12px; width: calc(100vw - 24px); height: calc(100dvh - 24px); max-height: calc(100dvh - 24px); }
     .receiving-workspace .modal-actions .action-control { flex: 1 1 100%; }
     .receiving-workspace .modal-actions .action-control > button { width: 100%; }

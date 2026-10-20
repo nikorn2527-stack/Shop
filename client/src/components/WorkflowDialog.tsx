@@ -88,6 +88,6 @@ export function WorkflowResult({ title, description, children, actionLabel = "�
 
 export function ReceivingSurface({ page, children, onClose, busy }: { page: boolean; children: ReactNode; onClose: () => void; busy: boolean }) {
   return page
-    ? <section className="stock-receive-modal receiving-workspace" aria-label="รับเข้าสินค้า" aria-busy={busy || undefined}>{children}</section>
-    : <WorkflowDialog title="รับเข้าสินค้า" onClose={onClose} busy={busy} className="form-modal stock-receive-modal">{children}</WorkflowDialog>;
+    ? <section className="stock-receive-modal receiving-workspace receiving-page-surface" aria-label="รับเข้าสินค้า" aria-busy={busy || undefined}>{children}</section>
+    : <WorkflowDialog title="รับเข้าสินค้า" onClose={onClose} busy={busy} className="form-modal stock-receive-modal receiving-workspace">{children}</WorkflowDialog>;
 }
