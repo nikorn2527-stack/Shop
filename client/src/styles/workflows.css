@@ -280,3 +280,8 @@
 .opening-stock-table th:first-child, .opening-stock-table td:first-child { text-align: left; white-space: normal; min-width: 150px; }
 .opening-stock-table td small { display: block; color: #64748b; }
 .opening-stock-table > p { padding: 8px 12px; color: #b91c1c; }
+
+@media screen {
+  .pos-rail-manage-row > .pos-shortcut-error { grid-column: 2 / -1; margin: 0; color: #b91c1c; font-size: 12px; }
+  :root:root .pos-rail-key-input[aria-invalid="true"] { border: 1px solid #dc2626; }
+}

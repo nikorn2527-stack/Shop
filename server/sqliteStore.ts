@@ -1,3 +1,4 @@
+import { findPosShortcutConflicts, posShortcutConflictMessage } from "../shared/posShortcuts";
 import { memberNumberHead, nextMemberNumberSequence, type MemberNumberFormat } from "../shared/memberNumber";
 import { allocateInventoryCost } from "./inventoryValuation";
 import { INVENTORY_ACTION_LABELS } from "../shared/inventoryActions";
@@ -3749,6 +3750,11 @@ export function getSettings(db: SqliteDb): StoreSettings {
 }
 
 export function setSettings(db: SqliteDb, patch: Partial<StoreSettings>, actor = "ผู้บริหาร", actorRole?: string | null): StoreSettings {
+  if (patch.posShortcutKeys !== undefined || patch.posRailHidden !== undefined) {
+    const previous = getSettings(db);
+    const conflicts = findPosShortcutConflicts(patch.posShortcutKeys ?? previous.posShortcutKeys, patch.posRailHidden ?? previous.posRailHidden);
+    if (conflicts.length) throw new StoreError(posShortcutConflictMessage(conflicts[0]));
+  }
   if (patch.memberNumberMode !== undefined) {
     setMemberNumberMode(db, patch.memberNumberMode);
   }

@@ -1,3 +1,4 @@
+import { parsePosShortcutKeys, getPosShortcutKey, findPosShortcutConflicts, posShortcutConflictMessage } from "@/lib/posShortcuts";
 import { BackgroundImageUpload } from "@/components/BackgroundImageUpload";
 import { FeedbackDialog } from "@/components/WorkflowDialog";
 import { notify } from "@/lib/notifications";
@@ -1150,20 +1151,20 @@ export function Settings({
     const next = new Set<string>(railHiddenFormSet);
     if (next.has(key)) next.delete(key);
     else next.add(key);
+    setShortcutKeyError(null);
     updateForm({ posRailHidden: JSON.stringify(Array.from(next)) });
   };
-  const shortcutKeyMap = useMemo(() => {
-    try {
-      const parsed: unknown = JSON.parse(form?.posShortcutKeys || "{}");
-      return parsed && typeof parsed === "object"
-        ? (parsed as Record<string, string>)
-        : {};
-    } catch {
-      return {};
-    }
-  }, [form?.posShortcutKeys]);
+  const shortcutKeyMap = useMemo(() => parsePosShortcutKeys(form?.posShortcutKeys), [form?.posShortcutKeys]);
+  const shortcutConflicts = useMemo(() => findPosShortcutConflicts(form?.posShortcutKeys, form?.posRailHidden), [form?.posShortcutKeys, form?.posRailHidden]);
+  const [shortcutKeyError, setShortcutKeyError] = useState<{action: string; message: string} | null>(null);
   const updateShortcutKey = (action: string, value: string) => {
     const next = { ...shortcutKeyMap, [action]: value.trim().toUpperCase() };
+    const conflict = findPosShortcutConflicts(JSON.stringify(next), form?.posRailHidden).find(item => item.actions.includes(action));
+    if (conflict) {
+      setShortcutKeyError({ action, message: posShortcutConflictMessage(conflict) });
+      return;
+    }
+    setShortcutKeyError(null);
     updateForm({ posShortcutKeys: JSON.stringify(next) });
   };
   const captureShortcutKey = (
@@ -1197,6 +1198,7 @@ export function Settings({
   const dirtyCount = dirtyKeys.length;
   const discardChanges = () => {
     if (!serverSettings) return;
+    setShortcutKeyError(null);
     setForm(serverSettings);
     setThresholdText(String(serverSettings.lowBalanceThreshold));
     applyThemeColor(serverSettings.appTheme); // ยกเลิกพรีวิวสีที่ยังไม่ได้บันทึก
@@ -1206,6 +1208,7 @@ export function Settings({
   const saveMutation = trpc.settings.set.useMutation({
     onSuccess: async () => {
       setError("");
+      setShortcutKeyError(null);
       setSaveReview(null);
       await Promise.all([utils.settings.get.invalidate(), utils.settings.brand.invalidate()]);
       notify.completed("บันทึกการตั้งค่าสำเร็จ", { description: "ใช้การตั้งค่าใหม่แล้ว" });
@@ -1255,6 +1258,11 @@ export function Settings({
   };
   const saveSettings = () => {
     if (!form || saveMutation.isPending || saveInFlight.current || !dirtyCount) return;
+    if (shortcutConflicts.length) {
+      setShortcutKeyError({action: shortcutConflicts[0].actions[0], message: posShortcutConflictMessage(shortcutConflicts[0])});
+      setTab("posmenu");
+      return;
+    }
     toast.dismiss();
     setSaveReview({ form: { ...form }, labels: [...dirtyKeys] });
   };
@@ -2621,10 +2629,14 @@ export function Settings({
                   </div>
                   <LayoutDashboard size={20} className="muted-icon" />
                 </div>
+                {shortcutKeyError && <div className="notice-bar error" role="alert">{shortcutKeyError.message}</div>}
+                {shortcutConflicts.map(conflict => <div key={conflict.key} className="notice-bar error" role="alert">{posShortcutConflictMessage(conflict)}</div>)}
                 <div className="pos-rail-manage-list">
                   {POS_RAIL_BUTTONS.map(button => {
                     const hidden = railHiddenFormSet.has(button.key);
                     const Icon = button.icon;
+                    const keyConflict = shortcutConflicts.find(item => item.actions.includes(button.key));
+                    const keyError = shortcutKeyError?.action === button.key ? shortcutKeyError.message : keyConflict ? posShortcutConflictMessage(keyConflict) : undefined;
                     return (
                       <div
                         className={`pos-rail-manage-row${hidden ? " off" : ""}`}
@@ -2635,7 +2647,7 @@ export function Settings({
                         </span>
                         <div>
                           <b>
-                            {button.label} {(shortcutKeyMap[button.key] ?? button.kbd) && <kbd>{shortcutKeyMap[button.key] ?? button.kbd}</kbd>}
+                            {button.label} {getPosShortcutKey(shortcutKeyMap, button.key, button.kbd) && <kbd>{getPosShortcutKey(shortcutKeyMap, button.key, button.kbd)}</kbd>}
                           </b>
                           <small>{button.detail}</small>
                         </div>
@@ -2644,13 +2656,15 @@ export function Settings({
                             type="button"
                             className="pos-rail-key-input"
                             aria-label={`ปุ่มลัด${button.label}`}
+                            aria-invalid={!!keyError}
+                            aria-describedby={keyError ? `shortcut-error-${button.key}` : undefined}
                             onKeyDown={event =>
                               captureShortcutKey(button.key, event)
                             }
                             disabled={!form || hidden}
                             title="กดปุ่มนี้ แล้วกดคีย์บนคีย์บอร์ดที่ต้องการ"
                           >
-                            {(shortcutKeyMap[button.key] ?? button.kbd) || "ตั้งปุ่ม"}
+                            {getPosShortcutKey(shortcutKeyMap, button.key, button.kbd) || "ตั้งปุ่ม"}
                           </button>
                           <button
                             className={`toggle ${!hidden ? "on" : ""}`}
@@ -2666,6 +2680,7 @@ export function Settings({
                             <span />
                           </button>
                         </div>
+                        {keyError && <small id={`shortcut-error-${button.key}`} className="pos-shortcut-error">{keyError}</small>}
                       </div>
                     );
                   })}
