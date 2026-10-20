@@ -1,9 +1,9 @@
 import { WorkflowDialog } from "./WorkflowDialog";
 import { useEffect, useMemo, useState } from "react";
-import html2canvas from "html2canvas";
+import { captureMemberCard } from "@/lib/captureMemberCard";
 import { jsPDF } from "jspdf";
 import QRCode from "qrcode";
-import { Barcode, CreditCard, Download, FileImage, LayoutGrid, Printer, QrCode as QrIcon, ScanLine, ShieldAlert, UserCheck, X } from "@/lib/icons";
+import { CreditCard, Download, FileImage, LayoutGrid, Printer, QrCode as QrIcon, ScanLine, ShieldAlert, UserCheck, X } from "@/lib/icons";
 import { money } from "../pages/pageData";
 import { code128DataUrl } from "../barcode";
 import { MemberAvatar } from "./MemberAvatar";
@@ -83,47 +83,27 @@ export function MemberCardArt({
   /** true = "ณ ตอนสแกนบัตร" (used in confirmForBill mode). */
   footnoteAtScan?: boolean;
 }) {
-  const barcodeDataUrl = code128DataUrl(member.memberNumber, { height: 54, moduleWidth: 2, padding: 10 });
-  const displayName = [member.prename?.trim() || "", member.firstName, member.lastName].filter(Boolean).join(" ");
-  // Round 43 (บั๊กชื่อถูกตัด) — ชื่อยาวย่อฟอนต์เป็นขั้น และรับ 2 บรรทัดได้ใน CSS
-  const nameLength = displayName.length;
-  const nameFit = nameLength > 36 ? " fit-xs" : nameLength > 26 ? " fit-sm" : "";
-  return (
-    <div className="member-card member-card-document" id={id}>
-      <div className="member-card-top">
-        <div className="member-card-brand">{brandLogo ? <img className="brand-logo member-card-logo" src={brandLogo} alt={brandName} /> : <span>{brandInitial(brandName)}</span>}<div><b>{brandName}</b><small>Welfare Store</small></div></div>
-        <span className="member-card-type">{member.type}</span>
-      </div>
-      <div className="member-card-body">
-        <div className="member-card-photo">
-          <MemberAvatar member={member} size={60} rounded={false} />
-        </div>
-        <div className="member-card-identity">
-          <div className={`member-card-name${nameFit}`}>{displayName}</div>
-          <div className="member-card-number">{member.memberNumber}</div>{member.cardNumber ? <div className="member-card-patient">{`บัตร ${member.cardNumber}${member.patientCode ? ` · HN ${member.patientCode}` : ""}`}</div> : null}
-          <div className="member-card-meta">
-            {member.createdAt ? <span>สมัครเมื่อ {formatCardDate(member.createdAt)}</span> : <span className="now">พร้อมใช้จ่ายที่เคาน์เตอร์</span>}
-            <span className={member.status === "active" ? "ok" : "suspended"}>{member.status === "active" ? "ใช้จ่ายได้ปกติ" : "ระงับการใช้จ่าย"}</span>
-          </div>
-        </div>
-      </div>
-      <div className="member-card-codes">
-        <div className="member-card-barcode">
-          {barcodeDataUrl ? <img src={barcodeDataUrl} alt={`บาร์โค้ดเลขสมาชิก ${member.memberNumber}`} /> : <span className="member-card-code-fallback">—</span>}
-          <small><Barcode size={12} /> บาร์โค้ด</small>
-        </div>
-        <div className="member-card-qr">
-          {qrDataUrl ? <img src={qrDataUrl} alt={`คิวอาร์โค้ดเลขสมาชิก ${member.memberNumber}`} /> : <span className="member-card-code-fallback"><QrIcon size={40} /></span>}
-          <small><QrIcon size={12} /> คิวอาร์โค้ด</small>
-        </div>
-      </div>
-      {/* P0-UX-02 (owner rule) — ห้ามพิมพ์ยอดคงเหลือติดบัตรถาวร เพราะยอดเปลี่ยนทุกครั้งที่ซื้อ/เติม/ถอน
-          และทำให้สมาชิกเข้าใจผิด ยอดคงเหลือแสดงเฉพาะในหน้าจอ POS/บัตร modal ไม่พิมพ์บนบัตร */}
-      <div className="member-card-foot">
-        <small>ยื่นบัตรนี้ให้สแกน หรือแจ้งหมายเลขสมาชิก ที่เคาน์เตอร์เพื่อใช้ยอดเงินสวัสดิการ</small>
-      </div>
+  const barcodeDataUrl = code128DataUrl(member.memberNumber, { height: 64, moduleWidth: 3, padding: 30, showLabel: false });
+  const displayName = [member.prename?.trim(), member.firstName, member.lastName].filter(Boolean).join(" ");
+  return <div className="member-card member-card-document" id={id}>
+    <div className="wallet-art-header">
+      <div className="wallet-art-brand">{brandLogo ? <img src={brandLogo} alt="" /> : <span>{brandInitial(brandName)}</span>}<div><b>{brandName}</b><small>Welfare Store</small></div></div>
+      <span className="wallet-art-type">{member.type}</span>
     </div>
-  );
+    <div className="wallet-art-main">
+      <div className="wallet-art-photo"><MemberAvatar member={member} size={52} rounded={false} /></div>
+      <div className="wallet-art-identity">
+        <b className={`wallet-art-name${displayName.length > 32 ? " wallet-art-name-long" : ""}`}>{displayName}</b>
+        <strong className="wallet-art-number">{member.memberNumber}</strong>
+        {member.cardNumber && <span className="wallet-art-secondary">บัตร {member.cardNumber}</span>}
+        {member.patientCode && <span className="wallet-art-secondary">HN {member.patientCode}</span>}
+      </div>
+      <div className="wallet-art-qr">{qrDataUrl ? <img src={qrDataUrl} alt={`คิวอาร์โค้ดเลขสมาชิก ${member.memberNumber}`} /> : <QrIcon size={48} />}<small>สแกนสมาชิก</small></div>
+    </div>
+    <div className="wallet-art-barcode">{barcodeDataUrl && <img src={barcodeDataUrl} alt={`บาร์โค้ดเลขสมาชิก ${member.memberNumber}`} />}<small>เลขสมาชิก {member.memberNumber}</small></div>
+    {/* Permanent identification must never carry a changing wallet balance. */}
+    <div className="wallet-art-footer"><span>{member.createdAt ? `สมัครเมื่อ ${formatCardDate(member.createdAt)}` : "บัตรประจำตัวสมาชิก"}</span><b>{member.status === "active" ? "ใช้จ่ายได้ปกติ" : "ระงับการใช้จ่าย"}</b></div>
+  </div>;
 }
 
 /**
@@ -161,69 +141,54 @@ export function MemberCardModal({
   confirmHint?: string;
 }) {
   const [busy, setBusy] = useState<"" | "pdf" | "png">("");
+  const [exportError, setExportError] = useState("");
   const { brandName, brandLogo } = useBrand();
   const qrDataUrl = useQrDataUrl(member.memberNumber);
   const displayName = [member.prename?.trim() || "", member.firstName, member.lastName].filter(Boolean).join(" ");
   const suspended = member.status === "suspended";
 
-  // P0-UX-02 — จับภาพบัตรเป็น canvas (ใช้ร่วมกัน PDF + PNG) เพื่อไม่ต้อง html2canvas ซ้อหลายรอบ
-  // scale 4: 360×220 → 1440×880px (≈406 DPI เกินมาตรฐานร้านพิมพ์ 300 DPI / 1063×650px ตาม owner spec)
-  // พื้นหลังขาวสะอาด (ไม่มี #f9fbfa tint ของ UI ติดไป) + useCORS รอรูปสมาชิก/โลโก้
-  const captureCardCanvas = async (): Promise<HTMLCanvasElement | null> => {
+  // Browser-shaped Thai text and embedded fonts; one artwork for PDF and PNG at 1440 × 880 px.
+  const captureCardCanvas = async (): Promise<HTMLCanvasElement> => {
     const element = document.getElementById("member-card-capture");
-    if (!element) return null;
+    if (!element) throw new Error("ไม่พบภาพบัตรสำหรับส่งออก");
     if (document.fonts?.ready) await document.fonts.ready;
-    const { width, height } = element.getBoundingClientRect();
-    if (Math.round(width) !== 360 || Math.round(height) !== 220) {
-      console.error("Member-card capture artboard must be 360×220px", { width, height });
-      return null;
-    }
-    return html2canvas(element, {
-      scale: 4,
-      width: 360,
-      height: 220,
-      backgroundColor: "#ffffff",
-      useCORS: true,
-      logging: false,
-    });
+    return captureMemberCard(element);
   };
   // P0-UX-02 owner spec output #1 — PDF 90×55มม. print-ready (ส่งร้านพิมพ์)
   // PNG lossless (ตัด artifacts ของ JPEG บนตัวอักษร/บาร์โค้ด/QR)
   const downloadCardPdf = async () => {
-    setBusy("pdf");
+    setBusy("pdf"); setExportError("");
     try {
       const canvas = await captureCardCanvas();
-      if (!canvas) return;
       const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: [90, 55] });
       pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, 90, 55);
       pdf.save(`card-${member.memberNumber}.pdf`);
-    } finally { setBusy(""); }
+    } catch (error) { setExportError(error instanceof Error ? error.message : "ส่งออกบัตรไม่สำเร็จ"); } finally { setBusy(""); }
   };
   // P0-UX-02 owner spec output #2 — PNG ความละเอียดสูง (ส่งไลน์/ตรวจภาพ/พิมพ์ด่วน)
   // ไม่หุ้มใน PDF — เป็นไฟล์ภาพตรงๆ 1440×880px (เกินมาตรฐาน 1063×650 @ 300 DPI)
   const downloadCardPng = async () => {
-    setBusy("png");
+    setBusy("png"); setExportError("");
     try {
       const canvas = await captureCardCanvas();
-      if (!canvas) return;
       const link = document.createElement("a");
       link.href = canvas.toDataURL("image/png");
       link.download = `card-${member.memberNumber}.png`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    } finally { setBusy(""); }
+    } catch (error) { setExportError(error instanceof Error ? error.message : "ส่งออกบัตรไม่สำเร็จ"); } finally { setBusy(""); }
   };
-  return <WorkflowDialog title={confirmForBill ? "ยืนยันข้อมูลสมาชิกก่อนทำรายการ" : "บัตรสมาชิก"} onClose={onClose} className={`member-card-modal${confirmForBill ? " confirm-mode" : ""}`}>
+  return <WorkflowDialog title={confirmForBill ? "ยืนยันข้อมูลสมาชิกก่อนทำรายการ" : "บัตรสมาชิก"} onClose={onClose} busy={busy !== ""} className={`member-card-modal${confirmForBill ? " confirm-mode" : ""}`}>
     <div className="modal-heading">
       <div>
         <span className="eyebrow">{confirmForBill ? "MEMBER VERIFICATION · SCAN" : "MEMBER WALLET CARD"}</span>
         <h2>{confirmForBill ? "ยืนยันข้อมูลสมาชิก" : "บัตรสมาชิก"}</h2>
         <p>{confirmForBill
-          ? `สแกนบัตรของ ${displayName} แล้ว — เทียบชื่อ รูป เลขสมาชิก และยอดคงเหลือบนบัตรกับหน้าจอนี้ ก่อนนำไปใช้ทำรายการ`
+          ? `สแกนบัตรของ ${displayName} แล้ว — เทียบชื่อ รูป และเลขสมาชิกบนบัตรกับหน้าจอนี้ ก่อนนำไปใช้ทำรายการ`
           : `${displayName} · บัตรใช้ยืนยันตัวตนที่เคาน์เตอร์ — มีทั้งบาร์โค้ดและคิวอาร์โค้ดในใบเดียว`}</p>
       </div>
-      <button className="icon-button" onClick={onClose} aria-label="ปิดหน้าต่าง"><X size={17} /></button>
+      <button className="icon-button" onClick={onClose} disabled={busy !== ""} aria-label="ปิดหน้าต่าง"><X size={17} /></button>
     </div>
     {confirmForBill && (
       <div className={`member-verify-strip${suspended ? " suspended" : ""}`}>
@@ -246,20 +211,21 @@ export function MemberCardModal({
         <span className={`balance-status ${member.status === "active" ? "ok" : "suspended"}`}>{member.status === "active" ? "ใช้จ่ายได้ปกติ" : "ระงับการใช้จ่าย"}</span>
       </div>
     )}
-    {/* P0-3 — hidden capture host สำหรับสร้าง PDF (ใช้ html2canvas จับภาพ 90×55 มม.) */}
+    {/* Capture host shares the exact artwork used by the visible preview. */}
     {!confirmForBill && (
       <div className="member-card-capture-host" aria-hidden="true">
         <MemberCardArt member={member} brandName={brandName} brandLogo={brandLogo} qrDataUrl={qrDataUrl} id="member-card-capture" footnoteAtScan={confirmForBill} />
       </div>
     )}
     <div className="member-card-note"><CreditCard size={15} /> {confirmForBill ? "ทุกครั้งที่ยิงบัตรสมาชิก ระบบจะเด้งข้อมูลบัตรขึ้นมาให้ตรวจสอบเสมอ — ยืนยันเฉพาะเมื่อข้อมูลตรงกับลูกค้าที่ยื่นบัตรเท่านั้น" : "สมาชิกไม่มีบัญชีเข้าสู่ระบบแอป — บัตรใบนี้ใช้ระบุตัวตนที่เคาน์เตอร์ · ทุกครั้งที่สแกนบัตร พนักงานจะเห็นข้อมูลสมาชิกเพื่อยืนยันก่อนหักยอดเสมอ"}</div>
+    {exportError && <div className="notice-bar error" role="alert">{exportError}</div>}
     <div className="modal-actions">
       {confirmForBill ? <>
         <button className="outline-button" onClick={onClose}><X size={16} /> ไม่ใช่สมาชิกนี้</button>
         <button className="primary-button" disabled={busy !== ""} onClick={() => onConfirm?.()}><UserCheck size={16} /> {confirmLabel}</button>
       </> : <>
-        <button className="outline-button amber" disabled={busy !== ""} onClick={downloadCardPdf} title="ดาวน์โหลดบัตรสมาชิกเป็นไฟล์ PDF 90×55 มม. (ส่งร้านพิมพ์)"><Printer size={16} /> {busy === "pdf" ? "กำลังสร้าง PDF..." : "ดาวน์โหลด PDF"}</button>
-        <button className="outline-button" disabled={busy !== ""} onClick={downloadCardPng} title="ดาวน์โหลดบัตรเป็น PNG ความละเอียดสูง 1440×880px (ส่งไลน์/ตรวจภาพ/พิมพ์ด่วน)"><FileImage size={16} /> {busy === "png" ? "กำลังสร้าง PNG..." : "ดาวน์โหลด PNG"}</button>
+        <button className="outline-button amber" disabled={busy !== "" || !qrDataUrl} onClick={downloadCardPdf} title="ดาวน์โหลดบัตรสมาชิกเป็นไฟล์ PDF 90×55 มม. (ส่งร้านพิมพ์)"><Printer size={16} /> {busy === "pdf" ? "กำลังสร้าง PDF..." : "ดาวน์โหลด PDF"}</button>
+        <button className="outline-button" disabled={busy !== "" || !qrDataUrl} onClick={downloadCardPng} title="ดาวน์โหลดบัตรเป็น PNG ความละเอียดสูง 1440×880px (ส่งไลน์/ตรวจภาพ/พิมพ์ด่วน)"><FileImage size={16} /> {busy === "png" ? "กำลังสร้าง PNG..." : "ดาวน์โหลด PNG"}</button>
       </>}
     </div>
   </WorkflowDialog>;
@@ -280,6 +246,8 @@ export function MemberCardBatchModal({
   members: MemberCardData[];
   onClose: () => void;
 }) {
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
   const { brandName, brandLogo } = useBrand();
   const qrByMember = new Map<string, string>();
   const [qrMap, setQrMap] = useState<Map<string, string>>(qrByMember);
@@ -313,26 +281,26 @@ export function MemberCardBatchModal({
     return out.length === 0 ? [[]] : out;
   }, [members, capacity]);
 
-  return <WorkflowDialog title="พิมพ์บัตรสมาชิกหลายคนพร้อมกัน" onClose={onClose} className="member-card-modal member-card-batch-modal">
+  return <WorkflowDialog title="พิมพ์บัตรสมาชิกหลายคนพร้อมกัน" onClose={onClose} busy={exporting} className="member-card-modal member-card-batch-modal">
     <div className="modal-heading">
       <div>
         <span className="eyebrow">MEMBER CARD · BATCH PRINT</span>
         <h2>บัตรสมาชิก {members.length} ใบ</h2>
         <p>ตรวจสอบบัตรสมาชิกและดาวน์โหลด PDF</p>
       </div>
-      <button className="icon-button" onClick={onClose} aria-label="ปิดหน้าต่าง"><X size={17} /></button>
+      <button className="icon-button" disabled={exporting} onClick={onClose} aria-label="ปิดหน้าต่าง"><X size={17} /></button>
     </div>
 
     {/* P0-UX-02 part 2 — สลับโหมดพิมพ์ */}
     <div className="batch-mode-tabs" role="tablist" aria-label="เลือกโหมดพิมพ์">
-      <button type="button" role="tab" aria-selected={!sheetMode} className={`batch-mode-tab${!sheetMode ? " active" : ""}`} onClick={() => setSheetMode(false)}><Printer size={14} /> บัตรเดี่ยวต่อหน้า</button>
-      <button type="button" role="tab" aria-selected={sheetMode} className={`batch-mode-tab${sheetMode ? " active" : ""}`} onClick={() => setSheetMode(true)}><LayoutGrid size={14} /> หลายบัตรต่อแผ่น A4</button>
+      <button type="button" role="tab" aria-selected={!sheetMode} className={`batch-mode-tab${!sheetMode ? " active" : ""}`} disabled={exporting} onClick={() => setSheetMode(false)}><Printer size={14} /> บัตรเดี่ยวต่อหน้า</button>
+      <button type="button" role="tab" aria-selected={sheetMode} className={`batch-mode-tab${sheetMode ? " active" : ""}`} disabled={exporting} onClick={() => setSheetMode(true)}><LayoutGrid size={14} /> หลายบัตรต่อแผ่น A4</button>
     </div>
 
     {sheetMode ? (
       <>
         {/* A4 sheet profile editor */}
-        <div className="sheet-profile-editor">
+        <fieldset className="sheet-profile-editor" disabled={exporting} style={{ minWidth: 0 }}>
           <label className="sheet-field">
             <span>โปรไฟล์แผ่น</span>
             <select value={profile.id === "custom" ? "custom" : profile.id} onChange={(e) => pickProfileId(e.target.value)}>
@@ -353,14 +321,14 @@ export function MemberCardBatchModal({
             <label className="sheet-field"><span>Offset Y มม.</span><input type="number" step="0.1" value={profile.offsetYMm} onChange={(e) => updateProfile({ offsetYMm: Number(e.target.value) || 0 })} /></label>
           </div>
           <p className="sheet-capacity">ความจุ {capacity} ใบ/แผ่น · {members.length} ใบ → {sheetCount} แผ่น{sheetCount > 1 ? ` (แผ่นละ ${capacity})` : ""}</p>
-        </div>
+        </fieldset>
 
         <div className="member-card-note"><LayoutGrid size={15} /> พรีวิวการจัดวางบน A4 — ปรับ offset X/Y จนตรงกับกระดาพจริง · กด "พิมพ์แผ่นทดสอบ" ก่อนใช้กระดาษจริง เพื่อตรวจแนวตำแหน่งทุกช่อง</div>
 
         {/* On-screen sheet preview (scaled) */}
         <div className="sheet-preview-wrap">
           <div className="sheet-preview-scaler">
-            <div className="card-sheet-a4 preview" style={{ "--cw": `${profile.cardWmm}mm`, "--ch": `${profile.cardHmm}mm` } as React.CSSProperties}>
+            <div className="card-sheet-a4 preview" style={{ "--cw": `${profile.cardWmm}mm`, "--ch": `${profile.cardHmm}mm`, "--card-scale-x": profile.cardWmm * 96 / 25.4 / 360, "--card-scale-y": profile.cardHmm * 96 / 25.4 / 220 } as React.CSSProperties}>
               {positions.map((pos, i) => {
                 const member = sheets[0]?.[i];
                 return <div key={i} className="card-slot" style={{ left: `${pos.left}mm`, top: `${pos.top}mm`, width: `${profile.cardWmm}mm`, height: `${profile.cardHmm}mm` }}>
@@ -380,25 +348,31 @@ export function MemberCardBatchModal({
         ))}
       </div>
     )}
+    {exportError && <div className="notice-bar error" role="alert">{exportError}</div>}
     <div className="modal-actions">
-      <button className="outline-button" onClick={onClose}>ปิด</button>
-      <button className="primary-button" onClick={async () => {
-        const elements = Array.from(document.querySelectorAll<HTMLElement>(sheetMode ? '.card-sheet-print-host .card-sheet-a4' : '#member-card-batch .member-card-batch-item'));
-        const pdf = new jsPDF({ unit: 'mm', format: sheetMode ? 'a4' : [90, 55], orientation: sheetMode ? 'portrait' : 'landscape' });
-        for (let i = 0; i < elements.length; i++) {
-          const canvas = await html2canvas(elements[i], { scale: 2, backgroundColor: '#ffffff', useCORS: true });
-          if (i) pdf.addPage(sheetMode ? 'a4' : [90, 55], sheetMode ? 'portrait' : 'landscape');
-          pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, 0, sheetMode ? 210 : 90, sheetMode ? 297 : 55);
-        }
-        pdf.save('member-cards.pdf');
-      }}><Download size={16} /> ดาวน์โหลด PDF</button>
+      <button className="outline-button" disabled={exporting} onClick={onClose}>ปิด</button>
+      <button className="primary-button" disabled={exporting || members.some(member => !qrMap.has(member.memberNumber))} onClick={async () => {
+        if (exporting) return;
+        setExporting(true); setExportError("");
+        try {
+          const elements = Array.from(document.querySelectorAll<HTMLElement>(sheetMode ? '.card-sheet-print-host .member-card-document' : '#member-card-batch .member-card-document'));
+          const pdf = new jsPDF({ unit: 'mm', format: sheetMode ? 'a4' : [90, 55], orientation: sheetMode ? 'portrait' : 'landscape' });
+          for (let i = 0; i < elements.length; i++) {
+            const canvas = await captureMemberCard(elements[i]);
+            if (i && (!sheetMode || i % capacity === 0)) pdf.addPage(sheetMode ? 'a4' : [90, 55], sheetMode ? 'portrait' : 'landscape');
+            const pos = sheetMode ? positions[i % capacity] : { left: 0, top: 0 };
+            pdf.addImage(canvas.toDataURL('image/png'), 'PNG', pos.left, pos.top, sheetMode ? profile.cardWmm : 90, sheetMode ? profile.cardHmm : 55);
+          }
+          pdf.save('member-cards.pdf');
+        } catch (error) { setExportError(error instanceof Error ? error.message : 'ส่งออกบัตรไม่สำเร็จ'); } finally { setExporting(false); }
+      }}><Download size={16} /> {exporting ? 'กำลังสร้าง PDF…' : 'ดาวน์โหลด PDF'}</button>
     </div>
 
     {/* P0-UX-02 part 2 — hidden A4 sheet print host (เห็นเฉพาะตอน @media print) */}
     {sheetMode && (
       <div className="card-sheet-print-host" aria-hidden="true">
         {sheets.map((sheetMembers, sheetIdx) => (
-          <div key={sheetIdx} className="card-sheet-a4" style={{ "--cw": `${profile.cardWmm}mm`, "--ch": `${profile.cardHmm}mm` } as React.CSSProperties}>
+          <div key={sheetIdx} className="card-sheet-a4" style={{ "--cw": `${profile.cardWmm}mm`, "--ch": `${profile.cardHmm}mm`, "--card-scale-x": profile.cardWmm * 96 / 25.4 / 360, "--card-scale-y": profile.cardHmm * 96 / 25.4 / 220 } as React.CSSProperties}>
             {positions.map((pos, i) => {
               const member = sheetMembers[i];
               return <div key={i} className="card-slot" style={{ left: `${pos.left}mm`, top: `${pos.top}mm`, width: `${profile.cardWmm}mm`, height: `${profile.cardHmm}mm` }}>

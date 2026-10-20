@@ -870,3 +870,9 @@
     :root .modal-backdrop .stock-receive-modal .receive-lines-head b { white-space: normal; }
   }
 }
+
+@media screen {
+  .stock-receive-modal .receive-entry-side .receive-scan-toolbar { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .stock-receive-modal .receive-entry-side .receive-scan-toolbar > button { justify-self: start; margin: 0; }
+  .stock-receive-modal .receive-entry-side .receive-item-editor { margin-top: 16px; }
+}

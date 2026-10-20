@@ -1,0 +1,37 @@
+/* Fixed document geometry, shared by screen, PNG and PDF; independent of dashboard cards. */
+:root .member-card.member-card-document {
+  box-sizing: border-box; display: grid; grid-template-rows: 28px 84px 54px 16px; gap: 4px;
+  width: 360px; min-width: 360px; max-width: 360px; height: 220px; min-height: 220px; max-height: 220px;
+  padding: 12px; border: 1px solid #d7e5de; border-radius: 10px; background: white; color: #172f27;
+  font: 400 11px/1.4 Sarabun, Tahoma, sans-serif; letter-spacing: 0; overflow: hidden; box-shadow: none;
+}
+.member-card-document::after { display: none !important; }
+.member-card-document :is(b, strong) { font-weight: 700; }
+.member-card-document * { box-sizing: border-box; letter-spacing: 0; }
+.wallet-art-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-width: 0; }
+.wallet-art-brand { display: flex; align-items: center; gap: 7px; min-width: 0; }
+.wallet-art-brand > img, .wallet-art-brand > span { width: 26px; height: 26px; object-fit: contain; flex: 0 0 26px; }
+.wallet-art-brand > span { display: grid; place-items: center; border: 1px solid #d7e5de; border-radius: 5px; }
+.wallet-art-brand b { display: block; font-size: 11px; line-height: 15px; max-height: 30px; overflow: hidden; overflow-wrap: anywhere; }
+.wallet-art-brand small { display: block; font-size: 8px; line-height: 11px; color: #52665e; }
+.wallet-art-type { flex-shrink: 0; font-size: 9px; border: 1px solid #d7e5de; padding: 3px 8px; border-radius: 20px; }
+.wallet-art-main { display: grid; grid-template-columns: 52px minmax(0, 1fr) 58px; align-items: center; gap: 10px; }
+.wallet-art-photo { width: 52px; height: 70px; overflow: hidden; border: 1px solid #d7e5de; border-radius: 4px; background: #f8faf9; }
+.wallet-art-photo :is(.member-photo, .member-photo-blank) { display: block !important; width: 100% !important; height: 100% !important; object-fit: cover; border: 0; border-radius: 0 !important; background: transparent; }
+.wallet-art-photo :is(.member-photo, .member-photo-blank)::after { display: none !important; }
+.wallet-art-identity { min-width: 0; text-align: center; }
+.wallet-art-name { display: block; font-size: 13px; line-height: 18px; max-height: 36px; overflow: hidden; overflow-wrap: anywhere; }
+.wallet-art-name-long { font-size: 11px; line-height: 16px; max-height: 32px; }
+.wallet-art-number { display: block; font-size: 19px; line-height: 26px; overflow-wrap: anywhere; }
+.wallet-art-secondary { display: block; font-size: 9px; line-height: 12px; overflow-wrap: anywhere; }
+.wallet-art-qr { text-align: center; }
+.wallet-art-qr img { display: block; width: 54px; height: 54px; margin: auto; }
+.wallet-art-qr small { display: block; font-size: 8px; line-height: 12px; }
+.wallet-art-barcode { display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 0; border-top: 1px solid #edf2ef; padding-top: 3px; }
+.wallet-art-barcode img { display: block; max-width: 100%; width: auto; height: 38px; object-fit: contain; }
+.wallet-art-barcode small { display: block; font-size: 9px; line-height: 12px; }
+.wallet-art-footer { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 8px; line-height: 12px; color: #52665e; }
+.member-card-stage { display: flex; justify-content: center; background: #f5f8f6; padding: 18px 12px; }
+@media (max-width: 430px) { .member-card-stage { justify-content: flex-start; } }
+
+.card-slot > .member-card-document { transform: scale(var(--card-scale-x, 0.944882), var(--card-scale-y, 0.944882)); transform-origin: top left; }

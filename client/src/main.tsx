@@ -16,6 +16,7 @@ import "./styles/workspace.css";
 import "./styles/clear-palette.css";
 import "./styles/motion.css";
 import "./styles/workflows.css";
+import "./styles/member-card.css";
 
 const queryClient = new QueryClient();
 
