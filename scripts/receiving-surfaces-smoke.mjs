@@ -114,9 +114,10 @@ try {
       if(viewport.width>=1366){
         const layout=await page.$eval('.receive-split-workspace',node=>{
           const form=node.querySelector('.receive-entry-side').getBoundingClientRect(),list=node.querySelector('.receive-review-side').getBoundingClientRect();
-          return {formWidth:form.width,listWidth:list.width,aligned:Math.abs(form.top-list.top)<2,separate:list.left>=form.right};
+          return {formWidth:form.width,listWidth:list.width,listHeight:list.height,workspaceHeight:node.getBoundingClientRect().height,aligned:Math.abs(form.top-list.top)<2,separate:list.left>=form.right};
         });
         assert.equal(layout.formWidth,360);assert.ok(layout.listWidth>layout.formWidth,'Review is wider than the form');
+        assert.ok(Math.abs(layout.listHeight-layout.workspaceHeight)<2,'Review fills available height even before adding items');
         assert.ok(layout.aligned && layout.separate,'Both panes align at the top without overlap');
       }
 
@@ -129,7 +130,19 @@ try {
     await page.waitForFunction(sku=>[...document.querySelectorAll('.product-scan-option')].some(node=>node.textContent.includes(sku)),{},product.sku);
     await fill('.stock-receive-modal .member-scan-field input',product.sku);await page.keyboard.press('Enter');
     await page.waitForFunction(()=>!!document.querySelector('#receive-editor-qty:not(:disabled)'));
-    await pause(150);await fill('#receive-editor-qty',2);await fill('#receive-editor-free',1);await fill('#receive-editor-paid',10);
+    await pause(150);
+    const details=await page.$eval('.receive-entry-form .member-scan-info',node=>({name:node.querySelector('b')?.textContent,display:getComputedStyle(node).display,height:node.getBoundingClientRect().height,stock:node.querySelector('small')?.textContent}));
+    assert.ok(details.display!=='none' && details.height>20 && details.name.includes(product.name),'Selected product details are visible before queuing');
+    assert.ok(details.stock.includes(String(product.stock)),'Current stock is shown while entering receipt');
+    await page.screenshot({path:path.join(dir,`receiving-${mode}-selected.png`)});
+    await page.focus('#receive-editor-qty');await page.focus('#receive-editor-free');
+    await page.waitForFunction(()=>document.querySelector('#receive-editor-qty')?.closest('label')?.dataset.fieldCaption==='ตรวจสอบข้อมูล');
+    const aligned=await page.evaluate(()=>[['receive-editor-qty','receive-editor-free'],['receive-editor-paid','receive-editor-selling-price'],['receive-editor-lot','receive-editor-expiry']].every(pair=>{
+      const [a,b]=pair.map(id=>document.getElementById(id).getBoundingClientRect());return Math.abs(a.top-b.top)<1 && Math.abs(a.height-b.height)<1;
+    }));
+    assert.ok(aligned,'Paired controls align with mixed missing and invalid captions');
+    await page.screenshot({path:path.join(dir,`receiving-${mode}-validation.png`)});
+    await fill('#receive-editor-qty',2);await fill('#receive-editor-free',1);await fill('#receive-editor-paid',10);
     await click('เพิ่มลงรายการ','.receive-entry-form');
     await page.waitForSelector('.receive-main-row');
     await page.waitForFunction(()=>document.querySelector('.receive-form-body')?.scrollTop===0);
@@ -137,6 +150,23 @@ try {
     assert.ok((await page.$eval('.receive-simple-table',e=>e.textContent)).includes(product.name));
     assert.equal(query('SELECT stock FROM products WHERE id=?',product.id).stock,product.stock,'Draft does not write stock');
     await page.screenshot({path:path.join(dir,`receiving-${mode}-draft.png`)});
+    if(mode==='page'){
+      for(let i=0;i<8;i++){
+        await fill('.stock-receive-modal .member-scan-field input',product.sku);await page.keyboard.press('Enter');
+        await page.waitForFunction(()=>!!document.querySelector('#receive-editor-qty:not(:disabled)'));
+        await pause(100);await fill('#receive-editor-qty',1);await fill('#receive-editor-paid',5);
+        await click('เพิ่มลงรายการ','.receive-entry-form');
+        await page.waitForFunction(count=>document.querySelectorAll('.receive-main-row').length===count,{},i+2);
+      }
+      const list=await page.$eval('.receive-review-side',node=>{
+        const table=node.querySelector('.receive-entry-table-wrap'),workspace=node.parentElement;
+        table.scrollTop=table.scrollHeight;
+        return {full:Math.abs(node.getBoundingClientRect().height-workspace.getBoundingClientRect().height)<2,scrollable:table.scrollHeight>table.clientHeight,scrolled:table.scrollTop>0};
+      });
+      assert.ok(list.full && list.scrollable && list.scrolled,'Many receipts scroll inside the full-height review');
+      assert.equal(query('SELECT stock FROM products WHERE id=?',product.id).stock,product.stock,'Many draft rows still write nothing');
+      await page.screenshot({path:path.join(dir,'receiving-many-rows.png')});
+    }
     await click('ยกเลิก','.stock-receive-modal > .modal-actions');
     await page.waitForSelector('.confirm-modal');
     await click('ทิ้งรายการ','.confirm-modal');

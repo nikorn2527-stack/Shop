@@ -6,7 +6,7 @@ type NewItem = {name:string;sku:string;category:string;unit:string;price:string;
 type Pricing = {previousCost:number|null;sellingPrice:number;remainingQty:number;highestRemainingCost:number|null;unknownRemainingQty:number};
 export function ReceiveEntryForm({scan, value, onChange, product, newItem, onNewChange, categories, pricing, loading, pricingError, canChangePrice, busy, onNew, onAdd, onClear}: {
   scan:ReactNode;value:Draft;onChange:(field:keyof Draft,value:string)=>void;
-  product?:{name:string;category:string;unit:string;price:number;sellMode?:string|null}|null;
+  product?:{name:string;category:string;unit:string;price:number;sellMode?:string|null;barcode?:string|null;sku?:string}|null;
   newItem?:NewItem;onNewChange:(field:keyof NewItem,value:string)=>void;categories:string[];
   pricing?:Pricing;loading:boolean;pricingError:boolean;canChangePrice:boolean;busy:boolean;
   onNew:()=>void;onAdd:()=>void;onClear:()=>void;
@@ -24,7 +24,7 @@ export function ReceiveEntryForm({scan, value, onChange, product, newItem, onNew
     <div className="receive-form-body">
     <div className="receive-form-section">
       <div className="receive-section-title"><h3>ข้อมูลสินค้า</h3>{!newItem && !product && <button type="button" className="outline-button compact" disabled={busy} onClick={onNew}>เพิ่มสินค้าใหม่</button>}{newItem && <span className="receive-new-badge">สินค้าใหม่</span>}</div>
-      {!newItem ? <>{scan}{product && <small className="receive-product-meta">{product.category} · หน่วยขาย {product.unit}</small>}</> : <div className="receive-new-fields">
+      {!newItem ? <>{scan}{product && <div className="receive-product-meta">{product.barcode && <span>บาร์โค้ด {product.barcode}</span>}<span>{product.category} · หน่วยขาย {product.unit}</span></div>}</> : <div className="receive-new-fields">
         <label>บาร์โค้ด / รหัส<input aria-label="บาร์โค้ดสินค้าใหม่" value={newItem.sku} disabled={busy} onChange={e=>onNewChange("sku",e.target.value)} placeholder="เว้นว่างเพื่อออกรหัสอัตโนมัติ" /></label>
         <label>ชื่อสินค้า *<input id="receive-new-name" aria-label="ชื่อสินค้าใหม่" value={newItem.name} disabled={busy} onChange={e=>onNewChange("name",e.target.value)} /></label>
         <div className="receive-form-pair"><label>หมวดสินค้า<select aria-label="หมวดสินค้าใหม่" value={newItem.category} disabled={busy} onChange={e=>onNewChange("category",e.target.value)}>{categories.map(c=><option key={c}>{c}</option>)}</select></label><label>หน่วยขาย<input aria-label="หน่วยขายสินค้าใหม่" value={newItem.unit} disabled={busy} onChange={e=>onNewChange("unit",e.target.value)} /></label></div>
