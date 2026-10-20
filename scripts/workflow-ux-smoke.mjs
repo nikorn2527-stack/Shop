@@ -402,10 +402,10 @@ try {
   await fill('#receive-editor-qty', 3); await fill('#receive-editor-paid', 12); await click('เพิ่มลงรายการ', '.receive-item-editor');
   await click('เพิ่มสินค้าใหม่', '.receiving-workspace'); await page.waitForSelector('.workflow-dialog input');
   const newName = 'UX receiving new product';
-  await fillLabel('ชื่อสินค้า', newName); await fillLabel('ราคาขาย', 9); await click('ใช้สินค้านี้ในรายการรับเข้า', '.workflow-dialog');
-  await page.waitForFunction(name => document.querySelector('.receive-item-editor h3')?.textContent.includes(name), {}, newName);
-  await pause(120); // Let the receive editor's delayed scan focus settle before typing amounts.
-  await fill('#receive-editor-qty', 2); await fill('#receive-editor-paid', 10); await click('เพิ่มลงรายการ', '.receive-item-editor');
+  await fillLabel('ชื่อสินค้า', newName); await fillLabel('ราคาขาย', 9);
+  await fill('.receive-new-quantity #receive-editor-qty', 2); await fill('.receive-new-quantity #receive-editor-paid', 10);
+  await click('ใช้สินค้านี้ในรายการรับเข้า', '.workflow-dialog');
+  await page.waitForFunction(name => document.querySelector('.receive-simple-table')?.textContent.includes(name), {}, newName);
   assert.equal(query('SELECT COUNT(*) n FROM products WHERE name=?', newName).n, 0, 'New product stays a draft');
   await click('บันทึกทั้งหมด', '.receiving-workspace'); await page.waitForSelector('.confirm-modal');
   assert.equal(query('SELECT stock FROM products WHERE id=?', product.id).stock, product.stock, 'No stock written before confirmation');

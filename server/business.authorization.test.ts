@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TrpcContext } from "./_core/context";
-import { createSqliteStore, ensureRbacSeed, type SqliteDb } from "./sqliteStore";
+import { createSqliteStore, createProduct, ensureRbacSeed, type SqliteDb } from "./sqliteStore";
 
 const store = vi.hoisted(() => ({ get: vi.fn() }));
 vi.mock("./welfareStore", () => ({
@@ -48,6 +48,14 @@ describe("business API permissions", () => {
       { productId: 1, purchaseQty: 1, paidAmount: 10 },
     ] })).rejects.toMatchObject({ code: "FORBIDDEN" });
     expect(db.prepare("SELECT COUNT(*) AS n FROM stock_lots").get()).toMatchObject({ n: 0 });
+  });
+
+  it("allows receiving stock but reserves receipt-time repricing for administrators", async () => {
+    const product=createProduct(db,{name:"Officer intake",price:20});
+    await expect(caller("stock_officer").stock.receiptPricing({productId:product.id})).resolves.toMatchObject({sellingPrice:20});
+    await expect(caller("stock_officer").stock.receiveBatch({entries:[{productId:product.id,purchaseQty:1,paidAmount:5,sellingPrice:25,expectedSellingPrice:20}]})).rejects.toMatchObject({code:"FORBIDDEN"});
+    expect(db.prepare("SELECT stock,price FROM products WHERE id=?").get(product.id)).toMatchObject({stock:0,price:20});
+    await expect(caller("stock_officer").stock.receiveBatch({entries:[{productId:product.id,purchaseQty:1,paidAmount:5}]})).resolves.toHaveLength(1);
   });
 
   it("allows stock officers to read inventory using their actual app role", async () => {

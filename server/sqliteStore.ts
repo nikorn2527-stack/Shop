@@ -696,6 +696,7 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
     END;`);
   // ROUND 65 (user) — จำนวนที่ "รับเข้าจริง" ของแต่ละ Lot (qty ปัจจุบันโดนหักตอนขาย
   // ไปแล้ว) ใช้คำนวณยอดยกมาของรายงานสินค้าคงคลังให้ตรงชีทโรงพยาบาล
+  ensureColumn(db, "stock_lots", "receipt_group", "TEXT");
   ensureColumn(db, "stock_lots", "received_qty", "INTEGER");
   db.prepare("UPDATE stock_lots SET received_qty = qty WHERE received_qty IS NULL").run();
   // Backfill units for sale_items rows written before the column existed (idempotent).
@@ -1581,7 +1582,8 @@ export function receiveStockLines(
     if (!lotLabel) {
       lotLabel = nextStockLotNumber(db).lot;
     }
-    const insert = db.prepare(`INSERT INTO stock_lots (product_id, lot, expiry_date, qty, cost, received_at, received_qty, received_value_satang, remaining_value_satang) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+    const receiptGroup = randomUUID();
+    const insert = db.prepare(`INSERT INTO stock_lots (product_id, lot, expiry_date, qty, cost, received_at, received_qty, received_value_satang, remaining_value_satang, receipt_group) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
     let valueRemaining = BigInt(receiptValue);
     let qtyRemaining = totalQty;
     const lots = parsed.map((line) => {
@@ -1589,7 +1591,7 @@ export function receiveStockLines(
       const value = Number(allocation.issuedValueSatang);
       valueRemaining = allocation.remainingValueSatang;
       qtyRemaining = allocation.remainingQuantity;
-      const result = insert.run(input.productId, lotLabel, input.expiryDate || null, line.qty, line.cost ?? previousCost, createdAt, line.qty, value, value);
+      const result = insert.run(input.productId, lotLabel, input.expiryDate || null, line.qty, line.cost ?? previousCost, createdAt, line.qty, value, value, receiptGroup);
       return { id: Number(result.lastInsertRowid), productId: input.productId, lot: lotLabel, expiry: input.expiryDate || null, qty: line.qty, cost: line.cost ?? previousCost, receivedAt: createdAt };
     });
     db.prepare(`UPDATE products SET stock = stock + ?, cost = ? WHERE id = ?`).run(totalQty, averageCost, input.productId);
@@ -1606,7 +1608,25 @@ export function receiveStockLines(
   return insideTransaction ? writeReceipt() : runInTransaction(db, writeReceipt);
 }
 
+/** Last actual receipt cost, including free units; opening/import estimates are not receipt costs. */
+export function stockReceiptPricing(db: SqliteDb, productId: number) {
+  const product = getProductById(db, productId);
+  if (!product) throw new StoreError("ไม่พบสินค้า");
+  const latest = db.prepare(`SELECT l.lot, l.received_at AS receivedAt, l.receipt_group AS receiptGroup FROM stock_lots l
+    WHERE l.product_id = ? AND EXISTS (SELECT 1 FROM stock_movements m WHERE m.type='RECEIVE' AND m.ref_type='stock_lot' AND m.ref_id=l.id)
+    ORDER BY l.received_at DESC, l.id DESC LIMIT 1`).get(productId) as {lot:string;receivedAt:string;receiptGroup:string|null} | undefined;
+  const receipt = latest ? db.prepare(`SELECT SUM(received_qty) qty, SUM(received_value_satang) value,
+    SUM(CASE WHEN received_qty IS NULL OR received_value_satang IS NULL THEN 1 ELSE 0 END) unknown
+    FROM stock_lots WHERE product_id=? AND ((? IS NOT NULL AND receipt_group=?) OR (? IS NULL AND lot=? AND received_at=?))`).get(productId,latest.receiptGroup,latest.receiptGroup,latest.receiptGroup,latest.lot,latest.receivedAt) as {qty:number|null;value:number|null;unknown:number} : undefined;
+  const inventory = db.prepare(`SELECT MAX(CASE WHEN qty>0 AND remaining_value_satang IS NOT NULL THEN remaining_value_satang/100.0/qty ELSE NULL END) highestCost,
+    SUM(CASE WHEN qty>0 AND remaining_value_satang IS NULL THEN qty ELSE 0 END) unknownQty FROM stock_lots WHERE product_id=?`).get(productId) as {highestCost:number|null;unknownQty:number|null};
+  return {productId, sellingPrice:product.price, remainingQty:product.stock, previousCost:receipt && !receipt.unknown && receipt.qty && receipt.value !== null ? receipt.value/100/receipt.qty : null,
+    previousLot:latest?.lot ?? null, previousReceivedAt:latest?.receivedAt ?? null, highestRemainingCost:inventory.highestCost, unknownRemainingQty:inventory.unknownQty ?? 0};
+}
+
 export type StockIntakeEntry = {
+  sellingPrice?: number;
+  expectedSellingPrice?: number;
   productId?: number;
   newProduct?: CreateProductInput;
   purchaseQty: number;
@@ -1619,14 +1639,35 @@ export type StockIntakeEntry = {
 /** Create catalog entries and their receipts together, or roll back the entire intake. */
 export function receiveStockBatch(db: SqliteDb, entries: StockIntakeEntry[], actor: string, actorRole?: string) {
   if (entries.length === 0 || entries.length > 200) throw new StoreError("จำนวนรายการรับเข้าต้องอยู่ระหว่าง 1–200 รายการ");
-  return runInTransaction(db, () => entries.map((entry) => {
-    if (Boolean(entry.productId) === Boolean(entry.newProduct)) throw new StoreError("เลือกรายการสินค้าเดิมหรือสินค้าใหม่อย่างใดอย่างหนึ่ง");
-    if (!Number.isInteger(entry.purchaseQty) || entry.purchaseQty <= 0 || !Number.isInteger(entry.freeQty ?? 0) || (entry.freeQty ?? 0) < 0 || !Number.isFinite(entry.paidAmount) || entry.paidAmount < 0) throw new StoreError("จำนวนรับเข้าหรือยอดจ่ายไม่ถูกต้อง");
-    if (entry.newProduct?.stock) throw new StoreError("สินค้าใหม่ต้องไม่มีสต็อกตั้งต้นในรายการรับเข้า");
-    if (entry.newProduct?.barcode?.trim() && db.prepare("SELECT id FROM products WHERE barcode = ? OR sku = ?").get(entry.newProduct.barcode.trim(), entry.newProduct.barcode.trim())) throw new StoreError("บาร์โค้ดนี้มีสินค้าอยู่แล้ว กรุณาเลือกสินค้าเดิม");
-    const productId = entry.newProduct ? createProduct(db, { ...entry.newProduct, stock: 0, actor, actorRole }).id : entry.productId!;
-    return receiveStockLines(db, { productId, lot: entry.lot, expiryDate: entry.expiryDate, paidAmount: entry.paidAmount, actor, actorRole, lines: [{ qty: entry.purchaseQty, cost: entry.paidAmount / entry.purchaseQty }, ...((entry.freeQty ?? 0) > 0 ? [{ qty: entry.freeQty!, cost: 0 }] : [])] }, true);
-  }));
+  return runInTransaction(db, () => {
+    const changes = new Map<number, number>();
+    for (const entry of entries) if (entry.sellingPrice !== undefined) {
+      if (!entry.productId || entry.newProduct || !Number.isFinite(entry.sellingPrice) || entry.sellingPrice < 0 || entry.expectedSellingPrice === undefined || !Number.isFinite(entry.expectedSellingPrice)) throw new StoreError("ข้อมูลปรับราคาขายไม่ถูกต้อง");
+      const product = getProductById(db, entry.productId);
+      if (!product || product.price !== entry.expectedSellingPrice) throw new StoreError("ราคาขายเปลี่ยนระหว่างทำรายการ กรุณาโหลดสินค้าใหม่และตรวจราคาก่อนยืนยัน");
+      if (product.sellMode === "money") throw new StoreError("สินค้าขายตามช่องราคาต้องปรับราคาที่ข้อมูลสินค้า");
+      const price = round2(entry.sellingPrice);
+      if (changes.has(entry.productId) && changes.get(entry.productId) !== price) throw new StoreError("สินค้าเดียวกันระบุราคาขายใหม่ไม่ตรงกัน กรุณาตรวจรายการรับเข้า");
+      changes.set(entry.productId, price);
+    }
+    const results = entries.map((entry) => {
+      if (Boolean(entry.productId) === Boolean(entry.newProduct)) throw new StoreError("เลือกรายการสินค้าเดิมหรือสินค้าใหม่อย่างใดอย่างหนึ่ง");
+      if (!Number.isInteger(entry.purchaseQty) || entry.purchaseQty <= 0 || !Number.isInteger(entry.freeQty ?? 0) || (entry.freeQty ?? 0) < 0 || !Number.isFinite(entry.paidAmount) || entry.paidAmount < 0) throw new StoreError("จำนวนรับเข้าหรือยอดจ่ายไม่ถูกต้อง");
+      if (entry.newProduct?.stock) throw new StoreError("สินค้าใหม่ต้องไม่มีสต็อกตั้งต้นในรายการรับเข้า");
+      if (entry.newProduct?.barcode?.trim() && db.prepare("SELECT id FROM products WHERE barcode = ? OR sku = ?").get(entry.newProduct.barcode.trim(), entry.newProduct.barcode.trim())) throw new StoreError("บาร์โค้ดนี้มีสินค้าอยู่แล้ว กรุณาเลือกสินค้าเดิม");
+      const productId = entry.newProduct ? createProduct(db, { ...entry.newProduct, stock: 0, actor, actorRole }).id : entry.productId!;
+      return receiveStockLines(db, { productId, lot: entry.lot, expiryDate: entry.expiryDate, paidAmount: entry.paidAmount, actor, actorRole, lines: [{ qty: entry.purchaseQty, cost: entry.paidAmount / entry.purchaseQty }, ...((entry.freeQty ?? 0) > 0 ? [{ qty: entry.freeQty!, cost: 0 }] : [])] }, true);
+      });
+    for (const [productId, price] of Array.from(changes)) {
+      const product = getProductById(db,productId)!;
+      if (product.price !== price) {
+        db.prepare("UPDATE products SET price=? WHERE id=?").run(price,productId);
+        logAction(db,"ปรับราคาขายตอนรับเข้า",actor,`${product.sku} · ${product.name} · ${money(product.price)} → ${money(price)} · ใช้กับสินค้าคงเหลือทั้งหมด`,"blue",actorRole ?? null,formatDateTime());
+      }
+    }
+    for (const result of results) if (changes.has(result.product.id)) result.product = getProductById(db,result.product.id)!;
+    return results;
+  });
 }
 
 export function receiveStock(

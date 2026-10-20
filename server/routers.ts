@@ -79,6 +79,7 @@ import {
   stockBalanceReport,
   receiveStockLines,
   receiveStockBatch,
+  stockReceiptPricing,
   registerLoginFailure,
   registerMember,
   revokeAppSession,
@@ -986,14 +987,16 @@ export const appRouter = router({
       requireLogin(ctx);
       return nextStockLotNumber(getWelfareDb());
     })),
+    receiptPricing: permissionProcedure("STOCK.VIEW").input(z.object({productId:z.number().int().positive()})).query(({input}) => withStoreErrors(() => stockReceiptPricing(getWelfareDb(),input.productId))),
     receiveBatch: permissionProcedure("STOCK.RECEIVE").input(z.object({ entries: z.array(z.object({
       productId: z.number().int().positive().optional(),
+      sellingPrice: z.number().min(0).optional(), expectedSellingPrice: z.number().min(0).optional(),
       newProduct: productCreateInput.optional(),
       purchaseQty: z.number().int().positive(), freeQty: z.number().int().min(0).optional(),
       paidAmount: z.number().min(0), lot: z.string().optional(), expiryDate: z.string().nullish(),
     })).min(1).max(200) })).mutation(({ ctx, input }) => withStoreErrors(() => {
       requireLogin(ctx);
-      if (input.entries.some(entry => entry.newProduct)) requireAdmin(ctx, "การสร้างสินค้าต้องใช้สิทธิ์ผู้บริหาร");
+      if (input.entries.some(entry => entry.newProduct || entry.sellingPrice !== undefined)) requireAdmin(ctx, "การสร้างสินค้าหรือปรับราคาขายต้องใช้สิทธิ์ผู้บริหาร");
       const { actor, actorRole } = resolveActor(ctx, {});
       return receiveStockBatch(getWelfareDb(), input.entries, actor, actorRole);
     })),

@@ -33,3 +33,40 @@
   :root:root .stock-receive-modal.receiving-workspace .receive-simple-table th:nth-child(7) { width: 11%; }
   @media (max-width: 600px) { :root:root .stock-receive-modal.receiving-workspace { padding: 14px; } }
 }
+@media screen {
+  /* Review every receipt across the full workspace width instead of a narrow right pane. */
+  :root:root .stock-receive-modal.receiving-workspace > .receive-split-workspace { grid-template-columns: minmax(0,1fr); align-content: start; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-entry-side { display: grid; grid-template-columns: minmax(260px,.8fr) minmax(0,1.2fr); gap: 20px; align-items: start; overflow: visible; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-item-editor { margin-top: 0; }
+  .receive-price-context { grid-column: 1/-1; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 8px; padding: 10px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; }
+  .receive-price-context :is(b,small) { display: block; overflow-wrap: anywhere; }
+  .receive-price-context small { font-size: 11px; color: #64748b; }
+  .receive-price-context b { margin: 3px 0; font-size: 13px; }
+  .receive-price-warning { grid-column: 1/-1; margin: 0; padding: 10px; border: 1px solid #fcd34d; border-radius: 8px; color: #92400e; background: #fffbeb; font-size: 12px; }
+  .receive-new-quantity { padding: 12px; margin: 16px 0; border: 1px solid #e2e8f0; border-radius: 10px; background: #f8fafc; }
+  .receive-new-quantity .receive-item-editor { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px 12px; }
+  .receive-new-quantity .receive-item-editor h3 { grid-column: 1/-1; margin: 0; font-size: 14px; }
+  .receive-new-quantity label { display: grid; gap: 5px; min-width: 0; }
+  .receive-new-quantity input { width: 100%; min-width: 0; min-height: 40px; box-sizing: border-box; padding: 8px; border: 1px solid #cbd5e1; border-radius: 8px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-simple-table { min-width: 980px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-simple-table th:nth-child(1) { width: 16%; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-simple-table th:nth-child(2), :root:root .stock-receive-modal.receiving-workspace .receive-simple-table th:nth-child(3) { width: 5%; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-simple-table th:nth-child(4) { width: 9%; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-simple-table th:nth-child(5), :root:root .stock-receive-modal.receiving-workspace .receive-simple-table th:nth-child(6) { width: 10%; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-simple-table th:nth-child(7), :root:root .stock-receive-modal.receiving-workspace .receive-simple-table th:nth-child(9) { width: 9%; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-simple-table th:nth-child(10) { width: 11%; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-simple-table td { white-space: nowrap; padding: 10px 6px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-simple-table td:first-child { overflow: hidden; text-overflow: ellipsis; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-simple-table td:first-child small { display: block; font-size: 10px; color: #64748b; }
+  .receive-price-changed { display: block; font-size: 10px; color: #9a3412; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-row-actions { gap: 4px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-row-actions .outline-button { padding: 6px; min-height: 32px; font-size: 11px; }
+  @media(max-width:999px) { :root:root .stock-receive-modal.receiving-workspace .receive-entry-side { grid-template-columns: minmax(0,1fr); } }
+  @media(max-width:600px) { .receive-price-context { grid-template-columns: minmax(0,1fr); } .receive-new-quantity .receive-item-editor { grid-template-columns: repeat(2,minmax(0,1fr)); } }
+}
+
+@media screen {
+  :root:root .stock-receive-modal.receiving-workspace .receive-simple-table th:nth-child(8) { width: 16%; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-simple-table th:nth-child(9), :root:root .stock-receive-modal.receiving-workspace .receive-simple-table th:nth-child(10) { width: 10%; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-simple-table td:nth-child(8) { font-size: 10px; }
+}

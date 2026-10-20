@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createSqliteStore, createProduct, receiveStockBatch, stockReceiptHistory, updateProduct } from "./sqliteStore";
+import { createSqliteStore, createProduct, receiveStockBatch, stockReceiptHistory, updateProduct, stockReceiptPricing, checkout } from "./sqliteStore";
 
 describe("unified stock intake", () => {
   it("rejects non-finite prices/costs and invalid reorder points before writing", () => {
@@ -60,5 +60,58 @@ describe("unified stock intake", () => {
       expect(() => receiveStockBatch(db, [{ newProduct: { name: "Fraction", sku: "FRACTION", price: 20 }, purchaseQty: 1.5, paidAmount: 1 }], "Operator")).toThrow();
       expect(db.prepare("SELECT id FROM products WHERE sku IN ('BAR-NEW', 'FRACTION')").all()).toHaveLength(0);
     } finally { db.close(); }
+  });
+});
+describe("receipt price context and atomic repricing", () => {
+  it("uses the last actual receipt including free units, and distinguishes unknown from documented zero cost", () => {
+    const db=createSqliteStore();
+    try {
+      const p=createProduct(db,{name:"Previous cost",price:20,cost:99});
+      expect(stockReceiptPricing(db,p.id).previousCost).toBeNull();
+      receiveStockBatch(db,[{productId:p.id,purchaseQty:10,freeQty:2,paidAmount:60,lot:"FIRST"}],"Receiver");
+      expect(stockReceiptPricing(db,p.id)).toMatchObject({previousCost:5,previousLot:"FIRST",sellingPrice:20,highestRemainingCost:5});
+      receiveStockBatch(db,[{productId:p.id,purchaseQty:2,paidAmount:18,lot:"NEXT"}],"Receiver");
+      expect(stockReceiptPricing(db,p.id)).toMatchObject({previousCost:9,previousLot:"NEXT"});
+      receiveStockBatch(db,[{productId:p.id,purchaseQty:1,paidAmount:0,lot:"FREE"}],"Receiver");
+      expect(stockReceiptPricing(db,p.id).previousCost).toBe(0);
+    } finally {db.close();}
+  });
+  it.each([25,12])("reprices future sales to %s while retaining old sale prices, exact costs and allocations", newPrice => {
+    const db=createSqliteStore();
+    try {
+      const p=createProduct(db,{name:"Reprice",price:20});
+      receiveStockBatch(db,[{productId:p.id,purchaseQty:10,paidAmount:80,lot:"OLD",expiryDate:"2030-01-01"}],"Receiver");
+      checkout(db,{items:[{productId:p.id,qty:2}],paymentMethod:"เงินสด"});
+      const oldItems=db.prepare("SELECT * FROM sale_items").all();
+      const allocations=db.prepare("SELECT * FROM sale_lot_allocations").all();
+      const results=receiveStockBatch(db,[{productId:p.id,purchaseQty:5,freeQty:1,paidAmount:60,lot:"NEW",expiryDate:"2031-01-01",sellingPrice:newPrice,expectedSellingPrice:20}],"Receiver");
+      expect(results[0].product).toMatchObject({price:newPrice,stock:14});
+      expect(db.prepare("SELECT * FROM sale_items").all()).toEqual(oldItems);
+      expect(db.prepare("SELECT * FROM sale_lot_allocations").all()).toEqual(allocations);
+      checkout(db,{items:[{productId:p.id,qty:1}],paymentMethod:"เงินสด"});
+      expect(db.prepare("SELECT price,cost_total_satang AS cost FROM sale_items ORDER BY id DESC LIMIT 1").get()).toMatchObject({price:newPrice,cost:800});
+      expect(db.prepare("SELECT detail FROM audit_logs WHERE action='ปรับราคาขายตอนรับเข้า'").get()).toBeDefined();
+    } finally {db.close();}
+  });
+  it("distinguishes repeated manual lot numbers received within the same second", () => {
+    const db=createSqliteStore();try {
+      const p=createProduct(db,{name:"Shared lot label",price:20});
+      receiveStockBatch(db,[{productId:p.id,purchaseQty:10,freeQty:2,paidAmount:60,lot:"SAME"},{productId:p.id,purchaseQty:1,paidAmount:9,lot:"SAME"}],"Receiver");
+      expect(stockReceiptPricing(db,p.id)).toMatchObject({previousCost:9,previousLot:"SAME"});
+    } finally {db.close();}
+  });
+  it("rolls back stock, new products and prices on stale/conflicting price drafts or a bad receipt", () => {
+    const db=createSqliteStore();
+    try {
+      const p=createProduct(db,{name:"Atomic price",price:20});
+      const entry={productId:p.id,purchaseQty:2,paidAmount:10,sellingPrice:25,expectedSellingPrice:20};
+      const before=db.prepare("SELECT stock,price FROM products WHERE id=?").get(p.id);
+      expect(()=>receiveStockBatch(db,[entry,{productId:999999,purchaseQty:1,paidAmount:1}],"Receiver")).toThrow();
+      expect(()=>receiveStockBatch(db,[entry,{...entry,sellingPrice:26}],"Receiver")).toThrow(/ไม่ตรงกัน/);
+      expect(()=>receiveStockBatch(db,[{newProduct:{name:"No phantom",sku:"PHANTOM",price:10},purchaseQty:1,paidAmount:1},{...entry,expectedSellingPrice:19}],"Receiver")).toThrow(/ราคาขายเปลี่ยน/);
+      expect(db.prepare("SELECT stock,price FROM products WHERE id=?").get(p.id)).toEqual(before);
+      expect(db.prepare("SELECT id FROM products WHERE sku='PHANTOM'").get()).toBeUndefined();
+      expect(db.prepare("SELECT COUNT(*) n FROM stock_lots").get()).toMatchObject({n:0});
+    } finally {db.close();}
   });
 });
