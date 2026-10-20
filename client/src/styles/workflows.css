@@ -291,3 +291,29 @@
   .bulk-price-file-upload small { color: #64748b; }
   .bulk-price-file-upload p { flex-basis: 100%; margin: 0; color: #334155; font-size: 13px; }
 }
+
+@media screen {
+  :root:root #tx-report > .tx-report-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin: 0 0 12px; padding: 10px; background: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 10px; }
+  :root:root #tx-report .tx-report-toolbar > .report-filter-bar { display: flex; flex: 1 1 auto; flex-direction: row; align-items: center; flex-wrap: wrap; gap: 8px 12px; min-width: 0; margin: 0; padding: 0; border: 0; background: transparent; }
+  :root:root #tx-report .tx-report-toolbar .report-range-row { flex: 0 1 auto; margin: 0; }
+  :root:root #tx-report .tx-report-toolbar .tx-filter-row { display: flex; flex: 1 1 auto; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
+  :root:root #tx-report .tx-report-toolbar .tx-export-toolbar { display: flex; flex: 0 1 auto; flex-wrap: wrap; justify-content: flex-end; gap: 6px; width: auto; margin: 0 0 0 auto; padding: 0; border: 0; }
+  :root:root #tx-report .tx-type-trigger { display: inline-flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 145px; min-height: 36px; margin-left: auto; padding: 6px 10px; border-radius: 8px; white-space: nowrap; }
+  :root:root #tx-report .tx-report-toolbar .report-period-pills { gap: 5px; }
+  :root:root #tx-report .tx-report-toolbar .report-period-pills button,
+  :root:root #tx-report .tx-report-toolbar .export-btn { min-height: 36px; padding: 6px 9px; white-space: nowrap; }
+  .tx-type-menu { width: 224px; max-width: calc(100vw - 24px); padding: 6px; background: #fff; color: #334155; border: 1px solid #cbd5e1; border-radius: 10px; }
+  .tx-type-menu [role="menuitemcheckbox"] { min-height: 36px; font-size: 13px; cursor: pointer; }
+  .tx-type-menu [data-state="checked"] { background: #fff7ed; color: #9a3412; }
+  @media (max-width: 600px) {
+    :root:root #tx-report .tx-report-toolbar > .report-filter-bar { flex-basis: 100%; }
+    :root:root #tx-report .tx-report-toolbar .tx-export-toolbar { flex-basis: 100%; justify-content: flex-start; }
+    :root:root #tx-report .tx-type-trigger { margin-left: 0; }
+  }
+}
+
+@media screen {
+  :root:root .report-filter-bar .thai-date-range-picker { margin-top: 0; }
+  :root:root #tx-report .tx-report-toolbar .tx-date-range { padding: 0; border: 0; background: transparent; }
+  :root:root #tx-report .tx-report-toolbar .thai-date-range-field { height: 36px; min-height: 36px; padding: 6px 28px 6px 10px; }
+}

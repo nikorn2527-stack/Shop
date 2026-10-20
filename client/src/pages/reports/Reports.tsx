@@ -1,3 +1,4 @@
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { notify } from "@/lib/notifications";
 import { SharedSearch } from "@/components/SharedSearch";
 /**
@@ -322,8 +323,8 @@ export function Reports({
   });
   const pickRangeChip = (mode: ReportRangeMode) => {
     if (mode === "custom") {
-      setRangeFrom("");
-      setRangeTo("");
+      setRangeFrom(effectiveFrom);
+      setRangeTo(effectiveTo);
       setRangeMode("custom");
       return;
     }
@@ -1732,15 +1733,13 @@ export function Reports({
                       </button>
                     ))}
                   </div>
-                  {rangeMode === "custom" && (
-                    <ThaiDateRangePicker
+                  <ThaiDateRangePicker
                       className="range-picker report-custom-picker"
-                      from={rangeFrom}
-                      to={rangeTo}
-                      onChange={(nextFrom, nextTo) => { setRangeFrom(nextFrom); setRangeTo(nextTo); }}
+                      from={effectiveFrom}
+                      to={effectiveTo}
+                      onChange={(nextFrom, nextTo) => { setRangeMode("custom"); setRangeFrom(nextFrom); setRangeTo(nextTo); }}
                       ariaLabel="กำหนดช่วงวันที่รายงานยอดขาย"
                     />
-                  )}
                   <div className="report-staff-multi" style={{ position: "relative" }}>
                     <button
                       type="button"
@@ -2727,7 +2726,7 @@ export function Reports({
           )}
           {reportTab === "transactions" && (
             <section className="panel table-panel" id="tx-report">
-              {/* Keep filters together; export actions have their own toolbar below. */}
+              <div className="tx-report-toolbar">
               <div className="report-filter-bar">
                 <div className="report-range-row report-filter-row-main">
                   <div
@@ -2753,13 +2752,13 @@ export function Reports({
                       </button>
                     ))}
                   </div>
-                  {txCustomRange && <ThaiDateRangePicker
+                  <ThaiDateRangePicker
                     className="tx-date-range"
                     from={txFrom}
                     to={txTo}
-                    onChange={(nextFrom, nextTo) => { setTxFrom(nextFrom); setTxTo(nextTo); }}
+                    onChange={(nextFrom, nextTo) => { setTxCustomRange(true); setTxFrom(nextFrom); setTxTo(nextTo); }}
                     ariaLabel="ช่วงวันที่ของธุรกรรม"
-                  />}
+                  />
                 </div>
                 <div className="report-filter-row-main tx-filter-row">
                   <MemberScanPicker
@@ -2769,49 +2768,19 @@ export function Reports({
                     placeholder="กรองตามสมาชิก — คีย์เลขสมาชิก หรือยิงบาร์โค้ด"
                     inputId="tx-member-filter-input"
                   />
-                  <div
-                    className="tx-type-pills"
-                    role="group"
-                    aria-label="กรองตามประเภทธุรกรรม — กดได้หลายประเภทพร้อมกัน"
-                  >
-                    <button
-                      type="button"
-                      className={txTypes.length === 0 ? "active" : ""}
-                      onClick={() => setTxTypes([])}
-                      title="แสดงทุกประเภทธุรกรรม"
-                    >
-                      ทั้งหมด
-                    </button>
-                    {(
-                      [
-                        ["purchase", "ใช้จ่าย"],
-                        ["deposit", "เติมเงิน"],
-                        ["withdrawal", "ถอนเงิน"],
-                        ["activation", "เปิดใช้บัตร"],
-                        ["refund", "คืนบัตรเงินสด"],
-                      ] as const
-                    ).map(([value, label]) => (
-                      <button
-                        type="button"
-                        key={value}
-                        aria-pressed={txTypes.includes(value)}
-                        className={txTypes.includes(value) ? "active" : ""}
-                        onClick={() => toggleTxType(value)}
-                        title={
-                          txTypes.includes(value)
-                            ? `กดอีกครั้งเพื่อถอน “${label}” ออกจากตัวกรอง`
-                            : `เพิ่ม “${label}” เข้าตัวกรอง — เลือกหลายประเภทพร้อมกันได้`
-                        }
-                      >
-                        {label}
-                        {txTypes.includes(value) && (
-                          <i className="pill-check" aria-hidden="true">
-                            ✓
-                          </i>
-                        )}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button type="button" className="outline-button tx-type-trigger" aria-label={`ประเภทธุรกรรม: ${txTypes.length ? txTypes.map(type => TX_TYPE_LABEL[type]).join(" / ") : "ทั้งหมด"}`} title={txTypes.length ? txTypes.map(type => TX_TYPE_LABEL[type]).join(" / ") : "ทุกประเภทธุรกรรม"}>
+                        <span>{txTypes.length === 0 ? "ทั้งหมด" : txTypes.length === 1 ? TX_TYPE_LABEL[txTypes[0]] : `เลือก ${txTypes.length} ประเภท`}</span>
+                        <ChevronDown size={14} />
                       </button>
-                    ))}
-                  </div>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="tx-type-menu" aria-label="ประเภทธุรกรรม (เลือกได้หลายประเภท)">
+                      <DropdownMenuCheckboxItem checked={txTypes.length === 0} onCheckedChange={() => setTxTypes([])} onSelect={event => event.preventDefault()}>ทั้งหมด</DropdownMenuCheckboxItem>
+                      <DropdownMenuSeparator />
+                      {(["purchase", "deposit", "withdrawal", "activation", "refund"] as const).map(value => <DropdownMenuCheckboxItem key={value} checked={txTypes.includes(value)} onCheckedChange={() => toggleTxType(value)} onSelect={event => event.preventDefault()}>{TX_TYPE_LABEL[value]}</DropdownMenuCheckboxItem>)}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </div>
                 <div
@@ -2854,6 +2823,7 @@ export function Reports({
                     <Eye size={15} /> ดูพรีวิว
                   </button>
                 </div>
+              </div>
               <div className="table-wrap">
                 {txQuery.isLoading ? (
                   <div className="table-loading">
@@ -3011,15 +2981,13 @@ export function Reports({
                       </button>
                     ))}
                   </div>
-                  {rangeMode === "custom" && (
-                    <ThaiDateRangePicker
+                  <ThaiDateRangePicker
                       className="report-custom-range"
-                      from={rangeFrom}
-                      to={rangeTo}
-                      onChange={(nextFrom, nextTo) => { setRangeFrom(nextFrom); setRangeTo(nextTo); }}
+                      from={effectiveFrom}
+                      to={effectiveTo}
+                      onChange={(nextFrom, nextTo) => { setRangeMode("custom"); setRangeFrom(nextFrom); setRangeTo(nextTo); }}
                       ariaLabel="เลือกช่วงวันที่รายงานสินค้าคงคลัง"
                     />
-                  )}
                   <SharedSearch label="รายงาน · ค้นหาในแท็บนี้"><div className="search-field">
                     <Search size={16} />
                     <input
