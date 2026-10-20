@@ -11,8 +11,10 @@ const cfg = JSON.parse(fs.readFileSync(process.env.AUDIT_CONFIG_PATH, 'utf8'));
 assert.ok(path.resolve(cfg.target).startsWith(path.resolve(os.tmpdir()) + path.sep));
 const db = createSqliteStore(cfg.target);
 const lot = `BROWSER-RECEIPT-${Date.now()}`;
+let expectedSellingPrice = 0;
 try {
-  const product = db.prepare('SELECT id FROM products LIMIT 1').get();
+  const product = db.prepare('SELECT id, price FROM products LIMIT 1').get();
+  expectedSellingPrice = product.price;
   receiveStockLines(db, { productId: product.id, lot, actor: 'Browser receiver', lines: [{ qty: 10, cost: 5 }, { qty: 2, cost: 0 }] });
 } finally { db.close(); }
 const browser = await puppeteer.launch({ headless: true, pipe: true, args: ['--no-sandbox'] });
@@ -51,7 +53,7 @@ try {
   await page.type('.receipt-history-filters input[aria-label="ค้นหาสินค้า SKU หรือ Lot ในประวัติรับเข้า"]', lot);
   await page.waitForFunction(() => document.querySelectorAll('.stock-receipt-history tbody tr').length === 2);
   const text = await page.$eval('.stock-receipt-history', n => n.innerText);
-  assert.ok(text.includes('Browser receiver') && text.includes('50.00'), text);
+  assert.ok(text.includes('Browser receiver') && text.includes((12 * expectedSellingPrice).toFixed(2)), text);
   await click('ดูพรีวิว', '.stock-receipt-history');
   await page.waitForSelector('.export-preview-modal');
   assert.ok(await page.$('.export-preview-modal iframe'), 'Actual document preview');
@@ -78,6 +80,10 @@ try {
       const rows = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
       assert.equal(rows.length, 3, 'Excel must contain header and two receiving lines');
       assert.ok(JSON.stringify(rows).includes(lot));
+      for (const row of rows.slice(1)) {
+        assert.equal(Number(row[5]), expectedSellingPrice, 'Report unit value uses selling price even for free stock');
+        assert.equal(Number(row[6]), Number(row[3]) * expectedSellingPrice);
+      }
     }
     console.log('PASS download:', label, file, bytes.length);
   }

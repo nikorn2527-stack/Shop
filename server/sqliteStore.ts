@@ -1,3 +1,4 @@
+import { reportSellingValue } from "../shared/reportValuation";
 import { findPosShortcutConflicts, posShortcutConflictMessage } from "../shared/posShortcuts";
 import { memberNumberHead, nextMemberNumberSequence, type MemberNumberFormat } from "../shared/memberNumber";
 import { allocateInventoryCost } from "./inventoryValuation";
@@ -1658,7 +1659,7 @@ export function stockReceiptHistory(db: SqliteDb, input: { from?: string; to?: s
     ORDER BY l.received_at DESC, l.id DESC`).all(
       input.from ?? '', input.from ?? '', input.to ?? '', input.to ?? '',
       input.search?.trim() ?? '', input.search?.trim() ?? '', input.actor?.trim() ?? '', input.actor?.trim() ?? ''
-    ) as { id: number; sku: string; name: string; unit: string; lot: string; receivedAt: string; receivedQty: number; expiry: string | null; cost: number; sellingPrice: number; sellingValue: number; actor: string | null; value: number | null }[];
+    ) as { id: number; sku: string; name: string; unit: string; lot: string; receivedAt: string; receivedQty: number | null; expiry: string | null; cost: number; sellingPrice: number; sellingValue: number | null; actor: string | null; value: number | null }[];
 }
 
 export function listStockRows(db: SqliteDb): SqliteStockRow[] {
@@ -1839,6 +1840,7 @@ export type SqliteOrderItem = {
   unit: string;
   category: string;
   cost: number;
+  sellingPrice: number;
   stock: number;
   reorderPoint: number;
   qty: number;
@@ -1847,7 +1849,7 @@ export type SqliteOrderItem = {
   createdAt: string;
 };
 
-const ORDER_ITEM_SELECT = `SELECT o.id, o.qty, o.note, o.created_by AS createdBy, o.created_at AS createdAt, p.id AS productId, p.sku, p.name, p.unit, p.category, p.cost, p.stock, p.reorder_point AS reorderPoint FROM order_list_items o JOIN products p ON p.id = o.product_id`;
+const ORDER_ITEM_SELECT = `SELECT o.id, o.qty, o.note, o.created_by AS createdBy, o.created_at AS createdAt, p.id AS productId, p.sku, p.name, p.unit, p.category, p.cost, p.price AS sellingPrice, p.stock, p.reorder_point AS reorderPoint FROM order_list_items o JOIN products p ON p.id = o.product_id`;
 
 export function listOrderItems(db: SqliteDb): SqliteOrderItem[] {
   return db.prepare(`${ORDER_ITEM_SELECT} ORDER BY o.id ASC`).all() as SqliteOrderItem[];
@@ -3330,11 +3332,11 @@ export function stockBalanceReport(db: SqliteDb, input: StockBalanceInput = {}):
   const sinceNow = `${formatDate(new Date())} 23:59:59`;
 
   const soldByProduct = new Map<number, number>();
-  for (const row of db.prepare(`SELECT si.product_id AS productId, COALESCE(SUM(si.qty), 0) AS qty FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE si.product_id IS NOT NULL AND s.created_at >= ? AND s.created_at <= ? GROUP BY si.product_id`).all(since, until) as unknown as { productId: number; qty: number }[]) {
+  for (const row of db.prepare(`SELECT si.product_id AS productId, COALESCE(SUM(si.qty), 0) AS qty FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE si.product_id IS NOT NULL AND COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ? GROUP BY si.product_id`).all(since, until) as unknown as { productId: number; qty: number }[]) {
     soldByProduct.set(row.productId, Number(row.qty));
   }
   const soldSinceStart = new Map<number, number>();
-  for (const row of db.prepare(`SELECT si.product_id AS productId, COALESCE(SUM(si.qty), 0) AS qty FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE si.product_id IS NOT NULL AND s.created_at >= ? AND s.created_at <= ? GROUP BY si.product_id`).all(since, sinceNow) as unknown as { productId: number; qty: number }[]) {
+  for (const row of db.prepare(`SELECT si.product_id AS productId, COALESCE(SUM(si.qty), 0) AS qty FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE si.product_id IS NOT NULL AND COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ? GROUP BY si.product_id`).all(since, sinceNow) as unknown as { productId: number; qty: number }[]) {
     soldSinceStart.set(row.productId, Number(row.qty));
   }
   const receivedByProduct = new Map<number, number>();
@@ -3363,7 +3365,7 @@ export function stockBalanceReport(db: SqliteDb, input: StockBalanceInput = {}):
       received,
       remaining: product.stock,
       sellingPrice: product.price,
-      sellingValue: round2(product.stock * product.price),
+      sellingValue: reportSellingValue(product.stock, product.price),
     };
   });
 }
