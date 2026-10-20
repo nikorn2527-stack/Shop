@@ -1,3 +1,4 @@
+import { MEMBER_CARD_WIDTH_MM, MEMBER_CARD_HEIGHT_MM } from "./memberCardSize";
 /**
  * P0-UX-02 part 2 — A4 sheet print profile system for member cards.
  *
@@ -8,8 +9,7 @@
  * owner rule: "ห้ามใช้ template A4 แบบเดาเอง" — ต้องเลือก template ตามจำนวนดวงและ
  * ตำแหน่งจริงบน A4 + มี "พิมพ์แผ่นทดสอบ" + X/Y calibration
  *
- * บัตร 90×55มม. (มาตรฐานนามบัตรไทย) — 8-up และ 10-up ใส่ A4 portrait พอดี
- * 12-up ไม่พอดี (3×90=270 > 210) จึงให้ผู้ใช้กำหนดเองผ่าน custom profile
+ * บัตรขนาด ID-1 85.60 × 53.98 มม.
  */
 
 export type CardSheetProfile = {
@@ -19,9 +19,9 @@ export type CardSheetProfile = {
   cols: number;
   /** จำนวนแถว (แนวตั้ง) */
   rows: number;
-  /** ความกว้างบัตร มม. (default 90 มาตรฐานนามบัตรไทย) */
+  /** ความกว้างบัตร มม. (85.60 มาตรฐานบัตรเครดิต) */
   cardWmm: number;
-  /** ความสูงบัตร มม. (default 55) */
+  /** ความสูงบัตร มม. (53.98 มาตรฐานบัตรเครดิต) */
   cardHmm: number;
   /** ระยะขอบบน มม. */
   marginTopMm: number;
@@ -40,26 +40,26 @@ export type CardSheetProfile = {
 /**
  * Built-in presets สำหรับ A4 (210×297มม. portrait)
  * คำนวณระยะขอบให้ grid อยู่กลางหน้า:
- *  - 8-up (2×4): 2×90=180 → ขอบซ้ายขวา 15มม. | 4×55=220 + 3×gap4=12 → 232 → ขอบบน 8 ขอบล่าง 57
- *  - 10-up (2×5): 5×55=275 + 4×gap3=12 → 287 → ขอบบน 5 ขอบล่าง 5 (แน่นแต่พอ)
- *  - custom: ผู้ใช้กำหนดเอง (รองรับ 12-up บน landscape หรือกระดาษพิเศษ)
+ *  - ใช้บัตร ID-1 จัดกึ่งกลางแนวนอน ขอบซ้าย 19.4 มม.
+ *  - เก็บระยะขอบ ช่องว่าง และ offset ที่เคยปรับไว้เมื่อย้ายจากโปรไฟล์เดิม
  */
 export const BUILT_IN_PROFILES: CardSheetProfile[] = [
-  { id: "a4-8", name: "A4 · 8 ใบ/แผ่น (2 × 4)", cols: 2, rows: 4, cardWmm: 90, cardHmm: 55, marginTopMm: 8, marginLeftMm: 15, gapXMm: 0, gapYMm: 4, offsetXMm: 0, offsetYMm: 0 },
-  { id: "a4-10", name: "A4 · 10 ใบ/แผ่น (2 × 5)", cols: 2, rows: 5, cardWmm: 90, cardHmm: 55, marginTopMm: 5, marginLeftMm: 15, gapXMm: 0, gapYMm: 3, offsetXMm: 0, offsetYMm: 0 },
-  { id: "custom", name: "กำหนดเอง — แก้ cols/rows/ขอบ/gap/offset", cols: 2, rows: 4, cardWmm: 90, cardHmm: 55, marginTopMm: 8, marginLeftMm: 15, gapXMm: 0, gapYMm: 4, offsetXMm: 0, offsetYMm: 0 },
+  { id: "a4-8", name: "A4 · 8 ใบ/แผ่น (2 × 4)", cols: 2, rows: 4, cardWmm: MEMBER_CARD_WIDTH_MM, cardHmm: MEMBER_CARD_HEIGHT_MM, marginTopMm: 8, marginLeftMm: 19.4, gapXMm: 0, gapYMm: 4, offsetXMm: 0, offsetYMm: 0 },
+  { id: "a4-10", name: "A4 · 10 ใบ/แผ่น (2 × 5)", cols: 2, rows: 5, cardWmm: MEMBER_CARD_WIDTH_MM, cardHmm: MEMBER_CARD_HEIGHT_MM, marginTopMm: 5, marginLeftMm: 19.4, gapXMm: 0, gapYMm: 3, offsetXMm: 0, offsetYMm: 0 },
+  { id: "custom", name: "กำหนดเอง — แก้ cols/rows/ขอบ/gap/offset", cols: 2, rows: 4, cardWmm: MEMBER_CARD_WIDTH_MM, cardHmm: MEMBER_CARD_HEIGHT_MM, marginTopMm: 8, marginLeftMm: 19.4, gapXMm: 0, gapYMm: 4, offsetXMm: 0, offsetYMm: 0 },
 ];
 
-const STORAGE_KEY = "card-sheet-profile-v1";
+const STORAGE_KEY = "card-sheet-profile-v2";
+const LEGACY_STORAGE_KEY = "card-sheet-profile-v1";
 
 /** โหลด profile ที่เลือก + calibration จาก localStorage (เก็บเฉพาะเครื่องเพราะ calibration ขึ้นเครื่องพิมพ์) */
 export function loadCardSheetProfile(): CardSheetProfile {
   try {
-    const raw = typeof localStorage !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
+    const raw = typeof localStorage !== "undefined" ? (localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY)) : null;
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<CardSheetProfile>;
       const base = BUILT_IN_PROFILES.find((p) => p.id === parsed.id) ?? BUILT_IN_PROFILES[0];
-      return { ...base, ...parsed } as CardSheetProfile;
+      return { ...base, ...parsed, cardWmm: MEMBER_CARD_WIDTH_MM, cardHmm: MEMBER_CARD_HEIGHT_MM } as CardSheetProfile;
     }
   } catch { /* ignore */ }
   return { ...BUILT_IN_PROFILES[0] };

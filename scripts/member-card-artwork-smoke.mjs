@@ -116,23 +116,23 @@ try {
   const cardNumber = await page.$eval('#member-card .wallet-art-number', e => e.textContent);
   const card = await page.$('#member-card');
   const screen = PNG.sync.read(await card.screenshot({path:path.join(dir,'screen-card.png')}));
-  assert.equal(screen.width,360); assert.equal(screen.height,220);
+  assert.ok(Math.abs(screen.width-342.4)<1); assert.ok(Math.abs(screen.height-215.92)<1);
   assert.equal(await page.$eval('#member-card', e=>e.scrollHeight<=e.clientHeight),true,'No card content is clipped');
   await click('ดาวน์โหลด PNG', '.member-card-modal');
   const pngPath = await waitFile(`card-${cardNumber}.png`);
   const png = PNG.sync.read(fs.readFileSync(pngPath));
-  assert.equal(png.width,1440); assert.equal(png.height,880);
+  assert.equal(png.width,1370); assert.equal(png.height,864);
   const gray=new Uint8ClampedArray(png.width*png.height);
   for(let i=0;i<gray.length;i++) gray[i]=(png.data[i*4]+2*png.data[i*4+1]+png.data[i*4+2])/4;
   const decoded=new Code128Reader().decode(new BinaryBitmap(new HybridBinarizer(new RGBLuminanceSource(gray,png.width,png.height))));
   assert.equal(decoded.getText(),cardNumber,'Exported card barcode still scans to the member identifier');
   // Compare the exported browser-shaped Thai text and geometry against the native screen card.
-  const reduced = await page.evaluate(async src => {
+  const reduced = await page.evaluate(async ({src,width,height}) => {
     const image = new Image(); image.src=src; await image.decode();
-    const canvas=document.createElement('canvas'); canvas.width=360;canvas.height=220;
-    const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0,360,220);
-    return Array.from(ctx.getImageData(0,0,360,220).data);
-  }, `data:image/png;base64,${fs.readFileSync(pngPath).toString('base64')}`);
+    const canvas=document.createElement('canvas'); canvas.width=width;canvas.height=height;
+    const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0,width,height);
+    return Array.from(ctx.getImageData(0,0,width,height).data);
+  }, {src:`data:image/png;base64,${fs.readFileSync(pngPath).toString('base64')}`,width:screen.width,height:screen.height});
   let diff=0;
   for(let i=0;i<reduced.length;i++) diff+=Math.abs(reduced[i]-screen.data[i]);
   const average=diff/reduced.length;
@@ -146,7 +146,7 @@ try {
   const pdfPath = await waitFile(`card-${cardNumber}.pdf`);
   const pdf = fs.readFileSync(pdfPath).toString('latin1');
   const box=pdf.match(/\/MediaBox \[0 0 ([\d.]+) ([\d.]+)\]/);
-  assert.ok(box); assert.ok(Math.abs(Number(box[1])*25.4/72-90)<0.01);assert.ok(Math.abs(Number(box[2])*25.4/72-55)<0.01);
+  assert.ok(box); assert.ok(Math.abs(Number(box[1])*25.4/72-85.6)<0.01);assert.ok(Math.abs(Number(box[2])*25.4/72-53.98)<0.01);
   assert.equal((pdf.match(/\/Type\s*\/Page\b/g)||[]).length,1);
   await page.screenshot({path:path.join(dir,'card-modal.png')});
   await page.click('.member-card-modal [aria-label="ปิดหน้าต่าง"]');

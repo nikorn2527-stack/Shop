@@ -1,3 +1,4 @@
+import { MEMBER_CARD_WIDTH_MM, MEMBER_CARD_HEIGHT_MM, MEMBER_CARD_WIDTH_PX, MEMBER_CARD_HEIGHT_PX } from "@shared/memberCardSize";
 import { WorkflowDialog } from "./WorkflowDialog";
 import { useEffect, useMemo, useState } from "react";
 import { captureMemberCard } from "@/lib/captureMemberCard";
@@ -147,26 +148,26 @@ export function MemberCardModal({
   const displayName = [member.prename?.trim() || "", member.firstName, member.lastName].filter(Boolean).join(" ");
   const suspended = member.status === "suspended";
 
-  // Browser-shaped Thai text and embedded fonts; one artwork for PDF and PNG at 1440 × 880 px.
+  // Browser-shaped Thai text and embedded fonts; one artwork for PDF and PNG at 1370 × 864 px.
   const captureCardCanvas = async (): Promise<HTMLCanvasElement> => {
     const element = document.getElementById("member-card-capture");
     if (!element) throw new Error("ไม่พบภาพบัตรสำหรับส่งออก");
     if (document.fonts?.ready) await document.fonts.ready;
     return captureMemberCard(element);
   };
-  // P0-UX-02 owner spec output #1 — PDF 90×55มม. print-ready (ส่งร้านพิมพ์)
+  // P0-UX-02 owner spec output #1 — PDF 85.60×53.98มม. print-ready (ส่งร้านพิมพ์)
   // PNG lossless (ตัด artifacts ของ JPEG บนตัวอักษร/บาร์โค้ด/QR)
   const downloadCardPdf = async () => {
     setBusy("pdf"); setExportError("");
     try {
       const canvas = await captureCardCanvas();
-      const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: [90, 55] });
-      pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, 90, 55);
+      const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: [MEMBER_CARD_WIDTH_MM, MEMBER_CARD_HEIGHT_MM] });
+      pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, MEMBER_CARD_WIDTH_MM, MEMBER_CARD_HEIGHT_MM);
       pdf.save(`card-${member.memberNumber}.pdf`);
     } catch (error) { setExportError(error instanceof Error ? error.message : "ส่งออกบัตรไม่สำเร็จ"); } finally { setBusy(""); }
   };
   // P0-UX-02 owner spec output #2 — PNG ความละเอียดสูง (ส่งไลน์/ตรวจภาพ/พิมพ์ด่วน)
-  // ไม่หุ้มใน PDF — เป็นไฟล์ภาพตรงๆ 1440×880px (เกินมาตรฐาน 1063×650 @ 300 DPI)
+  // ไม่หุ้มใน PDF — เป็นไฟล์ภาพตรงๆ 1370×864px (เกินมาตรฐาน 1063×650 @ 300 DPI)
   const downloadCardPng = async () => {
     setBusy("png"); setExportError("");
     try {
@@ -224,8 +225,8 @@ export function MemberCardModal({
         <button className="outline-button" onClick={onClose}><X size={16} /> ไม่ใช่สมาชิกนี้</button>
         <button className="primary-button" disabled={busy !== ""} onClick={() => onConfirm?.()}><UserCheck size={16} /> {confirmLabel}</button>
       </> : <>
-        <button className="outline-button amber" disabled={busy !== "" || !qrDataUrl} onClick={downloadCardPdf} title="ดาวน์โหลดบัตรสมาชิกเป็นไฟล์ PDF 90×55 มม. (ส่งร้านพิมพ์)"><Printer size={16} /> {busy === "pdf" ? "กำลังสร้าง PDF..." : "ดาวน์โหลด PDF"}</button>
-        <button className="outline-button" disabled={busy !== "" || !qrDataUrl} onClick={downloadCardPng} title="ดาวน์โหลดบัตรเป็น PNG ความละเอียดสูง 1440×880px (ส่งไลน์/ตรวจภาพ/พิมพ์ด่วน)"><FileImage size={16} /> {busy === "png" ? "กำลังสร้าง PNG..." : "ดาวน์โหลด PNG"}</button>
+        <button className="outline-button amber" disabled={busy !== "" || !qrDataUrl} onClick={downloadCardPdf} title="ดาวน์โหลดบัตรสมาชิกเป็นไฟล์ PDF 85.60×53.98 มม. (ส่งร้านพิมพ์)"><Printer size={16} /> {busy === "pdf" ? "กำลังสร้าง PDF..." : "ดาวน์โหลด PDF"}</button>
+        <button className="outline-button" disabled={busy !== "" || !qrDataUrl} onClick={downloadCardPng} title="ดาวน์โหลดบัตรเป็น PNG ความละเอียดสูง 1370×864px (ส่งไลน์/ตรวจภาพ/พิมพ์ด่วน)"><FileImage size={16} /> {busy === "png" ? "กำลังสร้าง PNG..." : "ดาวน์โหลด PNG"}</button>
       </>}
     </div>
   </WorkflowDialog>;
@@ -234,7 +235,7 @@ export function MemberCardModal({
 /**
  * FIX-4 issue 4 + P0-UX-02 part 2 — Batch print modal: พิมพ์บัตรสมาชิกหลายใบ
  * 2 โหมด:
- *  1. บัตรเดี่ยวต่อหน้า (เดิม) — 90×55มม. ต่อหน้า ใช้ window.print() + @media print
+ *  1. บัตรเดี่ยวต่อหน้า (เดิม) — 85.60×53.98มม. ต่อหน้า ใช้ window.print() + @media print
  *  2. หลายบัตรต่อแผ่น A4 (ใหม่) — เลือก profile (8/10-up หรือ custom) + X/Y calibration
  *     + "พิมพ์แผ่นทดสอบ" (กล่องโครงร่าง เพื่อตรวจแนวก่อนใช้กระดาษจริง)
  * แต่ละ profile เก็บใน localStorage เพราะ calibration ขึ้นกับเครื่องพิมพ์แต่ละเครื่อง
@@ -328,7 +329,7 @@ export function MemberCardBatchModal({
         {/* On-screen sheet preview (scaled) */}
         <div className="sheet-preview-wrap">
           <div className="sheet-preview-scaler">
-            <div className="card-sheet-a4 preview" style={{ "--cw": `${profile.cardWmm}mm`, "--ch": `${profile.cardHmm}mm`, "--card-scale-x": profile.cardWmm * 96 / 25.4 / 360, "--card-scale-y": profile.cardHmm * 96 / 25.4 / 220 } as React.CSSProperties}>
+            <div className="card-sheet-a4 preview" style={{ "--cw": `${profile.cardWmm}mm`, "--ch": `${profile.cardHmm}mm`, "--card-scale-x": profile.cardWmm * 96 / 25.4 / MEMBER_CARD_WIDTH_PX, "--card-scale-y": profile.cardHmm * 96 / 25.4 / MEMBER_CARD_HEIGHT_PX } as React.CSSProperties}>
               {positions.map((pos, i) => {
                 const member = sheets[0]?.[i];
                 return <div key={i} className="card-slot" style={{ left: `${pos.left}mm`, top: `${pos.top}mm`, width: `${profile.cardWmm}mm`, height: `${profile.cardHmm}mm` }}>
@@ -356,12 +357,12 @@ export function MemberCardBatchModal({
         setExporting(true); setExportError("");
         try {
           const elements = Array.from(document.querySelectorAll<HTMLElement>(sheetMode ? '.card-sheet-print-host .member-card-document' : '#member-card-batch .member-card-document'));
-          const pdf = new jsPDF({ unit: 'mm', format: sheetMode ? 'a4' : [90, 55], orientation: sheetMode ? 'portrait' : 'landscape' });
+          const pdf = new jsPDF({ unit: 'mm', format: sheetMode ? 'a4' : [MEMBER_CARD_WIDTH_MM, MEMBER_CARD_HEIGHT_MM], orientation: sheetMode ? 'portrait' : 'landscape' });
           for (let i = 0; i < elements.length; i++) {
             const canvas = await captureMemberCard(elements[i]);
-            if (i && (!sheetMode || i % capacity === 0)) pdf.addPage(sheetMode ? 'a4' : [90, 55], sheetMode ? 'portrait' : 'landscape');
+            if (i && (!sheetMode || i % capacity === 0)) pdf.addPage(sheetMode ? 'a4' : [MEMBER_CARD_WIDTH_MM, MEMBER_CARD_HEIGHT_MM], sheetMode ? 'portrait' : 'landscape');
             const pos = sheetMode ? positions[i % capacity] : { left: 0, top: 0 };
-            pdf.addImage(canvas.toDataURL('image/png'), 'PNG', pos.left, pos.top, sheetMode ? profile.cardWmm : 90, sheetMode ? profile.cardHmm : 55);
+            pdf.addImage(canvas.toDataURL('image/png'), 'PNG', pos.left, pos.top, sheetMode ? profile.cardWmm : MEMBER_CARD_WIDTH_MM, sheetMode ? profile.cardHmm : MEMBER_CARD_HEIGHT_MM);
           }
           pdf.save('member-cards.pdf');
         } catch (error) { setExportError(error instanceof Error ? error.message : 'ส่งออกบัตรไม่สำเร็จ'); } finally { setExporting(false); }
@@ -372,7 +373,7 @@ export function MemberCardBatchModal({
     {sheetMode && (
       <div className="card-sheet-print-host" aria-hidden="true">
         {sheets.map((sheetMembers, sheetIdx) => (
-          <div key={sheetIdx} className="card-sheet-a4" style={{ "--cw": `${profile.cardWmm}mm`, "--ch": `${profile.cardHmm}mm`, "--card-scale-x": profile.cardWmm * 96 / 25.4 / 360, "--card-scale-y": profile.cardHmm * 96 / 25.4 / 220 } as React.CSSProperties}>
+          <div key={sheetIdx} className="card-sheet-a4" style={{ "--cw": `${profile.cardWmm}mm`, "--ch": `${profile.cardHmm}mm`, "--card-scale-x": profile.cardWmm * 96 / 25.4 / MEMBER_CARD_WIDTH_PX, "--card-scale-y": profile.cardHmm * 96 / 25.4 / MEMBER_CARD_HEIGHT_PX } as React.CSSProperties}>
             {positions.map((pos, i) => {
               const member = sheetMembers[i];
               return <div key={i} className="card-slot" style={{ left: `${pos.left}mm`, top: `${pos.top}mm`, width: `${profile.cardWmm}mm`, height: `${profile.cardHmm}mm` }}>

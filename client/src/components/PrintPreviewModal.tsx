@@ -33,7 +33,7 @@ export type PrintPreviewPaper = "thermal" | "a4" | "card";
 const PAPER_LABEL: Record<PrintPreviewPaper, string> = {
   thermal: "สลิป · กระดาษต่อเนื่อง 58–80 มม.",
   a4: "กระดาษ A4 · 210 × 297 มม.",
-  card: "บัตรสมาชิก · นามบัตรไทย 90 × 55 มม.",
+  card: "บัตรสมาชิก · ขนาดบัตรเครดิต 85.60 × 53.98 มม.",
 };
 
 export function PrintPreviewModal({
@@ -100,7 +100,7 @@ export function PrintPreviewModal({
       const doc = holder.firstElementChild as HTMLElement | null;
       if (!stage || !doc) return;
       const documentPx = doc.getBoundingClientRect().width || stage.clientWidth || 1;
-      const widthMm = paper === "a4" ? 210 : paper === "card" ? 90 : thermalProfile.printableWidthMm;
+      const widthMm = paper === "a4" ? 210 : paper === "card" ? 85.6 : thermalProfile.printableWidthMm;
       const heightMm = Math.round((doc.scrollHeight / documentPx) * widthMm);
       if (heightMm > 0 && !Number.isNaN(heightMm)) setContentMm(heightMm);
     };
