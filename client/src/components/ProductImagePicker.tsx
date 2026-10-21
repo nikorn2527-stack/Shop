@@ -1,26 +1,61 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { X } from "@/lib/icons";
 import { WorkflowDialog } from "./WorkflowDialog";
-import { compressImageToDataUrl } from "../pageData";
+import { compressImageToDataUrl } from "@/pages/pageData";
 
 /** อีโมจิตัวแทนของแต่ละหมวดสินค้า ใช้สำหรับสินค้าที่ยังไม่มีรูปภาพและไม่มีบาร์โค้ด */
 export const CATEGORY_EMOJI_MAP: Record<string, string> = {
-  "เครื่องดื่ม": "🥤",
-  "อาหาร": "🍱",
-  "ของใช้": "🛍️",
-  "ของใช้ส่วนตัว": "🧴",
-  "ของใช้ในครัวเรือน": "🧺",
-  "ขนม": "🍬",
-  "เครื่องเขียน": "📝",
+  เครื่องดื่ม: "🥤",
+  อาหาร: "🍱",
+  ของใช้: "🛍️",
+  ของใช้ส่วนตัว: "🧴",
+  ของใช้ในครัวเรือน: "🧺",
+  ขนม: "🍬",
+  เครื่องเขียน: "📝",
 };
 
 /** รายการอีโมจิที่ใช้บ่อยสำหรับสินค้าทั่วไป */
 const COMMON_EMOJIS = [
-  "🥤", "🍱", "🍱", "🛍️", "🧴", "🧺", "🍬", "📝",
-  "🥤", "☕", "🧃", "🥛", "🍉", "🍎", "🍌", "🍊",
-  "🍞", "🍳", "🍔", "🍟", "🍕", "🍩", "🍪", "🍫",
-  "📦", "🎒", "👕", "👖", "👟", "🧢", "🧴", "🧼",
-  "📝", "✂️", "📎", "📄", "✏️", "🖊️", "📘", "📕",
+  "🥤",
+  "🍱",
+  "🍱",
+  "🛍️",
+  "🧴",
+  "🧺",
+  "🍬",
+  "📝",
+  "🥤",
+  "☕",
+  "🧃",
+  "🥛",
+  "🍉",
+  "🍎",
+  "🍌",
+  "🍊",
+  "🍞",
+  "🍳",
+  "🍔",
+  "🍟",
+  "🍕",
+  "🍩",
+  "🍪",
+  "🍫",
+  "📦",
+  "🎒",
+  "👕",
+  "👖",
+  "👟",
+  "🧢",
+  "🧴",
+  "🧼",
+  "📝",
+  "✂️",
+  "📎",
+  "📄",
+  "✏️",
+  "🖊️",
+  "📘",
+  "📕",
 ];
 
 export function ProductImagePicker({
@@ -36,12 +71,16 @@ export function ProductImagePicker({
   onChange: (emoji: string | null, imageUrl: string | null) => void;
   onClose: () => void;
 }) {
-  const [selectedEmoji, setSelectedEmoji] = useState(currentEmoji ?? CATEGORY_EMOJI_MAP[category ?? ""] ?? "🛍️");
+  const [selectedEmoji, setSelectedEmoji] = useState<string | null>(
+    currentEmoji ?? CATEGORY_EMOJI_MAP[category ?? ""] ?? "🛍️"
+  );
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState(currentImageUrl ?? null);
   const fileInput = useRef<HTMLInputElement>(null);
 
-  const handleImageChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (
+    event: React.ChangeEvent<HTMLInputElement>
+  ) => {
     const file = event.target.files?.[0] ?? null;
     if (!file) return;
     setImageFile(file);
@@ -62,7 +101,9 @@ export function ProductImagePicker({
   }, [selectedEmoji, previewUrl, onChange, onClose]);
 
   const emojiGrid = useMemo(() => {
-    const defaults = category ? [CATEGORY_EMOJI_MAP[category]].filter(Boolean) : [];
+    const defaults = category
+      ? [CATEGORY_EMOJI_MAP[category]].filter(Boolean)
+      : [];
     const others = COMMON_EMOJIS.filter(e => !defaults.includes(e));
     return [...defaults, ...others];
   }, [category]);
@@ -78,7 +119,11 @@ export function ProductImagePicker({
         <button
           type="button"
           className={`tab-btn${selectedEmoji ? " active" : ""}`}
-          onClick={() => { setSelectedEmoji(CATEGORY_EMOJI_MAP[category ?? ""] ?? "🛍️"); setImageFile(null); setPreviewUrl(null); }}
+          onClick={() => {
+            setSelectedEmoji(CATEGORY_EMOJI_MAP[category ?? ""] ?? "🛍️");
+            setImageFile(null);
+            setPreviewUrl(null);
+          }}
         >
           ใช้อีโมจิตามหมวด
         </button>
@@ -94,7 +139,15 @@ export function ProductImagePicker({
       {previewUrl ? (
         <div className="image-picker-preview">
           <img src={previewUrl} alt="ตัวอย่างรูปสินค้า" />
-          <button type="button" className="image-picker-remove" onClick={() => { setImageFile(null); setPreviewUrl(null); setSelectedEmoji(CATEGORY_EMOJI_MAP[category ?? ""] ?? "🛍️"); }}>
+          <button
+            type="button"
+            className="image-picker-remove"
+            onClick={() => {
+              setImageFile(null);
+              setPreviewUrl(null);
+              setSelectedEmoji(CATEGORY_EMOJI_MAP[category ?? ""] ?? "🛍️");
+            }}
+          >
             <X size={16} />
           </button>
         </div>
@@ -132,8 +185,12 @@ export function ProductImagePicker({
       )}
 
       <div className="image-picker-actions">
-        <button type="button" className="outline-button" onClick={onClose}>ยกเลิก</button>
-        <button type="button" className="primary-button" onClick={confirm}>ยืนยัน</button>
+        <button type="button" className="outline-button" onClick={onClose}>
+          ยกเลิก
+        </button>
+        <button type="button" className="primary-button" onClick={confirm}>
+          ยืนยัน
+        </button>
       </div>
     </WorkflowDialog>
   );
