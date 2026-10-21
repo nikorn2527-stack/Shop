@@ -80,6 +80,7 @@ import { SlipViewButton } from "@/components/SlipViewModal";
 import { ReceiptModal } from "@/components/ReceiptModal";
 import { transactionReceipt } from "@/lib/transactionReceipt";
 import { TimelineDrilldown } from "./TimelineDrilldown";
+import { PRODUCT_CATEGORIES, productCategoryOptions } from "@shared/productCategories";
 import { trpc } from "@/lib/trpc";
 import {
   formatLogDateTime,
@@ -168,63 +169,31 @@ const REPORT_GROUPBY_CHIPS: { value: ReportGroupBy; label: string }[] = [
   { value: "day", label: "รายวัน" },
   { value: "week", label: "รายสัปดาห์" },
   { value: "month", label: "รายเดือน" },
+];
 
-
-function CategoryMultiControl({
-  options,
-  selected,
-  open,
-  onOpenChange,
-  onSelect,
-}: {
+function CategoryMultiControl({ options, selected, onSelect }: {
   options: string[];
   selected: string[];
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
   onSelect: (name: string) => void;
 }) {
   return (
-    <div className="report-category-multi" style={{ position: "relative" }}>
-      <button
-        type="button"
-        className="report-category-toggle"
-        onClick={() => onOpenChange(true)}
-        aria-expanded={open}
-        aria-haspopup="listbox"
-        title="หมวดสินค้าที่กรอง"
-      >
-        <span className="report-category-toggle-label">
-          {selected.length === 0 ? "ทุกหมวด" : selected.join(", ")}
-        </span>
-        <ChevronDown size={15} className="report-category-toggle-icon" />
-      </button>
-      {open && (
-        <div
-          className="report-category-dropdown"
-          role="listbox"
-          aria-label="หมวดสินค้ารายงาน"
-        >
-          {options.map(opt => (
-            <button
-              key={opt}
-              type="button"
-              className={`report-category-option${selected.includes(opt) ? " selected" : ""}`}
-              onClick={() => {
-                onSelect(opt);
-                onOpenChange(false);
-              }}
-            >
-              <Check size={14} />
-              {opt}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" className="outline-button compact report-category-toggle" aria-label="กรองหมวดสินค้า" title={selected.length ? selected.join(", ") : "ทุกหมวด"}>
+          <span className="report-category-toggle-label">{selected.length ? selected.join(", ") : "ทุกหมวด"}</span>
+          <ChevronDown size={15} />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" aria-label="หมวดสินค้ารายงาน">
+        <DropdownMenuCheckboxItem checked={selected.length === 0} onSelect={event => event.preventDefault()} onCheckedChange={() => onSelect("")}>ทุกหมวด</DropdownMenuCheckboxItem>
+        <DropdownMenuSeparator />
+        {options.map(name => (
+          <DropdownMenuCheckboxItem key={name} checked={selected.includes(name)} onSelect={event => event.preventDefault()} onCheckedChange={() => onSelect(name)}>{name}</DropdownMenuCheckboxItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
-
-];
 
 /** Local calendar date for report defaults; avoids UTC rollover from toISOString(). */
 function todayIso() {
@@ -262,6 +231,16 @@ export function Reports({
   // ROUND 79 (user) — เลือกได้หลายคนพร้อมกัน (เช่น รวม 2 กะในรายงานเดียว) · [] = ทุกคน
   const [staffFilters, setStaffFilters] = useState<string[]>([]);
   const [staffFilterOpen, setStaffFilterOpen] = useState(false);
+  const [categoryFilters, setCategoryFilters] = useState<string[]>([]);
+  const productsQuery = trpc.product.list.useQuery();
+  const categoryOptions = useMemo(() => productCategoryOptions([
+    ...PRODUCT_CATEGORIES,
+    ...(productsQuery.data ?? []).map(product => product.category),
+  ]), [productsQuery.data]);
+  const toggleCategoryFilter = (name: string) => setCategoryFilters(current =>
+    name === "" ? [] : current.includes(name) ? current.filter(entry => entry !== name) : [...current, name]
+  );
+  const categorySuffix = categoryFilters.length ? " · หมวดสินค้า: " + categoryFilters.join(", ") : "";
   // ROUND 30 — สรุปยอดขายแยกตามชนิดสินค้า / พนักงานขาย + ประวัติธุรกรรมสมาชิก
   const [salesView, setSalesView] = useState<
     "timeline" | "category" | "product" | "items" | "cashier"
@@ -435,6 +414,7 @@ export function Reports({
       from: effectiveFrom,
       to: effectiveTo,
       cashiers: staffFilters.length > 0 ? staffFilters : undefined,
+      categories: categoryFilters.length ? categoryFilters : undefined,
     },
     { placeholderData: previous => previous }
   );
@@ -464,6 +444,7 @@ export function Reports({
     setRangeTo("");
     setGroupBy("day");
     setStaffFilters([]);
+    setCategoryFilters([]);
     setSalesView("timeline");
     setHospitalPreset("standard");
     setTxMember(null);
@@ -494,6 +475,7 @@ export function Reports({
       from: effectiveFrom,
       to: effectiveTo,
       cashiers: staffFilters.length > 0 ? staffFilters : undefined,
+      categories: categoryFilters.length ? categoryFilters : undefined,
     },
     {
       enabled: reportTab === "sales" && salesView === "category",
@@ -505,6 +487,7 @@ export function Reports({
       from: effectiveFrom,
       to: effectiveTo,
       cashiers: staffFilters.length > 0 ? staffFilters : undefined,
+      categories: categoryFilters.length ? categoryFilters : undefined,
     },
     {
       enabled: reportTab === "sales" && salesView === "cashier",
@@ -516,6 +499,7 @@ export function Reports({
       from: effectiveFrom,
       to: effectiveTo,
       cashiers: staffFilters.length > 0 ? staffFilters : undefined,
+      categories: categoryFilters.length ? categoryFilters : undefined,
     },
     {
       enabled: reportTab === "sales" && salesView === "product",
@@ -528,6 +512,7 @@ export function Reports({
       from: effectiveFrom,
       to: effectiveTo,
       cashiers: staffFilters.length > 0 ? staffFilters : undefined,
+      categories: categoryFilters.length ? categoryFilters : undefined,
     },
     {
       enabled: reportTab === "sales" && salesView === "items",
@@ -555,6 +540,7 @@ export function Reports({
       from: effectiveFrom,
       to: effectiveTo,
       search: debouncedStockSearch || undefined,
+      categories: categoryFilters.length ? categoryFilters : undefined,
     },
     { enabled: reportTab === "stock" }
   );
@@ -980,7 +966,7 @@ export function Reports({
       return {
         fileName: "daily-sales-summary.pdf",
         title: "รายงานสรุปยอดขายตามช่วงเวลา",
-        periodLabel: `ช่วงข้อมูล ${rangeLabel}${staffSuffix}${salesView === "timeline" ? ` · จัดกลุ่มราย${groupBy === "day" ? "วัน" : groupBy === "week" ? "สัปดาห์" : "เดือน"}` : ""}`,
+        periodLabel: `ช่วงข้อมูล ${rangeLabel}${staffSuffix}${categorySuffix}${salesView === "timeline" ? ` · จัดกลุ่มราย${groupBy === "day" ? "วัน" : groupBy === "week" ? "สัปดาห์" : "เดือน"}` : ""}`,
         meta: [
           ["จำนวนบิล", `${totals.orders.toLocaleString("th-TH")} บิล`],
           ["ยอดขายรวม", money(totals.revenue)],
@@ -1057,7 +1043,7 @@ export function Reports({
           salesView === "product"
             ? "รายงานสรุปยอดขายแยกตามสินค้า"
             : "รายงานสรุปยอดขายแยกตามชนิดสินค้า",
-        periodLabel: `ช่วงข้อมูล ${rangeLabel}${staffSuffix}`,
+        periodLabel: `ช่วงข้อมูล ${rangeLabel}${staffSuffix}${categorySuffix}`,
         columns: [
           salesView === "product" ? "สินค้า (รหัส)" : "ชนิดสินค้า",
           "บิล",
@@ -1077,7 +1063,7 @@ export function Reports({
       return {
         fileName: hospitalSales ? "hospital-sales-report.pdf" : "sales-line-items.pdf",
         title: hospitalSales ? "รายงานการขายสินค้า" : "รายงานรายการสินค้าที่ขาย (รายบิล)",
-        periodLabel: `ช่วงข้อมูล ${rangeLabel}${staffSuffix}`,
+        periodLabel: `ช่วงข้อมูล ${rangeLabel}${staffSuffix}${categorySuffix}`,
         meta: [
           ["จำนวนบิล", `${lineItemTotals.bills.toLocaleString("th-TH")} บิล`],
           [
@@ -1103,7 +1089,7 @@ export function Reports({
     return {
       fileName: "daily-sales-summary.pdf",
       title: "รายงานสรุปยอดขายแยกตามพนักงานขาย",
-      periodLabel: `ช่วงข้อมูล ${rangeLabel}${staffSuffix}`,
+      periodLabel: `ช่วงข้อมูล ${rangeLabel}${staffSuffix}${categorySuffix}`,
       columns: [
         "พนักงานขาย (ผู้ทำรายการ)",
         "บิล",
@@ -1178,7 +1164,7 @@ export function Reports({
       preferred: preferred ?? "pdf",
       doc,
       hasTotalsRow: true,
-      downloadNoticeBase: `รายงานยอดขาย${pack.label ? " " + pack.label : ""}`,
+      downloadNoticeBase: `รายงานยอดขาย${pack.label ? " " + pack.label : ""}${categorySuffix}`,
       printNotice:
         "สั่งพิมพ์รายงานยอดขายแล้ว — เอกสาร A4 ผ่านเครื่องพิมพ์เริ่มต้น",
     };
@@ -1515,7 +1501,7 @@ export function Reports({
   const stockBalanceDocConfig = (): ReportDocConfig => ({
     fileName: hospitalPreset === "stock" ? "hospital-stock-balance.pdf" : "stock-balance-period.pdf",
     title: "รายงานสินค้าคงคลัง",
-    periodLabel: `ช่วงข้อมูล ${rangeLabel} · ยอดยกมา ณ ต้นช่วง${debouncedStockSearch ? ` · ค้นหา “${debouncedStockSearch}”` : ""}`,
+    periodLabel: `ช่วงข้อมูล ${rangeLabel}${categorySuffix} · ยอดยกมา ณ ต้นช่วง${debouncedStockSearch ? ` · ค้นหา “${debouncedStockSearch}”` : ""}`,
     meta: [
       ["จำนวนรายการ", `${stockTotals.items.toLocaleString("th-TH")} รายการ`],
       ["ขายออกในช่วง", `${stockTotals.sold.toLocaleString("th-TH")} ชิ้น`],
@@ -1587,7 +1573,7 @@ export function Reports({
       preferred: preferred ?? "pdf",
       doc,
       hasTotalsRow: true,
-      downloadNoticeBase: `สินค้าคงคลัง · ${stockBalanceRows.length} รายการ · ${rangeLabel}`,
+      downloadNoticeBase: `สินค้าคงคลัง · ${stockBalanceRows.length} รายการ · ${rangeLabel}${categorySuffix}`,
       printNotice: `สั่งพิมพ์รายงานสินค้าคงคลังแล้ว · ${stockBalanceRows.length} รายการ`,
     };
     if (direct && preferred) {
@@ -1764,6 +1750,7 @@ export function Reports({
         <div className="dash-tab-body">
           {reportTab === "sales" && (
             <section className="panel" id="daily-sales-report">
+              {categoryFilters.length > 0 && <p className="session-table-note">หมวดสินค้า: {categoryFilters.join(", ")}</p>}
               {/* PT-3 Layer 3 — consolidated FilterBar: date chips + inline custom
                   picker + staff SELECT (replaces pills) + groupby + export */}
               <div className="report-filter-bar">
@@ -1796,6 +1783,7 @@ export function Reports({
                       onChange={(nextFrom, nextTo) => { setRangeMode("custom"); setRangeFrom(nextFrom); setRangeTo(nextTo); }}
                       ariaLabel="กำหนดช่วงวันที่รายงานยอดขาย"
                     />
+                  <CategoryMultiControl options={categoryOptions} selected={categoryFilters} onSelect={toggleCategoryFilter} />
                   <div className="report-staff-multi" style={{ position: "relative" }}>
                     <button
                       type="button"
@@ -2090,6 +2078,7 @@ export function Reports({
                                     from={row.date}
                                     to={row.end}
                                     cashiers={staffFilters}
+                                    categories={categoryFilters}
                                   />
                                 </td>
                               </tr>
@@ -3013,6 +3002,7 @@ export function Reports({
           )}
           {reportTab === "stock" && (
             <section className="panel" id="stock-balance-report">
+              {categoryFilters.length > 0 && <p className="session-table-note">หมวดสินค้า: {categoryFilters.join(", ")}</p>}
               {/* PT-3 Layer 3 — FilterBar: date chips + custom picker + search + export */}
               <div className="report-filter-bar">
                 <div className="report-range-row report-filter-row-main">
@@ -3044,6 +3034,7 @@ export function Reports({
                       onChange={(nextFrom, nextTo) => { setRangeMode("custom"); setRangeFrom(nextFrom); setRangeTo(nextTo); }}
                       ariaLabel="เลือกช่วงวันที่รายงานสินค้าคงคลัง"
                     />
+                  <CategoryMultiControl options={categoryOptions} selected={categoryFilters} onSelect={toggleCategoryFilter} />
                   <SharedSearch label="รายงาน · ค้นหาในแท็บนี้"><div className="search-field">
                     <Search size={16} />
                     <input

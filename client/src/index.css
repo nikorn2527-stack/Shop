@@ -15639,3 +15639,5 @@ body:has(.modal-backdrop) .shortcuts-fab { display: none; }
 .image-picker-upload-label small { color: #838776; font-size: 10px; text-align: center; }
 .image-picker-actions { display: flex; justify-content: flex-end; gap: 7px; margin-top: 16px; border-top: 1px solid #edf2f0; padding-top: 13px; }
 
+
+.report-category-toggle-label { max-width: min(210px, 55vw); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
