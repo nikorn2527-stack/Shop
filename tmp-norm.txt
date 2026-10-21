@@ -1,0 +1,15 @@
+102:   imageUrl: string | null;
+617:   ensureColumn(db, "products", "image_url", "TEXT");
+1385:     return db.prepare(`SELECT id, sku, barcode, name, category, emoji, color, size, image_url AS imageUrl, quick_pick AS quickPick, sell_mode AS sellMode, price_tiers AS priceTiers, unit, price, cost, stock, reorder_poin
+1387:   return db.prepare(`SELECT id, sku, barcode, name, category, emoji, color, size, image_url AS imageUrl, quick_pick AS quickPick, sell_mode AS sellMode, price_tiers AS priceTiers, unit, price, cost, stock, reorder_point 
+1391:   return db.prepare(`SELECT id, sku, barcode, name, category, emoji, color, size, image_url AS imageUrl, quick_pick AS quickPick, sell_mode AS sellMode, price_tiers AS priceTiers, unit, price, cost, stock, reorder_point 
+1399:   imageUrl?: string | null;
+1500:   const result = db.prepare(`INSERT INTO products (sku, barcode, name, category, emoji, color, size, image_url, unit, price, cost, stock, reorder_point, quick_pick, sell_mode, price_tiers, active) VALUES (?, ?, ?, ?, ?, 
+1508:     input.imageUrl || null,
+1979:   imageUrl?: string | null;
+2017:   const normalizeEmoji = (value: string | undefined) => value?.trim() || null;
+2049:   if (input.emoji !== undefined && normalizeEmoji(input.emoji) !== product.emoji) {
+2051:     values.push(normalizeEmoji(input.emoji));
+2064:   if (input.imageUrl !== undefined && (input.imageUrl || null) !== product.imageUrl) {
+2065:     assignments.push("image_url = ?");
+2066:     values.push(input.imageUrl || null);

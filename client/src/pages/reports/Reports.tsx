@@ -168,6 +168,62 @@ const REPORT_GROUPBY_CHIPS: { value: ReportGroupBy; label: string }[] = [
   { value: "day", label: "รายวัน" },
   { value: "week", label: "รายสัปดาห์" },
   { value: "month", label: "รายเดือน" },
+
+
+function CategoryMultiControl({
+  options,
+  selected,
+  open,
+  onOpenChange,
+  onSelect,
+}: {
+  options: string[];
+  selected: string[];
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSelect: (name: string) => void;
+}) {
+  return (
+    <div className="report-category-multi" style={{ position: "relative" }}>
+      <button
+        type="button"
+        className="report-category-toggle"
+        onClick={() => onOpenChange(true)}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        title="หมวดสินค้าที่กรอง"
+      >
+        <span className="report-category-toggle-label">
+          {selected.length === 0 ? "ทุกหมวด" : selected.join(", ")}
+        </span>
+        <ChevronDown size={15} className="report-category-toggle-icon" />
+      </button>
+      {open && (
+        <div
+          className="report-category-dropdown"
+          role="listbox"
+          aria-label="หมวดสินค้ารายงาน"
+        >
+          {options.map(opt => (
+            <button
+              key={opt}
+              type="button"
+              className={`report-category-option${selected.includes(opt) ? " selected" : ""}`}
+              onClick={() => {
+                onSelect(opt);
+                onOpenChange(false);
+              }}
+            >
+              <Check size={14} />
+              {opt}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 ];
 
 /** Local calendar date for report defaults; avoids UTC rollover from toISOString(). */

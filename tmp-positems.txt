@@ -1,0 +1,1 @@
+1148:         <div className="cart-items">{cart.length === 0 ? <div className="empty-cart"><ScanLine size={26} /><b>ยังไม่มีสินค้าในบิล</b><span>ยิงบาร์โค้ดที่ช่องด้า

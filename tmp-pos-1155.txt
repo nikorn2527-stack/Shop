@@ -1,0 +1,32 @@
+        <div className="product-scroll">{productsQuery.isLoading ? <div className="product-grid" aria-busy="true">{Array.from({ length: 6 }, (_, index) => <div aria-hidden="true" className="product-card skeleton-card" key={`skeleton-${index}`}>
+<div className="product-art">
+<span className="skeleton-avatar" />
+</div>
+<div className="product-card-info">
+<span className="skeleton-cell-w" />
+<span className="skeleton-cell-n" />
+<span className="skeleton-price" />
+</div>
+</div>)}</div> : productsQuery.isError ? <div className="inline-message error">
+<CircleAlert size={15} /> โหลดรายการสินค้าไม่สำเร็จ · {getErrorMessage(productsQuery.error)}</div> : panelList.length === 0 ? <div className="pos-loading">
+<Search size={26} />
+<b>ไม่พบสินค้าตามเงื่อนไข</b>
+<span>ลองเปลี่ยนคำค้นหาหรือหมวดหมู่</span>
+</div> : <div className="product-grid">{panelList.map((product) => { const tiers = product.sellMode === "money" ? parsePriceTiers(product.priceTiers) : []; if (tiers.length > 0) { return <div className={`product-card money-card${qtyInBill(product.id) > 0 ? " in-bill" : ""}`} key={product.id} aria-label={`${product.name} — สินค้าขายเป็นราคา เลือกขนาดที่ปุ่มราคา`} title={`${product.name} · ขายเป็นราคาตามขนาด`}>
+<div className={`product-art ${product.color}`}>{product.imageUrl ? <img className="product-art-img" src={product.imageUrl} alt="" /> : <span>{product.emoji}</span>}{product.stock <= 10 && <i>เหลือ {formatBillQty(product.stock, product.unit)}</i>}{qtyInBill(product.id) > 0 && <b className="pick-qty-badge">{formatBillQty(qtyInBill(product.id), product.unit)}</b>}</div>
+<div className="product-card-info">
+<b>{product.name}</b>
+<small>{product.unit} · คงเหลือ {formatBillQty(product.stock, product.unit)}</small>
+</div>
+<div className="tier-stepper" onClick={(event) => event.stopPropagation()}>{tiers.map((tier) => <button type="button" className="tier-button" key={tier.label} disabled={product.stock < tier.qty} onClick={() => addTier(product, tier)} aria-label={`เพิ่ม ${product.name} ${tier.label} ${money(tier.price)}`}>
+<b>฿{tier.price}</b>
+<small>{tier.label}</small>
+</button>)}</div>
+</div>; } return <div className={`product-card${qtyInBill(product.id) > 0 ? " in-bill" : ""}`} key={product.id} role="button" tabIndex={0} aria-label={`เพิ่ม ${product.name} เข้าบิล`} onClick={() => addProduct(product)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); addProduct(product); } }}>
+<div className={`product-art ${product.color}`}>{product.imageUrl ? <img className="product-art-img" src={product.imageUrl} alt="" /> : <span>{product.emoji}</span>}{product.stock <= 10 && <i>เหลือ {product.stock}</i>}{qtyInBill(product.id) > 0 && <b className="pick-qty-badge">{qtyInBill(product.id)}</b>}</div>
+<div className="product-card-info">
+<b>{product.name}</b>
+<small>{product.size ? `${product.size} · ` : ""}{product.unit} · คงเหลือ {product.stock}</small>
+<strong>{money(product.price)}</strong>
+</div>
+</div>; })}</div>}</div>

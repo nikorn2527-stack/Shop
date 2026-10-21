@@ -447,6 +447,8 @@ const reportRangeInput = z
     cashier: z.string().trim().max(120).optional(),
     /** ROUND 79 (user) — เลือกหลายพนักงานพร้อมกันได้ (เช่น รวม 2 กะ) · ว่าง = ทุกคน */
     cashiers: z.array(z.string().trim().max(120)).max(30).optional(),
+    /** ROUND 81 (user) — กรองตามหมวดสินค้า (เลือกได้หลายหมวด · ว่าง = ทุกหมวด) */
+    categories: z.array(z.string().trim().max(120)).max(30).optional(),
   })
   .nullish();
 
@@ -459,6 +461,8 @@ const reportsDailyInput = z
     cashier: z.string().trim().max(120).optional(),
     /** ROUND 79 (user) — เลือกหลายพนักงานพร้อมกันได้ (เช่น รวม 2 กะ) · ว่าง = ทุกคน */
     cashiers: z.array(z.string().trim().max(120)).max(30).optional(),
+    /** ROUND 81 (user) — กรองตามหมวดสินค้า (เลือกได้หลายหมวด · ว่าง = ทุกหมวด) */
+    categories: z.array(z.string().trim().max(120)).max(30).optional(),
   })
   .nullish();
 
@@ -488,6 +492,8 @@ const stockBalanceInput = z
     from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
     to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "รูปแบบวันที่ต้องเป็น YYYY-MM-DD").optional(),
     search: z.string().max(120).optional(),
+    /** ROUND 81 (user) — กรองตามหมวดสินค้า (เลือกได้หลายหมวด · ว่าง = ทุกหมวด) */
+    categories: z.array(z.string().trim().max(120)).max(30).optional(),
   })
   .nullish();
 

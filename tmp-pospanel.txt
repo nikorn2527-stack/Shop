@@ -1,0 +1,10 @@
+53:   quickPick: number;
+283:     quickPick: product.quickPick ?? 0,
+320:   const shortcuts = useMemo(() => products.filter((product) => product.quickPick === 1), [products]);
+328:   const quickPanelItems = useMemo(() => quickManageMatches.filter((product) => product.quickPick === 1), [quickManageMatches]);
+331:   const panelList = useMemo(() => {
+631:   const quickPickMutation = trpc.product.update.useMutation({
+634:       setQuickManageNotice(updated.quickPick === 1 ? `เพิ่ม ${updated.name} ขึ้นแผงลัดแล้ว` : `นำ ${updated.name} ออกจากแผงลัดแล้ว`);
+1153:         <div className="quick-pick-head"><div><h2>แผงลัดหน้าร้าน</h2></div><span className="quick-pick-count">{panelList.length} รายการ</span><button type="button" className="outline-button compact quick-manage-open-btn"
+1155:         <div className="product-scroll">{productsQuery.isLoading ? <div className="product-grid" aria-busy="true">{Array.from({ length: 6 }, (_, index) => <div aria-hidden="true" className="product-card skeleton-card" ke
+1195:     }} onRegistered={onMemberRegistered} />}{quickManageOpen && <WorkflowDialog title="จัดแผงลัดหน้าร้าน" onClose={() => setQuickManageOpen(false)} className="form-modal quick-manage-modal"><div className="modal-heading"

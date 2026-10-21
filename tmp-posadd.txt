@@ -1,0 +1,14 @@
+136:   const [cart, setCart] = useState<CartItem[]>([]);
+519:   const addProduct = (product: Product) => {
+532:     setCart((items) => addScannedItem(items, product));
+547:     setCart((items) => addTierItem(items, product, tier));
+574:     setCart((items) => items.map((entry) => (entry === item ? { ...entry, qty } : entry)));
+594:       if (target) { clearQtyDraft(key); addProduct(target); return; }
+625:     setCart((items) => items.flatMap((item) => (item.id === id && (item.variant ?? "") === (variant ?? "") ? (item.qty + delta * step <= 0 ? [] : [{ ...item, qty: item.qty + delta * step }]) : item)))
+656:   const pickScanProduct = (product: Product) => { addProduct(product); setQuery(""); closeScanDrop(); focusScan(); };
+875:     setCart((items) => [...items, { id: specialId, name, price, qty, unit, special: true }]);
+905:     setCart([]);
+923:     setCart(bill.items);
+937:     setCart([]);
+1155:         <div className="product-scroll">{productsQuery.isLoading ? <div className="product-grid" aria-busy="true">{Array.from({ length: 6 }, (_, index) => <div aria-hidden="true" className="product-ca
+1195:     }} onRegistered={onMemberRegistered} />}{quickManageOpen && <WorkflowDialog title="จัดแผงลัดหน้าร้าน" onClose={() => setQuickManageOpen(false)} className="form-modal quick-manage-modal"><div class

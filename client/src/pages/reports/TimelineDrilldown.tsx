@@ -15,16 +15,19 @@ export function TimelineDrilldown({
   from,
   to,
   cashiers,
+  categories,
 }: {
   from: string;
   to: string;
   cashiers?: string[];
+  categories?: string[];
 }) {
   const query = trpc.reports.byProduct.useQuery(
     {
       from,
       to,
       cashiers: cashiers && cashiers.length > 0 ? cashiers : undefined,
+      categories: categories && categories.length > 0 ? categories : undefined,
     },
     { placeholderData: previous => previous }
   );

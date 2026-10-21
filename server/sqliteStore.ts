@@ -1,6 +1,7 @@
 import { reportSellingValue } from "../shared/reportValuation";
 import { findPosShortcutConflicts, posShortcutConflictMessage } from "../shared/posShortcuts";
 import { memberNumberHead, nextMemberNumberSequence, type MemberNumberFormat } from "../shared/memberNumber";
+import { categoryEmoji } from "../shared/productCategories";
 import { allocateInventoryCost } from "./inventoryValuation";
 import { INVENTORY_ACTION_LABELS } from "../shared/inventoryActions";
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual } from "node:crypto";
@@ -1502,7 +1503,8 @@ export function createProduct(db: SqliteDb, input: CreateProductInput): SqlitePr
     input.barcode?.trim() || null,
     name,
     input.category?.trim() || "ของใช้",
-    input.emoji ?? null,
+    // ROUND 81 (user) — สินค้าใหม่ที่ไม่ได้เลือกอีโมจิ ใช้อีโมจิประจำหมวดเป็นภาพต้นแบบ
+    input.emoji?.trim() || categoryEmoji(input.category?.trim() || "ของใช้"),
     input.color ?? null,
     input.size?.trim() || null,
     input.imageUrl || null,
@@ -2045,6 +2047,14 @@ export function updateProduct(db: SqliteDb, input: UpdateProductInput): SqlitePr
     assignments.push("category = ?");
     values.push(input.category.trim());
     changedLabels.push("หมวดหมู่");
+    // ROUND 81 (user) — เปลี่ยนหมวดแล้วอีโมจิเดิมอาจไม่ตรงหมวดใหม่
+    // ถ้าสินค้ายังไม่มีอีโมจิ หรือใช้อีโมจิประจำหมวดเดิมอยู่ ให้อัปเดตเป็นอีโมจิของหมวดใหม่
+    const previousEmoji = product.emoji ?? null;
+    const previousCategoryEmoji = categoryEmoji(product.category);
+    if (input.emoji === undefined && (previousEmoji === null || previousEmoji === previousCategoryEmoji)) {
+      assignments.push("emoji = ?");
+      values.push(categoryEmoji(input.category.trim()));
+    }
   }
   if (input.emoji !== undefined && normalizeEmoji(input.emoji) !== product.emoji) {
     assignments.push("emoji = ?");
@@ -3019,7 +3029,21 @@ const ISO_DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 /** ROUND 51 — ชื่อพนักงานพิเศษ: แทนบิลที่ไม่ได้ระบุชื่อผู้ขาย (เก่า ๆ / นำเข้า) */
 export const UNASSIGNED_CASHIER = "ไม่ระบุพนักงาน";
 
-export type DailyRangeInput = { days?: number; from?: string; to?: string; cashier?: string; cashiers?: string[] };
+export type DailyRangeInput = { days?: number; from?: string; to?: string; cashier?: string; cashiers?: string[]; categories?: string[] };
+
+/**
+ * ROUND 81 (user) — ตัวกรองหมวดสินค้า
+ * กรองเฉพาะรายการที่มีหมวดตรงกับที่เลือก (ว่าง = ทุกหมวด)
+ * ใช้ร่วมกันทั้งรายงานยอดขายและรายงานสินค้าคงคลัง
+ */
+function categoryWhere(alias: string, input: { categories?: string[] }): { sql: string; params: string[] } {
+  const names = Array.from(new Set((input.categories ?? []).map((name) => name.trim()).filter((name) => name !== "")));
+  if (names.length === 0) return { sql: "", params: [] };
+  return {
+    sql: ` AND TRIM(COALESCE(${alias}.category, '')) IN (${names.map(() => "?").join(", ")})`,
+    params: names,
+  };
+}
 
 /**
  * ROUND 51 (user) — ตัวกรองพนักงานขายใช้ร่วมกับทุกรายงานยอดขาย
@@ -3086,12 +3110,20 @@ export function dailySalesRows(db: SqliteDb, input: number | DailyRangeInput = 3
   const since = `${formatDate(fromDate)} 00:00:00`;
   const until = `${formatDate(toDate)} 23:59:59`;
   const filter = cashierWhere("s", options);
+  const categoryFilter = categoryWhere("p", options);
   const salesByDay = new Map<string, { orders: number; revenue: number }>();
-  for (const row of db.prepare(`SELECT substr(s.created_at, 1, 10) AS date, COUNT(*) AS orders, ROUND(SUM(s.total), 2) AS revenue FROM sales s WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY date`).all(since, until, ...filter.params) as unknown as { date: string; orders: number; revenue: number }[]) {
-    salesByDay.set(row.date, { orders: row.orders, revenue: round2(row.revenue) });
+  if (categoryFilter.sql === "") {
+    for (const row of db.prepare(`SELECT substr(s.created_at, 1, 10) AS date, COUNT(*) AS orders, ROUND(SUM(s.total), 2) AS revenue FROM sales s WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY date`).all(since, until, ...filter.params) as unknown as { date: string; orders: number; revenue: number }[]) {
+      salesByDay.set(row.date, { orders: row.orders, revenue: round2(row.revenue) });
+    }
+  } else {
+    // ROUND 81 (user) — กรองตามหมวด: ยอดขายนับเฉพาะบรรทัดสินค้าในหมวดที่เลือก
+    for (const row of db.prepare(`SELECT substr(s.created_at, 1, 10) AS date, COUNT(DISTINCT s.id) AS orders, ROUND(COALESCE(SUM(si.qty * si.price), 0), 2) AS revenue FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql}${categoryFilter.sql} GROUP BY date`).all(since, until, ...filter.params, ...categoryFilter.params) as unknown as { date: string; orders: number; revenue: number }[]) {
+      salesByDay.set(row.date, { orders: row.orders, revenue: round2(row.revenue) });
+    }
   }
   const itemsByDay = new Map<string, { items: number; cogs: number }>();
-  for (const row of db.prepare(`SELECT substr(s.created_at, 1, 10) AS date, COALESCE(SUM(si.qty), 0) AS items, ROUND(COALESCE(SUM(${REPORT_COGS_SQL}), 0), 2) AS cogs FROM sales s JOIN sale_items si ON si.sale_id = s.id WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY date`).all(since, until, ...filter.params) as unknown as { date: string; items: number; cogs: number }[]) {
+  for (const row of db.prepare(`SELECT substr(s.created_at, 1, 10) AS date, COALESCE(SUM(si.qty), 0) AS items, ROUND(COALESCE(SUM(${REPORT_COGS_SQL}), 0), 2) AS cogs FROM sales s JOIN sale_items si ON si.sale_id = s.id LEFT JOIN products p ON p.id = si.product_id WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql}${categoryFilter.sql} GROUP BY date`).all(since, until, ...filter.params, ...categoryFilter.params) as unknown as { date: string; items: number; cogs: number }[]) {
     itemsByDay.set(row.date, { items: row.items, cogs: round2(row.cogs) });
   }
   const rows: DailySalesRow[] = [];
@@ -3117,7 +3149,8 @@ export function salesByCategory(db: SqliteDb, input: DailyRangeInput = {}): Sale
   const since = `${formatDate(fromDate)} 00:00:00`;
   const until = `${formatDate(toDate)} 23:59:59`;
   const filter = cashierWhere("s", input);
-  const rows = db.prepare(`SELECT COALESCE(NULLIF(TRIM(p.category), ''), 'ไม่ระบุหมวด') AS category, COUNT(DISTINCT si.sale_id) AS orders, COALESCE(SUM(si.qty), 0) AS qty, ROUND(COALESCE(SUM(si.qty * si.price), 0), 2) AS revenue, ROUND(COALESCE(SUM(${REPORT_COGS_SQL}), 0), 2) AS cogs FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY category ORDER BY revenue DESC`).all(since, until, ...filter.params) as unknown as { category: string; orders: number; qty: number; revenue: number; cogs: number }[];
+  const categoryFilter = categoryWhere("p", input);
+  const rows = db.prepare(`SELECT COALESCE(NULLIF(TRIM(p.category), ''), 'ไม่ระบุหมวด') AS category, COUNT(DISTINCT si.sale_id) AS orders, COALESCE(SUM(si.qty), 0) AS qty, ROUND(COALESCE(SUM(si.qty * si.price), 0), 2) AS revenue, ROUND(COALESCE(SUM(${REPORT_COGS_SQL}), 0), 2) AS cogs FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql}${categoryFilter.sql} GROUP BY category ORDER BY revenue DESC`).all(since, until, ...filter.params, ...categoryFilter.params) as unknown as { category: string; orders: number; qty: number; revenue: number; cogs: number }[];
   return rows.map((row) => { const profit = round2(row.revenue - row.cogs); return { ...row, qty: Number(row.qty), cogs: round2(row.cogs), profit, marginPct: row.revenue > 0 ? round2((profit / row.revenue) * 100) : 0 }; });
 }
 
@@ -3146,7 +3179,8 @@ export function salesByProduct(db: SqliteDb, input: DailyRangeInput = {}): Sales
   const since = `${formatDate(fromDate)} 00:00:00`;
   const until = `${formatDate(toDate)} 23:59:59`;
   const filter = cashierWhere("s", input);
-  const rows = db.prepare(`SELECT si.product_id AS productId, CASE WHEN si.product_id IS NULL THEN 'รายการพิเศษ' ELSE COALESCE(p.name, si.name) END AS name, p.sku AS sku, p.barcode AS barcode, NULLIF(TRIM(p.category), '') AS category, COUNT(DISTINCT si.sale_id) AS bills, COALESCE(SUM(si.qty), 0) AS qty, ROUND(COALESCE(SUM(si.qty * si.price), 0), 2) AS revenue, ROUND(COALESCE(SUM(${REPORT_COGS_SQL}), 0), 2) AS cogs FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY si.product_id ORDER BY revenue DESC`).all(since, until, ...filter.params) as unknown as { productId: number | null; name: string; sku: string | null; barcode: string | null; category: string | null; bills: number; qty: number; revenue: number; cogs: number }[];
+  const categoryFilter = categoryWhere("p", input);
+  const rows = db.prepare(`SELECT si.product_id AS productId, CASE WHEN si.product_id IS NULL THEN 'รายการพิเศษ' ELSE COALESCE(p.name, si.name) END AS name, p.sku AS sku, p.barcode AS barcode, NULLIF(TRIM(p.category), '') AS category, COUNT(DISTINCT si.sale_id) AS bills, COALESCE(SUM(si.qty), 0) AS qty, ROUND(COALESCE(SUM(si.qty * si.price), 0), 2) AS revenue, ROUND(COALESCE(SUM(${REPORT_COGS_SQL}), 0), 2) AS cogs FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql}${categoryFilter.sql} GROUP BY si.product_id ORDER BY revenue DESC`).all(since, until, ...filter.params, ...categoryFilter.params) as unknown as { productId: number | null; name: string; sku: string | null; barcode: string | null; category: string | null; bills: number; qty: number; revenue: number; cogs: number }[];
   return rows.map((row) => { const profit = round2(row.revenue - row.cogs); return { ...row, bills: Number(row.bills), qty: Number(row.qty), cogs: round2(row.cogs), profit, marginPct: row.revenue > 0 ? round2((profit / row.revenue) * 100) : 0 }; });
 }
 
@@ -3177,7 +3211,8 @@ export function salesLineItems(db: SqliteDb, input: DailyRangeInput = {}): Sales
   const since = `${formatDate(fromDate)} 00:00:00`;
   const until = `${formatDate(toDate)} 23:59:59`;
   const filter = cashierWhere("s", input);
-  return db.prepare(`SELECT s.order_number AS orderNumber, s.created_at AS createdAt, COALESCE(NULLIF(TRIM(p.sku), ''), NULLIF(TRIM(p.barcode), '')) AS productCode, si.name AS productName, COALESCE(si.unit, p.unit, 'ชิ้น') AS unit, si.qty, si.price, ROUND(si.qty * si.price, 2) AS amount, s.payment_method AS paymentMethod, COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, s.member_number AS memberNumber, CASE WHEN m.member_number IS NULL THEN NULL WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id LEFT JOIN members m ON m.member_number = s.member_number WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql} ORDER BY s.created_at DESC, s.id DESC, si.id ASC LIMIT 1000`).all(since, until, ...filter.params) as unknown as SalesLineItemRow[];
+  const categoryFilter = categoryWhere("p", input);
+  return db.prepare(`SELECT s.order_number AS orderNumber, s.created_at AS createdAt, COALESCE(NULLIF(TRIM(p.sku), ''), NULLIF(TRIM(p.barcode), '')) AS productCode, si.name AS productName, COALESCE(si.unit, p.unit, 'ชิ้น') AS unit, si.qty, si.price, ROUND(si.qty * si.price, 2) AS amount, s.payment_method AS paymentMethod, COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, s.member_number AS memberNumber, CASE WHEN m.member_number IS NULL THEN NULL WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id LEFT JOIN members m ON m.member_number = s.member_number WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql}${categoryFilter.sql} ORDER BY s.created_at DESC, s.id DESC, si.id ASC LIMIT 1000`).all(since, until, ...filter.params, ...categoryFilter.params) as unknown as SalesLineItemRow[];
 }
 
 export type SalesByCashierRow = { cashier: string; orders: number; items: number; memberBills: number; discount: number; total: number; cogs: number; profit: number };
@@ -3188,12 +3223,22 @@ export function salesByCashier(db: SqliteDb, input: DailyRangeInput = {}): Sales
   const since = `${formatDate(fromDate)} 00:00:00`;
   const until = `${formatDate(toDate)} 23:59:59`;
   const filter = cashierWhere("s", input);
-  const base = db.prepare(`SELECT COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, COUNT(*) AS orders, ROUND(COALESCE(SUM(s.discount), 0), 2) AS discount, ROUND(COALESCE(SUM(s.total), 0), 2) AS total, SUM(CASE WHEN s.member_number IS NOT NULL AND s.member_number != '' THEN 1 ELSE 0 END) AS memberBills, ROUND(COALESCE(SUM(sale_costs.cogs), 0), 2) AS cogs FROM sales s LEFT JOIN (SELECT si.sale_id, SUM(${REPORT_COGS_SQL}) AS cogs FROM sale_items si GROUP BY si.sale_id) sale_costs ON sale_costs.sale_id = s.id WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY cashier ORDER BY total DESC`).all(since, until, ...filter.params) as unknown as { cashier: string; orders: number; discount: number; total: number; memberBills: number; cogs: number }[];
+  const categoryFilter = categoryWhere("p", input);
+  const filtered = categoryFilter.sql !== "";
+  // ROUND 81 (user) — เมื่อกรองตามหมวด ยอดขาย/ต้นทุนต้องนับเฉพาะรายการในหมวดนั้น
+  // จึงต้อง join sale_items (ไม่งั้นยอดจะเป็นยอดทั้งบิลและซ้ำกันหลายบรรทัด)
+  const base = filtered
+    ? db.prepare(`SELECT COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, COUNT(DISTINCT s.id) AS orders, ROUND(COALESCE(SUM(si.qty * si.price), 0), 2) AS total, COUNT(DISTINCT CASE WHEN s.member_number IS NOT NULL AND s.member_number != '' THEN s.id END) AS memberBills, ROUND(COALESCE(SUM(${REPORT_COGS_SQL}), 0), 2) AS cogs FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql}${categoryFilter.sql} GROUP BY cashier ORDER BY total DESC`).all(since, until, ...filter.params, ...categoryFilter.params) as unknown as { cashier: string; orders: number; total: number; memberBills: number; cogs: number }[]
+    : db.prepare(`SELECT COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, COUNT(*) AS orders, ROUND(COALESCE(SUM(s.discount), 0), 2) AS discount, ROUND(COALESCE(SUM(s.total), 0), 2) AS total, SUM(CASE WHEN s.member_number IS NOT NULL AND s.member_number != '' THEN 1 ELSE 0 END) AS memberBills, ROUND(COALESCE(SUM(sale_costs.cogs), 0), 2) AS cogs FROM sales s LEFT JOIN (SELECT si.sale_id, SUM(${REPORT_COGS_SQL}) AS cogs FROM sale_items si GROUP BY si.sale_id) sale_costs ON sale_costs.sale_id = s.id WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY cashier ORDER BY total DESC`).all(since, until, ...filter.params) as unknown as { cashier: string; orders: number; discount?: number; total: number; memberBills: number; cogs: number }[];
   const itemsByCashier = new Map<string, number>();
-  for (const row of db.prepare(`SELECT COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, COALESCE(SUM(si.qty), 0) AS items FROM sales s JOIN sale_items si ON si.sale_id = s.id WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql} GROUP BY cashier`).all(since, until, ...filter.params) as unknown as { cashier: string; items: number }[]) {
+  for (const row of db.prepare(`SELECT COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, COALESCE(SUM(si.qty), 0) AS items FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql}${categoryFilter.sql} GROUP BY cashier`).all(since, until, ...filter.params, ...categoryFilter.params) as unknown as { cashier: string; items: number }[]) {
     itemsByCashier.set(row.cashier, Number(row.items));
   }
-  return base.map((row) => { const cogs = round2(row.cogs); const profit = round2(row.total - cogs); return { cashier: row.cashier, orders: row.orders, items: itemsByCashier.get(row.cashier) ?? 0, memberBills: Number(row.memberBills), discount: round2(row.discount), total: round2(row.total), cogs, profit }; });
+  return base.map((row) => {
+    const cogs = round2(row.cogs);
+    const profit = round2(row.total - cogs);
+    return { cashier: row.cashier, orders: row.orders, items: itemsByCashier.get(row.cashier) ?? 0, memberBills: Number(row.memberBills), discount: round2(row.discount ?? 0), total: round2(row.total), cogs, profit };
+  });
 }
 
 /** ROUND 51 (user) — รายชื่อพนักงานขายจากบิลจริงทั้งหมด (สำหรับตัวกรองเจาะจงในรายงาน) */
@@ -3359,7 +3404,7 @@ export type StockBalanceRow = {
   sellingValue: number;
 };
 
-export type StockBalanceInput = { from?: string; to?: string; search?: string };
+export type StockBalanceInput = { from?: string; to?: string; search?: string; categories?: string[] };
 
 export function stockBalanceReport(db: SqliteDb, input: StockBalanceInput = {}): StockBalanceRow[] {
   const fromDate = input.from && ISO_DATE_ONLY.test(input.from) ? input.from : formatDate(addDays(new Date(), -6));
@@ -3386,9 +3431,17 @@ export function stockBalanceReport(db: SqliteDb, input: StockBalanceInput = {}):
   }
 
   const search = input.search?.trim();
-  const where = search ? ` WHERE (name LIKE ? OR sku LIKE ? OR COALESCE(barcode, '') LIKE ?)` : "";
-  const params = search ? [`%${search}%`, `%${search}%`, `%${search}%`] : [];
-  const products = db.prepare(`SELECT id, sku, barcode, name, unit, category, stock, price, active FROM products${where} ORDER BY id`).all(...params) as unknown as { id: number; sku: string; barcode: string | null; name: string; unit: string; category: string; stock: number; price: number; active: number }[];
+  const whereParts: string[] = [];
+  const params: string[] = [];
+  if (search) {
+    whereParts.push(`(name LIKE ? OR sku LIKE ? OR COALESCE(barcode, '') LIKE ?)`);
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
+  }
+  // ROUND 81 (user) — กรองรายงานสินค้าคงคลังตามหมวดสินค้า
+  const categoryFilter = categoryWhere("products", input);
+  if (categoryFilter.sql !== "") whereParts.push(categoryFilter.sql.replace(/^AND\s+/i, ""));
+  const where = whereParts.length > 0 ? ` WHERE ${whereParts.join(" AND ")}` : "";
+  const products = db.prepare(`SELECT id, sku, barcode, name, unit, category, stock, price, active FROM products${where} ORDER BY id`).all(...params, ...categoryFilter.params) as unknown as { id: number; sku: string; barcode: string | null; name: string; unit: string; category: string; stock: number; price: number; active: number }[];
   const codeOrder = new Intl.Collator("th", {numeric: true, sensitivity: "base"});
   return products.map((product) => {
     const sold = soldByProduct.get(product.id) ?? 0;

@@ -1,0 +1,5 @@
+8: export type CartItem = { id: number; name: string; price: number; qty: number; unit: string; special?: boolean; variant?: string; step?: number };
+56: export function calculateCartSubtotal(items: CartItem[]) {
+62: export function addScannedItem(items: CartItem[], product: Product) {
+86: export function addTierItem(items: CartItem[], product: Product, tier: PriceTier) {
+153:   items: CartItem[];

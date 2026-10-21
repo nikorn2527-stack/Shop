@@ -1,0 +1,31 @@
+diff --git a/client/src/pages/Stock.tsx b/client/src/pages/Stock.tsx
+index d843afc..cb0772e 100755
+--- a/client/src/pages/Stock.tsx
++++ b/client/src/pages/Stock.tsx
+@@ -64,6 +64,8 @@ const SIZE_UNIT_OPTIONS = ["มล.", "ลิตร", "กรัม", "กก.",
+ // ROUND 71 — หมวดสินค้า: รหัสอัตโนมัติขึ้นต้นตามหมวด (ชุดเดียวกับ server/sqliteStore.ts CATEGORY_SKU_PREFIXES)
+ // เครื่องดื่ม=DRK · ของใช้ส่วนตัว=HYG · ขนม=SNK · อาหาร=FD · ของใช้ในครัวเรือน=HH · เครื่องเขียน=ST
+ const CATEGORY_SKU_PREFIXES: Record<string, string> = { "เครื่องดื่ม": "DRK", "อาหาร": "FD", "ของใช้": "HYG", "ของใช้ส่วนตัว": "HYG", "ของใช้ในครัวเรือน": "HH", "ขนม": "SNK", "เครื่องเขียน": "ST" };
++/** หมวดสินค้าแต่ละหมวดมีอีโมจิประจำหมวด ใช้เป็นภาพต้นแบบสำหรับสินค้าที่ยังไม่มีรูปภาพและไม่มีบาร์โค้ด */
++const CATEGORY_DEFAULT_EMOJI: Record<string, string> = { "เครื่องดื่ม": "🥤", "อาหาร": "🍱", "ของใช้": "🛍️", "ของใช้ส่วนตัว": "🧴", "ของใช้ในครัวเรือน": "🧺", "ขนม": "🍬", "เครื่องเขียน": "📝" };
+ const SIZE_PRESETS: [string, string][] = [["180", "มล."], ["300", "มล."], ["325", "มล."], ["500", "มล."], ["600", "มล."], ["1", "ลิตร"], ["200", "กรัม"], ["500", "กรัม"], ["1", "กก."]];
+ function parseSizeInput(size: string | null | undefined): { num: string; unit: string } {
+   const trimmed = (size ?? "").trim();
+@@ -503,7 +505,7 @@ export function Stock({ role, userName, initialAction, embeddedAction = false, r
+       cost,
+       reorderPoint,
+       category: newItem.category,
+-      emoji: "🛍️",
++      emoji: CATEGORY_DEFAULT_EMOJI[newItem.category] ?? "🛍️",
+       color: "mint",
+       sellMode: isMoney ? "money" : undefined,
+       priceTiers: isMoney ? tierResult.json : undefined,
+@@ -518,7 +520,7 @@ export function Stock({ role, userName, initialAction, embeddedAction = false, r
+         barcode: definition.barcode ?? null, size: definition.size ?? null,
+         imageUrl: definition.imageUrl ?? null, unit: newItem.unit, price,
+         cost: cost ?? 0, stock: 0, reorderPoint: definition.reorderPoint ?? 0,
+-        category: newItem.category, emoji: "🛍️", color: "mint", active: 1,
++        category: newItem.category, emoji: CATEGORY_DEFAULT_EMOJI[newItem.category] ?? "🛍️", color: "mint", active: 1,
+         quickPick: definition.quickPick ?? 0, sellMode: definition.sellMode ?? null,
+         priceTiers: definition.priceTiers ?? null, createdAt: new Date().toISOString(),
+       };
