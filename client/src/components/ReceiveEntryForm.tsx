@@ -4,8 +4,8 @@ import { ExpiryDateInput } from "./ExpiryDateInput";
 type Draft = { purchaseQty:string; freeQty:string; paidAmount:string; lot:string; expiry:string; sellingPrice:string };
 type NewItem = {name:string;sku:string;category:string;unit:string;price:string;sizeNum:string;sizeUnit:string};
 type Pricing = {previousCost:number|null;sellingPrice:number;remainingQty:number;highestRemainingCost:number|null;unknownRemainingQty:number};
-export function ReceiveEntryForm({scan, value, onChange, product, newItem, onNewChange, categories, pricing, loading, pricingError, canChangePrice, busy, newDraftActive, canCreate, onBarcodeCommit, onAdd, onClear}: {
-  scan:ReactNode;value:Draft;onChange:(field:keyof Draft,value:string)=>void;
+export function ReceiveEntryForm({artwork, scan, value, onChange, product, newItem, onNewChange, categories, pricing, loading, pricingError, canChangePrice, busy, newDraftActive, canCreate, onBarcodeCommit, onAdd, onClear}: {
+  artwork?:ReactNode;scan:ReactNode;value:Draft;onChange:(field:keyof Draft,value:string)=>void;
   product?:{name:string;category:string;unit:string;price:number;sellMode?:string|null;barcode?:string|null;sku?:string;size?:string|null;stock?:number}|null;
   newItem?:NewItem;onNewChange:(field:keyof NewItem,value:string)=>void;categories:string[];
   pricing?:Pricing;loading:boolean;pricingError:boolean;canChangePrice:boolean;busy:boolean;
@@ -27,6 +27,7 @@ export function ReceiveEntryForm({scan, value, onChange, product, newItem, onNew
     <div className="receive-form-section">
       <div className="receive-section-title"><h3>ข้อมูลสินค้า</h3>{product ? <span className="receive-existing-badge">สินค้าเดิม · คงเหลือ {product.stock} {product.unit}</span> : newDraftActive && <span className="receive-new-badge">สินค้าใหม่</span>}</div>
       {scan}
+      {artwork}
       <div className="receive-new-fields">
         <label>บาร์โค้ด / รหัส<input aria-label="บาร์โค้ดสินค้า" value={details.sku} readOnly={Boolean(product)} disabled={busy||!canCreate&&!product} onChange={e=>onNewChange("sku",e.target.value)} onBlur={()=>{if(!product && details.sku.trim())onBarcodeCommit(details.sku.trim());}} placeholder="เว้นว่างเพื่อออกรหัสอัตโนมัติ" /></label>
         <label>ชื่อสินค้า *<input id="receive-new-name" aria-label="ชื่อสินค้า" value={details.name} readOnly={Boolean(product)} disabled={busy||!canCreate&&!product} onChange={e=>onNewChange("name",e.target.value)} placeholder="ชื่อสินค้า" /></label>

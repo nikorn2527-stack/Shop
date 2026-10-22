@@ -1,3 +1,4 @@
+import { resolveProductArtwork } from "@shared/productIcons";
 import { notify } from "@/lib/notifications";
 import { useRef as useRequestRef } from "react";
 import { WorkflowDialog } from "@/components/WorkflowDialog";
@@ -271,13 +272,12 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
     stock: product.stock,
     unit: product.unit,
     color: product.color ?? "mint",
-    emoji: product.emoji ?? "🛍️",
+    ...resolveProductArtwork(product),
     sku: product.sku,
     barcode: product.barcode,
     cost: product.cost,
     reorderPoint: product.reorderPoint,
     size: product.size ?? null,
-    imageUrl: product.imageUrl ?? null,
     sellMode: product.sellMode ?? "unit",
     priceTiers: product.priceTiers ?? null,
     quickPick: product.quickPick ?? 0,

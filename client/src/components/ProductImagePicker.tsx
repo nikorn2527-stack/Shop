@@ -1,195 +1,149 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { X } from "@/lib/icons";
 import { WorkflowDialog } from "./WorkflowDialog";
-import { compressImageToDataUrl } from "@/pages/pageData";
-
-/** อีโมจิตัวแทนของแต่ละหมวดสินค้า ใช้สำหรับสินค้าที่ยังไม่มีรูปภาพและไม่มีบาร์โค้ด */
-export const CATEGORY_EMOJI_MAP: Record<string, string> = {
-  เครื่องดื่ม: "🥤",
-  อาหาร: "🍱",
-  ของใช้: "🛍️",
-  ของใช้ส่วนตัว: "🧴",
-  ของใช้ในครัวเรือน: "🧺",
-  ขนม: "🍬",
-  เครื่องเขียน: "📝",
-};
-
-/** รายการอีโมจิที่ใช้บ่อยสำหรับสินค้าทั่วไป */
-const COMMON_EMOJIS = [
-  "🥤",
-  "🍱",
-  "🍱",
-  "🛍️",
-  "🧴",
-  "🧺",
-  "🍬",
-  "📝",
-  "🥤",
-  "☕",
-  "🧃",
-  "🥛",
-  "🍉",
-  "🍎",
-  "🍌",
-  "🍊",
-  "🍞",
-  "🍳",
-  "🍔",
-  "🍟",
-  "🍕",
-  "🍩",
-  "🍪",
-  "🍫",
-  "📦",
-  "🎒",
-  "👕",
-  "👖",
-  "👟",
-  "🧢",
-  "🧴",
-  "🧼",
-  "📝",
-  "✂️",
-  "📎",
-  "📄",
-  "✏️",
-  "🖊️",
-  "📘",
-  "📕",
-];
+import {
+  categoryEmoji,
+  normalizeProductCategory,
+} from "@shared/productCategories";
+import { PRODUCT_ICONS, resolveProductArtwork } from "@shared/productIcons";
 
 export function ProductImagePicker({
   currentEmoji,
   currentImageUrl,
   category,
+  productName,
   onChange,
   onClose,
 }: {
   currentEmoji?: string | null;
   currentImageUrl?: string | null;
   category?: string | null;
+  productName?: string;
   onChange: (emoji: string | null, imageUrl: string | null) => void;
   onClose: () => void;
 }) {
-  const [selectedEmoji, setSelectedEmoji] = useState<string | null>(
-    currentEmoji ?? CATEGORY_EMOJI_MAP[category ?? ""] ?? "🛍️"
+  const [selection, setSelection] = useState(() =>
+    resolveProductArtwork({
+      emoji: currentEmoji,
+      imageUrl: currentImageUrl,
+      category,
+      name: productName,
+    })
   );
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState(currentImageUrl ?? null);
-  const fileInput = useRef<HTMLInputElement>(null);
-
-  const handleImageChange = async (
-    event: React.ChangeEvent<HTMLInputElement>
-  ) => {
-    const file = event.target.files?.[0] ?? null;
-    if (!file) return;
-    setImageFile(file);
-    const dataUrl = await compressImageToDataUrl(file);
-    setPreviewUrl(dataUrl);
-    setSelectedEmoji(null); // เลือกรูปแล้วให้เลือกระหว่างรูปกับอีโมจิอย่างใดอย่างหนึ่ง
-  };
-
-  const pickEmoji = useCallback((emoji: string) => {
-    setSelectedEmoji(emoji);
-    setImageFile(null);
-    setPreviewUrl(null);
-  }, []);
-
-  const confirm = useCallback(() => {
-    onChange(selectedEmoji || null, previewUrl || null);
-    onClose();
-  }, [selectedEmoji, previewUrl, onChange, onClose]);
-
-  const emojiGrid = useMemo(() => {
-    const defaults = category
-      ? [CATEGORY_EMOJI_MAP[category]].filter(Boolean)
-      : [];
-    const others = COMMON_EMOJIS.filter(e => !defaults.includes(e));
-    return [...defaults, ...others];
-  }, [category]);
-
+  const [query, setQuery] = useState("");
+  const [group, setGroup] = useState("ทั้งหมด");
+  const groups = useMemo(
+    () => [
+      "ทั้งหมด",
+      ...Array.from(new Set(PRODUCT_ICONS.map(icon => icon.category))),
+    ],
+    []
+  );
+  const choices = useMemo(() => {
+    const term = query.trim().toLowerCase();
+    return PRODUCT_ICONS.filter(
+      icon =>
+        (group === "ทั้งหมด" || icon.category === group) &&
+        (!term ||
+          `${icon.label} ${icon.aliases.join(" ")} ${icon.category}`
+            .toLowerCase()
+            .includes(term))
+    );
+  }, [group, query]);
+  const defaultEmoji = categoryEmoji(category);
   return (
     <WorkflowDialog
-      title="เลือกรูปสินค้าหรืออีโมจิ"
-      description="สินค้าที่ไม่มีบาร์โค้ดจะแสดงรูปหรืออีโมจิเป็นภาพต้นแบบบนแผงหน้าร้าน"
+      title="เลือกไอคอนสินค้า"
+      description="ใช้แทนรูปถ่ายได้ทั้งสินค้าบนแผงและสินค้าในคลัง เลือกแล้วกดยืนยัน"
       onClose={onClose}
       className="form-modal product-image-picker"
     >
-      <div className="image-picker-tabs">
+      <div className="modal-heading">
+        <div>
+          <h2>เลือกไอคอนสินค้า</h2>
+          <p>เลือกรูปแทนสินค้า โดยไม่ต้องถ่ายภาพจริง</p>
+        </div>
         <button
           type="button"
-          className={`tab-btn${selectedEmoji ? " active" : ""}`}
-          onClick={() => {
-            setSelectedEmoji(CATEGORY_EMOJI_MAP[category ?? ""] ?? "🛍️");
-            setImageFile(null);
-            setPreviewUrl(null);
-          }}
+          className="icon-button"
+          aria-label="ปิดตัวเลือกไอคอน"
+          onClick={onClose}
         >
-          ใช้อีโมจิตามหมวด
-        </button>
-        <button
-          type="button"
-          className={`tab-btn${!selectedEmoji && previewUrl ? " active" : ""}`}
-          onClick={() => fileInput.current?.click()}
-        >
-          อัปโหลดรูปภาพ
+          <X size={18} />
         </button>
       </div>
-
-      {previewUrl ? (
-        <div className="image-picker-preview">
-          <img src={previewUrl} alt="ตัวอย่างรูปสินค้า" />
-          <button
-            type="button"
-            className="image-picker-remove"
-            onClick={() => {
-              setImageFile(null);
-              setPreviewUrl(null);
-              setSelectedEmoji(CATEGORY_EMOJI_MAP[category ?? ""] ?? "🛍️");
-            }}
-          >
-            <X size={16} />
-          </button>
+      <div className="product-icon-preview" aria-live="polite">
+        {selection.imageUrl ? (
+          <img src={selection.imageUrl} alt="ตัวอย่างภาพสินค้า" />
+        ) : (
+          <span className="product-icon-emoji" aria-hidden="true">
+            {selection.emoji}
+          </span>
+        )}
+        <div>
+          <b>{productName || "ตัวอย่างสินค้า"}</b>
+          <small>จะบันทึกเมื่อกดบันทึกสินค้า</small>
         </div>
-      ) : (
-        <div className="emoji-grid">
-          {emojiGrid.map((emoji, index) => (
-            <button
-              key={index}
-              type="button"
-              className={`emoji-btn${selectedEmoji === emoji ? " active" : ""}`}
-              onClick={() => pickEmoji(emoji)}
-              aria-label={`เลือกอีโมจิ ${emoji}`}
-            >
-              {emoji}
-            </button>
+      </div>
+      <button
+        type="button"
+        className="outline-button product-icon-default"
+        aria-pressed={!selection.imageUrl && selection.emoji === defaultEmoji}
+        onClick={() => setSelection({ imageUrl: null, emoji: defaultEmoji })}
+      >
+        <span aria-hidden="true">{defaultEmoji}</span> ใช้ค่าเริ่มต้นตามหมวด ·{" "}
+        {normalizeProductCategory(category || "ของใช้")}
+      </button>
+      <label className="product-icon-search">
+        ค้นหาไอคอน
+        <input
+          type="search"
+          value={query}
+          onChange={event => setQuery(event.target.value)}
+          placeholder="เช่น แสตมป์ ผ้าเช็ดตัว น้ำแข็ง"
+        />
+      </label>
+      <label className="product-icon-filter">
+        หมวดไอคอน
+        <select value={group} onChange={event => setGroup(event.target.value)}>
+          {groups.map(value => (
+            <option key={value}>{value}</option>
           ))}
-        </div>
+        </select>
+      </label>
+      <div className="product-icon-grid" aria-label="ชุดไอคอนสินค้า">
+        {choices.map(icon => (
+          <button
+            key={icon.id}
+            type="button"
+            className="product-icon-choice"
+            aria-label={`เลือกไอคอน ${icon.label}`}
+            aria-pressed={selection.imageUrl === icon.imageUrl}
+            onClick={() =>
+              setSelection({ imageUrl: icon.imageUrl, emoji: icon.emoji })
+            }
+          >
+            <img src={icon.imageUrl} alt="" loading="lazy" />
+            <span>{icon.label}</span>
+          </button>
+        ))}
+      </div>
+      {choices.length === 0 && (
+        <p role="status">ไม่พบไอคอน ลองค้นด้วยชื่ออื่นหรือเลือกหมวดทั้งหมด</p>
       )}
-
-      {!previewUrl && (
-        <div className="image-picker-upload">
-          <label className="image-picker-upload-label">
-            <span>📷</span>
-            <b>เลือกไฟล์รูปภาพสินค้า</b>
-            <small>PNG, JPG หรือ WEBP · ขนาดไม่เกิน 2MB</small>
-            <input
-              ref={fileInput}
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              hidden
-              onChange={handleImageChange}
-            />
-          </label>
-        </div>
-      )}
-
-      <div className="image-picker-actions">
+      <div className="modal-actions">
         <button type="button" className="outline-button" onClick={onClose}>
           ยกเลิก
         </button>
-        <button type="button" className="primary-button" onClick={confirm}>
-          ยืนยัน
+        <button
+          type="button"
+          className="primary-button"
+          onClick={() => {
+            onChange(selection.emoji, selection.imageUrl);
+            onClose();
+          }}
+        >
+          ยืนยันไอคอน
         </button>
       </div>
     </WorkflowDialog>
