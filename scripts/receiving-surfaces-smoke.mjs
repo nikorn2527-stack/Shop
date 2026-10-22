@@ -108,7 +108,9 @@ try {
     snapshots.push(await inspect());
     assert.equal(snapshots.at(-1).entryWidth,360,"Both entry points share the same form width");
     assert.equal(await page.$$(".receive-split-workspace").then(rows=>rows.length),1,"One shared two-pane workspace on both entry points");
-    assert.equal(await page.$eval('#receive-editor-qty',e=>e.disabled),true);
+    assert.equal(await page.$eval('#receive-editor-qty',e=>e.disabled),false,'A new receipt can be entered immediately');
+    assert.equal(await page.$eval('#receive-new-name',e=>e.value),'');
+    assert.equal(await page.$$eval('.receive-entry-form button',nodes=>nodes.some(e=>e.textContent.includes('เพิ่มสินค้าใหม่'))),false,'No separate new-product button');
     for(const viewport of [{width:1920,height:1080},{width:1366,height:768},{width:1139,height:334},{width:390,height:844}]) {
       await page.setViewport(viewport);await pause(100);
       if(viewport.width>=1366){
@@ -129,10 +131,10 @@ try {
     await fill('.stock-receive-modal .member-scan-field input',product.name.slice(0,2));
     await page.waitForFunction(sku=>[...document.querySelectorAll('.product-scan-option')].some(node=>node.textContent.includes(sku)),{},product.sku);
     await fill('.stock-receive-modal .member-scan-field input',product.sku);await page.keyboard.press('Enter');
-    await page.waitForFunction(()=>!!document.querySelector('#receive-editor-qty:not(:disabled)'));
+    await page.waitForFunction(name=>document.querySelector('#receive-new-name')?.value===name,{},product.name);
     await pause(150);
-    const details=await page.$eval('.receive-entry-form .member-scan-info',node=>({name:node.querySelector('b')?.textContent,display:getComputedStyle(node).display,height:node.getBoundingClientRect().height,stock:node.querySelector('small')?.textContent}));
-    assert.ok(details.display!=='none' && details.height>20 && details.name.includes(product.name),'Selected product details are visible before queuing');
+    const details=await page.$eval('.receive-entry-form',node=>({name:node.querySelector('#receive-new-name').value,readonly:node.querySelector('#receive-new-name').readOnly,height:node.querySelector('#receive-new-name').getBoundingClientRect().height,stock:node.querySelector('.receive-existing-badge')?.textContent}));
+    assert.ok(details.readonly && details.height>20 && details.name===product.name,'Selected product fills the same visible fields before queuing');
     assert.ok(details.stock.includes(String(product.stock)),'Current stock is shown while entering receipt');
     await page.screenshot({path:path.join(dir,`receiving-${mode}-selected.png`)});
     await page.focus('#receive-editor-qty');await page.focus('#receive-editor-free');
@@ -153,7 +155,7 @@ try {
     if(mode==='page'){
       for(let i=0;i<8;i++){
         await fill('.stock-receive-modal .member-scan-field input',product.sku);await page.keyboard.press('Enter');
-        await page.waitForFunction(()=>!!document.querySelector('#receive-editor-qty:not(:disabled)'));
+        await page.waitForFunction(name=>document.querySelector('#receive-new-name')?.value===name,{},product.name);
         await pause(100);await fill('#receive-editor-qty',1);await fill('#receive-editor-paid',5);
         await click('เพิ่มลงรายการ','.receive-entry-form');
         await page.waitForFunction(count=>document.querySelectorAll('.receive-main-row').length===count,{},i+2);

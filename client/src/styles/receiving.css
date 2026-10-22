@@ -29,6 +29,7 @@
   :root:root .stock-receive-modal.receiving-workspace :is(.receive-section-title,.receive-review-side .receive-cart-head) { display:flex; align-items:center; justify-content:space-between; gap:12px; }
   :root:root .stock-receive-modal.receiving-workspace :is(.receive-entry-form,.receive-review-side) h3 { margin:0; font-size:14px; font-weight:700; }
   :root:root .stock-receive-modal.receiving-workspace .receive-section-title .compact { font-size:11px; min-height:32px; padding:6px 10px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-existing-badge { padding:4px 8px; color:#475569; background:#eef2f6; border-radius:20px; font-size:10px; }
   :root:root .stock-receive-modal.receiving-workspace .receive-new-badge { padding:4px 10px; background:#ffedd5; color:#9a3412; border-radius:20px; font-size:11px; }
   :root:root .stock-receive-modal.receiving-workspace .receive-form-pair { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
   :root:root .stock-receive-modal.receiving-workspace :is(.receive-entry-form,.receive-simple-table) label { display:grid; gap:6px; min-width:0; margin:0; font-size:12px; font-weight:500; }
@@ -36,6 +37,7 @@
   :root:root .stock-receive-modal.receiving-workspace .receive-entry-form label > :is(input,select) { height:42px; align-self:start; }
   :root:root .stock-receive-modal.receiving-workspace .receive-entry-form label::after { grid-row:3; margin-top:0; }
   :root:root .stock-receive-modal.receiving-workspace .receive-new-fields { display:grid; gap:12px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-new-fields label { grid-template-rows:18px 42px; }
   :root:root .stock-receive-modal.receiving-workspace .receive-size-details summary { cursor:pointer; color:var(--muted); font-size:12px; }
   :root:root .stock-receive-modal.receiving-workspace .receive-size-details[open] summary { margin-bottom:12px; }
   :root:root .stock-receive-modal.receiving-workspace .receive-price-context { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; padding:12px; border:1px solid #e2e8f0; background:white; border-radius:10px; }
