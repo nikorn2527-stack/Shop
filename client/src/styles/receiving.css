@@ -96,3 +96,64 @@
   }
   @media(max-width:600px) { :root:root .stock-receive-modal.receiving-workspace { padding:14px; } }
 }
+
+/* Actions belong to their pane; the workspace now uses the space of the old shared footer. */
+@media screen {
+  :root:root .stock-receive-modal.receiving-workspace > .receive-split-workspace { height:calc(100dvh - 166px); max-height:calc(100dvh - 166px); }
+  :root:root .stock-receive-modal.receiving-workspace .receive-form-body { flex:1 1 auto; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-draft-actions { flex-direction:column; gap:12px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-draft-actions > .primary-button { flex:none; width:100%; min-height:42px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-secondary-actions { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-secondary-actions .outline-button { min-height:30px; padding:4px 10px; font-size:11px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-cancel { margin-left:auto; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-review-content { flex:1 1 auto; min-height:0; overflow:auto; display:flex; flex-direction:column; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-review-content .receive-empty-list { min-height:140px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-review-content .receive-entry-table-wrap { min-height:140px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-review-actions { flex:0 0 auto; display:flex; justify-content:flex-end; padding:12px 16px; border-top:1px solid #e2e8f0; background:#f8fafc; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-review-actions .action-button { min-width:200px; }
+  .receive-price-insight { flex:0 0 auto; margin:16px; padding:16px; border:1px solid #dbe3ed; border-radius:12px; background:#f8fafc; }
+  .receive-insight-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:14px; }
+  .receive-insight-heading p { margin:4px 0 0; color:var(--muted); font-size:12px; overflow-wrap:anywhere; }
+  .receive-insight-heading > span { font-size:10px; white-space:nowrap; color:var(--muted); }
+  .receive-insight-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; }
+  .receive-insight-grid > div { display:flex; flex-direction:column; gap:6px; min-width:0; padding:12px; border:1px solid #e2e8f0; border-radius:10px; background:white; }
+  .receive-insight-grid small, .receive-insight-grid span { color:var(--muted); font-size:11px; line-height:1.6; overflow-wrap:anywhere; }
+  .receive-insight-grid strong { color:var(--ink); font-size:20px; font-variant-numeric:tabular-nums; overflow-wrap:anywhere; }
+  .receive-insight-grid .receive-insight-previous { border-color:#c2d7e6; background:#f0f7fc; }
+  .receive-insight-margin { display:flex; flex-wrap:wrap; gap:12px 24px; margin-top:12px; font-size:12px; }
+  .receive-insight-margin span { display:flex; flex-wrap:wrap; gap:8px; }
+  .receive-insight-margin b { font-variant-numeric:tabular-nums; color:#166534; }
+  .receive-insight-margin[data-loss] b { color:#b45309; }
+  .receive-insight-note { display:block; color:var(--muted); font-size:10px; line-height:1.6; margin-top:8px; }
+  .receive-price-insight .receive-price-warning { margin-top:10px; }
+  @media(max-width:1350px) { .receive-insight-grid strong { font-size:17px; } .receive-insight-grid { gap:8px; } .receive-insight-grid > div { padding:10px; } }
+  @media(max-width:1099px) {
+    :root:root .stock-receive-modal.receiving-workspace > .receive-split-workspace { height:auto; max-height:calc(100dvh - 166px); }
+    :root:root .stock-receive-modal.receiving-workspace .receive-review-content { overflow:visible; }
+    :root:root .stock-receive-modal.receiving-workspace .receive-draft-actions { position:sticky; bottom:0; }
+  }
+  @media(max-width:600px) { .receive-insight-grid { grid-template-columns:minmax(0,1fr); } .receive-price-insight { padding:12px; margin:12px; } :root:root .stock-receive-modal.receiving-workspace .receive-review-actions .action-button { width:100%; } }
+}
+
+/* Compact desktop entry: keep cost guidance in the review pane instead of repeating it. */
+@media screen {
+  :root:root .stock-receive-modal.receiving-workspace .receive-form-body { gap:10px; padding:12px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-form-section { gap:8px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-form-section + .receive-form-section { padding-top:10px; }
+  :root:root .stock-receive-modal.receiving-workspace :is(input:not([type="checkbox"]),select) { min-height:36px; padding:6px 8px; font-size:12px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-entry-form label { grid-template-rows:16px 36px minmax(10px,auto); gap:4px; font-size:11px; line-height:16px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-entry-form label > :is(input,select) { height:36px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-new-fields { gap:8px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-new-fields label { grid-template-rows:16px 36px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-form-pair { gap:8px; }
+  :root:root .stock-receive-modal.receiving-workspace .product-artwork-control { gap:8px; margin:0; }
+  :root:root .stock-receive-modal.receiving-workspace .product-artwork-thumb { width:28px; height:28px; font-size:22px; }
+  :root:root .stock-receive-modal.receiving-workspace .product-artwork-control .outline-button { min-height:30px; padding:4px 8px; font-size:11px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-draft-actions { padding:10px 12px; gap:10px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-draft-actions > .primary-button { min-height:38px; }
+  :root:root .stock-receive-modal.receiving-workspace :is(.receive-entry-form,.receive-review-side) h3 { font-size:13px; }
+}
+@media screen {
+  :root:root .stock-receive-modal.receiving-workspace .receive-secondary-actions .outline-button { height:30px; min-height:30px; line-height:18px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-draft-actions > .primary-button { height:40px; }
+}

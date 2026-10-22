@@ -50,3 +50,18 @@ old sales and atomic failure. API permission tests cover receiving without repri
 `scripts/receiving-pricing-smoke.mjs` uses a fresh /tmp database to exercise actual
 forms, quantity edits, new-product queuing, warnings, cancel/confirm, desktop/mobile
 review and unchanged historical sale snapshots.
+
+The review pane now shows price guidance for the product being entered: the last
+actual receipt cost with its date/lot, current unit cost (including free units),
+absolute/percentage cost change, the effective selling price, gross profit per
+unit and gross margin on sales. A known previous zero cost has no percentage
+comparison. Missing history remains missing; a catalog cost, if present, is
+labelled separately and never presented as a previous receipt. Gross profit is
+selling price minus the current receipt's unit cost, before other expenses.
+Incomplete/invalid quantities or amounts do not produce cost or profit figures.
+
+Each pane owns its actions. Add-to-list and a smaller, separated Cancel action
+remain inside the left form; save/confirmation starts inside the right review.
+Cancel retains the existing discard confirmation. Compact controls let the form
+fit a desktop viewport while short screens/mobile retain internal scrolling.
+Both the navigation page and stock/POS receiving dialog share these controls.

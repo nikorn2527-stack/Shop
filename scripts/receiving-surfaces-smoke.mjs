@@ -98,7 +98,7 @@ try {
   const inspect = () => page.evaluate(() => {
     const root=document.querySelector('.stock-receive-modal');
     const read=selector=>{ const node=root.querySelector(selector),style=getComputedStyle(node);return {fontSize:style.fontSize,lineHeight:style.lineHeight,padding:style.padding,background:style.backgroundColor,borderRadius:style.borderRadius,boxShadow:style.boxShadow,color:style.color}; };
-    return {heading:read('.modal-heading'), title:read('.modal-heading h2'), footer:read('.modal-actions'), quantity:read('#receive-editor-qty'), lot:read('#receive-editor-lot'), scanner:read('.receive-entry-form .member-scan-field input'), entryWidth:root.querySelector(".receive-entry-side").getBoundingClientRect().width, disabled:[...root.querySelectorAll('.receive-entry-form input')].map(e=>e.disabled)};
+    return {heading:read('.modal-heading'), title:read('.modal-heading h2'), footer:read('.receive-review-actions'), quantity:read('#receive-editor-qty'), lot:read('#receive-editor-lot'), scanner:read('.receive-entry-form .member-scan-field input'), entryWidth:root.querySelector(".receive-entry-side").getBoundingClientRect().width, disabled:[...root.querySelectorAll('.receive-entry-form input')].map(e=>e.disabled)};
   });
   const snapshots=[];
   for(const mode of ['page','dialog']) {
@@ -106,6 +106,10 @@ try {
     else {await page.click('[data-nav-item="stock"]');await page.waitForSelector('.stock-receive-entry');await page.click('.stock-receive-entry');await page.waitForSelector('.workflow-dialog.stock-receive-modal');}
     await pause(200);
     snapshots.push(await inspect());
+    assert.equal(await page.$('.stock-receive-modal > .modal-actions'),null,'No footer spans both panes');
+    assert.equal(await page.$eval('.receive-review-actions',node=>Boolean(node.closest('.receive-review-side'))),true,'Save belongs to the review pane');
+    assert.equal(await page.$eval('.receive-cancel',node=>{const cancel=node.getBoundingClientRect(),add=node.closest('.receive-entry-form').querySelector('[data-add-receipt]').getBoundingClientRect();return cancel.height<add.height&&cancel.width<add.width;}),true,'Cancel is smaller and stays inside the product form');
+
     assert.equal(snapshots.at(-1).entryWidth,360,"Both entry points share the same form width");
     assert.equal(await page.$$(".receive-split-workspace").then(rows=>rows.length),1,"One shared two-pane workspace on both entry points");
     assert.equal(await page.$eval('#receive-editor-qty',e=>e.disabled),false,'A new receipt can be entered immediately');
@@ -123,11 +127,12 @@ try {
         assert.ok(layout.aligned && layout.separate,'Both panes align at the top without overlap');
       }
 
-      assert.ok(await visible('.stock-receive-modal .modal-actions .action-button'),`${mode} save fits ${viewport.width}`);
+      if(viewport.width<1100) await page.$eval('.receive-review-actions',node=>node.scrollIntoView({block:'end'}));
+      assert.ok(await visible('.stock-receive-modal .receive-review-actions .action-button'),`${mode} save fits ${viewport.width}`);
       assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true,'No horizontal overflow');
       await page.screenshot({path:path.join(dir,`receiving-${mode}-${viewport.width}.png`)});
     }
-    await page.setViewport({width:1366,height:768});
+    await page.setViewport({width:1366,height:768});await page.$eval('.receive-split-workspace',node=>{node.scrollTop=0;});
     await fill('.stock-receive-modal .member-scan-field input',product.name.slice(0,2));
     await page.waitForFunction(sku=>[...document.querySelectorAll('.product-scan-option')].some(node=>node.textContent.includes(sku)),{},product.sku);
     await fill('.stock-receive-modal .member-scan-field input',product.sku);await page.keyboard.press('Enter');
@@ -169,7 +174,7 @@ try {
       assert.equal(query('SELECT stock FROM products WHERE id=?',product.id).stock,product.stock,'Many draft rows still write nothing');
       await page.screenshot({path:path.join(dir,'receiving-many-rows.png')});
     }
-    await click('ยกเลิก','.stock-receive-modal > .modal-actions');
+    await click('ยกเลิก','.stock-receive-modal .receive-draft-actions');
     await page.waitForSelector('.confirm-modal');
     await click('ทิ้งรายการ','.confirm-modal');
     await page.waitForFunction(()=>!document.querySelector('.stock-receive-modal'));

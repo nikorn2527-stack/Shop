@@ -113,10 +113,14 @@ try {
   assert.equal(await page.$eval('#receive-editor-qty',node=>node.value),'','Receipt values reset after adding a new product');
   await page.click('[aria-label="นำรายการ 1 ออก"]');await page.waitForFunction(()=>!document.querySelector('.receive-main-row'));await pause(100);
   await fill('.receiving-workspace .member-scan-field input',product.sku);await page.keyboard.press('Enter');
-  await page.waitForFunction(()=>document.querySelector('.receive-price-context')?.textContent.includes('5.0000'));
-  assert.ok((await page.$eval('.receive-entry-form',e=>e.textContent)).includes('10.00'));
+  await page.waitForFunction(()=>document.querySelector('.receive-insight-previous')?.textContent.includes('5.0000'));
+  assert.ok((await page.$eval('.receive-price-insight',e=>e.textContent)).includes('10.00'));
   await fill('#receive-editor-qty',4);await fill('#receive-editor-free',1);await fill('#receive-editor-paid',30);await fill('#receive-editor-selling-price',8);
   await page.waitForSelector('.receive-price-warning');
+  const guidance=await page.$eval('.receive-price-insight',node=>node.textContent);
+  assert.ok(guidance.includes('6.0000')&&guidance.includes('+20.0%'),'Current cost includes free units and compares with the last receipt');
+  assert.ok(guidance.includes('25.0%'),'Gross margin uses selling price as the denominator');
+
   assert.ok((await page.$eval('.receive-price-warning',e=>e.textContent)).includes('ลดราคา'));
   assert.equal(query('SELECT price FROM products WHERE id=?',product.id).price,10,'No repricing while drafting');
   await click('เพิ่มลงรายการ','.receive-entry-form');await page.waitForSelector('.receive-main-row');

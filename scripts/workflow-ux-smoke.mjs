@@ -388,7 +388,8 @@ try {
   await page.click('[data-nav-item="stock"]'); await page.waitForSelector('.stock-receive-entry'); await page.click('.stock-receive-entry'); await page.waitForSelector('.workflow-dialog.stock-receive-modal');
   for (const viewport of [{ width: 1366, height: 768 }, { width: 1139, height: 334 }, { width: 390, height: 844 }]) {
     await page.setViewport(viewport); await pause(100);
-    assert.ok(await visible('.stock-receive-modal .modal-actions .action-button'), `Receiving save visible: ${viewport.width}×${viewport.height}`);
+    if(viewport.width<1100) await page.$eval('.receive-review-actions',node=>node.scrollIntoView({block:'end'}));
+    assert.ok(await visible('.stock-receive-modal .receive-review-actions .action-button'), `Receiving save visible: ${viewport.width}×${viewport.height}`);
     await page.screenshot({ path: path.join(dir, `receiving-modal-${viewport.width}.png`) });
   }
   await click('ยกเลิก', '.stock-receive-modal'); await page.waitForFunction(() => !document.querySelector('.workflow-dialog.stock-receive-modal'));
