@@ -396,11 +396,11 @@ try {
 
   await page.setViewport({ width: 1366, height: 768 }); await page.click('[data-nav-item="receive"]'); await page.waitForSelector('.receiving-workspace');
   await fill('.receiving-workspace .member-scan-field input', product.sku); await page.keyboard.press('Enter');
-  await page.waitForFunction(name => document.querySelector('.receive-entry-form .product-scan-chip')?.textContent.includes(name), {}, product.name);
+  await page.waitForFunction(name => document.querySelector('#receive-new-name')?.value===name, {}, product.name);
   await click('เพิ่มลงรายการ', '.receive-entry-form'); await acknowledge();
-  assert.equal(await page.$eval('.receive-entry-form .product-scan-chip', (e,name) => e.textContent.includes(name), product.name), true, 'Validation preserves the selected product');
+  assert.equal(await page.$eval('#receive-new-name', (e,name) => e.value===name, product.name), true, 'Validation preserves the selected product');
   await fill('#receive-editor-qty', 3); await fill('#receive-editor-paid', 12); await click('เพิ่มลงรายการ', '.receive-entry-form');
-  await click('เพิ่มสินค้าใหม่', '.receiving-workspace'); await page.waitForSelector('#receive-new-name');
+  await page.waitForFunction(()=>document.querySelector('#receive-new-name')?.value==='');
   const newName = 'UX receiving new product';
   await fill('#receive-new-name', newName); await fill('#receive-editor-selling-price', 9);
   await fill('#receive-editor-qty', 2); await fill('#receive-editor-paid', 10);

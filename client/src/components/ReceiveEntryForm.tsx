@@ -4,32 +4,35 @@ import { ExpiryDateInput } from "./ExpiryDateInput";
 type Draft = { purchaseQty:string; freeQty:string; paidAmount:string; lot:string; expiry:string; sellingPrice:string };
 type NewItem = {name:string;sku:string;category:string;unit:string;price:string;sizeNum:string;sizeUnit:string};
 type Pricing = {previousCost:number|null;sellingPrice:number;remainingQty:number;highestRemainingCost:number|null;unknownRemainingQty:number};
-export function ReceiveEntryForm({scan, value, onChange, product, newItem, onNewChange, categories, pricing, loading, pricingError, canChangePrice, busy, onNew, onAdd, onClear}: {
+export function ReceiveEntryForm({scan, value, onChange, product, newItem, onNewChange, categories, pricing, loading, pricingError, canChangePrice, busy, newDraftActive, canCreate, onBarcodeCommit, onAdd, onClear}: {
   scan:ReactNode;value:Draft;onChange:(field:keyof Draft,value:string)=>void;
-  product?:{name:string;category:string;unit:string;price:number;sellMode?:string|null;barcode?:string|null;sku?:string}|null;
+  product?:{name:string;category:string;unit:string;price:number;sellMode?:string|null;barcode?:string|null;sku?:string;size?:string|null;stock?:number}|null;
   newItem?:NewItem;onNewChange:(field:keyof NewItem,value:string)=>void;categories:string[];
   pricing?:Pricing;loading:boolean;pricingError:boolean;canChangePrice:boolean;busy:boolean;
-  onNew:()=>void;onAdd:()=>void;onClear:()=>void;
+  newDraftActive:boolean;canCreate:boolean;onBarcodeCommit:(code:string)=>void;onAdd:()=>void;onClear:()=>void;
 }) {
-  const ready=Boolean(product || newItem);
+  const ready=Boolean(product || canCreate);
+  const details=newItem ?? {name:product?.name??"",sku:product?.barcode||product?.sku||"",category:product?.category??"",unit:product?.unit??"",price:"",sizeNum:"",sizeUnit:"มล."};
+  const locked=busy || Boolean(product) || !canCreate;
   const total=Number(value.purchaseQty)+Number(value.freeQty);
   const cost=value.paidAmount.trim() && total>0 ? Number(value.paidAmount)/total : null;
   const price=newItem ? Number(newItem.price) : value.sellingPrice.trim() ? Number(value.sellingPrice) : pricing?.sellingPrice ?? product?.price ?? 0;
   const numberField=(field:"purchaseQty"|"freeQty"|"paidAmount",label:string,id:string,min:number,step:string)=><label>{label}<input id={id} aria-label={label} type="number" min={min} step={step} value={value[field]} disabled={busy||!ready} onChange={e=>onChange(field,e.target.value)} /></label>;
-  return <section className="receive-entry-form" onKeyDown={event=>{
+  return <section className="receive-entry-form" data-field-feedback={!product&&!newDraftActive ? "off" : undefined} onKeyDown={event=>{
     if(event.key!=="Enter" || event.defaultPrevented || event.nativeEvent.isComposing || !(event.target instanceof HTMLInputElement)) return;
-    const controls=Array.from(event.currentTarget.querySelectorAll<HTMLElement>("input:not(:disabled),select:not(:disabled),button[data-add-receipt]:not(:disabled)"));
+    const controls=Array.from(event.currentTarget.querySelectorAll<HTMLElement>("input:not(:disabled):not([readonly]),select:not(:disabled),button[data-add-receipt]:not(:disabled)"));
     event.preventDefault();controls[controls.indexOf(event.target)+1]?.focus();
   }}>
     <div className="receive-form-body">
     <div className="receive-form-section">
-      <div className="receive-section-title"><h3>ข้อมูลสินค้า</h3>{!newItem && !product && <button type="button" className="outline-button compact" disabled={busy} onClick={onNew}>เพิ่มสินค้าใหม่</button>}{newItem && <span className="receive-new-badge">สินค้าใหม่</span>}</div>
-      {!newItem ? <>{scan}{product && <div className="receive-product-meta">{product.barcode && <span>บาร์โค้ด {product.barcode}</span>}<span>{product.category} · หน่วยขาย {product.unit}</span></div>}</> : <div className="receive-new-fields">
-        <label>บาร์โค้ด / รหัส<input aria-label="บาร์โค้ดสินค้าใหม่" value={newItem.sku} disabled={busy} onChange={e=>onNewChange("sku",e.target.value)} placeholder="เว้นว่างเพื่อออกรหัสอัตโนมัติ" /></label>
-        <label>ชื่อสินค้า *<input id="receive-new-name" aria-label="ชื่อสินค้าใหม่" value={newItem.name} disabled={busy} onChange={e=>onNewChange("name",e.target.value)} /></label>
-        <div className="receive-form-pair"><label>หมวดสินค้า<select aria-label="หมวดสินค้าใหม่" value={newItem.category} disabled={busy} onChange={e=>onNewChange("category",e.target.value)}>{categories.map(c=><option key={c}>{c}</option>)}</select></label><label>หน่วยขาย<input aria-label="หน่วยขายสินค้าใหม่" value={newItem.unit} disabled={busy} onChange={e=>onNewChange("unit",e.target.value)} /></label></div>
-        <details className="receive-size-details"><summary>ขนาด / ปริมาณสินค้า</summary><div className="receive-form-pair"><label>ขนาด<input type="number" min="0" value={newItem.sizeNum} disabled={busy} aria-label="ขนาดสินค้าใหม่" onChange={e=>onNewChange("sizeNum",e.target.value)} /></label><label>หน่วยขนาด<select value={newItem.sizeUnit} disabled={busy} aria-label="หน่วยขนาดสินค้าใหม่" onChange={e=>onNewChange("sizeUnit",e.target.value)}>{["มล.","ลิตร","กรัม","กก.","ชิ้น","แพ็ก","ถุง","ขวด","กล่อง"].map(u=><option key={u}>{u}</option>)}</select></label></div></details>
-      </div>}
+      <div className="receive-section-title"><h3>ข้อมูลสินค้า</h3>{product ? <span className="receive-existing-badge">สินค้าเดิม · คงเหลือ {product.stock} {product.unit}</span> : newDraftActive && <span className="receive-new-badge">สินค้าใหม่</span>}</div>
+      {scan}
+      <div className="receive-new-fields">
+        <label>บาร์โค้ด / รหัส<input aria-label="บาร์โค้ดสินค้า" value={details.sku} readOnly={Boolean(product)} disabled={busy||!canCreate&&!product} onChange={e=>onNewChange("sku",e.target.value)} onBlur={()=>{if(!product && details.sku.trim())onBarcodeCommit(details.sku.trim());}} placeholder="เว้นว่างเพื่อออกรหัสอัตโนมัติ" /></label>
+        <label>ชื่อสินค้า *<input id="receive-new-name" aria-label="ชื่อสินค้า" value={details.name} readOnly={Boolean(product)} disabled={busy||!canCreate&&!product} onChange={e=>onNewChange("name",e.target.value)} placeholder="ชื่อสินค้า" /></label>
+        <div className="receive-form-pair"><label>หมวดสินค้า<select aria-label="หมวดสินค้า" value={details.category} disabled={locked} onChange={e=>onNewChange("category",e.target.value)}>{categories.map(c=><option key={c}>{c}</option>)}</select></label><label>หน่วยขาย<input aria-label="หน่วยขายสินค้า" value={details.unit} readOnly={Boolean(product)} disabled={busy||!canCreate&&!product} onChange={e=>onNewChange("unit",e.target.value)} /></label></div>
+        <details className="receive-size-details"><summary>ขนาด / ปริมาณสินค้า{product?.size ? ` · ${product.size}` : ""}</summary>{!product && <div className="receive-form-pair"><label>ขนาด<input type="number" min="0" value={details.sizeNum} disabled={locked} aria-label="ขนาดสินค้าใหม่" onChange={e=>onNewChange("sizeNum",e.target.value)} /></label><label>หน่วยขนาด<select value={details.sizeUnit} disabled={locked} aria-label="หน่วยขนาดสินค้าใหม่" onChange={e=>onNewChange("sizeUnit",e.target.value)}>{["มล.","ลิตร","กรัม","กก.","ชิ้น","แพ็ก","ถุง","ขวด","กล่อง"].map(u=><option key={u}>{u}</option>)}</select></label></div>}</details>
+      </div>
     </div>
     <div className="receive-form-section">
       <h3>จำนวนและราคา</h3>
@@ -42,6 +45,6 @@ export function ReceiveEntryForm({scan, value, onChange, product, newItem, onNew
     </div>
     <div className="receive-form-section"><h3>ล็อตสินค้า</h3><div className="receive-form-pair"><label>Lot<input id="receive-editor-lot" aria-label="Lot ที่กำลังกรอก" value={value.lot} disabled={busy||!ready} placeholder="อัตโนมัติ" onChange={e=>onChange("lot",e.target.value)} /></label><label>วันหมดอายุ<ExpiryDateInput id="receive-editor-expiry" value={value.expiry} disabled={busy||!ready} onChange={v=>onChange("expiry",v)} label="วันหมดอายุรายการที่กำลังกรอก" /></label></div></div>
     </div>
-    <div className="receive-draft-actions"><button data-add-receipt type="button" className="primary-button" disabled={busy||!ready||loading} onClick={onAdd}>เพิ่มลงรายการ</button>{ready && <button type="button" className="outline-button" disabled={busy} onClick={onClear}>ล้างข้อมูล</button>}</div>
+    <div className="receive-draft-actions"><button data-add-receipt type="button" className="primary-button" disabled={busy||!ready||loading} onClick={onAdd}>เพิ่มลงรายการ</button>{(product||newDraftActive) && <button type="button" className="outline-button" disabled={busy} onClick={onClear}>ล้างข้อมูล</button>}</div>
   </section>;
 }

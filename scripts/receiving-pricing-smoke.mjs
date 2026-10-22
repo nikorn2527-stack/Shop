@@ -103,6 +103,15 @@ try {
   };
   const saleBefore=query('SELECT json_group_array(json_object(\'id\',id,\'price\',price,\'cost\',cost_total_satang)) snapshot FROM sale_items').snapshot;
   await page.click('[data-nav-item="receive"]');await page.waitForSelector('.receiving-workspace');
+  assert.equal(await page.$eval('#receive-new-name',node=>!node.readOnly && !node.disabled),true,'Product fields are ready immediately');
+  assert.equal(await page.$$eval('.receive-entry-form button',nodes=>nodes.some(node=>node.textContent.trim()==='เพิ่มสินค้าใหม่')),false);
+  const directName='Direct entry without new-product button';
+  await fill('#receive-new-name',directName);await fill('#receive-editor-qty',1);await fill('#receive-editor-paid',2);await fill('#receive-editor-selling-price',5);
+  await click('เพิ่มลงรายการ','.receive-entry-form');await page.waitForSelector('.receive-main-row');
+  assert.equal(query('SELECT COUNT(*) n FROM products WHERE name=?',directName).n,0,'Direct entry is still a draft');
+  await page.waitForFunction(()=>document.querySelector('#receive-new-name')?.value==='');
+  assert.equal(await page.$eval('#receive-editor-qty',node=>node.value),'','Receipt values reset after adding a new product');
+  await page.click('[aria-label="นำรายการ 1 ออก"]');await page.waitForFunction(()=>!document.querySelector('.receive-main-row'));await pause(100);
   await fill('.receiving-workspace .member-scan-field input',product.sku);await page.keyboard.press('Enter');
   await page.waitForFunction(()=>document.querySelector('.receive-price-context')?.textContent.includes('5.0000'));
   assert.ok((await page.$eval('.receive-entry-form',e=>e.textContent)).includes('10.00'));

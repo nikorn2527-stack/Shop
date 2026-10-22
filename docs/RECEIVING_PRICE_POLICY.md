@@ -27,11 +27,14 @@ The catalog's weighted average cost remains a separate existing calculation.
 
 Both receiving entry points use the same two-pane desktop layout: a 360px form
 pane on the left and a wider receipt review on the right.
-Scanning a known code fills the product details in the form and loads the
-last documented cost and current selling price. An unknown barcode opens new
-product fields in that same form, preserving the scanned code. Name, category,
+The same product fields are present from the moment the form opens; there is no
+new-product mode button. Scanning a known code or leaving the barcode field with
+a known code fills those fields and loads the last documented cost and selling
+price. Existing product details are read-only. A new name can be entered directly
+without a barcode, which is generated on confirmation. An unknown scan supplies
+the barcode while preserving quantities already entered. Name, category,
 unit, optional size, selling price, quantities, paid amount, lot and expiry can
-be entered without opening a second dialog. Adding the row queues it only.
+be entered without opening a second dialog. Adding the row queues it only, then clears all product and receipt fields.
 
 Queued rows show a compact summary; their Edit action enables direct edits to quantities, amount, price, lot and expiry.
 The totals and receipt unit cost update immediately. Product creation, receipts,
