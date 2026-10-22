@@ -1,0 +1,198 @@
+/* Screen workspace fixes. Paper layout is owned by the document templates. */
+@media screen {
+  :root:root .app-shell .stock-page .stock-inventory-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+    align-items: start;
+  }
+  :root:root
+    .app-shell
+    .stock-page
+    .stock-inventory-toolbar
+    > .toolbar-actions {
+    display: flex;
+    width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+    align-items: end;
+    justify-content: flex-start;
+    gap: 10px;
+  }
+  :root:root .app-shell .stock-inventory-toolbar .stock-category-filter {
+    grid-template-columns: minmax(0, 150px);
+    align-items: start;
+    gap: 5px;
+    margin: 0;
+  }
+  :root:root .app-shell .stock-export-menu {
+    display: contents;
+  }
+  :root:root .app-shell .stock-export-toggle {
+    display: none;
+  }
+  :root:root .app-shell .stock-inventory-toolbar .filter-pills {
+    min-width: 0;
+    max-width: 100%;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  :root:root .app-shell .stock-inventory-toolbar .stock-export-actions {
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-left: auto;
+  }
+  :root:root .app-shell .stock-inventory-toolbar .shared-search-anchor:empty {
+    display: none;
+  }
+  :root:root .app-shell .stock-inventory-toolbar + .table-filter-summary {
+    margin-top: 10px;
+  }
+  :root:root .app-shell .section-header > * {
+    min-width: 0;
+  }
+}
+@media screen and (max-width: 760px) {
+  /* Grid also keeps portal-mounted search fields within headers without actions. */
+  :root:root .app-shell .cost-profit-page .section-header {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+  :root:root
+    .app-shell
+    .cost-profit-page
+    .section-header
+    > .shared-search-host {
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    height: auto;
+  }
+  :root:root .app-shell .member-top-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  :root:root .app-shell .member-top-grid > .member-balance-card {
+    grid-column: 1 / -1;
+  }
+  :root:root
+    .app-shell
+    .member-top-grid
+    > :is(.member-balance-card, .member-mini-card) {
+    min-height: 0;
+    padding: 12px;
+    gap: 8px;
+  }
+  :root:root .app-shell .member-top-grid .member-mini-card {
+    flex-wrap: wrap;
+  }
+  :root:root .app-shell .member-top-grid strong {
+    font-size: 19px;
+  }
+  :root:root .app-shell .users-overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  :root:root .app-shell .users-overview .stock-stat {
+    padding: 10px;
+    min-width: 0;
+  }
+  :root:root .app-shell .users-overview .stat-icon {
+    flex-shrink: 0;
+  }
+  :root:root .app-shell .users-overview :is(small, strong) {
+    overflow-wrap: anywhere;
+  }
+  :root:root .app-shell .stock-inventory-toolbar .stock-category-filter {
+    grid-template-columns: auto minmax(0, 1fr);
+    width: 100%;
+  }
+  :root:root .app-shell .stock-inventory-toolbar .stock-category-filter select {
+    width: 100%;
+    min-width: 0;
+  }
+  :root:root .app-shell .stock-inventory-toolbar .filter-pills {
+    width: 100%;
+  }
+  :root:root .app-shell .stock-inventory-toolbar .stock-export-actions {
+    margin-left: 0;
+    flex: 1 1 100%;
+  }
+}
+
+@media screen and (max-width: 760px) {
+  :root:root .app-shell .stock-inventory-toolbar .stock-export-menu {
+    display: contents;
+  }
+  :root:root .app-shell .stock-inventory-toolbar .stock-export-toggle {
+    display: inline-flex;
+    min-height: 40px;
+  }
+  :root:root
+    .app-shell
+    .stock-inventory-toolbar
+    .stock-export-menu:not(.is-open)
+    .stock-export-actions {
+    display: none;
+  }
+  :root:root
+    .app-shell
+    .stock-inventory-toolbar
+    .stock-export-menu.is-open
+    .stock-export-actions {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+  :root:root .app-shell .stock-inventory-toolbar .stock-export-actions button {
+    min-width: 0;
+    justify-content: center;
+  }
+  :root:root .app-shell .stock-workbench > .dash-tabbar {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px;
+  }
+  :root:root .app-shell .stock-workbench > .dash-tabbar .dash-tab {
+    min-width: 0;
+    padding: 8px 4px;
+    justify-content: center;
+    font-size: 11px;
+    gap: 5px;
+  }
+  :root:root .app-shell .stock-workbench > .dash-tabbar .dash-tab small {
+    display: none;
+  }
+}
+
+@media screen {
+  /* Keep per-card actions on one line instead of making each row several buttons tall. */
+  :root:root .app-shell .card-inventory .card-inventory-table-wrap table {
+    min-width: 1040px;
+  }
+  :root:root .app-shell .card-inventory .card-inventory-actions {
+    flex-wrap: nowrap;
+  }
+  :root:root .app-shell .card-inventory .card-inventory-actions button {
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+}
+
+@media screen and (max-width: 760px) {
+  :root:root .app-shell .settings-cat {
+    min-height: 56px;
+  }
+  :root:root .app-shell .settings-cat .cat-text {
+    min-width: 0;
+    overflow: visible;
+  }
+  :root:root .app-shell .settings-cat .cat-text b {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    line-height: 1.4;
+  }
+}

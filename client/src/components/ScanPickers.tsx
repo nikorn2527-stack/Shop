@@ -47,6 +47,7 @@ export function MemberScanPicker({
   allowGeneralCustomer = true,
   inputLabel = "เลขสมาชิกสำหรับบิลนี้ (คีย์หรือสแกน)",
   autoFocus = false,
+  local = false,
 }: {
   members: MemberLite[];
   selectedNumber: string | null;
@@ -59,6 +60,8 @@ export function MemberScanPicker({
   allowGeneralCustomer?: boolean;
   inputLabel?: string;
   autoFocus?: boolean;
+  /** Keep secondary filters beside their table instead of taking over the page search. */
+  local?: boolean;
 }) {
   const [term, setTerm] = useState("");
   const [open, setOpen] = useState(false);
@@ -154,7 +157,7 @@ export function MemberScanPicker({
   };
 
   return (
-    <SharedSearch label="สมาชิก" priority={20} enabled={!selected && inputId !== "pos-member-input"}>
+    <SharedSearch label="สมาชิก" priority={20} enabled={!selected && !local && inputId !== "pos-member-input"}>
     <div className="member-scan-wrap" ref={wrapRef}>
       {selected ? (
         <div className="member-scan-chip">

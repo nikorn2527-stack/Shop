@@ -1,3 +1,4 @@
+import { normalizeBillSearch } from "@/lib/billSearch";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { notify } from "@/lib/notifications";
 import { SharedSearch } from "@/components/SharedSearch";
@@ -54,7 +55,6 @@ import {
   isAdminRole,
   memberFullName,
   money,
-  scanCandidates,
 } from "../pageData";
 import { SectionHeader, StatusPill } from "../PagePrimitives";
 import { PageTemplate } from "@/components/page/PageTemplate";
@@ -601,7 +601,7 @@ export function Reports({
     const timer = setTimeout(
       () =>
         setDebouncedBillSearch(
-          scanCandidates(billSearch.trim()).pop() ?? billSearch.trim()
+          normalizeBillSearch(billSearch)
         ),
       350
     );
@@ -1340,8 +1340,8 @@ export function Reports({
       : ["วันที่ · เวลา", "เลขที่บัตร", "เลขสมาชิก", "ชื่อสมาชิก", "รายการ", "ยอด (บาท)", "คงเหลือ (บาท)", "ผู้ทำรายการ"],
     columnWidths: hospitalTxPreset
       ? ["16%", "16%", "15%", "15%", "19%", "19%"]
-      : ["17%", "14%", "10%", "15%", "11%", "10%", "10%", "13%"],
-    nowrapCols: hospitalTxPreset ? [0, 1, 2, 3] : [5, 6],
+      : ["15%", "13%", "11%", "13%", "9%", "14%", "14%", "11%"],
+    nowrapCols: hospitalTxPreset ? [2, 3] : [5, 6],
     numericCols: hospitalTxPreset ? [2] : [5, 6],
     rows: txRows.map(row => hospitalTxPreset
       ? [
@@ -2559,6 +2559,7 @@ export function Reports({
                   </div></SharedSearch>
                   <div className="bill-member-filter">
                     <MemberScanPicker
+                      local
                       members={members}
                       selectedNumber={billMember?.memberNumber ?? null}
                       onSelect={member => setBillMember(member)}
@@ -2807,6 +2808,7 @@ export function Reports({
                 </div>
                 <div className="report-filter-row-main tx-filter-row">
                   <MemberScanPicker
+                      local
                     members={members}
                     selectedNumber={txMember?.memberNumber ?? null}
                     onSelect={member => setTxMember(member)}
@@ -3489,3 +3491,4 @@ export function Reports({
     </PageTemplate>
   );
 }
+

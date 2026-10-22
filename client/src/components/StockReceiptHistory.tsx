@@ -1,4 +1,3 @@
-import { reportSellingValue } from "@shared/reportValuation";
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Download, Eye, FileBarChart, FileText, Printer } from "@/lib/icons";
@@ -26,16 +25,14 @@ export function StockReceiptHistory({ canExport, onUpgrade, expanded = false }: 
   const [notice, setNotice] = useState("");
   const query = trpc.stock.receipts.useQuery({ from, to, search, actor }, { enabled: open });
   const entries = query.data ?? [];
-  const columns = ["วัน–เวลา", "รหัส / สินค้า", "Lot", "จำนวนรับ", "หน่วย", "ราคาต่อหน่วย (ราคาขาย)", "มูลค่ารับเข้า (ราคาขาย)", "ราคาขาย/หน่วย", "มูลค่าราคาขาย", "หมดอายุ", "เจ้าหน้าที่"];
+  const columns = ["วัน–เวลา", "รหัส / สินค้า", "Lot", "จำนวนรับ", "หน่วย", "ราคาขาย/หน่วย", "มูลค่าราคาขาย", "หมดอายุ", "เจ้าหน้าที่"];
   const rows = entries.map(row => [formatLogDateTime(row.receivedAt), `${row.sku} · ${row.name}`, row.lot,
     row.receivedQty === null ? "ไม่ระบุ" : String(row.receivedQty), row.unit,
-    exportNumber(row.sellingPrice), row.receivedQty === null ? "ไม่ระบุ" : exportNumber(reportSellingValue(row.receivedQty, row.sellingPrice)),
     exportNumber(row.sellingPrice), row.sellingValue === null ? "ไม่ระบุ" : exportNumber(row.sellingValue),
     row.expiry ?? "—", row.actor ?? "ไม่ระบุ"]);
   const total = entries.reduce((sum, row) => sum + (row.sellingValue ?? 0), 0);
-  const receivedTotal = entries.reduce((sum, row) => sum + (row.receivedQty === null ? 0 : reportSellingValue(row.receivedQty, row.sellingPrice)), 0);
   const unknownValues = entries.filter(row => row.receivedQty === null).length;
-  const numericCols = [3, 5, 6, 7, 8];
+  const numericCols = [3, 5, 6];
   const buildExportState = (preferred: ExportFormat = "pdf"): ExportPreviewState => {
     const units = new Map<string, number>();
     for (const row of entries) if (row.receivedQty !== null) units.set(row.unit, (units.get(row.unit) ?? 0) + row.receivedQty);
@@ -44,7 +41,8 @@ export function StockReceiptHistory({ canExport, onUpgrade, expanded = false }: 
       sheetName: "ประวัติรับเข้า", rows: [columns, ...rows], numericCols, preferred, hasTotalsRow: false,
       downloadNoticeBase: "ประวัติรับเข้า", printNotice: "สั่งพิมพ์ประวัติรับเข้าแล้ว",
       doc: { fileName: "stock-receipts.pdf", title: "ประวัติรับเข้าสินค้า", periodLabel, columns, rows, numericCols,
-        meta: [["จำนวนบรรทัดรับเข้า", String(entries.length)], ["จำนวนตามหน่วย", Array.from(units).map(([unit, qty]) => `${qty} ${unit}`).join(" · ") || "—"], ["มูลค่ารับเข้าตามราคาขาย", money(receivedTotal)], ...(unknownValues ? [["ไม่ระบุจำนวนรับเข้า", `${unknownValues} รายการ`] as [string, string]] : []), ["มูลค่าตามราคาขายปัจจุบัน", money(total)]],
+        columnWidths: ["12%", "24%", "9%", "7%", "6%", "10%", "12%", "10%", "10%"],
+        meta: [["จำนวนบรรทัดรับเข้า", String(entries.length)], ["จำนวนตามหน่วย", Array.from(units).map(([unit, qty]) => `${qty} ${unit}`).join(" · ") || "—"], ...(unknownValues ? [["ไม่ระบุจำนวนรับเข้า", `${unknownValues} รายการ`] as [string, string]] : []), ["มูลค่าตามราคาขายปัจจุบัน", money(total)]],
         compact: true, brandName: "ร้านค้าสวัสดิการ" }
     };
   };
@@ -86,7 +84,7 @@ export function StockReceiptHistory({ canExport, onUpgrade, expanded = false }: 
           <button type="button" className="outline-button compact export-btn preview-btn" onClick={() => void openExport()} title="ดูตัวอย่างเอกสารก่อนส่งออก"><Eye size={15} /> ดูพรีวิว</button>
         </div>
       </div>
-      <p>{entries.length} บรรทัดรับเข้า · มูลค่ารับเข้าตามราคาขาย {money(receivedTotal)}{unknownValues > 0 ? ` · ไม่ระบุมูลค่า ${unknownValues} รายการ` : ""} · มูลค่าตามราคาขายปัจจุบัน {money(total)}</p>
+      <p>{entries.length} บรรทัดรับเข้า · มูลค่าตามราคาขายปัจจุบัน {money(total)}{unknownValues > 0 ? ` · ไม่ระบุมูลค่า ${unknownValues} รายการ` : ""}</p>
       {notice && !entries.length && <p role="status">{notice}</p>}
       {query.isLoading ? <p>กำลังโหลด…</p> : query.isError ? <p role="alert">{query.error.message}</p> : <div className="table-wrap"><table className="data-table"><thead><tr>{columns.map(c => <th key={c}>{c}</th>)}</tr></thead><tbody>{rows.map((row, index) => <tr key={entries[index].id}>{row.map((cell, i) => <td key={i}>{cell}</td>)}</tr>)}</tbody></table>{!entries.length && <p>ไม่มีรายการรับเข้าในช่วงที่เลือก</p>}</div>}
     </>}

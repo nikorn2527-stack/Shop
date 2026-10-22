@@ -33,7 +33,8 @@ assignMemberCard(db, { memberNumber: member.member_number, cardNumber: 'UX-WALLE
 createBlankCards(db, ['PRINT-00001', 'PRINT-00002', '12345678901234567890', 'ทดสอบ'], 'Print fixture');
 createProduct(db,{name:'Sort item 02',sku:'SORT-02',barcode:'02',price:4});
 createProduct(db,{name:'Sort item 01',sku:'SORT-01',barcode:'01',price:2});
-walletTx(db,{memberNumber:member.member_number,type:'deposit',amount:6756,actor:'นายทดสอบ ระยะห่างคอลัมน์'});
+for(let i=1;i<=40;i++) createProduct(db,{name:`Multi-page report fixture ${String(i).padStart(2,'0')}`,sku:`LAYOUT-${i}`,barcode:`9911223344${String(i).padStart(3,'0')}`,price:10,stock:5});
+walletTx(db,{memberNumber:member.member_number,type:'deposit',amount:123456.78,actor:'นายทดสอบ ระยะห่างคอลัมน์'});
 db.close();
 const port = await new Promise((resolve, reject) => {
   const probe = net.createServer(); probe.once('error', reject);
@@ -97,9 +98,17 @@ try {
   await page.goto(baseUrl, { waitUntil: 'networkidle2' }); await page.waitForSelector('.app-shell');
 
   await page.click('[data-nav-item="reports"]');
+  await click('ประวัติบิล','.dash-tabbar');
+  await page.waitForSelector('[aria-label="ค้นหาประวัติบิล"]',{visible:true});
+  await page.waitForSelector('#bill-member-filter-input',{visible:true});
+  const order=query('SELECT order_number AS code FROM sales ORDER BY id DESC LIMIT 1').code;
+  await page.type('[aria-label="ค้นหาประวัติบิล"]',order);
+  await page.waitForFunction(code=>document.querySelectorAll('#bills-history-report tbody tr.clickable').length===1 && document.querySelector('#bills-history-report tbody')?.textContent.includes(code),{},order);
+  assert.ok(await visible('[aria-label="ค้นหาประวัติบิล"]'),'Bill search stays visible beside the secondary member filter');
   await click('ประวัติธุรกรรม','.dash-tabbar');
+  await page.waitForSelector('#tx-member-filter-input',{visible:true});
   await page.waitForSelector('.tx-report-toolbar');
-  await page.waitForFunction(()=>document.body.textContent.includes('6,756.00'));
+  await page.waitForFunction(()=>document.body.textContent.includes('123,456.78'));
   await click('ดูพรีวิว');
   await page.waitForSelector('.export-preview-modal iframe');
   const frame=await (await page.$('.export-preview-modal iframe')).contentFrame();
@@ -121,7 +130,7 @@ try {
   const pdfFile=path.join(dir,'member-transactions.pdf');
   for(let i=0;i<100 && !fs.existsSync(pdfFile);i++) await pause(100);
   const pdf=fs.readFileSync(pdfFile);assert.equal(pdf.subarray(0,5).toString(),'%PDF-');
-  const text=execFileSync('pdftotext',['-layout',pdfFile,'-'],{encoding:'utf8'});assert.ok(text.includes('6,756.00'));
+  const text=execFileSync('pdftotext',['-layout',pdfFile,'-'],{encoding:'utf8'});assert.ok(text.includes('123,456.78'));
   if(await page.$('.export-preview-modal')) await click('ปิด','.export-preview-modal');
   await click('สินค้าคงคลัง','.dash-tabbar');
   await page.waitForSelector('.stock-balance-table');
@@ -133,6 +142,10 @@ try {
   await stockFrame.waitForSelector('.rd-table tbody td');
   const exportedCodes=await stockFrame.$$eval('.rd-table tbody tr',rows=>rows.slice(0,2).map(row=>row.querySelectorAll('td')[1].textContent.trim()));
   assert.deepEqual(exportedCodes,['01','02'],'Export preview uses the same order as the screen');
+  await page.waitForFunction(()=>{
+    const frame=document.querySelector('.export-preview-modal iframe');
+    return frame?.contentDocument?.body.scrollHeight>1123 && frame.clientHeight>=frame.contentDocument.body.scrollHeight-1;
+  });
   await (await stockFrame.$('body')).screenshot({path:path.join(dir,'stock-preview.png')});
   assert.deepEqual(errors,[]);
   console.log('REPORT_LAYOUT_ORDER_PASS',dir);

@@ -18,6 +18,7 @@ import "./styles/motion.css";
 import "./styles/workflows.css";
 import "./styles/member-card.css";
 import "./styles/receiving.css";
+import "./styles/layout-audit.css";
 
 const queryClient = new QueryClient();
 

@@ -88,8 +88,9 @@ export const REPORT_DOC_CSS = `
   .rd-table.rd-fixed-layout { table-layout: fixed; }
   .rd-table thead { display: table-header-group; }
   .rd-table tbody tr { break-inside: avoid; page-break-inside: avoid; }
-  .rd-table th { background: #f0f0ee; color: #111111; font-weight: 700; text-align: left; padding: 7px 8px; border-top: 2px solid #111111; border-bottom: 1.5px solid #555555; white-space: nowrap; font-size: 11px; text-transform: uppercase; letter-spacing: .3px; }
+  .rd-table th { background: #f0f0ee; color: #111111; font-weight: 700; text-align: left; padding: 7px 8px; border-top: 2px solid #111111; border-bottom: 1.5px solid #555555; white-space: normal; font-size: 11px; text-transform: uppercase; letter-spacing: .3px; }
   .rd-table th.num, .rd-table td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .rd-table th.num { white-space: normal; }
   .rd-table th.nowrap, .rd-table td.nowrap { white-space: nowrap; overflow-wrap: normal; word-break: normal; }
   .rd-table td { padding: 6px 8px; font-weight: 500; border-bottom: 1px solid #e0e0dc; vertical-align: middle; }
   .rd-table tbody.rd-row-group + tbody.rd-row-group::before { content: ""; display: table-row; height: 16px; }
