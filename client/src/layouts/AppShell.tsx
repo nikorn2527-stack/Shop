@@ -49,7 +49,8 @@ import { GlobalSearch } from "@/components/GlobalSearch";
 import { SharedSearchHost, SharedSearchProvider } from "@/components/SharedSearch";
 import { KeyboardShortcutsOverlay, ShortcutsFab } from "@/components/KeyboardShortcutsOverlay";
 import { Dashboard } from "../pages/Dashboard";
-import { Pos } from "../pages/Pos";
+import { Pos, type PosBillDraft, type PosCheckoutRuntime } from "../pages/Pos";
+import { blocker } from "@/components/BlockerAlert";
 import { Stock } from "../pages/Stock";
 import { ConfirmDialog } from "../pages/PagePrimitives";
 import { Users } from "../pages/Users";
@@ -117,10 +118,17 @@ export function AppShell({
   onLogout,
   viewComponents: { Members, Reports, Settings, Logs },
 }: AppShellProps) {
+  const [posBillDraft, setPosBillDraft] = useState<PosBillDraft>({cart:[],discount:"0",memberNumber:null});
+  const posCheckoutRuntime = useRef<PosCheckoutRuntime>({attempt:{current:null},submitting:{current:false}});
+  const [posPaymentPending, setPosPaymentPending] = useState(false);
   const [activeView, commitView] = useState<View>("dashboard");
   const [receiveDirty, setReceiveDirty] = useState(false);
   const [pendingView, setPendingView] = useState<View | null>(null);
   const setActiveView = (view: View) => {
+    if (posCheckoutRuntime.current.submitting.current && view !== "pos") {
+      blocker.info("กำลังบันทึกบิล", "รอผลการชำระเงินก่อนเปลี่ยนหน้า เพื่อให้ตรวจผลบิลนี้ได้ครบ");
+      return;
+    }
     if (activeView === "receive" && receiveDirty && view !== "receive") { setPendingView(view); return; }
     commitView(view);
   };
@@ -868,6 +876,11 @@ export function AppShell({
           )}
           {safeView === "pos" && (
             <Pos
+              paymentPending={posPaymentPending}
+              billDraft={posBillDraft}
+              setBillDraft={setPosBillDraft}
+              checkoutRuntime={posCheckoutRuntime.current}
+              onPaymentPendingChange={setPosPaymentPending}
               shortcut={posShortcut}
               setShortcut={setPosShortcut}
               role={role}

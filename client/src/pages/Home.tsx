@@ -86,6 +86,7 @@ export default function Home() {
   }
   return (
     <AppShell
+      key={user.openId}
       user={user}
       brand={brandQuery.data}
       onLogout={() => void authQuery.refetch()}

@@ -128,3 +128,22 @@ Browser smoke ตรวจภาพ QR เทียบ payload ของทั�
 ตัวอย่างขาย 2 ชิ้น ราคาชิ้นละ 20 ต้นทุนชิ้นละ 17: ยอดขาย 40 ต้นทุน 34 กำไร 6 บาท หากทั้งสองชิ้นมาจากล็อตที่บันทึกรับเข้าต้นทุน 0 และลดราคา 1 บาท: ยอดขายสุทธิ 39 ต้นทุน 0 กำไร 39 บาท รายละเอียดแยกสินค้า/หมวดยังคงแสดงยอดและกำไรก่อนส่วนลดตามหัวตาราง ข้อมูลเก่าที่ยังไม่มีต้นทุนยืนยันยังใช้ราคาขายประเมินตามนโยบายเดิม ส่วนยอดขาดทุนจากการขายต่ำกว่าต้นทุนจริงยังแสดงติดลบ
 
 การแก้สูตรนี้อ่านข้อมูลที่มีอยู่เพื่อคำนวณรายงาน ไม่เขียนแก้ยอดขาย ต้นทุนที่บันทึก สต็อก หรือประวัติธุรกรรมย้อนหลัง ทดสอบกับฐาน in-memory เท่านั้น
+
+### Active POS bill across view switches
+
+The authenticated application shell owns the active cart, quantities (including
+special/tier lines), selected member and discount. Switching to inventory,
+members or reports and returning to POS keeps that draft without recording a
+sale or changing stock. The draft is in memory for the current signed-in shell;
+use the existing Hold bill action for storage across a page reload. Logging out
+or changing authenticated user starts a separate active draft.
+
+Explicit bill cancellation and successful checkout clear the draft, so a paid
+bill cannot reappear as unpaid after leaving the receipt screen. An unchanged
+failed/unknown checkout retains its idempotency key across internal navigation.
+While checkout is in flight, navigation waits for the result. Payment dialogs
+are reopened deliberately rather than carrying a confirmation into another view.
+
+`scripts/pos-navigation-draft-smoke.mjs` uses a fresh demo database to check view
+switches, member/discount/quantity retention, cancellation, completed sales,
+a lost checkout response retried after navigation, and another user's session.

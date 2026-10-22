@@ -25,7 +25,7 @@ export function ReceiveEntryForm({artwork, scan, value, onChange, product, newIt
   }}>
     <div className="receive-form-body">
     <div className="receive-form-section">
-      <div className="receive-section-title"><h3>ข้อมูลสินค้า</h3>{product ? <span className="receive-existing-badge">สินค้าเดิม · คงเหลือ {product.stock} {product.unit}</span> : newDraftActive && <span className="receive-new-badge">สินค้าใหม่</span>}</div>
+      <div className="receive-section-title"><h3>ข้อมูลสินค้า</h3>{product ? <span className="receive-existing-badge">สินค้าเดิม · คงเหลือ {product.stock} {product.unit}</span> : newDraftActive && <span className="receive-new-badge">สินค้าใหม่</span>}{(product||newDraftActive) && <button type="button" className="receive-clear" disabled={busy} onClick={onClear}>ล้างข้อมูล</button>}</div>
       {scan}
       {artwork}
       <div className="receive-new-fields">
@@ -44,6 +44,6 @@ export function ReceiveEntryForm({artwork, scan, value, onChange, product, newIt
     </div>
     <div className="receive-form-section"><h3>ล็อตสินค้า</h3><div className="receive-form-pair"><label>Lot<input id="receive-editor-lot" aria-label="Lot ที่กำลังกรอก" value={value.lot} disabled={busy||!ready} placeholder="อัตโนมัติ" onChange={e=>onChange("lot",e.target.value)} /></label><label>วันหมดอายุ<ExpiryDateInput id="receive-editor-expiry" value={value.expiry} disabled={busy||!ready} onChange={v=>onChange("expiry",v)} label="วันหมดอายุรายการที่กำลังกรอก" /></label></div></div>
     </div>
-    <div className="receive-draft-actions"><button data-add-receipt type="button" className="primary-button" disabled={busy||!ready||loading} onClick={onAdd}>เพิ่มลงรายการ</button><div className="receive-secondary-actions">{(product||newDraftActive) && <button type="button" className="outline-button" disabled={busy} onClick={onClear}>ล้างข้อมูล</button>}<button type="button" className="outline-button receive-cancel" disabled={busy} onClick={onCancel}>ยกเลิก</button></div></div>
+    <div className="receive-draft-actions"><button data-add-receipt type="button" className="primary-button" disabled={busy||!ready||loading} onClick={onAdd}>เพิ่มลงรายการ</button><div className="receive-secondary-actions"><button type="button" className="outline-button receive-cancel" disabled={busy} onClick={onCancel}>ยกเลิก</button></div></div>
   </section>;
 }
