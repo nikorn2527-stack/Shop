@@ -166,6 +166,8 @@ export type SqliteAuditLog = {
 };
 
 export type CheckoutReceipt = {
+  terminalId?: string | null;
+  terminalNumber?: number | null;
   orderNumber: string;
   createdAt: string;
   items: { productId: number | null; name: string; unit: string; qty: number; price: number; amount: number }[];
@@ -664,6 +666,16 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
   ensureColumn(db, "day_closures", "withdrawal_amount", "REAL NOT NULL DEFAULT 0");
   ensureColumn(db, "day_closures", "refund_count", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn(db, "day_closures", "refund_amount", "REAL NOT NULL DEFAULT 0");
+  db.exec(`CREATE TABLE IF NOT EXISTS pos_terminals (
+    id TEXT PRIMARY KEY,
+    number INTEGER NOT NULL UNIQUE CHECK (number BETWEEN 1 AND 999),
+    device_id TEXT NOT NULL UNIQUE,
+    registered_by TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+  )`);
+  ensureColumn(db, "sales", "terminal_id", "TEXT");
+  ensureColumn(db, "sales", "terminal_number", "INTEGER");
+
   // P2-b (idempotency) — client_request_id lets checkout() + walletTx()
   // short-circuit a retried submit and return the original receipt/ledger row
   // instead of double-charging the member or double-decrementing stock.
@@ -2302,7 +2314,39 @@ function deductLotsFifo(db: SqliteDb, productId: number, qty: number, saleItemId
   return { shortfall: remaining, costSatang };
 }
 
+export type PosTerminal = { id: string; number: number; registeredBy: string; createdAt: string };
+const TERMINAL_SELECT = "SELECT id, number, registered_by AS registeredBy, created_at AS createdAt FROM pos_terminals";
+export function getPosTerminal(db: SqliteDb, deviceId: string): PosTerminal | null {
+  return (db.prepare(`${TERMINAL_SELECT} WHERE device_id = ?`).get(deviceId) as PosTerminal | undefined) ?? null;
+}
+export function listPosTerminals(db: SqliteDb): PosTerminal[] {
+  return db.prepare(`${TERMINAL_SELECT} ORDER BY number`).all() as unknown as PosTerminal[];
+}
+export function registerPosTerminal(db: SqliteDb, deviceId: string, number: number, actor: string): PosTerminal {
+  if (!/^[0-9a-f-]{36}$/i.test(deviceId) || !Number.isInteger(number) || number < 1 || number > 999) throw new StoreError("รหัสเครื่องหรือเลขจุดขายไม่ถูกต้อง");
+  return runInTransaction(db, () => {
+    const current = getPosTerminal(db, deviceId);
+    const occupied = db.prepare("SELECT id FROM pos_terminals WHERE number = ?").get(number) as { id: string } | undefined;
+    if (occupied && occupied.id !== current?.id) throw new StoreError("เลขจุดขายนี้ผูกกับเครื่องอื่นแล้ว กรุณาเลือกเลขอื่น หรือยกเลิกการผูกเครื่องเดิมก่อน");
+    if (current?.number === number) return current;
+    if (current) db.prepare("UPDATE pos_terminals SET number = ?, registered_by = ? WHERE id = ?").run(number, actor, current.id);
+    else db.prepare("INSERT INTO pos_terminals (id, number, device_id, registered_by) VALUES (?, ?, ?, ?)").run(randomUUID(), number, deviceId, actor);
+    logAction(db, "ตั้งค่าจุดขาย", actor, `กำหนดจุดขาย ${String(number).padStart(2, "0")}${current ? ` (เดิม ${current.number})` : ""}`);
+    return getPosTerminal(db, deviceId)!;
+  });
+}
+export function releasePosTerminal(db: SqliteDb, id: string, actor: string) {
+  return runInTransaction(db, () => {
+    const terminal = db.prepare(`${TERMINAL_SELECT} WHERE id = ?`).get(id) as PosTerminal | undefined;
+    if (!terminal) throw new StoreError("ไม่พบจุดขายนี้ กรุณาโหลดรายการใหม่");
+    db.prepare("DELETE FROM pos_terminals WHERE id = ?").run(id);
+    logAction(db, "ยกเลิกการผูกจุดขาย", actor, `จุดขาย ${String(terminal.number).padStart(2, "0")} · เก็บประวัติบิลเดิมไว้`);
+    return { success: true };
+  });
+}
+
 export type CheckoutInput = {
+  terminalDeviceId?: string;
   items: CheckoutItemInput[];
   paymentMethod: (typeof PAYMENT_METHODS)[number];
   memberNumber?: string | null;
@@ -2331,8 +2375,8 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
   // for every retry of one logical checkout. We replay the original receipt
   // (items + totals + balanceAfter) so the UI shows the same slip again.
   if (input.clientRequestId) {
-    const existing = db.prepare(`SELECT id, order_number AS orderNumber, created_at AS createdAt, subtotal, discount, total, payment_method AS paymentMethod, member_number AS memberNumber, cashier, received_cash AS receivedCash, change_due AS changeDue, payment_verified AS paymentVerified FROM sales WHERE client_request_id = ? LIMIT 1`).get(input.clientRequestId) as
-      | { id: number; orderNumber: string; createdAt: string; subtotal: number; discount: number; total: number; paymentMethod: string; memberNumber: string | null; cashier: string | null; receivedCash: number | null; changeDue: number | null; paymentVerified: number | null }
+    const existing = db.prepare(`SELECT id, order_number AS orderNumber, created_at AS createdAt, subtotal, discount, total, payment_method AS paymentMethod, member_number AS memberNumber, cashier, terminal_id AS terminalId, terminal_number AS terminalNumber, received_cash AS receivedCash, change_due AS changeDue, payment_verified AS paymentVerified FROM sales WHERE client_request_id = ? LIMIT 1`).get(input.clientRequestId) as
+      | { terminalId: string | null; terminalNumber: number | null; id: number; orderNumber: string; createdAt: string; subtotal: number; discount: number; total: number; paymentMethod: string; memberNumber: string | null; cashier: string | null; receivedCash: number | null; changeDue: number | null; paymentVerified: number | null }
       | undefined;
     if (existing) {
       const itemRows = db.prepare(`SELECT product_id AS productId, name, COALESCE(unit, 'ชิ้น') AS unit, qty, price, ROUND(qty * price, 2) AS amount FROM sale_items WHERE sale_id = ?`).all(existing.id) as { productId: number | null; name: string; unit: string; qty: number; price: number; amount: number }[];
@@ -2360,6 +2404,8 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
         memberName,
         balanceAfter,
         cashier: existing.cashier,
+        terminalId: existing.terminalId,
+        terminalNumber: existing.terminalNumber,
         // FIX-7 — replay ยอดเงินสด/ทอน และ flag ยืนยันด้วย (null/undefined สำหรับบิลเก่า)
         receivedCash: existing.receivedCash ?? null,
         changeDue: existing.changeDue ?? null,
@@ -2367,6 +2413,8 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
       };
     }
   }
+  const terminal = input.terminalDeviceId === undefined ? null : getPosTerminal(db, input.terminalDeviceId);
+  if (input.terminalDeviceId !== undefined && !terminal) throw new StoreError("เครื่องนี้ยังไม่ได้กำหนดจุดขาย กรุณาให้ผู้บริหารตั้งค่าจุดขายก่อนชำระเงิน");
   if (!input.items?.length) throw new StoreError("ยังไม่มีสินค้าในบิล");
   if (!PAYMENT_METHODS.includes(input.paymentMethod)) throw new StoreError("วิธีชำระเงินไม่ถูกต้อง");
   // Catalog lines merge by productId+price+label (round 31-12: money-mode
@@ -2435,7 +2483,7 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
   const slipImage = typeof input.slipImage === "string" && input.slipImage.startsWith("data:image/") ? input.slipImage.slice(0, 600_000) : null;
 
   return runInTransaction(db, () => {
-    const saleResult = db.prepare(`INSERT INTO sales (order_number, payment_method, member_number, subtotal, discount, total, cashier, created_at, slip_url, client_request_id, received_cash, change_due, payment_verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    const saleResult = db.prepare(`INSERT INTO sales (order_number, payment_method, member_number, subtotal, discount, total, cashier, created_at, slip_url, client_request_id, received_cash, change_due, payment_verified, terminal_id, terminal_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
       orderNumber,
       input.paymentMethod,
       member?.memberNumber ?? (input.memberNumber?.trim() || null),
@@ -2450,6 +2498,8 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
       input.paymentMethod === "เงินสด" ? (typeof input.receivedCash === "number" ? round2(input.receivedCash) : null) : null,
       input.paymentMethod === "เงินสด" ? (typeof input.changeDue === "number" ? round2(input.changeDue) : null) : null,
       input.paymentMethod === "QR / สแกน" ? (input.paymentVerified ? 1 : 0) : null,
+      terminal?.id ?? null,
+      terminal?.number ?? null,
     );
     const saleId = Number(saleResult.lastInsertRowid);
     const insertItem = db.prepare(`INSERT INTO sale_items (sale_id, product_id, name, qty, price, cost, unit) VALUES (?, ?, ?, ?, ?, ?, ?)`);
@@ -2506,6 +2556,8 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
       memberName: member ? [member.prename, member.firstName, member.lastName].filter(Boolean).join(" ") : null,
       balanceAfter,
       cashier,
+      terminalId: terminal?.id ?? null,
+      terminalNumber: terminal?.number ?? null,
       // FIX-7 — ส่งยอดเงินสด/ทอน และ flag ยืนยันกลับไปแสดงในใบเสร็จ
       receivedCash: input.paymentMethod === "เงินสด" ? (typeof input.receivedCash === "number" ? round2(input.receivedCash) : null) : null,
       changeDue: input.paymentMethod === "เงินสด" ? (typeof input.changeDue === "number" ? round2(input.changeDue) : null) : null,
@@ -2532,7 +2584,7 @@ export function salesList(db: SqliteDb, input: SalesListInput = {}): SaleHistory
     params.push(`%${search}%`, `%${search}%`);
   }
   const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
-  const sales = db.prepare(`SELECT s.id, s.order_number AS orderNumber, s.payment_method AS paymentMethod, s.member_number AS memberNumber, s.subtotal, s.discount, s.total, s.cashier, s.created_at AS createdAt, s.slip_url IS NOT NULL AS hasSlip, s.received_cash AS receivedCash, s.change_due AS changeDue, s.payment_verified AS paymentVerified, s.voided AS voided, CASE WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sales s LEFT JOIN members m ON m.member_number = s.member_number${where} ORDER BY s.created_at DESC, s.id DESC${limit == null ? "" : " LIMIT ?"}`).all(...params, ...(limit == null ? [] : [limit])) as unknown as {
+  const sales = db.prepare(`SELECT s.id, s.order_number AS orderNumber, s.payment_method AS paymentMethod, s.member_number AS memberNumber, s.subtotal, s.discount, s.total, s.cashier, s.terminal_id AS terminalId, s.terminal_number AS terminalNumber, s.created_at AS createdAt, s.slip_url IS NOT NULL AS hasSlip, s.received_cash AS receivedCash, s.change_due AS changeDue, s.payment_verified AS paymentVerified, s.voided AS voided, CASE WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sales s LEFT JOIN members m ON m.member_number = s.member_number${where} ORDER BY s.created_at DESC, s.id DESC${limit == null ? "" : " LIMIT ?"}`).all(...params, ...(limit == null ? [] : [limit])) as unknown as {
     id: number;
     orderNumber: string;
     paymentMethod: string;
@@ -2541,6 +2593,8 @@ export function salesList(db: SqliteDb, input: SalesListInput = {}): SaleHistory
     discount: number;
     total: number;
     cashier: string | null;
+    terminalId: string | null;
+    terminalNumber: number | null;
     createdAt: string;
     hasSlip: number;
     receivedCash: number | null;
@@ -2581,6 +2635,8 @@ export function salesList(db: SqliteDb, input: SalesListInput = {}): SaleHistory
       ? ((balanceLookup.get(sale.memberNumber, `บิล #${sale.orderNumber} ·%`) as { balanceAfter: number | null } | undefined)?.balanceAfter ?? null)
       : null,
     cashier: sale.cashier,
+    terminalId: sale.terminalId,
+    terminalNumber: sale.terminalNumber,
     hasSlip: sale.hasSlip === 1,
     // FIX-7 — replay ยอดเงินสด/ทอน และ flag ยืนยัน (null สำหรับบิลเก่าที่ไม่มีข้อมูลนี้)
     receivedCash: sale.receivedCash ?? null,
@@ -5066,3 +5122,4 @@ export function openWelfareStore(filename = process.env.SQLITE_DB_PATH ?? "data/
   }
   return db;
 }
+

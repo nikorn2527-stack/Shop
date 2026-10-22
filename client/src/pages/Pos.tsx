@@ -1,3 +1,5 @@
+import { PosTerminalSettings } from "@/components/PosTerminalSettings";
+import { terminalLabel, usePosTerminal } from "@/lib/posTerminal";
 import { resolveProductArtwork } from "@shared/productIcons";
 import { notify } from "@/lib/notifications";
 import { useRef as useRequestRef } from "react";
@@ -56,6 +58,8 @@ type StoreProduct = Product & {
 };
 
 type CheckoutReceipt = {
+  terminalId?: string | null;
+  terminalNumber?: number | null;
   orderNumber: string;
   createdAt: string;
   items: { productId: number | null; name: string; unit: string; qty: number; price: number; amount: number }[];
@@ -121,6 +125,8 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
   // ROUND 75 — autoPrintReceipt was removed: the checkout success screen never
   // auto-opens the print dialog anymore (print/image/PDF are manual buttons).
   const settingsQuery = trpc.settings.get.useQuery(undefined);
+  const terminal = usePosTerminal();
+  const [terminalOpen, setTerminalOpen] = useState(false);
   // ROUND 75 (user) — ตั้งค่า "เมนูลัดหน้าร้าน" (ตั้งค่า → การขายหน้าร้าน): ปุ่มไหนถูกปิด
   // ให้ซ่อนจากรางซ้าย และคีย์ลัด F ของปุ่มนั้นหยุดทำงานด้วย (ป้องกันกด F2 แล้วหน้าต่างเด้งขึ้นมา)
   const railHidden = useMemo(() => {
@@ -366,7 +372,7 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
 
     },
     // ROUND 78 — ชำระเงินไม่สำเร็จ (เงินไม่พอ · สต็อกไม่พอ · เซิร์ฟเวอร์ error) ต้องเห็นกลางจอทันที
-    onError: (mutationError) => { setError(getErrorMessage(mutationError)); blocker.error("ยังยืนยันผลการชำระเงินไม่ได้", getErrorMessage(mutationError), { hint: "หากการเชื่อมต่อขัดข้อง ให้ยืนยันบิลเดิมซ้ำโดยไม่แก้ข้อมูล ระบบจะเรียกคืนผลเดิมและไม่บันทึกซ้ำ" }); },
+    onError: (mutationError) => { void terminal.refetch(); setError(getErrorMessage(mutationError)); blocker.error("ยังยืนยันผลการชำระเงินไม่ได้", getErrorMessage(mutationError), { hint: "หากการเชื่อมต่อขัดข้อง ให้ยืนยันบิลเดิมซ้ำโดยไม่แก้ข้อมูล ระบบจะเรียกคืนผลเดิมและไม่บันทึกซ้ำ" }); },
   });
   // ROUND 80 — Enter = ยืนยันการชำระเงินทันที (นิสัย POS มาตรฐาน): โฟกัสปุ่มยืนยันเมื่อเปิดหน้าต่าง
   // และรองรับ Enter ระดับหน้าต่างเมื่อโฟกัสยังไม่ได้อยู่ใน modal (กดปุ่มจ่ายเงินแล้วโฟกัสค้างที่ปุ่มเดิม)
@@ -738,6 +744,7 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
   const requestPayment = (method: PaymentMethod) => {
     toast.dismiss();
     if (cart.length === 0) return;
+    if (!terminal.deviceId || (!terminal.data && !checkoutAttemptRef.current)) { setTerminalOpen(true); return; }
     if (method === "หักบัญชีสมาชิก" && !selectedMember) {
       setError("เลือกสมาชิกก่อนชำระแบบหักบัญชี");
       setMessage("สแกนหรือค้นหาสมาชิกก่อน ระบบเก็บสินค้าในตะกร้าไว้ให้");
@@ -783,8 +790,10 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
   const completePayment = (method: PaymentMethod) => {
     if (cart.length === 0 || checkoutSubmittingRef.current || checkoutMutation.isPending) return;
     if (discountValue > subtotal) { setError("ส่วนลดมากกว่ายอดรวมสินค้า"); blocker.warning("ส่วนลดมากกว่ายอดรวมสินค้า", "ปรับส่วนลดให้ไม่เกินยอดรวม แล้วกดยืนยันใหม่ได้เลย"); return; }
+    if (!terminal.deviceId || (!terminal.data && !checkoutAttemptRef.current)) { setPayConfirm(null); setTerminalOpen(true); return; }
     clearNotices();
     const payload = {
+      terminalDeviceId: terminal.deviceId,
       items: cart.map((item) => item.special
         ? { name: item.name, price: item.price, qty: item.qty, unit: item.unit }
         : item.variant
@@ -1086,8 +1095,9 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
     document.querySelector(".scan-drop-row.active")?.scrollIntoView({ block: "nearest" });
   }, [scanHighlight]);
   return <>
+    {terminalOpen && <WorkflowDialog title="ตั้งค่าจุดขาย" onClose={() => setTerminalOpen(false)} busy={paymentPending} className="pos-terminal-dialog"><div className="modal-heading"><b>ตั้งค่าจุดขาย</b><button type="button" className="icon-button" aria-label="ปิดตั้งค่าจุดขาย" onClick={() => setTerminalOpen(false)}><X size={18} /></button></div><PosTerminalSettings canManage={isAdminRole(role)} locked={paymentPending} /></WorkflowDialog>}
     {inventoryQuickOpen && <div className="modal-backdrop pos-inventory-backdrop" role="dialog" aria-modal="true" aria-label="เพิ่มสินค้าใหม่และรับเข้าสินค้า" onClick={() => setInventoryQuickOpen(false)}><div className="pos-inventory-modal" onClick={(event) => event.stopPropagation()}><div className="pos-inventory-modal-body"><Stock role={role} userName={userName} initialAction={inventoryQuickAction} embeddedAction onClose={() => setInventoryQuickOpen(false)} /></div></div></div>}
-    <SectionHeader eyebrow="หน้าร้าน / จุดขายสินค้า" title="POS · ขายสินค้า" description="สแกนบาร์โค้ดที่ช่องด้านบน · สินค้าไม่มีบาร์โค้ดปรับจำนวนได้ที่การ์ดด้านขวา · สรุปยอดและปุ่มชำระเงินล็อคอยู่ด้านล่างตลอดเวลา" action={<div className="pos-header-actions"><div className="pos-status"><span className="live-dot" /> จุดขายที่ 01 · เปิดให้บริการ</div></div>} />
+    <SectionHeader eyebrow="หน้าร้าน / จุดขายสินค้า" title="POS · ขายสินค้า" description="สแกนบาร์โค้ดที่ช่องด้านบน · สินค้าไม่มีบาร์โค้ดปรับจำนวนได้ที่การ์ดด้านขวา · สรุปยอดและปุ่มชำระเงินล็อคอยู่ด้านล่างตลอดเวลา" action={<div className="pos-header-actions"><button type="button" className="pos-status terminal-badge" data-unregistered={!terminal.data || undefined} disabled={paymentPending} onClick={() => setTerminalOpen(true)} title="กำหนดจุดขายให้เบราว์เซอร์นี้">{terminal.isLoading ? "กำลังตรวจสอบจุดขาย…" : terminal.data ? terminalLabel(terminal.data.number) : "กำหนดจุดขาย"}</button></div>} />
     <div className="pos-layout pos-premium-layout">
       <section className="panel cart-panel pos-premium-bill" ref={cartPanelRef}>
         <div className="pos-sale-workspace">

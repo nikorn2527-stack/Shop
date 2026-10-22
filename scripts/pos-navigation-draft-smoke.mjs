@@ -200,6 +200,15 @@ try {
       customer: document.querySelector(".pos-customer-row").textContent,
     }));
   await pos();
+  await page.click(".terminal-badge");
+  await page.waitForSelector(".pos-terminal-dialog");
+  await fill('[aria-label="เลขจุดขาย"]', "1");
+  await click("กำหนดให้เครื่องนี้", ".pos-terminal-dialog");
+  await page.waitForFunction(() => document.querySelector(".terminal-current")?.textContent.includes("จุดขายที่ 01"));
+  await page.screenshot({ path: path.join(dir, "terminal-registered.png") });
+  await page.click('[aria-label="ปิดตั้งค่าจุดขาย"]');
+  await page.waitForFunction(() => document.querySelector(".terminal-badge")?.textContent === "จุดขายที่ 01");
+  checks.push("Administrator registers this browser as station 01; badge reflects server registration");
   await add();
   await fill('input[id^="bill-qty-"]', 3);
   await page.keyboard.press("Enter");
@@ -246,6 +255,9 @@ try {
   await click("ยืนยันการชำระเงิน", ".pay-confirm-modal");
   await page.waitForSelector("#receipt-paper");
   assert.equal(read("SELECT COUNT(*) n FROM sales").n, initialSales + 1);
+  assert.equal(read("SELECT terminal_number FROM sales ORDER BY id DESC LIMIT 1").terminal_number, 1);
+  assert.ok(await page.$eval("#receipt-paper", n => n.textContent.includes("จุดขาย01")));
+  checks.push("New bill and receipt carry the registered station number");
   assert.deepEqual(
     (await snapshot()).qty,
     [],

@@ -43,6 +43,10 @@ import {
   stockCard,
   changeOwnPassword,
   checkout,
+  getPosTerminal,
+  listPosTerminals,
+  registerPosTerminal,
+  releasePosTerminal,
   clearLoginFailures,
   countAppUsers,
   createAppSession,
@@ -306,6 +310,7 @@ const orderUpdateInput = z.object({
 // (special/custom line: weighed goods, services, ad-hoc charges — no product row,
 // no stock movement). sale_items.product_id is nullable on purpose for these.
 const checkoutInput = z.object({
+  terminalDeviceId: z.string().uuid("กรุณาตั้งค่าจุดขายสำหรับเครื่องนี้ก่อนชำระเงิน"),
   items: z
     .array(z.union([
       z.object({ productId: z.number().int().positive(), qty: z.number().int().positive(), price: z.number().positive().optional(), unit: z.string().max(30).optional(), label: z.string().max(120).optional() }),
@@ -1114,6 +1119,24 @@ export const appRouter = router({
   }),
 
   pos: router({
+    terminal: publicProcedure.input(z.object({ deviceId: z.string().uuid() })).query(({ ctx, input }) => withStoreErrors(() => {
+      requireLogin(ctx);
+      return getPosTerminal(getWelfareDb(), input.deviceId);
+    })),
+    terminals: publicProcedure.query(({ ctx }) => withStoreErrors(() => {
+      requireLogin(ctx);
+      return listPosTerminals(getWelfareDb());
+    })),
+    registerTerminal: publicProcedure.input(z.object({ deviceId: z.string().uuid(), number: z.number().int().min(1).max(999) })).mutation(({ ctx, input }) => withStoreErrors(() => {
+      requireLogin(ctx);
+      requireAdmin(ctx, "การกำหนดจุดขายต้องใช้สิทธิ์ผู้บริหาร");
+      return registerPosTerminal(getWelfareDb(), input.deviceId, input.number, ctx.user!.name ?? "ผู้บริหาร");
+    })),
+    releaseTerminal: publicProcedure.input(z.object({ id: z.string().uuid() })).mutation(({ ctx, input }) => withStoreErrors(() => {
+      requireLogin(ctx);
+      requireAdmin(ctx, "การยกเลิกการผูกจุดขายต้องใช้สิทธิ์ผู้บริหาร");
+      return releasePosTerminal(getWelfareDb(), input.id, ctx.user!.name ?? "ผู้บริหาร");
+    })),
     checkout: publicProcedure
       .input(checkoutInput)
       .mutation(({ ctx, input }) => {
@@ -1833,3 +1856,4 @@ export const appRouter = router({
 });
 
 export type AppRouter = typeof appRouter;
+

@@ -1,3 +1,4 @@
+import { PosTerminalSettings } from "@/components/PosTerminalSettings";
 import { parsePosShortcutKeys, getPosShortcutKey, findPosShortcutConflicts, posShortcutConflictMessage } from "@/lib/posShortcuts";
 import { BackgroundImageUpload } from "@/components/BackgroundImageUpload";
 import { FeedbackDialog } from "@/components/WorkflowDialog";
@@ -2615,6 +2616,7 @@ export function Settings({
           )}
           {tab === "posmenu" && (
             <div className="settings-single">
+              <section className="panel settings-card"><PosTerminalSettings canManage={isAdminRole} /></section>
               <section className="panel settings-card">
                 <div className="settings-heading">
                   <div>
