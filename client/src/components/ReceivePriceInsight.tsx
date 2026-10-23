@@ -104,7 +104,7 @@ export function ReceivePriceInsight({
               </span>
             )}
         </div>
-        <div>
+        <div className="receive-insight-current">
           <small>ต้นทุนรอบนี้ / {unit}</small>
           <strong>{insight.cost === null ? "—" : amount(insight.cost)}</strong>
           <span>
@@ -120,12 +120,12 @@ export function ReceivePriceInsight({
             )}
           </span>
         </div>
-        <div>
+        <div className="receive-insight-selling" data-loss={(insight.grossProfit !== null && insight.grossProfit < 0) || undefined}>
           <small>ราคาขายที่จะใช้ / {unit}</small>
           <strong>
             {insight.price === null ? "—" : amount(insight.price, 2)}
           </strong>
-          <span>
+          <span className="receive-current-selling-price">
             {!newProduct && currentSellingPrice !== undefined
               ? `ราคาขายปัจจุบัน ${amount(pricing?.sellingPrice ?? currentSellingPrice, 2)}`
               : "กำหนดราคาขายที่ช่องด้านซ้าย"}

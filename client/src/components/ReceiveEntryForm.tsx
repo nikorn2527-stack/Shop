@@ -17,11 +17,14 @@ export function ReceiveEntryForm({artwork, scan, value, onChange, product, newIt
   const locked=busy || Boolean(product) || !canCreate;
   const {cost}=receiptPriceInsight({...value,sellingPrice:newItem?.price??value.sellingPrice});
   const price=newItem ? Number(newItem.price) : value.sellingPrice.trim() ? Number(value.sellingPrice) : pricing?.sellingPrice ?? product?.price ?? 0;
-  const numberField=(field:"purchaseQty"|"freeQty"|"paidAmount",label:string,id:string,min:number,step:string)=><label>{label}<input id={id} aria-label={label} type="number" min={min} step={step} value={value[field]} disabled={busy||!ready} onChange={e=>onChange(field,e.target.value)} /></label>;
+  const numberField=(field:"purchaseQty"|"freeQty"|"paidAmount",label:string,id:string,min:number,step:string)=><label>{label}<input id={id} aria-label={label} type="number" min={min} step={step} value={value[field]} disabled={busy||!ready} onChange={e=>onChange(field,field==="paidAmount" ? e.target.value : e.target.value.replace(/^0+(?=\d)/,""))} /></label>;
   return <section className="receive-entry-form" data-field-feedback={!product&&!newDraftActive ? "off" : undefined} onKeyDown={event=>{
-    if(event.key!=="Enter" || event.defaultPrevented || event.nativeEvent.isComposing || !(event.target instanceof HTMLInputElement)) return;
-    const controls=Array.from(event.currentTarget.querySelectorAll<HTMLElement>("input:not(:disabled):not([readonly]),select:not(:disabled),button[data-add-receipt]:not(:disabled)"));
-    event.preventDefault();controls[controls.indexOf(event.target)+1]?.focus();
+    if(event.key!=="Enter" || event.defaultPrevented || event.nativeEvent.isComposing || !(event.target instanceof HTMLElement) || event.target.closest(".member-scan-field")) return;
+    if(!event.target.matches("input,select") && !(event.shiftKey && event.target.matches("[data-add-receipt]"))) return;
+    const controls=Array.from(event.currentTarget.querySelectorAll<HTMLElement>("input:not(:disabled):not([readonly]),select:not(:disabled),button[data-add-receipt]:not(:disabled)")).filter(control=>!control.closest(".member-scan-field") && control.getClientRects().length>0);
+    const index=controls.indexOf(event.target);
+    if(index<0)return;
+    event.preventDefault();controls[index+(event.shiftKey ? -1 : 1)]?.focus();
   }}>
     <div className="receive-form-body">
     <div className="receive-form-section">
@@ -42,7 +45,8 @@ export function ReceiveEntryForm({artwork, scan, value, onChange, product, newIt
       <label>{newItem ? "ราคาขาย *" : "ราคาขายหลังรับเข้า"}<input id="receive-editor-selling-price" aria-label={newItem ? "ราคาขายสินค้าใหม่" : "ราคาขายหลังรับเข้า"} type="number" min="0" step="0.01" value={newItem?.price??value.sellingPrice} disabled={busy||!ready||(!newItem&&(!canChangePrice||loading||pricingError))} placeholder={product ? `คงเดิม ${(pricing?.sellingPrice??product.price).toFixed(2)}` : "0.00"} onChange={e=>newItem ? onNewChange("price",e.target.value) : onChange("sellingPrice",e.target.value)} /></label></div>
       {ready && ((pricing && value.sellingPrice.trim() && Number(value.sellingPrice)<pricing.sellingPrice) || (cost!==null && price<cost)) && <p className="receive-price-warning" role="status">{pricing && value.sellingPrice.trim() && Number(value.sellingPrice)<pricing.sellingPrice ? `ลดราคาจาก ฿${pricing.sellingPrice.toFixed(2)} เป็น ฿${price.toFixed(2)} · คงเหลือ ${pricing.remainingQty} หน่วย${pricing.highestRemainingCost!==null ? ` · ต้นทุนสูงสุดที่มีข้อมูล ฿${pricing.highestRemainingCost.toFixed(4)}` : " · ยังไม่ทราบต้นทุนของเดิม"}${pricing.unknownRemainingQty ? ` · ไม่ทราบต้นทุน ${pricing.unknownRemainingQty} หน่วย` : ""} · ` : ""}{cost!==null && price<cost ? "ราคาขายต่ำกว่าต้นทุนรอบนี้ · " : ""}ตรวจสอบก่อนยืนยัน</p>}
     </div>
-    <div className="receive-form-section"><h3>ล็อตสินค้า</h3><div className="receive-form-pair"><label>Lot<input id="receive-editor-lot" aria-label="Lot ที่กำลังกรอก" value={value.lot} disabled={busy||!ready} placeholder="อัตโนมัติ" onChange={e=>onChange("lot",e.target.value)} /></label><label>วันหมดอายุ<ExpiryDateInput id="receive-editor-expiry" value={value.expiry} disabled={busy||!ready} onChange={v=>onChange("expiry",v)} label="วันหมดอายุรายการที่กำลังกรอก" /></label></div></div>
+    <div className="receive-form-section"><h3>ล็อตสินค้า</h3><div className="receive-form-pair"><label>Lot<input id="receive-editor-lot" aria-label="Lot ที่กำลังกรอก" value={value.lot} disabled={busy||!ready} placeholder="อัตโนมัติ" onChange={e=>onChange("lot",e.target.value)} /></label><label>วันหมดอายุ (ไม่บังคับ)<ExpiryDateInput id="receive-editor-expiry" value={value.expiry} disabled={busy||!ready} onChange={v=>onChange("expiry",v)} label="วันหมดอายุรายการที่กำลังกรอก" /></label></div></div>
+    <small className="receive-keyboard-hint">Enter ถัดไป · Shift+Enter ย้อนกลับ · ใช้ Tab / Shift+Tab ได้</small>
     </div>
     <div className="receive-draft-actions"><button data-add-receipt type="button" className="primary-button" disabled={busy||!ready||loading} onClick={onAdd}>เพิ่มลงรายการ</button><div className="receive-secondary-actions"><button type="button" className="outline-button receive-cancel" disabled={busy} onClick={onCancel}>ยกเลิก</button></div></div>
   </section>;

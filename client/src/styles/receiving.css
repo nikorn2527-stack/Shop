@@ -238,3 +238,21 @@
   :root:root .stock-receive-modal.receiving-workspace .receive-product-name.is-expanded { flex-wrap:wrap; }
   :root:root .stock-receive-modal.receiving-workspace .receive-product-name.is-expanded b { flex-basis:100%; }
 }
+
+
+/* Distinguish previous cost, current intake cost and the selling price. */
+@media screen {
+  :root:root .stock-receive-modal.receiving-workspace .receive-draft-actions .receive-secondary-actions .receive-cancel:not(:disabled) { background:#fff1f2; border-color:#fda4af; color:#9f1239; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-draft-actions .receive-secondary-actions .receive-cancel:hover:not(:disabled) { background:#ffe4e6; border-color:#fb7185; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-draft-actions .receive-secondary-actions .receive-cancel:focus-visible { outline:2px solid #be123c; outline-offset:2px; }
+  .receive-keyboard-hint { color:#64748b; font-size:10px; line-height:1.5; }
+  .receive-insight-grid .receive-insight-previous { background:#eff6ff; border-color:#bfdbfe; border-top:3px solid #3b82f6; }
+  .receive-insight-grid .receive-insight-previous :is(strong,small) { color:#1e40af; }
+  .receive-insight-grid .receive-insight-current { background:#fffbeb; border-color:#fde68a; border-top:3px solid #d97706; }
+  .receive-insight-grid .receive-insight-current :is(strong,small) { color:#92400e; }
+  .receive-insight-grid .receive-insight-selling { background:#f0fdf4; border-color:#bbf7d0; border-top:3px solid #16a34a; }
+  .receive-insight-grid .receive-insight-selling :is(strong,small) { color:#166534; }
+  .receive-insight-grid .receive-current-selling-price { align-self:flex-start; padding:3px 7px; border:1px solid #cbd5e1; border-radius:6px; background:#f1f5f9; color:#334155; }
+  .receive-insight-grid .receive-insight-selling[data-loss] { background:#fff1f2; border-color:#fda4af; border-top-color:#be123c; }
+  .receive-insight-grid .receive-insight-selling[data-loss] :is(strong,small) { color:#9f1239; }
+}

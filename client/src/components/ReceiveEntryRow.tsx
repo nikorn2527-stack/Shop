@@ -10,7 +10,7 @@ export function ReceiveEntryRow({entry,index,name,code,unit,sellingPrice,canChan
   const [nameExpanded,setNameExpanded]=useState(false);
   const row=index+1;
   const total=Number(entry.purchaseQty)+Number(entry.freeQty);
-  const field=(key:"purchaseQty"|"freeQty"|"paidAmount",label:string,min:number,step:string)=><label>{label}<input aria-label={`${label}รายการ ${row}`} type="number" min={min} step={step} value={entry[key]} disabled={busy} onChange={e=>onUpdate(key,e.target.value)} /></label>;
+  const field=(key:"purchaseQty"|"freeQty"|"paidAmount",label:string,min:number,step:string)=><label>{label}<input aria-label={`${label}รายการ ${row}`} type="number" min={min} step={step} value={entry[key]} disabled={busy} onChange={e=>onUpdate(key,key==="paidAmount" ? e.target.value : e.target.value.replace(/^0+(?=\d)/,""))} /></label>;
   const unitCost=entry.paidAmount.trim() && total>0 ? `฿${(Number(entry.paidAmount)/total).toFixed(4)}` : "—";
   return <tr className={`receive-main-row${editing ? " receive-row-editing" : ""}`}>
     <td><button type="button" className={`receive-product-name${nameExpanded ? " is-expanded" : ""}`} title={`${name}${code ? ` / ${code}` : ""}`} aria-label={`${nameExpanded ? "ย่อชื่อสินค้า" : "ดูชื่อสินค้าเต็ม"}รายการ ${row}: ${name}`} aria-expanded={nameExpanded} onClick={()=>setNameExpanded(current=>!current)}><b>{name}</b>{code && <><span className="receive-inline-divider"> / </span><small className="receive-product-code">{code}</small></>}</button></td>
