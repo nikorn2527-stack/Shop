@@ -146,6 +146,13 @@ try {
   assert.equal(await page.$$eval('.receive-main-row',rows=>rows.length),2,'New item joins receipt directly');
   await page.click('[aria-label="แก้ไขรายการ 2"]');
   await fill('.receive-main-row input[aria-label="ราคาขายรายการ 2"]',12);
+  const readableNumbers=await page.$$eval('.receive-row-editing input[type="number"]',nodes=>nodes.every(node=>{
+    const style=getComputedStyle(node),canvas=document.createElement('canvas'),context=canvas.getContext('2d');
+    context.font=style.font;
+    const available=node.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight);
+    return style.appearance==='textfield' && available>=context.measureText('200').width;
+  }));
+  assert.ok(readableNumbers,'Inline numeric fields must show three digits without spinner controls covering the value');
   await fill('.receive-main-row input[aria-label="จำนวนซื้อรายการ 1"]',0);
   await click('บันทึกทั้งหมด','.receiving-workspace');await pause(100);
   assert.equal(await page.$('.confirm-modal'),null,'Invalid inline quantity blocks confirmation');

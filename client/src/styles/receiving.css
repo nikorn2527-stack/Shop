@@ -261,3 +261,14 @@
   :root:root .stock-receive-modal.receiving-workspace .receive-simple-table th:nth-child(1) { width:18%; }
   :root:root .stock-receive-modal.receiving-workspace .receive-simple-table th:nth-child(6) { width:14%; }
 }
+
+/* Editing needs full column width for each field, even when the summary is compact. */
+@media screen {
+  :root:root .stock-receive-modal.receiving-workspace .receive-row-editing .receive-inline-fields { grid-template-columns:minmax(0,1fr); gap:10px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-row-editing input[type="number"] { appearance:textfield; -moz-appearance:textfield; padding-left:6px; padding-right:6px; text-align:right; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-row-editing input[type="number"]::-webkit-inner-spin-button,
+  :root:root .stock-receive-modal.receiving-workspace .receive-row-editing input[type="number"]::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-row-editing td:nth-child(3) .receive-inline-values { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-row-editing td:nth-child(3) .receive-inline-values > label { grid-column:1 / -1; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-row-editing td:nth-child(3) small { white-space:nowrap; }
+}
