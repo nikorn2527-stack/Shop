@@ -1626,16 +1626,35 @@ export function receiveStockLines(
 export function stockReceiptPricing(db: SqliteDb, productId: number) {
   const product = getProductById(db, productId);
   if (!product) throw new StoreError("ไม่พบสินค้า");
-  const latest = db.prepare(`SELECT l.lot, l.received_at AS receivedAt, l.receipt_group AS receiptGroup FROM stock_lots l
+  const latest = db.prepare(`SELECT l.id, l.lot, l.received_at AS receivedAt, l.receipt_group AS receiptGroup FROM stock_lots l
     WHERE l.product_id = ? AND EXISTS (SELECT 1 FROM stock_movements m WHERE m.type='RECEIVE' AND m.ref_type='stock_lot' AND m.ref_id=l.id)
-    ORDER BY l.received_at DESC, l.id DESC LIMIT 1`).get(productId) as {lot:string;receivedAt:string;receiptGroup:string|null} | undefined;
-  const receipt = latest ? db.prepare(`SELECT SUM(received_qty) qty, SUM(received_value_satang) value,
+    ORDER BY l.received_at DESC, l.id DESC LIMIT 1`).get(productId) as {id:number;lot:string;receivedAt:string;receiptGroup:string|null} | undefined;
+  const receipt = latest ? db.prepare(`SELECT MIN(id) id, SUM(received_qty) qty, SUM(received_value_satang) value,
     SUM(CASE WHEN received_qty IS NULL OR received_value_satang IS NULL THEN 1 ELSE 0 END) unknown
-    FROM stock_lots WHERE product_id=? AND ((? IS NOT NULL AND receipt_group=?) OR (? IS NULL AND lot=? AND received_at=?))`).get(productId,latest.receiptGroup,latest.receiptGroup,latest.receiptGroup,latest.lot,latest.receivedAt) as {qty:number|null;value:number|null;unknown:number} : undefined;
+    FROM stock_lots WHERE product_id=? AND ((? IS NOT NULL AND receipt_group=?) OR (? IS NULL AND lot=? AND received_at=?))`).get(productId,latest.receiptGroup,latest.receiptGroup,latest.receiptGroup,latest.lot,latest.receivedAt) as {id:number;qty:number|null;value:number|null;unknown:number} : undefined;
   const inventory = db.prepare(`SELECT MAX(CASE WHEN qty>0 AND remaining_value_satang IS NOT NULL THEN remaining_value_satang/100.0/qty ELSE NULL END) highestCost,
     SUM(CASE WHEN qty>0 AND remaining_value_satang IS NULL THEN qty ELSE 0 END) unknownQty FROM stock_lots WHERE product_id=?`).get(productId) as {highestCost:number|null;unknownQty:number|null};
   return {productId, sellingPrice:product.price, remainingQty:product.stock, previousCost:receipt && !receipt.unknown && receipt.qty && receipt.value !== null ? receipt.value/100/receipt.qty : null,
+    previousReceipt:receipt ? {id:receipt.id,reference:stockReceiptReference(receipt.id)} : null,
     previousLot:latest?.lot ?? null, previousReceivedAt:latest?.receivedAt ?? null, highestRemainingCost:inventory.highestCost, unknownRemainingQty:inventory.unknownQty ?? 0};
+}
+
+// A stable internal reference for existing receipt records; not a supplier invoice number.
+const stockReceiptReference = (id: number) => `IN-${String(id).padStart(6, "0")}`;
+
+export function stockReceiptSource(db: SqliteDb, lotId: number) {
+  const source = db.prepare(`SELECT l.*, p.sku, p.name, p.unit FROM stock_lots l JOIN products p ON p.id=l.product_id
+    WHERE l.id=? AND EXISTS (SELECT 1 FROM stock_movements m WHERE m.type='RECEIVE' AND m.ref_type='stock_lot' AND m.ref_id=l.id)`).get(lotId) as {id:number;product_id:number;receipt_group:string|null;lot:string;received_at:string;sku:string;name:string;unit:string} | undefined;
+  if (!source) throw new StoreError("ไม่พบรายการรับเข้าที่อ้างอิง");
+  const lines = db.prepare(`SELECT l.id, l.lot, l.expiry_date AS expiry, l.received_at AS receivedAt,
+    l.received_qty AS receivedQty, l.received_value_satang AS receivedValueSatang,
+    (SELECT m.actor FROM stock_movements m WHERE m.ref_type='stock_lot' AND m.ref_id=l.id AND m.type='RECEIVE' ORDER BY m.id LIMIT 1) AS actor
+    FROM stock_lots l WHERE l.product_id=? AND ((? IS NOT NULL AND l.receipt_group=?) OR (? IS NULL AND l.lot=? AND l.received_at=?)) ORDER BY l.id`).all(source.product_id,source.receipt_group,source.receipt_group,source.receipt_group,source.lot,source.received_at) as {id:number;lot:string;expiry:string|null;receivedAt:string;receivedQty:number|null;receivedValueSatang:number|null;actor:string|null}[];
+  const known = lines.every(line=>line.receivedQty!==null && line.receivedValueSatang!==null);
+  const quantity = known ? lines.reduce((sum,line)=>sum+line.receivedQty!,0) : null;
+  const paidAmount = known ? lines.reduce((sum,line)=>sum+line.receivedValueSatang!,0)/100 : null;
+  return {id:lines[0].id, reference:stockReceiptReference(lines[0].id), name:source.name, sku:source.sku, unit:source.unit,
+    receivedAt:source.received_at, quantity, paidAmount, unitCost:quantity && paidAmount!==null ? paidAmount/quantity : null, lines};
 }
 
 export type StockIntakeEntry = {

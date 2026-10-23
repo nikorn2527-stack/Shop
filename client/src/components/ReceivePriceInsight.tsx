@@ -1,9 +1,12 @@
 import { receiptPriceInsight } from "@/lib/receiptPriceInsight";
+import { useState } from "react";
+import { StockReceiptSourceDialog } from "./StockReceiptSourceDialog";
 
 type Pricing = {
   previousCost: number | null;
   previousLot?: string | null;
   previousReceivedAt?: string | null;
+  previousReceipt?: { id: number; reference: string } | null;
   sellingPrice: number;
   highestRemainingCost: number | null;
   unknownRemainingQty: number;
@@ -34,6 +37,7 @@ export function ReceivePriceInsight({
   error: boolean;
   newProduct?: boolean;
 }) {
+  const [sourceId, setSourceId] = useState<number | null>(null);
   const insight = receiptPriceInsight({
     ...draft,
     currentSellingPrice: newProduct
@@ -83,6 +87,11 @@ export function ReceivePriceInsight({
                 {pricing.previousLot ? ` · Lot ${pricing.previousLot}` : ""}
               </span>
             )}
+          {!newProduct && !loading && !error && pricing?.previousReceipt && (
+            <button type="button" className="receive-source-link" onClick={() => setSourceId(pricing.previousReceipt!.id)}>
+              อ้างอิงรับเข้า {pricing.previousReceipt.reference} · ดูรายละเอียด
+            </button>
+          )}
           {!newProduct &&
             !loading &&
             !error &&
@@ -158,6 +167,7 @@ export function ReceivePriceInsight({
           ราคาขายต่ำกว่าต้นทุนรอบนี้ ตรวจราคาก่อนเพิ่มลงรายการ
         </p>
       )}
+      {sourceId !== null && <StockReceiptSourceDialog lotId={sourceId} onClose={() => setSourceId(null)} />}
     </section>
   );
 }

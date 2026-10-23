@@ -58,6 +58,11 @@ describe("business API permissions", () => {
     await expect(caller("stock_officer").stock.receiveBatch({entries:[{productId:product.id,purchaseQty:1,paidAmount:5}]})).resolves.toHaveLength(1);
   });
 
+  it("protects receipt cost source details before opening the database", async () => {
+    await expect(caller().stock.receiptSource({lotId:1})).rejects.toMatchObject({code:"UNAUTHORIZED"});
+    expect(store.get).not.toHaveBeenCalled();
+  });
+
   it("allows stock officers to read inventory using their actual app role", async () => {
     await expect(caller("stock_officer").stock.rows()).resolves.toEqual([]);
   });

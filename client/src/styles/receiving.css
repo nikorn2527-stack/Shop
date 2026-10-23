@@ -188,3 +188,25 @@
   :root:root .stock-receive-modal.receiving-workspace .receive-secondary-actions { align-self:center; }
   :root:root .stock-receive-modal.receiving-workspace .receive-cancel { margin:0; }
 }
+
+/* Read-only source receipt, opened without leaving the current intake draft. */
+@media screen {
+  .receive-source-link { align-self:flex-start; padding:4px 0; border:0; background:transparent; color:#155e75; font:inherit; font-size:11px; text-align:left; text-decoration:underline; text-underline-offset:3px; overflow-wrap:anywhere; cursor:pointer; }
+  .receive-source-link:focus-visible { outline:2px solid var(--teal); outline-offset:3px; }
+  :root .workflow-dialog.receive-source-dialog { box-sizing:border-box; width:min(720px,calc(100vw - 32px)); max-height:calc(100dvh - 32px); overflow:auto; padding:20px; background:white; }
+  :root:root .receive-source-dialog > .modal-heading { position:static; margin:0 0 16px; padding:0 0 12px; gap:12px; align-items:flex-start; box-shadow:none; }
+  .receive-source-dialog .modal-heading h2 { min-width:0; font-size:18px; line-height:1.4; }
+  .receive-source-dialog .modal-heading button { flex-shrink:0; }
+  :root:root .receive-source-dialog > .modal-actions:last-child { bottom:-20px; margin:16px -20px -20px; padding:12px 20px 20px; }
+  .receive-source-dialog > p { white-space:normal; overflow-wrap:anywhere; }
+  .receive-source-reference { font-weight:700; color:#155e75; }
+  .receive-source-summary { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; margin:16px 0; }
+  .receive-source-summary div { min-width:0; padding:10px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; }
+  .receive-source-summary dt,.receive-source-note { font-size:12px; color:var(--muted); }
+  .receive-source-summary dd { margin:6px 0 0; font-weight:600; overflow-wrap:anywhere; font-variant-numeric:tabular-nums; }
+  .receive-source-dialog .table-wrap { overflow:auto; }
+  .receive-source-dialog .data-table { min-width:440px; }
+  .receive-source-dialog .data-table td:first-child { overflow-wrap:anywhere; }
+  .receive-source-dialog .data-table :is(td,th):nth-child(2),.receive-source-dialog .data-table :is(td,th):nth-child(3) { text-align:right; white-space:nowrap; }
+  @media(max-width:600px) { .receive-source-summary { grid-template-columns:minmax(0,1fr); } }
+}

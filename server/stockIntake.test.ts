@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createSqliteStore, createProduct, receiveStockBatch, stockReceiptHistory, updateProduct, stockReceiptPricing, checkout } from "./sqliteStore";
+import { createSqliteStore, createProduct, receiveStockBatch, stockReceiptHistory, updateProduct, stockReceiptPricing, stockReceiptSource, checkout } from "./sqliteStore";
 
 describe("unified stock intake", () => {
   it("rejects non-finite prices/costs and invalid reorder points before writing", () => {
@@ -112,6 +112,49 @@ describe("receipt price context and atomic repricing", () => {
       expect(db.prepare("SELECT stock,price FROM products WHERE id=?").get(p.id)).toEqual(before);
       expect(db.prepare("SELECT id FROM products WHERE sku='PHANTOM'").get()).toBeUndefined();
       expect(db.prepare("SELECT COUNT(*) n FROM stock_lots").get()).toMatchObject({n:0});
+    } finally {db.close();}
+  });
+});
+
+
+describe("receipt cost source references", () => {
+  it("links to original paid and free lines after depletion and a later receipt with the same lot label", () => {
+    const db=createSqliteStore();try {
+      const p=createProduct(db,{name:"Source product",price:20});
+      receiveStockBatch(db,[{productId:p.id,purchaseQty:10,freeQty:2,paidAmount:60,lot:"REUSED"}],"First receiver");
+      const first=stockReceiptPricing(db,p.id).previousReceipt!;
+      expect(first.reference).toBe(`IN-${String(first.id).padStart(6,"0")}`);
+      checkout(db,{items:[{productId:p.id,qty:12}],paymentMethod:"เงินสด"});
+      receiveStockBatch(db,[{productId:p.id,purchaseQty:1,paidAmount:9,lot:"REUSED"}],"Next receiver");
+      const next=stockReceiptPricing(db,p.id).previousReceipt!;
+      expect(next.id).not.toBe(first.id);
+      const source=stockReceiptSource(db,first.id);
+      expect(source).toMatchObject({reference:first.reference,quantity:12,paidAmount:60,unitCost:5});
+      expect(source.lines).toHaveLength(2);
+      expect(source.lines.map(line=>line.actor)).toEqual(["First receiver","First receiver"]);
+      expect(stockReceiptSource(db,source.lines[1].id).reference).toBe(first.reference);
+      expect(stockReceiptSource(db,next.id)).toMatchObject({quantity:1,paidAmount:9,unitCost:9});
+    } finally {db.close();}
+  });
+  it("does not invent a source for catalog costs or opening stock, and preserves documented zero cost", () => {
+    const db=createSqliteStore();try {
+      const p=createProduct(db,{name:"Catalog cost",price:20,cost:99,stock:3});
+      expect(stockReceiptPricing(db,p.id)).toMatchObject({previousCost:null,previousReceipt:null});
+      const opening={id:Number(db.prepare("INSERT INTO stock_lots (product_id,lot,qty,cost,received_qty,received_at) VALUES (?,'OPENING',3,99,3,'2020-01-01 10:00:00')").run(p.id).lastInsertRowid)};
+      expect(()=>stockReceiptSource(db,opening.id)).toThrow("ไม่พบรายการรับเข้า");
+      expect(()=>stockReceiptSource(db,999999)).toThrow("ไม่พบรายการรับเข้า");
+      receiveStockBatch(db,[{productId:p.id,purchaseQty:1,paidAmount:0}],"Receiver");
+      const pricing=stockReceiptPricing(db,p.id);
+      expect(stockReceiptSource(db,pricing.previousReceipt!.id)).toMatchObject({quantity:1,paidAmount:0,unitCost:0});
+    } finally {db.close();}
+  });
+  it("shows unknown historical receipt amounts as unknown", () => {
+    const db=createSqliteStore();try {
+      const p=createProduct(db,{name:"Legacy receipt",price:20});
+      receiveStockBatch(db,[{productId:p.id,purchaseQty:2,paidAmount:10}],"Receiver");
+      const receipt=stockReceiptPricing(db,p.id).previousReceipt!;
+      db.prepare("UPDATE stock_lots SET received_value_satang=NULL,receipt_group=NULL WHERE id=?").run(receipt.id);
+      expect(stockReceiptSource(db,receipt.id)).toMatchObject({paidAmount:null,unitCost:null});
     } finally {db.close();}
   });
 });

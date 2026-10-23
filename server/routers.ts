@@ -84,6 +84,7 @@ import {
   receiveStockLines,
   receiveStockBatch,
   stockReceiptPricing,
+  stockReceiptSource,
   registerLoginFailure,
   registerMember,
   revokeAppSession,
@@ -999,6 +1000,7 @@ export const appRouter = router({
       return nextStockLotNumber(getWelfareDb());
     })),
     receiptPricing: permissionProcedure("STOCK.VIEW").input(z.object({productId:z.number().int().positive()})).query(({input}) => withStoreErrors(() => stockReceiptPricing(getWelfareDb(),input.productId))),
+    receiptSource: permissionProcedure("STOCK.VIEW").input(z.object({lotId:z.number().int().positive()})).query(({input}) => withStoreErrors(() => stockReceiptSource(getWelfareDb(),input.lotId))),
     receiveBatch: permissionProcedure("STOCK.RECEIVE").input(z.object({ entries: z.array(z.object({
       productId: z.number().int().positive().optional(),
       sellingPrice: z.number().min(0).optional(), expectedSellingPrice: z.number().min(0).optional(),
