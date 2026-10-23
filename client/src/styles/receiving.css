@@ -210,3 +210,31 @@
   .receive-source-dialog .data-table :is(td,th):nth-child(2),.receive-source-dialog .data-table :is(td,th):nth-child(3) { text-align:right; white-space:nowrap; }
   @media(max-width:600px) { .receive-source-summary { grid-template-columns:minmax(0,1fr); } }
 }
+
+
+/* One visual line per receipt: slash-separated values in each column. */
+@media screen {
+  :root:root .stock-receive-modal.receiving-workspace .receive-simple-table { min-width:800px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-simple-table th:nth-child(1) { width:20%; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-simple-table th:nth-child(2) { width:9%; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-simple-table th:nth-child(3) { width:25%; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-simple-table th:nth-child(4) { width:9%; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-simple-table th:nth-child(5) { width:26%; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-simple-table th:nth-child(6) { width:11%; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-simple-table td { vertical-align:middle; padding:8px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-product-name { display:flex; align-items:baseline; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-product-name b { flex:0 1 auto; min-width:0; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-simple-table .receive-product-code { flex:0 0 auto; max-width:50%; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-inline-divider { flex:none; white-space:pre; color:#64748b; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-simple-table .receive-main-row small { display:inline; margin:0; line-height:18px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-inline-values { display:flex; align-items:baseline; justify-content:flex-end; white-space:nowrap; gap:3px; font-variant-numeric:tabular-nums; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-inline-values > * { flex-shrink:0; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-inline-lot { justify-content:flex-start; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-inline-lot .receive-lot-label { flex:0 1 auto; min-width:0; font-size:10px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-inline-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-row-editing label + label { margin-top:0; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-row-editing .receive-inline-values { align-items:center; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-row-editing .receive-inline-values > label { flex:1; min-width:0; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-product-name.is-expanded { flex-wrap:wrap; }
+  :root:root .stock-receive-modal.receiving-workspace .receive-product-name.is-expanded b { flex-basis:100%; }
+}

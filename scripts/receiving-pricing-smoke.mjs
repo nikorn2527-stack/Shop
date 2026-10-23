@@ -157,8 +157,13 @@ try {
   await page.click('[aria-label="แก้ไขรายการ 1"]');await page.click('[aria-label="แก้ไขรายการ 2"]');
   for(const width of [1920,1366]){
     await page.setViewport({width,height:900});await pause(100);
-    const fits=await page.$eval('.receive-entry-table-wrap',e=>e.scrollWidth<=e.clientWidth+1);
-    assert.equal(fits,true,`All receipt columns fit at ${width}`);
+    const layout=await page.$eval('.receive-entry-table-wrap',e=>({
+      contained:getComputedStyle(e).overflowX==='auto',
+      singleLine:[...e.querySelectorAll('.receive-main-row .receive-inline-values')].every(node=>node.getBoundingClientRect().height<=21),
+      quantity:e.querySelector('.receive-main-row td:nth-child(2)')?.textContent,
+    }));
+    assert.ok(layout.contained && layout.singleLine,`Receipt values stay on one line inside the scrollable table at ${width}`);
+    assert.match(layout.quantity,/^5\s*\/\s*1$/,'Quantity contains only purchase / free values');
     await page.screenshot({path:path.join(dir,`review-${width}.png`)});
   }
   await click('บันทึกทั้งหมด','.receiving-workspace');await page.waitForSelector('.confirm-modal');
