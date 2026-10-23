@@ -1,3 +1,5 @@
+import { Check, Pencil, Trash2 } from "@/lib/icons";
+import { RowActionButton } from "./RowActionButton";
 import { useState } from "react";
 import { ExpiryDateInput } from "./ExpiryDateInput";
 
@@ -18,6 +20,6 @@ export function ReceiveEntryRow({entry,index,name,code,unit,sellingPrice,canChan
     <td><div className="receive-inline-values">{editing ? field("paidAmount","ยอดจ่าย",0,"0.01") : <b>฿{Number(entry.paidAmount||0).toFixed(2)}</b>}<small> / {entry.previousCost==null ? "—" : `฿${entry.previousCost.toFixed(4)}`}</small><small> / {unitCost}</small></div></td>
     <td><div className="receive-inline-values">{editing && canChangePrice ? <label>ราคาขาย<input aria-label={`ราคาขายรายการ ${row}`} type="number" min="0" step="0.01" value={entry.sellingPrice} placeholder={sellingPrice.toFixed(2)} disabled={busy} onChange={e=>onUpdate("sellingPrice",e.target.value)} /></label> : <span className={entry.sellingPrice.trim() ? "receive-price-changed" : undefined} title={entry.sellingPrice.trim() && entry.expectedSellingPrice!==undefined ? `ราคาขายเดิม ฿${entry.expectedSellingPrice.toFixed(2)}` : undefined}>฿{sellingPrice.toFixed(2)}</span>}</div></td>
     <td>{editing ? <div className="receive-inline-fields"><label>Lot<input aria-label={`Lot รายการ ${row}`} value={entry.lot} disabled={busy} placeholder="อัตโนมัติ" onChange={e=>onUpdate("lot",e.target.value)} /></label><label>วันหมดอายุ<ExpiryDateInput value={entry.expiry} disabled={busy} onChange={v=>onUpdate("expiry",v)} label={`วันหมดอายุรายการ ${row}`} /></label></div> : <div className="receive-inline-values receive-inline-lot" title={`${entry.lot||"อัตโนมัติ"} / หมดอายุ ${entry.expiry||"ไม่ระบุ"}`}><span className="receive-lot-label">{entry.lot||"อัตโนมัติ"}</span><small> / {entry.expiry||"ไม่ระบุ"}</small></div>}</td>
-    <td><div className="receive-row-actions"><button type="button" className="outline-button" disabled={busy} aria-label={`แก้ไขรายการ ${row}`} aria-pressed={editing} onClick={()=>setEditing(current=>!current)}>{editing ? "เสร็จ" : "แก้ไข"}</button><button type="button" className="icon-button" disabled={busy} aria-label={`นำรายการ ${row} ออก`} onClick={onRemove}>×</button></div></td>
+    <td><div className="receive-row-actions"><RowActionButton disabled={busy} label={`${editing ? "เสร็จสิ้นการแก้ไขรายการ" : "แก้ไขรายการ"} ${row}`} tone={editing ? "success" : "default"} aria-pressed={editing} onClick={()=>setEditing(current=>!current)}>{editing ? <Check aria-hidden="true" /> : <Pencil aria-hidden="true" />}</RowActionButton><RowActionButton disabled={busy} label={`นำรายการ ${row} ออก`} tone="danger" onClick={onRemove}><Trash2 aria-hidden="true" /></RowActionButton></div></td>
   </tr>;
 }

@@ -154,7 +154,7 @@ try {
   await fill('.receive-main-row input[aria-label="จำนวนซื้อรายการ 1"]',5);
 
   assert.equal(query('SELECT COUNT(*) n FROM products WHERE name=?',newName).n,0,'New item remains a draft');
-  await page.click('[aria-label="แก้ไขรายการ 1"]');await page.click('[aria-label="แก้ไขรายการ 2"]');
+  await page.click('[aria-label="เสร็จสิ้นการแก้ไขรายการ 1"]');await page.click('[aria-label="เสร็จสิ้นการแก้ไขรายการ 2"]');
   for(const width of [1920,1366]){
     await page.setViewport({width,height:900});await pause(100);
     const layout=await page.$eval('.receive-entry-table-wrap',e=>({
