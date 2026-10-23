@@ -29,27 +29,50 @@
 .pos-terminal-settings .terminal-help {
   color: var(--muted);
 }
-.pos-terminal-settings .terminal-register {
-  display: flex;
-  align-items: flex-end;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.pos-terminal-settings label {
+:root:root .pos-terminal-settings .terminal-register {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+}
+:root:root .pos-terminal-settings .terminal-register > label {
+  display: grid;
+  grid-template-rows: 18px 40px auto;
   gap: 6px;
   font-size: 12px;
-  flex: 1;
-  min-width: 150px;
+  line-height: 18px;
+  min-width: 0;
 }
-.pos-terminal-settings input {
+:root:root .pos-terminal-settings .terminal-register input {
   width: 100%;
   box-sizing: border-box;
+  height: 40px;
   min-height: 40px;
+  margin: 0;
   border: 1px solid var(--control-border);
   border-radius: 8px;
   padding: 8px 10px;
   background: white;
+}
+:root:root .pos-terminal-settings .terminal-register > label::after {
+  grid-row: 3;
+  margin-top: 0;
+}
+:root:root .pos-terminal-settings .terminal-register > button {
+  margin: 24px 0 0;
+  height: 40px;
+  min-height: 40px;
+  white-space: nowrap;
+}
+@media (max-width: 360px) {
+  :root:root .pos-terminal-settings .terminal-register {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  :root:root .pos-terminal-settings .terminal-register > button {
+    margin-top: 0;
+    width: 100%;
+    justify-content: center;
+  }
 }
 .pos-terminal-settings .terminal-list {
   list-style: none;

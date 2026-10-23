@@ -94,7 +94,7 @@ export function PosTerminalSettings({
           }}
         >
           <label>
-            เลขจุดขาย (1–999)
+            <span>เลขจุดขาย (1–999)</span>
             <input
               aria-label="เลขจุดขาย"
               type="number"
