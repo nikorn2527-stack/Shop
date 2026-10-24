@@ -136,3 +136,6 @@ dev.log
 dev.pid
 .zscripts-*.log
 tool-results/
+
+# Structural migration reports may include customer database aggregates.
+migration-reports/
