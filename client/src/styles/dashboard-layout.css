@@ -1,4 +1,4 @@
-/* Desktop keeps one information hierarchy: today, metrics beside the working chart. */
+/* Desktop keeps the original hierarchy: today, four metrics, then the working chart. */
 :root .app-shell .dashboard-overview {
   min-width: 0;
 }
@@ -112,15 +112,15 @@
   }
   :root .app-shell .dashboard-overview .dashboard-workspace {
     display: grid;
-    grid-template-columns: 240px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
     gap: 10px;
     flex: 1 1 0;
     min-height: 310px;
-    grid-template-rows: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
   }
   :root .app-shell .dashboard-overview .metric-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     align-content: start;
     margin: 0;
     gap: 8px;
@@ -169,7 +169,7 @@
   }
   :root .app-shell .dashboard-overview .chart-wrap.chart-wrap-line {
     flex: 1 1 0;
-    min-height: 110px;
+    min-height: 138px;
     height: auto;
     display: grid;
     grid-template-columns: 34px minmax(0, 1fr);
@@ -453,4 +453,55 @@
   white-space: normal;
   overflow: visible;
   text-overflow: clip;
+}
+
+/* Short desktop windows keep readable text; spacing yields room to the chart. */
+@media screen and (min-width: 1024px) and (max-height: 700px) {
+  :root:root .app-shell .page-content:has(> .dashboard-overview) {
+    padding: 8px 12px;
+  }
+  :root .app-shell .dashboard-overview {
+    gap: 4px 12px;
+  }
+  :root .app-shell .dashboard-overview:not(:has(.onboarding-guide[open], .onboarding-banner.complete)) {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  :root .app-shell .dashboard-overview:not(:has(.onboarding-guide[open], .onboarding-banner.complete)) > .section-header > .shared-search-host {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  :root .app-shell .dashboard-overview:not(:has(.onboarding-guide[open], .onboarding-banner.complete)) > .section-header > .section-actions {
+    grid-column: 2;
+    grid-row: 2;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+  }
+  :root .app-shell .dashboard-overview > .today-snapshot {
+    padding-block: 3px;
+  }
+  :root .app-shell .dashboard-overview .metric-card {
+    padding-block: 5px;
+  }
+  :root .app-shell .dashboard-overview .dash-tabbar {
+    padding-block: 3px;
+  }
+  :root .app-shell .dashboard-overview .chart-panel {
+    padding: 8px 10px;
+  }
+  :root .app-shell .dashboard-overview .chart-panel .chart-interactive-meta {
+    min-height: 18px;
+    padding-bottom: 3px;
+    margin-bottom: 2px;
+  }
+  :root .app-shell .dashboard-overview .chart-panel .chart-wrap.chart-wrap-line,
+  :root .app-shell .dashboard-overview .chart-summary {
+    margin-top: 2px;
+  }
+  :root .app-shell .dashboard-overview .chart-summary > div {
+    flex-direction: row;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
 }
