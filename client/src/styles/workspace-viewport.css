@@ -1,0 +1,36 @@
+/* Only the outer host loads this stylesheet; the app keeps its own document styles. */
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+html,
+body {
+  overflow: hidden;
+}
+.workspace-viewport {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #fffcf8;
+}
+.workspace-viewport > iframe {
+  position: absolute;
+  border: 0;
+  display: block;
+  transform-origin: top left;
+}
+@media print {
+  .workspace-viewport {
+    position: static;
+    overflow: visible;
+  }
+  .workspace-viewport > iframe {
+    position: static;
+    transform: none !important;
+    width: 100% !important;
+  }
+}

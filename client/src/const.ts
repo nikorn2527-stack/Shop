@@ -27,5 +27,8 @@ export const startLogin = () => {
   url.searchParams.set("state", state);
   url.searchParams.set("type", "signIn");
 
-  window.location.href = url.toString();
+  // External sign-in providers may refuse to render inside a frame.
+  const navigationWindow =
+    window.name === "shop-workspace" ? window.parent : window;
+  navigationWindow.location.href = url.toString();
 };
