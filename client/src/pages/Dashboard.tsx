@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import {
   Activity, BarChart3, CalendarClock, CalendarDays, Check, CircleAlert, Crown, FileText, MoreHorizontal, PackageSearch, Printer, ReceiptText, ShieldCheck, ShoppingBag, Terminal, Wallet, X, UsersRound,
 } from "@/lib/icons";
-import type { BusinessPeriodStatus, DashboardStats, DayClosureRow } from "../../../server/sqliteStore";
+import type { BusinessPeriodStatus, DashboardStats, DayClosureRow } from '@shared/storeTypes/reports';
 import type { Role, View } from "./pageData";
 import { isAdminRole, money, roleThaiLabel } from "./pageData";
 import { ConfirmDialog, SectionHeader } from "./PagePrimitives";

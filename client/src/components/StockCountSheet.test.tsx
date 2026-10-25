@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import type { SqliteProduct } from "../../../server/sqliteStore";
+import type { Product } from '@shared/storeTypes/inventory';
 import { StockCountSheet } from "./StockCountSheet";
 
 vi.mock("react-dom", () => ({ createPortal: (children: unknown) => children }));
@@ -20,7 +20,7 @@ describe("stock count sheet product identifiers", () => {
         active: 1,
         stock: 12,
         unit: "ชิ้น",
-      } as SqliteProduct;
+      } as Product;
       const html = renderToStaticMarkup(<StockCountSheet products={[product]} />);
       expect(html).toContain('<th class="scs-code">บาร์โค้ด / รหัสสินค้า</th>');
       expect(html).toContain(`<td class="scs-code">${barcode?.trim() || "HYG-0042"}</td>`);

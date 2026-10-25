@@ -103,7 +103,7 @@ import {
   useEditionStatus,
 } from "@/components/EditionUi";
 import type { Role, View } from "../pageData";
-import type { BankAccount, InstallOverview } from "../../../../server/sqliteStore";
+import type { BankAccount, InstallOverview } from '@shared/storeTypes/settings';
 import {
   canAccessView,
   formatMemberNumber,

@@ -1,7 +1,7 @@
-import type { SqliteStockRow } from "../../../server/sqliteStore";
+import type { StockRow } from '@shared/storeTypes/inventory';
 
 /** Outstanding conditions, not unread messages. Empty lots cannot expire. */
-export function pendingStockAlerts(rows: SqliteStockRow[], now = new Date()) {
+export function pendingStockAlerts(rows: StockRow[], now = new Date()) {
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const active = rows.filter(row => row.active);
   const lowStock = active.filter((row, index) => row.stock <= row.reorderPoint && active.findIndex(other => other.productId === row.productId) === index);

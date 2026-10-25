@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useState } from "react";
 import QRCode from "qrcode";
-import type { BankAccount } from "../../../server/sqliteStore";
+import type { BankAccount } from '@shared/storeTypes/settings';
 import { validateBankPaymentQr } from "@shared/paymentQr";
 import { buildPromptPayPayload, isValidPromptPayId } from "@/promptpay";
 import { Bank, Copy, QrCode } from "@/lib/icons";

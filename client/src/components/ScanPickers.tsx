@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { Camera, PackageSearch, ScanLine, X } from "@/lib/icons";
 import { toast } from "sonner";
 import { blocker } from "@/components/BlockerAlert";
-import type { SqliteProduct } from "../../../server/sqliteStore";
+import type { Product } from '@shared/storeTypes/inventory';
 import type { MemberLite } from "@/pages/pageData";
 import { money, memberFullName, scanMatches, smartMatchScore } from "@/pages/pageData";
 import { SCAN_LAYOUT_TOAST, useScanLayout } from "../scanLayout";
@@ -331,9 +331,9 @@ export function ProductScanPicker({
   onNotFound,
   placeholder = "ยิงบาร์โค้ดที่ตัวสินค้า หรือคีย์รหัส SKU / ชื่อสินค้า",
 }: {
-  products: SqliteProduct[];
+  products: Product[];
   selectedId: number | null;
-  onSelect: (product: SqliteProduct | null) => void;
+  onSelect: (product: Product | null) => void;
   autoFocus?: boolean;
   compactSelected?: boolean;
   local?: boolean;
@@ -387,7 +387,7 @@ export function ProductScanPicker({
     }
   }, [selectedId]);
 
-  const pick = (product: SqliteProduct | null) => {
+  const pick = (product: Product | null) => {
     onSelect(product);
     setTerm("");
     setMissed("");

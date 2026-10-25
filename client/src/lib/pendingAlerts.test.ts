@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { SqliteStockRow } from "../../../server/sqliteStore";
+import type { StockRow } from '@shared/storeTypes/inventory';
 import { pendingStockAlerts } from "./pendingAlerts";
 
-const row: SqliteStockRow = { id: 1, productId: 1, sku: "A", name: "A", unit: "ชิ้น", lot: "1", expiry: "2026-10-10", qty: 1, cost: 1, price: 2, stock: 1, reorderPoint: 2, receivedAt: null, active: 1, status: "สต็อกต่ำ", tone: "red" };
+const row: StockRow = { id: 1, productId: 1, sku: "A", name: "A", unit: "ชิ้น", lot: "1", expiry: "2026-10-10", qty: 1, cost: 1, price: 2, stock: 1, reorderPoint: 2, receivedAt: null, active: 1, status: "สต็อกต่ำ", tone: "red" };
 const now = new Date(2026, 9, 4);
 describe("outstanding stock alerts", () => {
   it("deduplicates low-stock products without hiding an expiring lot", () => {

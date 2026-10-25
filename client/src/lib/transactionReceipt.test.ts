@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { MemberTransactionRow } from "../../../server/sqliteStore";
+import type { MemberTransactionRow } from '@shared/storeTypes/reports';
 import { transactionReceipt } from "./transactionReceipt";
 
 const row: MemberTransactionRow = { id: 17, memberNumber: "001", memberName: "ทดสอบ", cardNumber: null, patientCode: null, kind: "tx", type: "deposit", detail: "เติมเงิน", amount: 100, paymentMethod: "เงินสด", balanceAfter: 150, actor: "เจ้าหน้าที่", createdAt: "2026-10-04 10:00:00" };

@@ -7,7 +7,7 @@ import { useState } from "react";
 import {
   Check, ChevronDown, ChevronUp, CircleAlert, Crown, KeyRound, LockKeyhole, LockOpen, LogOut, MonitorSmartphone, Search, Settings2, Pencil, ShieldCheck, Terminal, UserPlus, UserRound, UsersRound, X,
 } from "@/lib/icons";
-import type { AppSessionSummary, AppUserSummary } from "../../../server/sqliteStore";
+import type { AppSessionSummary, AppUserSummary } from '@shared/storeTypes/access';
 import { ConfirmDialog, SectionHeader, StatusPill, formEnterNav } from "./PagePrimitives";
 import { formatLogDateTime, getErrorMessage, parseStoreDate } from "./viewFormat";
 import { passwordIssues } from "@/components/PasswordMeter";

@@ -3,7 +3,7 @@ import { WorkflowDialog } from "./WorkflowDialog";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
 import { Bank, Check, Download, FileImage, Plus, Printer, X } from "@/lib/icons";
-import type { CheckoutReceipt } from "../../../server/sqliteStore";
+import type { CheckoutReceipt } from '@shared/storeTypes/sales';
 import { money } from "../pages/pageData";
 import { trpc } from "@/lib/trpc";
 import { PrintPreviewModal } from "./PrintPreviewModal";

@@ -1,3 +1,185 @@
+// Compatibility exports keep existing server consumers working during the staged refactor.
+import type {
+  Member as SqliteMember,
+  Transaction as SqliteTransaction,
+  MemberSummary as SqliteMemberSummary,
+  PhysicalCardStatus,
+  CardUsageSession,
+  CardSessionTransaction,
+  PhysicalCardRow,
+  RegisterMemberInput,
+  WalletTxInput,
+  UpdateMemberInput,
+  DeleteMemberInput,
+  MemberSpendingStats,
+} from "../shared/storeTypes/members";
+export type {
+  Member as SqliteMember,
+  Transaction as SqliteTransaction,
+  MemberSummary as SqliteMemberSummary,
+  PhysicalCardStatus,
+  CardUsageSession,
+  CardSessionTransaction,
+  PhysicalCardRow,
+  RegisterMemberInput,
+  WalletTxInput,
+  UpdateMemberInput,
+  DeleteMemberInput,
+  MemberSpendingStats,
+} from "../shared/storeTypes/members";
+import type {
+  Product as SqliteProduct,
+  StockRow as SqliteStockRow,
+  CreateProductInput,
+  ReceiveStockLine,
+  ReceiveStockLotRow,
+  ReceiveStockResult,
+  StockIntakeEntry,
+  StockCountInput,
+  LotCountEntry,
+  StockCountLotsInput,
+  StockCountLotResult,
+  StockCountLotsResult,
+  OrderItem as SqliteOrderItem,
+  OrderAddInput,
+  OrderUpdateInput,
+  UpdateProductInput,
+  BulkPriceItemInput,
+  BulkUpdatePricesInput,
+  BulkUpdatePricesResult,
+  DeleteProductInput,
+  SetProductActiveInput,
+  StockMovementType,
+  StockMovementInput,
+} from "../shared/storeTypes/inventory";
+export type {
+  Product as SqliteProduct,
+  StockRow as SqliteStockRow,
+  CreateProductInput,
+  ReceiveStockLine,
+  ReceiveStockLotRow,
+  ReceiveStockResult,
+  StockIntakeEntry,
+  StockCountInput,
+  LotCountEntry,
+  StockCountLotsInput,
+  StockCountLotResult,
+  StockCountLotsResult,
+  OrderItem as SqliteOrderItem,
+  OrderAddInput,
+  OrderUpdateInput,
+  UpdateProductInput,
+  BulkPriceItemInput,
+  BulkUpdatePricesInput,
+  BulkUpdatePricesResult,
+  DeleteProductInput,
+  SetProductActiveInput,
+  StockMovementType,
+  StockMovementInput,
+} from "../shared/storeTypes/inventory";
+import type {
+  Sale as SqliteSale,
+  SaleItem as SqliteSaleItem,
+  CheckoutReceipt,
+  SaleHistoryEntry,
+  CheckoutItemInput,
+  PosTerminal,
+  CheckoutInput,
+  SalesListInput,
+  CashierShift,
+} from "../shared/storeTypes/sales";
+export type {
+  Sale as SqliteSale,
+  SaleItem as SqliteSaleItem,
+  CheckoutReceipt,
+  SaleHistoryEntry,
+  CheckoutItemInput,
+  PosTerminal,
+  CheckoutInput,
+  SalesListInput,
+  CashierShift,
+} from "../shared/storeTypes/sales";
+import type {
+  AuditLog as SqliteAuditLog,
+  DailySalesRow,
+  DashboardStats,
+  DailyRangeInput,
+  SalesByCategoryRow,
+  SalesByProductRow,
+  SalesLineItemRow,
+  SalesByCashierRow,
+  CashierOptionRow,
+  MemberTransactionRow,
+  MemberTransactionsInput,
+  MemberBalanceRow,
+  MemberBalancesInput,
+  StockBalanceRow,
+  StockBalanceInput,
+  DayClosureRow,
+  BusinessPeriodStatus,
+  CloseDayInput,
+} from "../shared/storeTypes/reports";
+export type {
+  AuditLog as SqliteAuditLog,
+  DailySalesRow,
+  DashboardStats,
+  DailyRangeInput,
+  SalesByCategoryRow,
+  SalesByProductRow,
+  SalesLineItemRow,
+  SalesByCashierRow,
+  CashierOptionRow,
+  MemberTransactionRow,
+  MemberTransactionsInput,
+  MemberBalanceRow,
+  MemberBalancesInput,
+  StockBalanceRow,
+  StockBalanceInput,
+  DayClosureRow,
+  BusinessPeriodStatus,
+  CloseDayInput,
+} from "../shared/storeTypes/reports";
+import type {
+  BankAccount,
+  StoreSettings,
+  ReleaseAction,
+  ReleaseLogRow,
+  LogReleaseInput,
+  InstallOverview,
+} from "../shared/storeTypes/settings";
+export type {
+  BankAccount,
+  StoreSettings,
+  ReleaseAction,
+  ReleaseLogRow,
+  LogReleaseInput,
+  InstallOverview,
+} from "../shared/storeTypes/settings";
+import type {
+  AppUserRole,
+  PermissionKey,
+  AppUser,
+  LoginFailureOutcome,
+  AppSessionSummary,
+  AppUserSummary,
+  CreateAppUserInput,
+  SetupInitialAdminInput,
+  ChangeOwnPasswordInput,
+  UpdateAppUserInput,
+} from "../shared/storeTypes/access";
+export type {
+  AppUserRole,
+  PermissionKey,
+  AppUser,
+  LoginFailureOutcome,
+  AppSessionSummary,
+  AppUserSummary,
+  CreateAppUserInput,
+  SetupInitialAdminInput,
+  ChangeOwnPasswordInput,
+  UpdateAppUserInput,
+} from "../shared/storeTypes/access";
+import { PAYMENT_METHODS } from "../shared/storeTypes/sales";
 import { reportSellingValue } from "../shared/reportValuation";
 import { findPosShortcutConflicts, posShortcutConflictMessage } from "../shared/posShortcuts";
 import { memberNumberHead, nextMemberNumberSequence, type MemberNumberFormat } from "../shared/memberNumber";
@@ -29,317 +211,33 @@ export class StoreError extends Error {
   }
 }
 
-export type SqliteMember = {
-  id: number;
-  memberNumber: string;
-  /** คำนำหน้าชื่อ (นาย/นาง/นางสาว/…) — null = ไม่มี */
-  prename?: string | null;
-  firstName: string;
-  lastName: string;
-  idCard: string | null;
-  phone: string | null;
-  type: string;
-  balance: number;
-  status: "active" | "suspended";
-  createdAt: string;
-  photoUrl: string | null;
-  gender: string | null;
-  /** ROUND 65 (user) — รหัสบัตรเงินสดของสมาชิก (เช่น 2395100201) · null = ยังไม่ผูกบัตร */
-  cardNumber: string | null;
-  accountClosed?: number;
-  /** 1 when the current physical-card binding and usage round are both live. */
-  cardUsable?: number;
-  /** ROUND 65 (user) — รหัสผู้ป่วย (HN) ที่ผูกกับบัตร · null = ไม่มี */
-  patientCode: string | null;
-};
 
-export type SqliteTransaction = {
-  id: number;
-  memberNumber: string;
-  type: "purchase" | "deposit" | "withdrawal" | "activation" | "refund";
-  detail: string;
-  amount: number;
-  paymentMethod: string | null;
-  balanceAfter: number | null;
-  createdAt: string;
-  /** เลขบัตร ณ รอบที่ทำรายการ ไม่เปลี่ยนตามบัตรปัจจุบันของสมาชิก */
-  cardNumber: string | null;
-  /** ROUND 63 — รายการนี้มีรูปหลักฐานแนบไหม (ตัวรูปดึงแยกที่ member.transactionSlip) */
-  hasSlip?: number;
-};
 
-export type SqliteMemberSummary = {
-  id: number;
-  memberNumber: string;
-  /** คำนำหน้าชื่อ — null = ไม่มี */
-  prename?: string | null;
-  firstName: string;
-  lastName: string;
-  type: string;
-  balance: number;
-  status: "active" | "suspended";
-  createdAt: string;
-  lastTransactionAt: string | null;
-  photoUrl: string | null;
-  gender: string | null;
-  /** ROUND 65 — รหัสบัตรเงินสด / รหัสผู้ป่วย (แสดงในรายการและรายงานยอดเงินในบัตร) */
-  cardNumber: string | null;
-  /** 1 เมื่อบัตรยัง assigned ให้สมาชิกรายนี้และมีรอบใช้งานที่ยังไม่ปิด */
-  cardUsable: number;
-  patientCode: string | null;
-};
 
-export type SqliteProduct = {
-  id: number;
-  sku: string;
-  barcode: string | null;
-  name: string;
-  category: string;
-  emoji: string | null;
-  color: string | null;
-  unit: string;
-  price: number;
-  size: string | null;
-  imageUrl: string | null;
-  /** สินค้าลัดหน้าร้าน — 1 = โชว์เป็นปุ่มลัดที่ POS (round 31-12) */
-  quickPick: number;
-  /** "unit" = ขายตามหน่วย · "money" = ขายเป็นเงิน เช่น น้ำแข็ง (ใช้ priceTiers) */
-  sellMode: string | null;
-  /** ตัวเลือกราคาสั้นๆ สำหรับ sellMode "money": JSON [{ label, price, qty }] */
-  priceTiers: string | null;
-  cost: number;
-  stock: number;
-  reorderPoint: number;
-  active: number;
-  createdAt: string;
-};
 
-export type SqliteStockRow = {
-  id: number;
-  productId: number;
-  sku: string;
-  name: string;
-  unit: string;
-  lot: string;
-  expiry: string | null;
-  qty: number;
-  cost: number;
-  price: number;
-  stock: number;
-  reorderPoint: number;
-  receivedAt: string | null;
-  active: number;
-  status: "ปกติ" | "สต็อกต่ำ" | "ใกล้หมดอายุ" | "ปิดการขาย";
-  tone: "green" | "red" | "amber" | "purple";
-};
 
-export type SqliteSale = {
-  id: number;
-  orderNumber: string;
-  paymentMethod: string;
-  memberNumber: string | null;
-  subtotal: number;
-  discount: number;
-  total: number;
-  cashier: string | null;
-  createdAt: string;
-};
 
-export type SqliteSaleItem = {
-  id: number;
-  saleId: number;
-  productId: number | null;
-  name: string;
-  qty: number;
-  price: number;
-  cost: number;
-};
 
-export type SqliteAuditLog = {
-  id: number;
-  action: string;
-  actor: string;
-  actorRole: string | null;
-  detail: string;
-  tone: string;
-  createdAt: string;
-};
 
-export type CheckoutReceipt = {
-  terminalId?: string | null;
-  terminalNumber?: number | null;
-  orderNumber: string;
-  createdAt: string;
-  items: { productId: number | null; name: string; unit: string; qty: number; price: number; amount: number }[];
-  subtotal: number;
-  discount: number;
-  total: number;
-  paymentMethod: string;
-  memberNumber: string | null;
-  memberName: string | null;
-  balanceAfter: number | null;
-  cashier: string | null;
-  /** FIX-7 (user) — ยอดเงินสดที่รับมา (เฉพาะ "เงินสด") ใช้พิมพ์ "รับเงินมา X / ทอน Y" ท้ายใบเสร็จ */
-  receivedCash?: number | null;
-  /** FIX-7 (user) — ยอดเงินทอน (เฉพาะ "เงินสด") */
-  changeDue?: number | null;
-  /** FIX-7 (user) — บิล QR ที่แคชเชียร์ยืนยันตรวจสอบแล้ว (เก็บไว้ในตารางเพื่อ audit) */
-  paymentVerified?: boolean | null;
-  /** FIX-8 (user) — พรีวิวก่อนพิมพ์ใบเสร็จ/บัตร/รายงาน: true = เปิด preview ก่อน (default, ปลอดภัย)
-   *  false = กดปุ่มพิมพ์แล้ว window.print() เลย (เร็วกว่า แต่ไม่มีโอกาสตรวจก่อน) */
-  printPreviewBefore?: boolean;
-};
 
-/** A past receipt rebuilt from the sales/sale_items tables — balanceAfter is replayed from the member ledger when that bill was a wallet purchase. */
-export type SaleHistoryEntry = CheckoutReceipt & {
-  /** รหัสแถวในตาราง sales — ใช้ดึงหลักฐานแนบ (sales.slip) รอบหลัง */
-  id: number;
-  /** ROUND 63 — บิลนี้มีรูปหลักฐานการชำระแนบอยู่ไหม (ตัวรูปดึงแยกที่ sales.slip เพื่อไม่ให้ลิสต์หนัก) */
-  hasSlip: boolean;
-  /** FEAT-9 — บิลนี้ถูกยกเลิกหรือไม่ (true = void, แสดง red strikethrough ใน RecentBillsWidget) */
-  voided?: boolean;
-};
 
-export type DailySalesRow = {
-  date: string;
-  orders: number;
-  items: number;
-  revenue: number;
-  cogs: number;
-  profit: number;
-  marginPct: number;
-};
 
-export type DashboardStats = {
-  rangeDays: number;
-  totalSales: number;
-  totalOrders: number;
-  itemsSold: number;
-  bestSellerCount: number;
-  avgDailySales: number;
-  revenueByDay: { date: string; total: number }[];
-  bestSellers: { name: string; qty: number; revenue: number }[];
-  lowStock: { id: number; sku: string; name: string; unit: string; stock: number; reorderPoint: number }[];
-  expirySoon: { id: number; productId: number; sku: string; name: string; unit: string; lot: string; expiry: string; qty: number }[];
-  recentActivities: SqliteAuditLog[];
-  memberWalletTotal: number;
-  memberCount: { total: number; active: number; suspended: number };
-};
 
-/** FIX-5 (user) — บัญชีธนาคารของร้าน (รับเงินโอน)
- *  เก็บเป็น JSON array ใน StoreSettings.bankAccounts ·
- *  ใช้แสดงที่หน้ายืนยันการชำระ POS + ท้ายใบเสร็จ (เมื่อชำระด้วย QR/สแกน)
- *  แทนที่จะมีเฉพาะ QR PromptPay อย่างเดียว */
-export type BankAccount = {
-  /** id คงที่ (crypto.randomUUID()) — ใช้เป็น React key + อ้างอิงตอนลบ/แก้ */
-  id: string;
-  /** รหัสธนาคาร — เช่น "BBL" "KBANK" "SCB" "KTB" "BAY" "TTB" "TCD" "CIMBT" "TISCO" "KKTB" "ICB" "TCRB" "LHFB" "GHIB"
-   *  เก็บเพื่อ sort/group และแสดงสี/ไอคอน (ถ้ามี) ในอนาคต */
-  bankCode: string;
-  /** ชื่อธนาคาร (display) เช่น "ธนาคารกสิกรไทย" — ตรงกับที่ผู้ใช้พิมพ์เข้ามา */
-  bankName: string;
-  /** เลขที่บัญชี (ตัวเลขเท่านั้น, 10-12 หลัก) */
-  accountNumber: string;
-  /** ชื่อบัญชี (ตัวอักษรตามสมุดบัญชี) — ลูกค้าใช้ตรวจสอบก่อนโอน */
-  accountName: string;
-  /** ชื่อสาขา (ถ้ามี) — ไม่บังคับ */
-  branch?: string;
-  /** ปิด/เปิดใช้งาน — ปิดได้โดยไม่ลบ (สำหรับเปลี่ยนบัญชีชั่วคราว) */
-  active: boolean;
-  /** หมายเหตุ (ถ้ามี) เช่น "บัญชีออมทรัพย์" "เฉพาะโอนภายในเวลาทำการ" */
-  note?: string;
-  /** Reusable receiving QR exported by the bank, decoded and validated before saving. */
-  qrPayload?: string;
-};
 
-export type StoreSettings = {
-  memberNumberMode: "running" | "year" | "manual";
-  memberNumberPrefix: string;
-  memberNumberYearMode: "none" | "buddhist" | "gregorian";
-  memberNumberYearDigits: 2 | 4;
-  memberNumberSeparator: "-" | "/" | "_" | "";
-  memberNumberResetMonth: number;
-  memberNumberSequenceDigits: number;
-  storeName: string;
-  storeCode: string;
-  storeAddress: string;
-  /** Round 25 — ปรับแต่งแอป: ชื่อที่แสดงบน sidebar/login/title */
-  appName: string;
-  /** data-URL รูปโลโก้ (สูงสุด ~512KB) — ว่าง = ใช้อักษรย่อ */
-  appLogo: string;
-  appBackground: string;
-  loginBackground: string;
-  /** สีธีมหลัก: preset id เช่น "emerald" หรือ hex "#007a55" */
-  appTheme: string;
-  /** ROUND 75 (user) — หน้าแจ้งผลหลังชำระเงิน ไม่เด้งไปหน้าสั่งพิมพ์อีกต่อไป:
-   *  แสดงหน้าใบเสร็จพร้อมปุ่ม พิมพ์/บันทึกรูป/ดาวน์โหลด PDF ให้ผู้ใช้กดเอง —
-   *  ตัวตั้ง autoPrintReceipt เดิมถูกลบออก (พฤติกรรม window.print() อัตโนมัติ)
-   *  · เพิ่ม posRailHidden: ปุ่มรางซ้าย POS ที่ปิดใช้งาน (JSON array ของ key) */
-  posRailHidden: string;
-  posShortcutKeys: string;
-  showBalanceOnReceipt: boolean;
-  lowBalanceAlert: boolean;
-  lowBalanceThreshold: number;
-  lowStockAlert: boolean;
-  expiryAlert: boolean;
-  expiryAlertDays: number;
-  /** Round 31 — รอบตัดยอดประจำวัน: auto = ระบบตัดตามเวลาที่กำหนด · manual = เจ้าหน้าที่กดตัดยอดเอง */
-  dailyCutOffMode: "auto" | "manual";
-  /** "HH:MM" เวลาตัดยอดของรอบอัตโนมัติ (เช่น "02:00" = รอบวันวิ่ง 02:00→02:00 ของวันถัดไป) */
-  dailyCutOffTime: string;
-  /** ROUND 36 (ข้อ 31) — ประตูบัญชีผู้พัฒนา (dev): ปิดอยู่ (false) = บัญชี dev เข้าสู่ระบบไม่ได้ทั้งหมด */
-  devAccess: boolean;
-  /** ROUND 38 (ข้อ 39) — สไตล์การแสดงผลของแอป: "shop" (ค่าเริ่มต้น) | "apple" | "microsoft" | "android" */
-  appStyle: string;
-  /** ROUND 38 (ข้อ 39) — สำรองข้อมูลอัตโนมัติ: เปิด/ปิดตัวตรวจตามรอบเวลาของเซิร์ฟเวอร์ */
-  backupAutoEnabled: boolean;
-  /** ROUND 38 (ข้อ 39) — รอบสำรองข้อมูลอัตโนมัติเป็นชั่วโมง (1-168) */
-  backupIntervalHours: number;
-  /** ROUND 38 (ข้อ 39) — จำนวนไฟล์สำรองที่เก็บสูงสุด (3-60) — เกินจากนี้ลบไฟล์เก่าสุด */
-  backupKeepCount: number;
-  /** ROUND 42 (ข้อ 32 ตอนที่ 3 — ข้อ 4) — ความกว้างกระดาษสลิปเครื่องพิมพ์: "58" (สลิปเล็ก) | "72" (มาตรฐานเดิม) | "80" (สลิปใหญ่) */
-  receiptPaperWidth: "58" | "72" | "80";
-  /** FIX-8 (user) — พรีวิวก่อนพิมพ์ (ใบเสร็จ/บัตร/รายงาน): true = เปิดก่อน (default ปลอดภัย)
-   *  false = กดปุ่มพิมพ์แล้ว window.print() ทันที (เร็ว แต่ไม่มีโอกาสตรวจก่อน) */
-  printPreviewBefore: boolean;
-  /** FIX-9 (user) — @deprecated ใช้ receiptPrinterName/reportPrinterName/cardPrinterName แทน
-   *  เก็บไว้เพื่อ backward compat (บิลเก่าที่ยังไม่ได้อัปเดต) */
-  defaultPrinterName: string;
-  /** FIX-15 (user) — เครื่องพิมพ์ใบเสร็จ (thermal) — พิมพ์ใบเสร็จ/สลิปเติม-ถอน · "" = ยังไม่ตั้ง */
-  receiptPrinterName: string;
-  /** FIX-15 (user) — เครื่องพิมพ์รายงาน (A4 laser/inkjet) — พิมพ์รายงานสมาชิก/สรุปยอด · "" = ยังไม่ตั้ง */
-  reportPrinterName: string;
-  /** FIX-15 (user) — เครื่องพิมพ์บัตรสมาชิก — พิมพ์บัตรสมาชิก · "" = ยังไม่ตั้ง */
-  cardPrinterName: string;
-  /** FIX-18 (user) — toggle พรีวิวแยกตามประเภทเอกสาร */
-  receiptPreviewBefore: boolean;
-  reportPreviewBefore: boolean;
-  cardPreviewBefore: boolean;
-  /** ROUND 56 (user) — เช็คลิสต์วันขึ้นระบบ (โซนเครื่องมือติดตั้ง): JSON array ของ id ที่ติ๊กแล้ว
-   *  เก็บฝั่งเซิร์ฟเวอร์ให้ทุกเครื่องเห็นตรงกัน · "" = ยังไม่ได้ติ๊กอะไร */
-  goliveChecks: string;
-  /** ROUND 61 (user) — ระบบเวอร์ชัน 3 แบบ (ทั่วไป/โปร/โปรพลัส): รหัสลิขสิทธิ์ที่ใส่แล้ว ("" = ยังไม่มี) ·
-   *  เปลี่ยนผ่าน edition.applyLicense เท่านั้น (settings.set กลั่น fields เหล่านี้ทิ้งเสมอ) */
-  licenseKey: string;
-  /** ชื่อผู้ถือลิขสิทธิ์ที่พิมพ์ตอนใช้รหัส — แสดงบนหน้าเวอร์ชันและโซนช่าง */
-  licenseName: string;
-  /** วันเริ่มทดลองใช้โปรพลัส 30 วัน "YYYY-MM-DD" · "" = ยังไม่เคยทดลอง · ตั้งผ่าน edition.startTrial เท่านั้น */
-  trialStart: string;
-  /** ROUND 63 (user) — บัญชีพร้อมเพย์ของร้าน (เบอร์โทร 10 หลัก หรือเลขบัตรประชาชน 13 หลัก)
-   *  ใช้สร้าง QR ให้ลูกค้าสแกนจ่ายที่หน้ายืนยันการชำระเงิน · "" = ยังไม่ตั้ง (ไม่แสดง QR) */
-  promptpayId: string;
-  /** เปิด/ปิดการรับเงินพร้อมเพย์ โดยไม่ต้องลบหมายเลขที่ตั้งค่าไว้ */
-  promptpayActive: boolean;
-  /** Preferred receiving QR: promptpay or a bank account id. */
-  paymentQrSource: string;
-  /** FIX-5 (user) — บัญชีธนาคารของร้าน (รับเงินโอน) · เก็บเป็น JSON array ใน store_settings
-   *  แสดงที่หน้ายืนยันการชำระ POS (ควบคู่กับ QR) และท้ายใบเสร็จเมื่อชำระด้วย QR / สแกน ·
-   *  [] = ยังไม่มีบัญชี (ลูกค้าไม่เห็นตัวเลือกโอนผ่านธนาคาร) */
-  bankAccounts: BankAccount[];
-  /** ROUND 68 (user) — เบอร์โทรศูนย์ช่วยเหลือของร้าน แสดงท้ายหน้าจอทุกหน้า
-   *  (แถบ footer) · "" = ไม่แสดง (เดิมเคยเป็นข้อความล็อก 02-XXX-XXXX แก้ไม่ได้) */
-  helpPhone: string;
-};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 /**
  * Lightweight SQLite adapter for local feature testing.
@@ -721,10 +619,9 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
   ensureRbacSeed(db);
   return db;
 }
-/** บัตรกายภาพหมุนเวียน — แยกสต็อกบัตรออกจากตัวตนสมาชิก (member_number ไม่ reuse). */
-export type PhysicalCardStatus = "blank" | "assigned" | "returned_vacant" | "lost" | "damaged";
-export type CardUsageSession = { id: number; cardNumber: string; memberNumber: string; memberName: string; startedAt: string; endedAt: string | null; openedBy: string | null; closedBy: string | null; openingBalance: number; closingBalance: number | null; legacy: number; transactionCount: number; incoming: number; outgoing: number };
-export type CardSessionTransaction = { id: number; type: string; amount: number; balanceAfter: number | null; createdAt: string; actor: string | null; detail: string };
+
+
+
 
 function initializeCardUsageSessions(db: SqliteDb) {
   db.exec(`CREATE TABLE IF NOT EXISTS card_usage_sessions (
@@ -812,7 +709,7 @@ export function cardUsageHistory(db: SqliteDb, cardNumber: string) {
     WHERE s.card_number = ? ORDER BY t.id DESC`).all(cardNumber) as unknown as (CardSessionTransaction & { sessionId: number })[];
   return { sessions, transactions };
 }
-export type PhysicalCardRow = { cardNumber: string; status: PhysicalCardStatus; assignedMemberNumber: string | null; note: string | null; createdBy: string | null; updatedBy: string | null; createdAt: string; updatedAt: string };
+
 
 function seedPhysicalCardsFromMembers(db: SqliteDb) {
   const rows = db.prepare(`SELECT DISTINCT card_number AS cardNumber, member_number AS memberNumber FROM members WHERE card_number IS NOT NULL AND TRIM(card_number) != ''`).all() as unknown as { cardNumber: string; memberNumber: string }[];
@@ -1176,7 +1073,7 @@ export function suspendMember(db: SqliteDb, memberNumber: string) {
 // reports, settings and audit logs. All user-facing errors are Thai.
 // ---------------------------------------------------------------------------
 
-const PAYMENT_METHODS = ["เงินสด", "QR / สแกน", "หักบัญชีสมาชิก"] as const;
+
 const WALLET_PAYMENT = "หักบัญชีสมาชิก";
 
 const pad2 = (value: number) => String(value).padStart(2, "0");
@@ -1249,38 +1146,11 @@ export function listAuditLogs(db: SqliteDb, limit = 200): SqliteAuditLog[] {
 
 // --- P4: release/rollback log + schema version tracking --------------------
 
-/**
- * P4 (release/rollback) — One row per install/update/rollback/hotfix action,
- * so the on-premise deployment has an auditable release history that pairs
- * with `scripts/update.sh` and `scripts/rollback.sh`. Action is constrained
- * to the four canonical values by a CHECK clause on the table itself; the
- * TypeScript union here mirrors that and keeps callers type-safe.
- */
-export type ReleaseAction = "install" | "update" | "rollback" | "hotfix";
 
-export type ReleaseLogRow = {
-  id: number;
-  version: string;
-  action: ReleaseAction;
-  notes: string | null;
-  migrations: string | null;
-  backupFile: string | null;
-  healthCheck: string | null;
-  actor: string | null;
-  createdAt: string;
-};
 
-export type LogReleaseInput = {
-  version: string;
-  action: ReleaseAction;
-  notes?: string | null;
-  migrations?: string | null;
-  backupFile?: string | null;
-  healthCheck?: string | null;
-  actor?: string | null;
-  /** actorRole is preserved for audit-trail parity with logAction. */
-  actorRole?: string | null;
-};
+
+
+
 
 /**
  * Append a release_logs row AND a matching audit_logs entry. The audit log
@@ -1404,29 +1274,7 @@ function getProductById(db: SqliteDb, productId: number): SqliteProduct | undefi
   return db.prepare(`SELECT id, sku, barcode, name, category, emoji, color, size, image_url AS imageUrl, quick_pick AS quickPick, sell_mode AS sellMode, price_tiers AS priceTiers, unit, price, cost, stock, reorder_point AS reorderPoint, active, created_at AS createdAt FROM products WHERE id = ?`).get(productId) as SqliteProduct | undefined;
 }
 
-export type CreateProductInput = {
-  name: string;
-  sku?: string;
-  barcode?: string;
-  size?: string;
-  imageUrl?: string | null;
-  /** 1 = สินค้าลัดหน้าร้าน (boolean ก็รับแล้วแปลงเป็น 0/1) */
-  quickPick?: number | boolean | null;
-  /** "unit" (default) | "money" — ขายเป็นเงินใช้ priceTiers */
-  sellMode?: "unit" | "money" | null;
-  /** JSON [{ label, price, qty }] สำหรับ sellMode "money" */
-  priceTiers?: string | null;
-  unit?: string;
-  price: number;
-  cost?: number;
-  stock?: number;
-  reorderPoint?: number;
-  category?: string;
-  emoji?: string;
-  color?: string;
-  actor?: string;
-  actorRole?: string;
-};
+
 
 // ROUND 71 — รหัสสินค้าอัตโนมัติแยกตามหมวด (ตามชุดข้อมูลจริง 120 รายการ):
 // เครื่องดื่ม=DRK · ของใช้ส่วนตัว=HYG · ขนม=SNK · อาหาร=FD · ของใช้ในครัวเรือน=HH · เครื่องเขียน=ST
@@ -1533,28 +1381,11 @@ export function createProduct(db: SqliteDb, input: CreateProductInput): SqlitePr
   return getProductById(db, Number(result.lastInsertRowid))!;
 }
 
-/**
- * ROUND 77 (user) — รับเข้าสินค้า "ต้นทุนต่างกันแต่ละรอบ" ได้:
- * สินค้าชนิดเดียวกัน รอบละราคาไม่เท่ากัน (เช่น รอบนี้ 10 ห่อ @฿200 แถมอีก 2 ห่อ)
- * ต้นทุนที่ fix คงที่ใช้ไม่ได้ → ระบบเก็บเป็น "ต้นทุนถัวเฉลี่ย" (weighted average):
- * ผสมมูลค่าของเดิมในคลังกับทุกบรรทัดที่รับเข้ารอบนี้ บรรทัดแถม (ต้นทุน ฿0) จะดึง
- * ค่าเฉลี่ยลงให้เอง — รายงานกำไรจึงถูกต้องตามของจริงเสมอ
- */
-export type ReceiveStockLine = { qty: number; cost?: number };
 
-export type ReceiveStockLotRow = { id: number; productId: number; lot: string; expiry: string | null; qty: number; cost: number; receivedAt: string };
 
-export type ReceiveStockResult = {
-  /** ทุกบรรทัดที่รับเข้ารอบนี้ (แต่ละบรรทัด = 1 stock_lot ใช้ Lot เดียวกัน) */
-  lots: ReceiveStockLotRow[];
-  /** บรรทัดแรก — ผู้เรียกแบบเดิม (บรรทัดเดียว) ยังอ่านได้ตามรูปเก่า */
-  lot: ReceiveStockLotRow;
-  product: SqliteProduct;
-  /** ต้นทุนถัวเฉลี่ยใหม่ที่เก็บในสินค้า (ของเดิมในคลัง + ทุกบรรทัดรอบนี้) */
-  averageCost: number;
-  /** ต้นทุนเฉลี่ยก่อนรับเข้ารอบนี้ */
-  previousCost: number;
-};
+
+
+
 
 export function nextStockLotNumber(db: SqliteDb) {
   const prefix = `LOT-${formatDate()}-`;
@@ -1657,17 +1488,7 @@ export function stockReceiptSource(db: SqliteDb, lotId: number) {
     receivedAt:source.received_at, quantity, paidAmount, unitCost:quantity && paidAmount!==null ? paidAmount/quantity : null, lines};
 }
 
-export type StockIntakeEntry = {
-  sellingPrice?: number;
-  expectedSellingPrice?: number;
-  productId?: number;
-  newProduct?: CreateProductInput;
-  purchaseQty: number;
-  freeQty?: number;
-  paidAmount: number;
-  lot?: string;
-  expiryDate?: string | null;
-};
+
 
 /** Create catalog entries and their receipts together, or roll back the entire intake. */
 export function receiveStockBatch(db: SqliteDb, entries: StockIntakeEntry[], actor: string, actorRole?: string) {
@@ -1759,13 +1580,7 @@ export function listStockRows(db: SqliteDb): SqliteStockRow[] {
   });
 }
 
-export type StockCountInput = {
-  productId: number;
-  countedQty: number;
-  note?: string;
-  actor?: string;
-  actorRole?: string;
-};
+
 
 /** Reconciles the authoritative products.stock with a physical count. */
 export function stockCount(db: SqliteDb, input: StockCountInput) {
@@ -1799,34 +1614,13 @@ export function stockCount(db: SqliteDb, input: StockCountInput) {
   };
 }
 
-export type LotCountEntry = { lotId: number; countedQty: number };
 
-export type StockCountLotsInput = {
-  counts: LotCountEntry[];
-  note?: string;
-  actor?: string;
-  actorRole?: string;
-};
 
-export type StockCountLotResult = {
-  lotId: number;
-  lot: string;
-  expiry: string | null;
-  systemQty: number;
-  countedQty: number;
-  diff: number;
-};
 
-export type StockCountLotsResult = {
-  productId: number;
-  sku: string;
-  name: string;
-  unit: string;
-  systemQty: number;
-  countedQty: number;
-  diff: number;
-  lots: StockCountLotResult[];
-};
+
+
+
+
 
 /**
  * Reconciles physical counts PER LOT: each listed lot's qty is set to its
@@ -1906,22 +1700,7 @@ export function stockCountLots(db: SqliteDb, input: StockCountLotsInput): StockC
 
 // --- order list (รายการสั่งซื้อ — round 32-15) --------------------------------
 
-export type SqliteOrderItem = {
-  id: number;
-  productId: number;
-  sku: string;
-  name: string;
-  unit: string;
-  category: string;
-  cost: number;
-  sellingPrice: number;
-  stock: number;
-  reorderPoint: number;
-  qty: number;
-  note: string | null;
-  createdBy: string | null;
-  createdAt: string;
-};
+
 
 const ORDER_ITEM_SELECT = `SELECT o.id, o.qty, o.note, o.created_by AS createdBy, o.created_at AS createdAt, p.id AS productId, p.sku, p.name, p.unit, p.category, p.cost, p.price AS sellingPrice, p.stock, p.reorder_point AS reorderPoint FROM order_list_items o JOIN products p ON p.id = o.product_id`;
 
@@ -1929,13 +1708,7 @@ export function listOrderItems(db: SqliteDb): SqliteOrderItem[] {
   return db.prepare(`${ORDER_ITEM_SELECT} ORDER BY o.id ASC`).all() as SqliteOrderItem[];
 }
 
-export type OrderAddInput = {
-  productId: number;
-  qty?: number;
-  note?: string;
-  actor?: string;
-  actorRole?: string;
-};
+
 
 /** Adds (or merges +qty when the product is already on the list) an order row. */
 export function addOrderItem(db: SqliteDb, input: OrderAddInput): SqliteOrderItem[] {
@@ -1957,13 +1730,7 @@ export function addOrderItem(db: SqliteDb, input: OrderAddInput): SqliteOrderIte
   return listOrderItems(db);
 }
 
-export type OrderUpdateInput = {
-  id: number;
-  qty?: number;
-  note?: string | null;
-  actor?: string;
-  actorRole?: string;
-};
+
 
 export function updateOrderItem(db: SqliteDb, input: OrderUpdateInput): SqliteOrderItem[] {
   const existing = db.prepare(`${ORDER_ITEM_SELECT} WHERE o.id = ?`).get(input.id) as SqliteOrderItem | undefined;
@@ -2004,27 +1771,7 @@ export function clearOrderList(db: SqliteDb, input: { actor?: string; actorRole?
   return listOrderItems(db);
 }
 
-export type UpdateProductInput = {
-  productId: number;
-  name?: string;
-  barcode?: string | null;
-  size?: string | null;
-  imageUrl?: string | null;
-  /** 1 = สินค้าลัดหน้าร้าน (boolean ก็รับแล้วแปลงเป็น 0/1) */
-  quickPick?: number | boolean | null;
-  /** "unit" (default) | "money" — ขายเป็นเงินใช้ priceTiers */
-  sellMode?: "unit" | "money" | null;
-  /** JSON [{ label, price, qty }] สำหรับ sellMode "money" */
-  priceTiers?: string | null;
-  unit?: string;
-  price?: number;
-  cost?: number;
-  reorderPoint?: number;
-  category?: string;
-  emoji?: string;
-  actor?: string;
-  actorRole?: string;
-};
+
 
 /** Updates only the provided product fields. Undefined keeps the current value; only fields whose value actually changed are written/logged. */
 export function updateProduct(db: SqliteDb, input: UpdateProductInput): SqliteProduct {
@@ -2136,26 +1883,11 @@ export function updateProduct(db: SqliteDb, input: UpdateProductInput): SqlitePr
   return getProductById(db, input.productId)!;
 }
 
-export type BulkPriceItemInput = {
-  productId: number;
-  price?: number;
-  cost?: number;
-};
 
-export type BulkUpdatePricesInput = {
-  items: BulkPriceItemInput[];
-  actor?: string;
-  actorRole?: string;
-};
 
-export type BulkUpdatePricesResult = {
-  updated: number;
-  priceChanges: number;
-  costChanges: number;
-  skipped: number;
-  /** ตัวอย่างชื่อสินค้าที่แก้ (ใช้ทำ toast สรุป) */
-  sampleNames: string[];
-};
+
+
+
 
 /**
  * Round 64 — ปรับราคาขาย/ต้นทุนหลายรายการพร้อมกันใน transaction เดียว
@@ -2222,11 +1954,7 @@ export function bulkUpdateProductPrices(db: SqliteDb, input: BulkUpdatePricesInp
   return { updated: changing.length, priceChanges, costChanges, skipped: input.items.length - changing.length, sampleNames };
 }
 
-export type DeleteProductInput = {
-  productId: number;
-  actor?: string;
-  actorRole?: string;
-};
+
 
 /**
  * Permanently removes a product and its remaining lots from the catalog.
@@ -2251,12 +1979,7 @@ export function deleteProduct(db: SqliteDb, input: DeleteProductInput): { delete
   return { deleted: true, name: product.name, sku: product.sku };
 }
 
-export type SetProductActiveInput = {
-  productId: number;
-  active: boolean;
-  actor?: string;
-  actorRole?: string;
-};
+
 
 /** Archives (active = 0) or restores (active = 1) a product. Archived products keep their stock, lots and history. */
 export function setProductActive(db: SqliteDb, input: SetProductActiveInput): SqliteProduct {
@@ -2296,10 +2019,7 @@ function summarizeItems(items: { name: string; qty: number; unit: string }[]) {
   return items.length > 3 ? `${head} และอีก ${items.length - 3} รายการ` : head;
 }
 
-/** A catalog line references a product; a "รายการพิเศษ" line is a priced ad-hoc item with no product/stock behind it. */
-export type CheckoutItemInput =
-  | { productId: number; qty: number; price?: number; unit?: string; label?: string }
-  | { name: string; price: number; qty: number; unit?: string };
+
 
 /**
  * Deducts sold qty from the product's lots FEFO-style (first-expiry-first-out:
@@ -2333,7 +2053,7 @@ function deductLotsFifo(db: SqliteDb, productId: number, qty: number, saleItemId
   return { shortfall: remaining, costSatang };
 }
 
-export type PosTerminal = { id: string; number: number; registeredBy: string; createdAt: string };
+
 const TERMINAL_SELECT = "SELECT id, number, registered_by AS registeredBy, created_at AS createdAt FROM pos_terminals";
 export function getPosTerminal(db: SqliteDb, deviceId: string): PosTerminal | null {
   return (db.prepare(`${TERMINAL_SELECT} WHERE device_id = ?`).get(deviceId) as PosTerminal | undefined) ?? null;
@@ -2364,29 +2084,7 @@ export function releasePosTerminal(db: SqliteDb, id: string, actor: string) {
   });
 }
 
-export type CheckoutInput = {
-  terminalDeviceId?: string;
-  items: CheckoutItemInput[];
-  paymentMethod: (typeof PAYMENT_METHODS)[number];
-  memberNumber?: string | null;
-  discount?: number;
-  cashier?: string;
-  actorRole?: string;
-  /** ROUND 63 (user) — รูปหลักฐานการชำระ (สลิปโอน/สแกนจ่าย) data-URL · ไม่แนบ = ไม่ส่ง */
-  slipImage?: string | null;
-  /**
-   * P2-b (idempotency) — client-generated key (UUID) sent once per checkout
-   * attempt. Retries with the SAME key return the original receipt instead
-   * of writing a second bill. Omitted on legacy clients → no idempotency.
-   */
-  clientRequestId?: string | null;
-  /** FIX-7 (user) — ยอดเงินที่รับมาจากลูกค้า (เฉพาะ "เงินสด") · null/undefined สำหรับ QR/wallet */
-  receivedCash?: number | null;
-  /** FIX-7 (user) — ยอดเงินทอน (เฉพาะ "เงินสด") · null/undefined สำหรับ QR/wallet */
-  changeDue?: number | null;
-  /** FIX-7 (user) — แคชเชียร์ยืนยันว่าตรวจสอบการชำระแล้ว (เฉพาะ "QR / สแกน") · null สำหรับเงินสด/wallet */
-  paymentVerified?: boolean | null;
-};
+
 
 export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
   // P2-b (idempotency) — short-circuit a retried submit BEFORE touching stock
@@ -2587,10 +2285,7 @@ export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
 
 // --- sales history (receipt reprint) ---------------------------------------
 
-export type SalesListInput = {
-  search?: string;
-  limit?: number;
-};
+
 
 /** Lists past receipts, newest first. Search matches order number or member number (case-insensitive contains). */
 export function salesList(db: SqliteDb, input: SalesListInput = {}): SaleHistoryEntry[] {
@@ -2728,24 +2423,7 @@ export function generateMemberNumber(db: SqliteDb, mode: "running" | "year" | "m
   return `${memberNumberHead(mode, config)}${String(nextMemberNumberSequence(members, mode, config)).padStart(digits, "0")}`;
 }
 
-export type RegisterMemberInput = {
-  prename?: string;
-  firstName: string;
-  lastName: string;
-  citizenId?: string;
-  phone?: string;
-  type?: string;
-  gender?: string;
-  photoUrl?: string;
-  initialDeposit?: number;
-  memberNumber?: string;
-  /** ROUND 65 — รหัสบัตรเงินสดที่ออกให้สมาชิก (เช่น 2395100201) */
-  cardNumber?: string;
-  /** ROUND 65 — รหัสผู้ป่วย (HN) ที่ผูกกับบัตร */
-  patientCode?: string;
-  actor?: string;
-  actorRole?: string;
-};
+
 
 export function findExistingMembers(db: SqliteDb, input: { firstName: string; lastName: string; citizenId?: string; phone?: string }) {
   const normalize = (value: string) => value.normalize("NFKC").replace(/\s+/g, "").toLowerCase();
@@ -2836,26 +2514,7 @@ export function setMemberStatus(db: SqliteDb, memberNumber: string, suspended: b
   return getMemberDetail(db, memberNumber);
 }
 
-export type WalletTxInput = {
-  memberNumber: string;
-  /** ROUND 65 — 'refund' = คืนบัตรเงินสด (ผู้ป่วยคืนบัตร ร้านจ่ายเงินคืน) คิดเหมือนถอน */
-  type: "deposit" | "withdrawal" | "refund";
-  /** Internal account closure: refund money but keep the physical card assigned. */
-  retainCard?: boolean;
-  amount: number;
-  note?: string;
-  actor?: string;
-  actorRole?: string;
-  /** ROUND 63 (user) — รูปหลักฐาน (สลิปโอน/ถอน) data-URL · ไม่แนบ = ไม่ส่ง */
-  slipImage?: string | null;
-  /**
-   * P2-b (idempotency) — client-generated key (UUID) sent once per wallet
-   * operation. Retries with the SAME key return the original transaction row
-   * instead of double-debiting/crediting the member. Omitted on legacy clients
-   * → no idempotency.
-   */
-  clientRequestId?: string | null;
-};
+
 
 export function walletTx(db: SqliteDb, input: WalletTxInput) {
   // P2-b (idempotency) — short-circuit a retried submit BEFORE touching the
@@ -2960,23 +2619,7 @@ export function walletTx(db: SqliteDb, input: WalletTxInput) {
   };
 }
 
-export type UpdateMemberInput = {
-  memberNumber: string;
-  prename?: string | null;
-  firstName?: string;
-  lastName?: string;
-  idCard?: string | null;
-  phone?: string | null;
-  type?: string;
-  gender?: string | null;
-  photoUrl?: string | null;
-  /** ROUND 65 — รหัสบัตรเงินสด · "" = ล้าง */
-  cardNumber?: string | null;
-  /** ROUND 65 — รหัสผู้ป่วย (HN) · "" = ล้าง */
-  patientCode?: string | null;
-  actor?: string;
-  actorRole?: string;
-};
+
 
 /** Updates only the provided member profile fields. Undefined keeps the current value; empty idCard/phone clears them. */
 export function updateMember(db: SqliteDb, input: UpdateMemberInput): SqliteMember {
@@ -3072,11 +2715,7 @@ export function updateMember(db: SqliteDb, input: UpdateMemberInput): SqliteMemb
   return getMemberByNumber(db, member.memberNumber)!;
 }
 
-export type DeleteMemberInput = {
-  memberNumber: string;
-  actor?: string;
-  actorRole?: string;
-};
+
 
 /** Hard-deletes a member. Blocked while a balance remains or any transaction history exists. */
 export function deleteMember(db: SqliteDb, input: DeleteMemberInput): { memberNumber: string; memberName: string } {
@@ -3104,7 +2743,7 @@ const ISO_DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 /** ROUND 51 — ชื่อพนักงานพิเศษ: แทนบิลที่ไม่ได้ระบุชื่อผู้ขาย (เก่า ๆ / นำเข้า) */
 export const UNASSIGNED_CASHIER = "ไม่ระบุพนักงาน";
 
-export type DailyRangeInput = { days?: number; from?: string; to?: string; cashier?: string; cashiers?: string[]; categories?: string[] };
+
 
 /**
  * ROUND 81 (user) — ตัวกรองหมวดสินค้า
@@ -3216,7 +2855,7 @@ export function dailySalesRows(db: SqliteDb, input: number | DailyRangeInput = 3
 
 // --- report breakdowns (round 30): by product category & by cashier ---------
 
-export type SalesByCategoryRow = { category: string; orders: number; qty: number; revenue: number; cogs: number; profit: number; marginPct: number };
+
 
 /** Sales grouped by product category — special (no-product) lines land in "รายการพิเศษ". */
 export function salesByCategory(db: SqliteDb, input: DailyRangeInput = {}): SalesByCategoryRow[] {
@@ -3229,19 +2868,7 @@ export function salesByCategory(db: SqliteDb, input: DailyRangeInput = {}): Sale
   return rows.map((row) => { const profit = round2(row.revenue - row.cogs); return { ...row, qty: Number(row.qty), cogs: round2(row.cogs), profit, marginPct: row.revenue > 0 ? round2((profit / row.revenue) * 100) : 0 }; });
 }
 
-export type SalesByProductRow = {
-  productId: number | null;
-  name: string;
-  sku: string | null;
-  barcode: string | null;
-  category: string | null;
-  bills: number;
-  qty: number;
-  revenue: number;
-  cogs: number;
-  profit: number;
-  marginPct: number;
-};
+
 
 /**
  * Sales grouped per product (สรุปยอดขายแยกตามสินค้า). Special lines with no
@@ -3259,27 +2886,7 @@ export function salesByProduct(db: SqliteDb, input: DailyRangeInput = {}): Sales
   return rows.map((row) => { const profit = round2(row.revenue - row.cogs); return { ...row, bills: Number(row.bills), qty: Number(row.qty), cogs: round2(row.cogs), profit, marginPct: row.revenue > 0 ? round2((profit / row.revenue) * 100) : 0 }; });
 }
 
-/**
- * ROUND 48 (user) — รายงาน "แยกตามรายการในบิล": ทุกบรรทัดสินค้าจากทุกบิลในช่วงเวลา
- * ผู้ใช้อยากรู้ว่าแต่ละช่วง "มีรายการอะไร" บ้าง ไม่ใช่แค่จำนวนบิล — รายงานนี้คือ
- * สมุดขายรายบรรทัด: บิลไหน วันไหน เวลาไหน ขายอะไร กี่ชิ้น ราคาเท่าไหร่ ใครขาย
- * จำกัดที่ 1000 บรรทัดล่าสุดกันช่วงยาว ๆ ลากเบราว์เซอร์ (พอสำหรับรายงานหน้าร้าน)
- */
-export type SalesLineItemRow = {
-  orderNumber: string;
-  createdAt: string;
-  /** SKU is the hospital-report product identifier; barcode is a legacy fallback. */
-  productCode: string | null;
-  productName: string;
-  unit: string;
-  qty: number;
-  price: number;
-  amount: number;
-  paymentMethod: string;
-  cashier: string;
-  memberNumber: string | null;
-  memberName: string | null;
-};
+
 
 export function salesLineItems(db: SqliteDb, input: DailyRangeInput = {}): SalesLineItemRow[] {
   const { fromDate, toDate } = resolveRangeDates(input);
@@ -3290,7 +2897,7 @@ export function salesLineItems(db: SqliteDb, input: DailyRangeInput = {}): Sales
   return db.prepare(`SELECT s.order_number AS orderNumber, s.created_at AS createdAt, COALESCE(NULLIF(TRIM(p.sku), ''), NULLIF(TRIM(p.barcode), '')) AS productCode, si.name AS productName, COALESCE(si.unit, p.unit, 'ชิ้น') AS unit, si.qty, si.price, ROUND(si.qty * si.price, 2) AS amount, s.payment_method AS paymentMethod, COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, s.member_number AS memberNumber, CASE WHEN m.member_number IS NULL THEN NULL WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id LEFT JOIN members m ON m.member_number = s.member_number WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql}${categoryFilter.sql} ORDER BY s.created_at DESC, s.id DESC, si.id ASC LIMIT 1000`).all(since, until, ...filter.params, ...categoryFilter.params) as unknown as SalesLineItemRow[];
 }
 
-export type SalesByCashierRow = { cashier: string; orders: number; items: number; memberBills: number; discount: number; total: number; cogs: number; profit: number };
+
 
 /** Sales grouped by the staff member (cashier) who closed each bill. */
 export function salesByCashier(db: SqliteDb, input: DailyRangeInput = {}): SalesByCashierRow[] {
@@ -3316,8 +2923,7 @@ export function salesByCashier(db: SqliteDb, input: DailyRangeInput = {}): Sales
   });
 }
 
-/** ROUND 51 (user) — รายชื่อพนักงานขายจากบิลจริงทั้งหมด (สำหรับตัวกรองเจาะจงในรายงาน) */
-export type CashierOptionRow = { cashier: string; bills: number; lastSale: string };
+
 
 export function salesCashierOptions(db: SqliteDb): CashierOptionRow[] {
   return db.prepare(`SELECT COALESCE(NULLIF(TRIM(cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, COUNT(*) AS bills, MAX(created_at) AS lastSale FROM sales GROUP BY COALESCE(NULLIF(TRIM(cashier), ''), '${UNASSIGNED_CASHIER}') ORDER BY bills DESC`).all() as unknown as CashierOptionRow[];
@@ -3326,32 +2932,9 @@ export function salesCashierOptions(db: SqliteDb): CashierOptionRow[] {
 // --- member transaction history (round 30): what members spent / deposited /
 // withdrew + which staff member performed each entry ---------------------------
 
-export type MemberTransactionRow = {
-  id: number;
-  memberNumber: string;
-  memberName: string | null;
-  /** เลขบัตร ณ รอบที่ทำรายการ (จาก card_usage_sessions) */
-  cardNumber: string | null;
-  patientCode: string | null;
-  type: "purchase" | "deposit" | "withdrawal" | "activation" | "refund";
-  kind: "tx";
-  detail: string;
-  amount: number;
-  paymentMethod: string | null;
-  balanceAfter: number | null;
-  actor: string | null;
-  createdAt: string;
-};
 
-export type MemberTransactionsInput = {
-  memberNumber?: string;
-  type?: "purchase" | "deposit" | "withdrawal" | "activation" | "refund";
-  /** ROUND 77 (user) — เลือกหลายประเภทพร้อมกัน (รวมกับ type เดี่ยว ถ้าส่งทั้งคู่) */
-  types?: ("purchase" | "deposit" | "withdrawal" | "activation" | "refund")[];
-  from?: string;
-  to?: string;
-  limit?: number;
-};
+
+
 
 /**
  * Member wallet ledger with the staff member (actor) who performed each entry.
@@ -3405,27 +2988,9 @@ export function memberTransactions(db: SqliteDb, input: MemberTransactionsInput 
 // รวมเปิดใช้บัตร+เติมเงิน) · ยอดจ่าย (ใช้ซื้อ+ถอน+คืนบัตร) · คงเหลือ · วันที่เปิดใช้บัตร ·
 // รหัสผู้ป่วย · ชื่อผู้ป่วย ---------------------------------------------------------
 
-export type MemberBalanceRow = {
-  id: number;
-  memberNumber: string;
-  cardNumber: string | null;
-  patientCode: string | null;
-  prename: string | null;
-  firstName: string;
-  lastName: string;
-  type: string;
-  status: "active" | "suspended";
-  /** วันที่เปิดใช้บัตร = วันที่ลงทะเบียนสมาชิกในระบบ */
-  createdAt: string;
-  /** ยอดทั้งหมด (บาท) — เงินเข้ารวมทุกช่องทาง: เปิดใช้บัตร + เติมเงิน */
-  totalIn: number;
-  /** ยอดจ่าย (บาท) — ใช้ซื้อสินค้า + ถอน + คืนบัตรเงินสด (ค่าบวก) */
-  totalOut: number;
-  /** คงเหลือ (บาท) = ยอดคงเหลือในบัญชีสมาชิกขณะนี้ */
-  balance: number;
-};
 
-export type MemberBalancesInput = { search?: string };
+
+
 
 /**
  * ROUND 65 — รายงาน "ยอดเงินในบัตร" ทุกใบในระบบ (ยอดทั้งหมด/ยอดจ่าย/คงเหลือ
@@ -3457,29 +3022,9 @@ export function memberBalances(db: SqliteDb, input: MemberBalancesInput = {}): M
 // ยอดขาย · คงเหลือ — ยอดยกมาคำนวณย้อนกลับจากสต็อกปัจจุบัน (ยกมา = ปัจจุบัน +
 // ที่ขายในช่วง − ที่รับเข้าในช่วง) --------------------------------------------------
 
-export type StockBalanceRow = {
-  productId: number;
-  /** รหัสสินค้า — บาร์โค้ดถ้ามี ไม่มีก็ใช้ SKU */
-  code: string;
-  sku: string;
-  barcode: string | null;
-  name: string;
-  unit: string;
-  category: string;
-  active: number;
-  /** จำนวนยกมาต้นช่วง */
-  opening: number;
-  /** จำนวนที่ขายออกในช่วง */
-  sold: number;
-  /** จำนวนที่รับเข้าในช่วง */
-  received: number;
-  /** จำนวนคงเหลือปัจจุบัน */
-  remaining: number;
-  sellingPrice: number;
-  sellingValue: number;
-};
 
-export type StockBalanceInput = { from?: string; to?: string; search?: string; categories?: string[] };
+
+
 
 export function stockBalanceReport(db: SqliteDb, input: StockBalanceInput = {}): StockBalanceRow[] {
   const fromDate = input.from && ISO_DATE_ONLY.test(input.from) ? input.from : formatDate(addDays(new Date(), -6));
@@ -3578,16 +3123,7 @@ export function dashboardStats(db: SqliteDb, rangeDays = 30): DashboardStats {
 
 // --- settings ---------------------------------------------------------------
 
-/** ROUND 56 (user) — ภาพรวมสำหรับ "เครื่องมือติดตั้งระบบ" (โซนผู้พัฒนา): ตัวเลขที่ช่าง
- *  ต้องเห็นในวันขึ้นระบบ — จำนวนบัญชี/สมาชิก/สินค้า/บิลวันนี้/สินค้ายังไม่ตั้งราคา
- *  ขนาดฐานข้อมูล — ไว้ตรวจรับข้อมูลก่อนส่งมอบระบบให้ลูกค้า */
-export type InstallOverview = {
-  users: { total: number; active: number; devAccounts: number };
-  members: { total: number; active: number; walletTotal: number };
-  products: { total: number; active: number; zeroPrice: number; lowStock: number };
-  sales: { todayBills: number; todayRevenue: number; totalBills: number };
-  dbSizeBytes: number;
-};
+
 
 export function installOverview(db: SqliteDb, dbPath: string): InstallOverview {
   const users = listAppUsers(db);
@@ -3678,57 +3214,9 @@ const SETTINGS_KEY = "app_settings";
 
 // --- daily cut-off (ตัดยอดประจำวัน) -----------------------------------------
 
-export type DayClosureRow = {
-  id: number;
-  periodStart: string;
-  closedAt: string;
-  bills: number;
-  pieces: number;
-  revenue: number;
-  cashTotal: number;
-  qrTotal: number;
-  walletTotal: number;
-  deposits: number;
-  withdrawals: number;
-  depositCount: number;
-  depositAmount: number;
-  activationCount: number;
-  activationAmount: number;
-  withdrawalCount: number;
-  withdrawalAmount: number;
-  refundCount: number;
-  refundAmount: number;
-  closedBy: string | null;
-  note: string | null;
-};
 
-export type BusinessPeriodStatus = {
-  mode: "auto" | "manual";
-  cutOffTime: string;
-  /** เริ่มรอบปัจจุบัน — auto: เวลาตัดยอของวันนี้/เมื่อวาน · manual: ตั้งแต่ตัดยอดครั้งล่าสุด */
-  periodStart: string;
-  /** รอบถัดไปจะเริ่มเมื่อ (auto เท่านั้น) */
-  nextCutOffAt: string | null;
-  totals: {
-    bills: number;
-    pieces: number;
-    revenue: number;
-    cashTotal: number;
-    qrTotal: number;
-    walletTotal: number;
-    deposits: number;
-    withdrawals: number;
-    depositCount: number;
-    depositAmount: number;
-    activationCount: number;
-    activationAmount: number;
-    withdrawalCount: number;
-    withdrawalAmount: number;
-    refundCount: number;
-    refundAmount: number;
-  };
-  lastClosure: DayClosureRow | null;
-};
+
+
 
 const CLOSURE_SELECT = `SELECT id, period_start AS periodStart, closed_at AS closedAt, bills, pieces, ROUND(revenue, 2) AS revenue, ROUND(cash_total, 2) AS cashTotal, ROUND(qr_total, 2) AS qrTotal, ROUND(wallet_total, 2) AS walletTotal, ROUND(deposits, 2) AS deposits, ROUND(withdrawals, 2) AS withdrawals, deposit_count AS depositCount, ROUND(deposit_amount, 2) AS depositAmount, activation_count AS activationCount, ROUND(activation_amount, 2) AS activationAmount, withdrawal_count AS withdrawalCount, ROUND(withdrawal_amount, 2) AS withdrawalAmount, refund_count AS refundCount, ROUND(refund_amount, 2) AS refundAmount, closed_by AS closedBy, note FROM day_closures`;
 
@@ -3797,11 +3285,7 @@ export function businessPeriodStatus(db: SqliteDb): BusinessPeriodStatus {
   };
 }
 
-export type CloseDayInput = {
-  actor?: string;
-  actorRole?: string;
-  note?: string;
-};
+
 
 /**
  * ตัดยอดรอบปัจจุบัน — snapshots everything since the period started into
@@ -3958,8 +3442,7 @@ export function setEditionSettings(db: SqliteDb, patch: Partial<Pick<StoreSettin
 
 // --- app users & local sessions ---------------------------------------------
 
-/** Login account role for the welfare store app itself (local session auth). */
-export type AppUserRole = "staff" | "admin" | "dev";
+
 
 /**
  * หลัง RBAC migration (ensureRbacSeed) ค่าใน app_users.role ถูกเขียนใหม่เป็นชื่อ
@@ -4003,13 +3486,7 @@ export function storedRoleFor(appRole: AppUserRole): string {
 // RBAC — Role-Based Access Control with granular permissions
 // ============================================================================
 
-export type PermissionKey =
-  | "POS.SELL" | "POS.VOID" | "POS.REFUND" | "POS.DISCOUNT" | "POS.SPECIAL"
-  | "STOCK.VIEW" | "STOCK.RECEIVE" | "STOCK.ADJUST" | "STOCK.COUNT" | "STOCK.TRANSFER"
-  | "REPORT.SALES" | "REPORT.PROFIT" | "REPORT.INVENTORY" | "REPORT.AUDIT" | "REPORT.ADVANCED"
-  | "MEMBER.VIEW" | "MEMBER.EDIT" | "MEMBER.WALLET" | "MEMBER.DELETE"
-  | "SYSTEM.USER_MANAGE" | "SYSTEM.ROLE_MANAGE" | "SYSTEM.BACKUP" | "SYSTEM.RESTORE"
-  | "SYSTEM.SETTING" | "SYSTEM.LICENSE" | "SYSTEM.UPDATE" | "SYSTEM.SESSION_REVOKE";
+
 
 export const PERMISSION_CATALOG: { key: PermissionKey; group: string; description: string }[] = [
   { key: "POS.SELL", group: "POS", description: "ขายสินค้าและรับชำระ" },
@@ -4130,19 +3607,9 @@ export function hasPermission(db: SqliteDb, role: string, permission: Permission
 // Stock Movement Ledger — central truth of every stock change
 // ============================================================================
 
-export type StockMovementType = 'RECEIVE' | 'SALE' | 'ADJUST' | 'TRANSFER' | 'RETURN' | 'VOID' | 'COUNT';
 
-export interface StockMovementInput {
-  type: StockMovementType;
-  productId: number;
-  qtyDelta: number; // signed: +in / -out
-  unitCost?: number;
-  refType?: string;
-  refId?: number;
-  reason?: string;
-  actor?: string;
-  actorRole?: string;
-}
+
+
 
 /** Record a stock movement in the ledger (does NOT update products.stock — caller must do that). */
 export function recordMovement(db: SqliteDb, input: StockMovementInput): void {
@@ -4174,23 +3641,7 @@ export function stockCard(db: SqliteDb, productId: number, from?: string, to?: s
 // Cashier Shift — open/close + cash count
 // ============================================================================
 
-export interface CashierShift {
-  id: number;
-  cashierName: string;
-  status: string;
-  openingCash: number;
-  expectedCash: number;
-  countedCash: number | null;
-  cashDifference: number | null;
-  expectedQr: number;
-  expectedWallet: number;
-  billsCount: number;
-  pieces: number;
-  salesTotal: number;
-  note: string | null;
-  openedAt: string;
-  closedAt: string | null;
-}
+
 
 export function openShift(db: SqliteDb, input: { cashierName: string; openingCash: number; note?: string }): CashierShift {
   const existing = db.prepare(`SELECT id FROM cashier_shifts WHERE cashier_name = ? AND status = 'open'`).get(input.cashierName);
@@ -4345,20 +3796,7 @@ export function validatePasswordStrength(password: string, role: AppUserRole = "
   return issues;
 }
 
-/** Login account for the welfare store app itself (local session auth). */
-export type AppUser = {
-  id: number;
-  username: string;
-  passwordHash: string;
-  displayName: string;
-  role: AppUserRole;
-  active: number;
-  createdAt: string;
-  failedAttempts: number;
-  lockedUntil: string | null;
-  /** ROUND 36 (ข้อ 31) — 1 = ต้องเปลี่ยนรหัสผ่านก่อนเริ่มใช้งาน (บัญชีใหม่/รหัสที่ผู้บริหารตั้งให้) */
-  mustChangePassword: number;
-};
+
 
 const SCRYPT_SALT_BYTES = 16;
 const SCRYPT_KEY_BYTES = 64;
@@ -4422,11 +3860,7 @@ export function loginLockRemainingMinutes(lockedUntil: string): number {
   return remaining <= 0 ? 0 : Math.max(1, Math.ceil(remaining / 60000));
 }
 
-export type LoginFailureOutcome = {
-  attempts: number;
-  lockedUntil: string | null;
-  justLocked: boolean;
-};
+
 
 /**
  * Records one wrong password for the (active) account. Unknown or suspended
@@ -4493,17 +3927,7 @@ export function deleteAppSession(db: SqliteDb, sessionId: string): void {
 
 // --- active session administration (admin only) ------------------------------
 
-/** Active session without internal ids — safe to return to clients. */
-export type AppSessionSummary = {
-  sessionId: string;
-  username: string;
-  displayName: string;
-  role: AppUserRole;
-  active: number;
-  createdAt: string;
-  expiresAt: string;
-  lastSeenAt: string;
-};
+
 
 /** Purges expired session rows (housekeeping shared by list/revoke helpers). */
 function purgeExpiredAppSessions(db: SqliteDb): void {
@@ -4575,19 +3999,7 @@ export function revokeOtherAppSessions(db: SqliteDb, keepSessionId: string, acto
 
 // --- app user administration (admin only) ------------------------------------
 
-/** AppUser without the password hash — safe to return to clients. */
-export type AppUserSummary = {
-  id: number;
-  username: string;
-  displayName: string;
-  role: AppUserRole;
-  active: number;
-  createdAt: string;
-  failedAttempts: number;
-  lockedUntil: string | null;
-  /** ROUND 36 (ข้อ 31) — 1 = บัญชีนี้ยังต้องเปลี่ยนรหัสผ่านก่อนเริ่มใช้งาน */
-  mustChangePassword: number;
-};
+
 
 const APP_USER_SUMMARY_SELECT = `SELECT id, username, display_name AS displayName, role, active, created_at AS createdAt, failed_attempts AS failedAttempts, locked_until AS lockedUntil, must_change_password AS mustChangePassword FROM app_users`;
 
@@ -4624,26 +4036,14 @@ export function unlockAppUser(db: SqliteDb, userId: number, actor = "ผู้�
 
 const USERNAME_PATTERN = /^[a-zA-Z0-9_.]{3,30}$/;
 
-export type CreateAppUserInput = {
-  username: string;
-  password: string;
-  displayName: string;
-  role: AppUserRole;
-  actor?: string;
-  actorRole?: string | null;
-};
+
 
 /** Counts every login account (any role, any status) — 0 = ระบบยังไม่ถูกตั้งค่าครั้งแรก. */
 export function countAppUsers(db: SqliteDb): number {
   return (db.prepare(`SELECT COUNT(*) AS count FROM app_users`).get() as { count: number }).count;
 }
 
-export type SetupInitialAdminInput = {
-  username: string;
-  displayName: string;
-  password: string;
-  storeName?: string;
-};
+
 
 /**
  * ROUND 36 (ข้อ 31) — ลงทะเบียนครั้งแรก: ใช้ได้เฉพาะระบบที่ยังไม่มีบัญชีผู้ใช้เลย
@@ -4677,15 +4077,7 @@ export function setupInitialAdmin(db: SqliteDb, input: SetupInitialAdminInput): 
   return getAppUserSummaryById(db, Number(result.lastInsertRowid))!;
 }
 
-export type ChangeOwnPasswordInput = {
-  userId: number;
-  currentPassword: string;
-  newPassword: string;
-  /** เซสชันที่ผู้ใช้กำลังใช้อยู่ (จากคุกกี้) — จะไม่ถูกยกเลิกไปด้วย */
-  keepSessionId?: string;
-  actor?: string;
-  actorRole?: string | null;
-};
+
 
 /**
  * ROUND 36 (ข้อ 31) — ผู้ใช้เปลี่ยนรหัสผ่านของตัวเอง: ตรวจรหัสปัจจุบัน + กฎความแข็งแรง
@@ -4758,15 +4150,7 @@ export function createAppUser(db: SqliteDb, input: CreateAppUserInput): AppUserS
   return getAppUserSummaryById(db, Number(result.lastInsertRowid))!;
 }
 
-export type UpdateAppUserInput = {
-  userId: number;
-  displayName?: string;
-  role?: AppUserRole;
-  active?: boolean;
-  password?: string;
-  actor?: string;
-  actorRole?: string | null;
-};
+
 
 /** Updates only the provided account fields. Undefined keeps the current value; empty password strings are ignored. */
 export function updateAppUser(db: SqliteDb, input: UpdateAppUserInput): AppUserSummary {
@@ -4854,12 +4238,7 @@ export function updateAppUser(db: SqliteDb, input: UpdateAppUserInput): AppUserS
 
 // --- member spending stats ----------------------------------------------------
 
-export type MemberSpendingStats = {
-  totalSpent: number;
-  billCount: number;
-  lastPurchaseAt: string | null;
-  topProducts: { name: string; qty: number; total: number }[];
-};
+
 
 /** Lifetime purchase summary for one member, computed from the sales tables (paid totals after discount). */
 export function memberSpendingStats(db: SqliteDb, memberNumber: string): MemberSpendingStats {

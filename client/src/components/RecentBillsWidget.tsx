@@ -11,7 +11,7 @@ import { money } from "../pages/pageData";
 import { trpc } from "@/lib/trpc";
 import { formatTimeShort, formatThaiDate } from "../pages/viewFormat";
 import { ReceiptModal } from "./ReceiptModal";
-import type { SaleHistoryEntry } from "../../../server/sqliteStore";
+import type { SaleHistoryEntry } from '@shared/storeTypes/sales';
 
 /**
  * RecentBillsWidget — compact "last N bills" panel for the Dashboard.

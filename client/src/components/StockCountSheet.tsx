@@ -1,4 +1,4 @@
-import type { SqliteProduct } from "../../../server/sqliteStore";
+import type { Product } from '@shared/storeTypes/inventory';
 import { createPortal } from "react-dom";
 import { REPORT_DOC_CSS } from "@shared/reportDoc";
 import { normalizeProductCategory } from "@shared/productCategories";
@@ -24,7 +24,7 @@ function countSheetDate() {
   return `${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear() + 543}`;
 }
 
-export function StockCountSheet({ products }: { products: SqliteProduct[] }) {
+export function StockCountSheet({ products }: { products: Product[] }) {
   const active = products.filter((product) => product.active === 1).map(product => ({ ...product, category: normalizeProductCategory(product.category) })).sort((a,b)=>codeOrder.compare(a.barcode?.trim() || a.sku,b.barcode?.trim() || b.sku));
   const groups = CATEGORY_ORDER.map((category) => ({ category, items: active.filter((product) => product.category === category) }));
   const etc = active.filter((product) => !CATEGORY_ORDER.includes(product.category));

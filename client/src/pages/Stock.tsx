@@ -38,7 +38,7 @@ import { EditionUpgradeModal, useEditionStatus } from "@/components/EditionUi";
 import type { EditionFeatureKey } from "@shared/editions";
 import { printReportDoc, downloadReportPdf } from "@/reportDoc";
 import { downloadCsvFile, downloadXlsxFile, exportCount, exportNumber } from "@/exportUtils";
-import type { SqliteProduct } from "../../../server/sqliteStore";
+import type { Product } from '@shared/storeTypes/inventory';
 import { trpc } from "@/lib/trpc";
 
 function getErrorMessage(error: unknown) {
@@ -58,7 +58,7 @@ const emptyNewItem = { name: "", sku: "", category: "ของใช้", sizeNu
 type ReceiveFormDraft = { productId: string; lot: string; expiry: string; purchaseQty: string; freeQty: string; paidAmount: string; sellingPrice: string; expectedSellingPrice?: number; previousCost?: number | null };
 const emptyReceiveForm = (): ReceiveFormDraft => ({ productId: "", lot: "", expiry: "", purchaseQty: "", freeQty: "0", paidAmount: "", sellingPrice: "" });
 /** สะสมหลายสินค้าไว้ใน "รายการรับเข้า" แล้วบันทึกพร้อมกันรอบเดียว */
-type NewProductDraft = Omit<import("../../../server/sqliteStore").CreateProductInput, "quickPick"> & { quickPick?: number };
+type NewProductDraft = Omit<import('@shared/storeTypes/inventory').CreateProductInput, "quickPick"> & { quickPick?: number };
 type ReceiveCartEntry = Omit<ReceiveFormDraft, "productId"> & { productId: number; newProduct?: NewProductDraft };
 const emptyCountForm = { productId: "", countedQty: "", note: "" };
 const emptyEditForm = { name: "", category: "", unit: "ชิ้น", price: "", cost: "", reorder: "", sizeNum: "", sizeUnit: "มล.", barcode: "", emoji: "", imageUrl: "", sellMode: "unit" as "unit" | "money", quickPick: false, tiers: [{ label: "", price: "", qty: "" }] };
@@ -111,7 +111,7 @@ export function Stock({ role, userName, initialAction, embeddedAction = false, r
   const showValidation = (message: string) => { setError(message); notify.warning("ตรวจสอบข้อมูลก่อนทำรายการ", { description: message }); };
   const [addOpen, setAddOpen] = useState(initialAction === "add");
   const [receiveOpen, setReceiveOpen] = useState(receivingPage || initialAction === "receive");
-  const [draftProducts, setDraftProducts] = useState<SqliteProduct[]>([]);
+  const [draftProducts, setDraftProducts] = useState<Product[]>([]);
   const [draftDefinitions, setDraftDefinitions] = useState<Record<number, NewProductDraft>>({});
   const [creatingForReceipt, setCreatingForReceipt] = useState(false);
   const [newItem, setNewItem] = useState(emptyNewItem);
@@ -131,7 +131,7 @@ export function Stock({ role, userName, initialAction, embeddedAction = false, r
     document.querySelector<HTMLElement>(".stock-receive-modal .receive-split-workspace")?.scrollTo({top:0});
     document.querySelector<HTMLInputElement>(".stock-receive-modal .member-scan-field input")?.focus({preventScroll:true});
   },80);
-  const queueReceiptProduct = (product: SqliteProduct) => {
+  const queueReceiptProduct = (product: Product) => {
     if (creatingForReceipt && (newItem.name.trim() || newReceiptForm.purchaseQty.trim() || newReceiptForm.paidAmount.trim() || Number(newReceiptForm.freeQty)>0)) { showValidation("มีข้อมูลสินค้าใหม่ที่กำลังกรอก กรุณาเพิ่มลงรายการหรือล้างข้อมูลก่อนเลือกสินค้าอื่น"); return; }
     if (product.id < 0) { showValidation("สินค้าใหม่นี้อยู่ในรายการแล้ว กรุณาแก้ไขจำนวนในตาราง"); return; }
     if (receiveForm.productId && receiveForm.productId !== String(product.id)) {
@@ -217,18 +217,18 @@ export function Stock({ role, userName, initialAction, embeddedAction = false, r
     if (embeddedReadyRef.current) onClose();
   }, [addOpen, embeddedAction, initialAction, onClose, receiveOpen, operationResult]);
   const [editOpen, setEditOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<SqliteProduct | null>(null);
+  const [editTarget, setEditTarget] = useState<Product | null>(null);
   // ROUND 38 (ข้อ 37) — ถ่ายรูปสินค้าจากกล้อง (เพิ่มใหม่ + แก้ไข)
   const [newCameraOpen, setNewCameraOpen] = useState(false);
   const [editCameraOpen, setEditCameraOpen] = useState(false);
   // ROUND 25 — การ์ดสินค้า: กดการ์ดเพื่อเปิดดูล็อต + ทุก action ของสินค้านั้น
-  const [detailTarget, setDetailTarget] = useState<SqliteProduct | null>(null);
+  const [detailTarget, setDetailTarget] = useState<Product | null>(null);
   const [editForm, setEditForm] = useState(emptyEditForm);
-  const [archiveTarget, setArchiveTarget] = useState<SqliteProduct | null>(null);
+  const [archiveTarget, setArchiveTarget] = useState<Product | null>(null);
   // Round 29 — keep-open receive/count flows (scan the next item right away) and
   // hard-delete for catalog mistakes (สินค้าไม่มีบาร์โค้ดที่สร้างผิด/ไม่ใช้แล้ว).
   const countKeepRef = useRef(false);
-  const [deleteTarget, setDeleteTarget] = useState<SqliteProduct | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Product | null>(null);
   // Round 32-15 — รายการสั่งซื้อ: สะสมสินค้าที่จะสั่งเข้า กันตกหล่นก่อนสั่งจริง
   const [stockTab, setStockTab] = useState<"inventory" | "orders" | "receipts">("inventory");
   // ROUND 55 (user) — ใบนับสต๊อกพิมพ์ออกมานับมือ (พรีวิวก่อนพิมพ์เหมือนทุกจุด)
@@ -271,7 +271,7 @@ export function Stock({ role, userName, initialAction, embeddedAction = false, r
   const orderItems = orderListQuery.data ?? [];
   const orderSellingPrice = (item: typeof orderItems[number]) => allProducts.find(product => product.id === item.productId)?.price ?? item.sellingPrice;
   const orderTotalValue = orderItems.reduce((sum, item) => sum + reportSellingValue(item.qty, orderSellingPrice(item)), 0);
-  const orderSuggest = (product: SqliteProduct) => Math.max(product.reorderPoint * 2 - product.stock, 1);
+  const orderSuggest = (product: Product) => Math.max(product.reorderPoint * 2 - product.stock, 1);
   const refreshOrderQueries = () => {
     void utils.stock.orderList.invalidate();
     void utils.logs.list.invalidate();
@@ -519,7 +519,7 @@ export function Stock({ role, userName, initialAction, embeddedAction = false, r
       if (!Number.isInteger(Number(newReceiptForm.purchaseQty)) || Number(newReceiptForm.purchaseQty)<=0 || !Number.isInteger(Number(newReceiptForm.freeQty)) || Number(newReceiptForm.freeQty)<0 || !newReceiptForm.paidAmount.trim() || !Number.isFinite(Number(newReceiptForm.paidAmount)) || Number(newReceiptForm.paidAmount)<0) { showValidation("กรุณากรอกจำนวนซื้อ จำนวนแถม และยอดจ่ายของสินค้าใหม่ให้ถูกต้อง"); return; }
       if (normalizeExpiryDate(newReceiptForm.expiry) === null) { showValidation("วันหมดอายุไม่ถูกต้อง"); return; }
       const draftId = Math.min(0, ...draftProducts.map(product => product.id)) - 1;
-      const draft: SqliteProduct = {
+      const draft: Product = {
         id: draftId, name, sku: skuValue || `DRAFT-${Math.abs(draftId)}`,
         barcode: definition.barcode ?? null, size: definition.size ?? null,
         imageUrl: definition.imageUrl ?? null, unit: newItem.unit, price,
@@ -604,20 +604,20 @@ export function Stock({ role, userName, initialAction, embeddedAction = false, r
     countKeepRef.current = keepOpen;
     setCountReview({ description: `${selectedCountProduct.name} · ปรับยอด ${lotCountEntries.length} Lot ตามจำนวนที่ตรวจนับ · ระบบจะบันทึกผลต่าง`, run: () => countLotsMutation.mutate({ counts: lotCountEntries.map((entry) => ({ lotId: entry.row.id, countedQty: entry.parsed })), note: countForm.note.trim() || undefined, actor, actorRole }) });
   };
-  const openReceiveFor = (product: SqliteProduct) => {
+  const openReceiveFor = (product: Product) => {
     setDetailTarget(null);
     setReceiveForm({ ...emptyReceiveForm(), productId: String(product.id) });
     setReceiveOpen(true);
     setError("");
   };
-  const openCountFor = (product: SqliteProduct) => {
+  const openCountFor = (product: Product) => {
     if (!hasStockCount) { setUpgradeFeature("stockCount"); return; } // ROUND 61 — นับสต็อกเป็นฟีเจอร์โปรพลัส
     setDetailTarget(null);
     setCountForm({ ...emptyCountForm, productId: String(product.id) });
     setCountOpen(true);
     setError("");
   };
-  const openEditProduct = (product: SqliteProduct) => {
+  const openEditProduct = (product: Product) => {
     // Editing replaces the inventory card; do not keep a second overlay over the form.
     setDetailTarget(null);
     setEditTarget(product);
@@ -690,7 +690,7 @@ export function Stock({ role, userName, initialAction, embeddedAction = false, r
     setArchiveTarget(null);
     setActiveMutation.mutate({ productId: target.id, active: false, actor, actorRole });
   };
-  const restoreProduct = (product: SqliteProduct) => {
+  const restoreProduct = (product: Product) => {
     setActiveMutation.mutate({ productId: product.id, active: true, actor, actorRole });
   };
   // Round 32-26 — รายการคงคลัง: ส่งออก CSV/Excel + สั่งพิมพ์ พร้อมแถว "ยอดยกมา" นำหน้าตาราง

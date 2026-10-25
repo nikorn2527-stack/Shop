@@ -5,7 +5,7 @@ import { notify } from "@/lib/notifications";
 import { useEffect, useMemo, useState, useRef } from "react";
 import { TRPCClientError } from "@trpc/client";
 import { Check, CircleAlert, Coins, Percent, RotateCcw, Search, SlidersHorizontal, X } from "@/lib/icons";
-import type { SqliteProduct } from "../../../server/sqliteStore";
+import type { Product } from '@shared/storeTypes/inventory';
 import { money } from "@/pages/pageData";
 import { trpc } from "@/lib/trpc";
 
@@ -37,7 +37,7 @@ function withDraft(previous: Record<number, DraftValue>, productId: number, patc
 
 export type BulkPriceModalProps = {
   open: boolean;
-  products: SqliteProduct[];
+  products: Product[];
   actor: string;
   actorRole: string;
   onClose: () => void;

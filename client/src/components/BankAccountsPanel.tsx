@@ -26,7 +26,7 @@ import {
   CircleAlert,
 } from "@/lib/icons";
 import { toast } from "sonner";
-import type { BankAccount } from "../../../server/sqliteStore";
+import type { BankAccount } from '@shared/storeTypes/settings';
 
 /** Preset list of Thai banks — quick pick, but admin can type custom too. */
 const THAI_BANK_PRESETS: { code: string; name: string }[] = [

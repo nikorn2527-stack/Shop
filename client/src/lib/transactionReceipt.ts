@@ -1,4 +1,5 @@
-import type { CheckoutReceipt, MemberTransactionRow } from "../../../server/sqliteStore";
+import type { CheckoutReceipt } from '@shared/storeTypes/sales';
+import type { MemberTransactionRow } from '@shared/storeTypes/reports';
 
 export function transactionReceipt(row: MemberTransactionRow): CheckoutReceipt | null {
   if (row.kind !== "tx" || !["deposit", "withdrawal", "refund"].includes(row.type)) return null;

@@ -50,7 +50,8 @@ import {
 import { type EditionFeatureKey } from "@shared/editions";
 import { EditionUpgradeModal, useEditionStatus } from "@/components/EditionUi";
 import type { MemberLite, Role } from "../pageData";
-import type { MemberTransactionRow, SaleHistoryEntry } from "../../../../server/sqliteStore";
+import type { MemberTransactionRow } from '@shared/storeTypes/reports';
+import type { SaleHistoryEntry } from '@shared/storeTypes/sales';
 import {
   isAdminRole,
   memberFullName,
