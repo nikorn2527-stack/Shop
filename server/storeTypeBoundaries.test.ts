@@ -55,6 +55,24 @@ function imports(path: string): string[] {
 }
 
 describe("business contract dependency boundaries", () => {
+  it("keeps receiving services and domain helpers independent of database implementations", () => {
+    const roots = ["./services/", "./domain/"].map((directory) =>
+      fileURLToPath(new URL(directory, import.meta.url)),
+    );
+    const violations = roots
+      .flatMap((root) => files(root))
+      .flatMap((path) =>
+        imports(path)
+          .filter((name) =>
+            /(?:^|\/)(sqliteStore|welfareStore|sqliteStockIntakeRepository)(?:\.|$)|^node:sqlite$|^(pg|mysql2|drizzle-orm)(\/|$)/.test(
+              name,
+            ),
+          )
+          .map((name) => `${path}: ${name}`),
+      );
+    expect(violations).toEqual([]);
+  });
+
   it("keeps frontend imports independent of the SQLite implementation", () => {
     const root = fileURLToPath(new URL("../client/src", import.meta.url));
     const violations = files(root).flatMap((path) =>

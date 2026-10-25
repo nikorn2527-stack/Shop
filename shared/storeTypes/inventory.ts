@@ -251,3 +251,14 @@ export interface StockMovementInput {
   actor?: string;
   actorRole?: string;
 }
+
+/** Shared input contract for both receiving API entry points and adapters. */
+export type ReceiveStockLinesInput = {
+  productId: number;
+  lot?: string;
+  expiryDate?: string | null;
+  lines: (ReceiveStockLine | null | undefined)[] | null | undefined;
+  paidAmount?: number;
+  actor?: string;
+  actorRole?: string;
+};
