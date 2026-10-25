@@ -64,3 +64,41 @@
   :root .pos-rail .rail-btn,
   :root .quick-pick-panel .product-card { transition: none; transform: none !important; }
 }
+/* Distinguish the three POS tasks while keeping input and item surfaces white. */
+@media screen {
+  :root:root .app-shell .pos-premium-layout {
+    --pos-bill-surface: #f1f5fa;
+    --pos-payment-surface: #fff5e8;
+    --pos-products-surface: #eff8f6;
+  }
+  :root:root .app-shell .pos-premium-layout .pos-premium-bill .cart-mid {
+    background-color: var(--pos-bill-surface);
+    background-image: none;
+    border-color: #cbd9e8;
+  }
+  :root:root .app-shell .pos-premium-layout .pos-premium-bill .pos-payment-summary {
+    background-color: var(--pos-payment-surface);
+    background-image: none;
+    border-color: #ead4b5;
+  }
+  :root:root .app-shell .pos-premium-layout > .product-panel.quick-pick-panel {
+    background-color: var(--pos-products-surface);
+    background-image: none;
+    border-color: #c5ddd6;
+  }
+  :root:root .app-shell .pos-premium-layout .pos-premium-bill .pos-head,
+  :root:root .app-shell .pos-premium-layout .pos-premium-bill .cart-item,
+  :root:root .app-shell .pos-premium-layout .pos-premium-bill .cart-items-head,
+  :root:root .app-shell .pos-premium-layout .pos-payment-summary .total-line,
+  :root:root .app-shell .pos-premium-layout .quick-pick-panel .product-card {
+    background-color: #ffffff;
+    background-image: none;
+  }
+  :root:root .app-shell .pos-premium-layout .pos-premium-bill .pos-summary-count {
+    color: #526579;
+  }
+  :root:root .app-shell .pos-premium-layout .pos-premium-bill .cart-items {
+    background-color: transparent;
+    background-image: none;
+  }
+}
