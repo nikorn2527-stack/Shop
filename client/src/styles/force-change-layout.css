@@ -1,0 +1,200 @@
+/* Keep first-login password changes visible on desktop, with natural scrolling on small screens. */
+.force-change-screen.login-screen {
+  padding: 16px;
+}
+.force-change-screen .force-change-card.login-card {
+  width: min(900px, 100%);
+  padding: 20px 28px 16px;
+}
+.force-change-screen .login-brand {
+  flex-direction: row;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 12px;
+  text-align: left;
+}
+.force-change-screen .login-brand .brand-mark,
+.force-change-screen .login-brand .login-logo {
+  width: 36px;
+  height: 36px;
+}
+.force-change-screen .login-brand .brand-mark span {
+  font-size: 19px;
+}
+.force-change-screen .login-brand small {
+  margin-left: auto;
+}
+.force-change-screen .force-change-head {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 3px 10px;
+  align-items: center;
+  margin: 0 0 16px;
+}
+.force-change-screen .force-change-icon {
+  grid-row: 1 / 3;
+  width: 32px;
+  height: 36px;
+  margin: 0;
+}
+.force-change-screen .force-change-head p {
+  grid-column: 2;
+}
+.force-change-screen .force-change-form {
+  gap: 12px;
+}
+.force-change-screen .force-change-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.2fr);
+  gap: 24px;
+  align-items: start;
+}
+.force-change-screen .force-change-account {
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background-color: #f5f8fb;
+}
+.force-change-screen .force-change-identity {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.force-change-screen .force-change-identity > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.force-change-screen .force-change-identity .role-avatar {
+  flex-shrink: 0;
+}
+.force-change-screen .login-scope-note {
+  margin-top: 14px;
+  padding: 12px 0 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  font-size: 11px;
+}
+.force-change-screen .force-change-fields {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+.force-change-screen .force-change-form input {
+  min-height: 40px;
+  padding: 9px 12px;
+  margin-top: 4px;
+  font-size: 14px;
+}
+.force-change-screen .login-password input {
+  padding-right: 46px;
+}
+.force-change-screen .login-password button {
+  width: 36px;
+  height: 36px;
+  right: 3px;
+}
+.force-change-screen .pw-meter {
+  margin-top: 0;
+}
+.force-change-screen .login-error {
+  margin: 12px 0 0;
+}
+.force-change-screen .force-change-actions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 1.2fr);
+  align-items: center;
+  gap: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.force-change-screen .force-change-actions .login-submit {
+  margin: 0;
+  min-height: 44px;
+}
+.force-change-screen .force-change-logout {
+  justify-self: start;
+  min-height: 44px;
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+.force-change-screen .login-footer {
+  margin-top: 12px;
+}
+.force-change-screen .login-footer .powered-line {
+  display: inline;
+  margin-left: 10px;
+}
+@media (max-width: 699px) {
+  .force-change-screen.login-screen {
+    padding: 16px 12px;
+  }
+  .force-change-screen .force-change-card.login-card {
+    padding: 20px 18px 16px;
+  }
+  .force-change-screen .login-brand small {
+    width: 100%;
+    margin-left: 46px;
+  }
+  .force-change-screen .force-change-columns {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+  .force-change-screen .force-change-form input {
+    min-height: 44px;
+    font-size: 16px;
+  }
+  .force-change-screen .login-password button {
+    width: 44px;
+    height: 44px;
+  }
+  .force-change-screen .force-change-actions {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+  .force-change-screen .force-change-actions .login-submit {
+    grid-row: 1;
+  }
+  .force-change-screen .force-change-logout {
+    justify-self: end;
+  }
+}
+
+.force-change-screen .force-change-columns {
+  grid-template-rows: auto 1fr;
+  row-gap: 12px;
+}
+.force-change-screen .force-change-account {
+  grid-column: 1;
+  grid-row: 1;
+}
+.force-change-screen .force-change-fields {
+  grid-column: 2;
+  grid-row: 1 / 3;
+}
+.force-change-screen .force-change-columns > .login-error {
+  grid-column: 1;
+  grid-row: 2;
+  margin: 0;
+}
+.force-change-screen .force-change-help {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+@media (max-width: 699px) {
+  .force-change-screen .force-change-columns {
+    grid-template-rows: none;
+  }
+  .force-change-screen .force-change-account,
+  .force-change-screen .force-change-fields,
+  .force-change-screen .force-change-columns > .login-error {
+    grid-column: auto;
+    grid-row: auto;
+  }
+}
