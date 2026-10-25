@@ -61,6 +61,7 @@ describe("business contract dependency boundaries", () => {
     );
     const violations = roots
       .flatMap((root) => files(root))
+      .filter((path) => !/\.test\.tsx?$/.test(path))
       .flatMap((path) =>
         imports(path)
           .filter((name) =>

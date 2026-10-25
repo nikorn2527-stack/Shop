@@ -10,6 +10,8 @@
 
 ระยะ 2 ต่อเนื่อง: แยก service/repository งานขายและเงินสมาชิก พร้อมทดสอบ atomic rollback และ retry แล้ว ดู [รายละเอียดงานขายและเงินสมาชิก](PAYMENT_SERVICES_REFACTOR_TH.md) ยังเหลือ async boundary, helper บางส่วน, PostgreSQL adapter และการย้าย/ตรวจเทียบข้อมูล
 
+เริ่ม async foundation แล้ว: เพิ่ม unit of work สำหรับ pool connection และเส้นทาง async wallet ที่ใช้กฎร่วมกับ SQLite พร้อม error mapping หลัง await ดู [ขอบเขตและข้อจำกัด Environment](ASYNC_POSTGRES_FOUNDATION_TH.md) ยังไม่มี driver/server สำหรับทดสอบ PostgreSQL จริง และยังไม่เปิดใช้ provider นี้ในแอป
+
 ลูกค้าใช้หลายจุดขายผ่าน LAN โดยมี Windows เครื่องหลักหนึ่งเครื่องรัน Shop Server และ PostgreSQL เป็นบริการของ Windows เครื่องขายเข้า Shop ผ่านเบราว์เซอร์เท่านั้น ไม่เปิดไฟล์ฐานข้อมูลผ่านโฟลเดอร์แชร์ และไม่ต้องติดตั้ง PostgreSQL บนทุกจุดขาย Docker เป็นทางเลือกสำหรับทีมพัฒนา ไม่ใช่ข้อบังคับของลูกค้า
 
 ## สิ่งที่ตรวจพบในโค้ดปัจจุบัน

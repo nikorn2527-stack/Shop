@@ -1,3 +1,4 @@
+import { withStoreErrors } from "./_core/storeErrors";
 import { previewOpeningStock, importOpeningStock } from "./openingStockImport";
 import { QR_BANKS, validateBankPaymentQr } from "@shared/paymentQr";
 import { previewGeneratedCards, generateBlankCards } from "./sqliteStore";
@@ -113,18 +114,6 @@ import {
   businessPeriodStatus,
   closeBusinessDay,
 } from "./sqliteStore";
-
-/** Maps business-rule StoreErrors (Thai messages) to tRPC BAD_REQUEST errors. */
-function withStoreErrors<T>(fn: () => T): T {
-  try {
-    return fn();
-  } catch (error) {
-    if (error instanceof StoreError) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: error.message });
-    }
-    throw error;
-  }
-}
 
 /** Same-origin cookie policy: secure only when the request is actually https. */
 function isSecureRequest(req: TrpcContext["req"]) {

@@ -40,6 +40,8 @@
 
 interface และ service ระยะนี้ยัง synchronous ห้ามนำ async callback ไปใช้กับ transaction wrapper เดิมหรือถือว่าเปลี่ยน connection string แล้วใช้ PostgreSQL ได้ ต้องทำ async service/repository และ API error mapping พร้อม pool connection เดียวตลอด transaction รวมถึงแยก helper ที่ยังเหลือ
 
+ความคืบหน้าถัดมา: เพิ่ม async transaction foundation และ async wallet แยกไว้แล้ว โดยย้ายกฎเงินไปใช้ร่วมกับ service เดิม ดู [รายละเอียด](ASYNC_POSTGRES_FOUNDATION_TH.md) แต่ยังไม่มี PostgreSQL repository/driver ที่ทดสอบจริงและยังไม่เปิดเส้นทาง async นี้ใน router
+
 การ replay ยังค้นด้วย request ID ตามพฤติกรรมเดิม ยังไม่ได้เพิ่ม unique constraint หรือ fingerprint สำหรับป้องกันการนำ key เดิมไปใช้กับ payload อื่น ส่วน PostgreSQL ต้องเพิ่มการควบคุมนี้พร้อมการล็อกแถวสมาชิก/สินค้า/Lot ในลำดับเดียวกัน และออกเลขบิลด้วย counter ที่รองรับ concurrent transactions ไม่ใช้ MAX + 1
 
 หลังทำ PostgreSQL adapter/migration ต้องตรวจเทียบยอดและทดสอบสองเครื่องแย่งสินค้าชิ้นสุดท้าย ใช้ยอดสมาชิกเดียวกันพร้อมกัน ส่งคำขอซ้ำหลังเครือข่ายขาด และสำรอง/กู้คืน ก่อนทดสอบบน Windows สามเครื่องตาม `LOCAL_THREE_MACHINE_TEST_TH.md` แล้วจึงตรวจ Setup/นำเข้า/ตัวติดตั้งจริง
