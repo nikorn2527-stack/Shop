@@ -9,6 +9,7 @@
     "start": "cross-env NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",
     "test:lan": "node scripts/lan-test.mjs",
+    "test:lan:recover": "tsx scripts/lan-test-recover.ts",
     "format": "prettier --write .",
     "test": "vitest run",
     "test:sqlite": "vitest run server/sqliteStore.test.ts server/welfareStore.test.ts --pool=forks --maxWorkers=1 --minWorkers=1",
