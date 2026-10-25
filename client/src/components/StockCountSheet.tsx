@@ -4,7 +4,7 @@ import { REPORT_DOC_CSS } from "@shared/reportDoc";
 import { normalizeProductCategory } from "@shared/productCategories";
 
 /**
- * ROUND 53 (user) — ใบนับสต๊อกสำหรับพิมพ์ออกมานับมือ
+ * ROUND 53 (user) — ใบนับสต็อกสำหรับพิมพ์ออกมานับมือ
  * "ตอนนี้มีให้กรอกเพื่อนับสต็อก แต่ไม่มีการปริ้นเอกสารเพื่อเอาออกมาแบบนับมือ"
  *
  * เอกสาร A4 แยกตามหมวดหมู่ — ทุกแถวมีช่อง "นับได้ / ผลต่าง / หมายเหตุ" เว้นว่าง

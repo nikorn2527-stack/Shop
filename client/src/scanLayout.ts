@@ -160,5 +160,5 @@ export function useScanLayout() {
 /** แจ้งเตือนมาตรฐานเมื่อมีการแปลง — ให้พนักงานรู้ว่าไม่ต้องสลับภาษาเอง */
 export const SCAN_LAYOUT_TOAST = {
   message: "แปลงคีย์บอร์ดไทย → อังกฤษให้อัตโนมัติ",
-  description: (from: string, to: string) => `"${from}" → "${to}" — ยิงบาร์โค้ดได้เลยไม่ต้องสลับภาษา`,
+  description: (from: string, to: string) => `"${from}" → "${to}" — สแกนต่อได้โดยไม่ต้องสลับภาษา`,
 };

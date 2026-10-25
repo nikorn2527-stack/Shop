@@ -220,7 +220,7 @@ export function MemberScanPicker({
               className="scan-camera-btn"
               onClick={() => setCameraOpen(true)}
               aria-label="สแกนบัตรสมาชิกด้วยกล้อง"
-              title="สแกนด้วยกล้องโทรศัพท์/เว็บแคม — สำหรับเครื่องที่ไม่มีปืนสแกน อ่านบาร์โค้ด/QR บนบัตรได้เลย"
+              title="ใช้กล้องอ่านบาร์โค้ดหรือ QR บนบัตรสมาชิก"
             >
               <Camera size={16} />
             </button>
@@ -559,7 +559,7 @@ export function ProductScanPicker({
         <BarcodeCameraModal
           open
           title="สแกนสินค้าด้วยกล้อง"
-          hint="เล็งบาร์โค้ดที่ตัวสินค้า — อ่านได้แล้วสินค้าเข้าฟอร์มให้ทันที ใช้นับสต็อกเดินรอบร้านได้เลย"
+          hint="เล็งบาร์โค้ดสินค้า ระบบจะค้นหาและเติมข้อมูลในฟอร์ม"
           onClose={() => setCameraOpen(false)}
           onDetect={(code) => {
             setCameraOpen(false);

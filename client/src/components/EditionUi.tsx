@@ -105,7 +105,7 @@ export function DevKeygenTool() {
   const generateMutation = trpc.edition.generateKey.useMutation({
     onSuccess: (data) => {
       setResult(data.key);
-      toast.success("ออกรหัสลิขสิทธิ์เรียบร้อย", { description: "คัดลอกส่งให้ลูกค้าได้เลย — ใช้ได้กับระบบที่ยังไม่เคยใส่รหัสนี้" });
+      toast.success("ออกรหัสลิขสิทธิ์เรียบร้อย", { description: "คัดลอกรหัสเพื่อส่งให้ผู้ซื้อนำไปเปิดใช้งาน" });
     },
     onError: (mutationError) => notify.error("ออกรหัสไม่สำเร็จ", { description: getErrorMessage(mutationError) }),
   });
@@ -162,7 +162,7 @@ export function EditionUpgradeModal({ open, onClose, status, focusFeature, onApp
   });
   const trialMutation = trpc.edition.startTrial.useMutation({
     onSuccess: (next) => {
-      notify.completed(`เริ่มทดลองใช้โปรพลัส ${EDITION_TRIAL_DAYS} วันแล้ว`, { description: "ทุกฟีเจอร์เปิดใช้งานทันที — เมื่อครบกำหนดจะกลับเป็นเวอร์ชันทั่วไป" });
+      notify.completed(`เริ่มทดลองใช้โปรพลัส ${EDITION_TRIAL_DAYS} วันแล้ว`, { description: "ทดลองใช้โปรพลัส เมื่อครบกำหนดจะใช้เวอร์ชันทั่วไป โดยเก็บข้อมูลเดิม" });
       void utils.edition.status.invalidate();
       onApplied?.(next);
       onClose();
@@ -236,7 +236,7 @@ export function EditionUpgradeModal({ open, onClose, status, focusFeature, onApp
         </div>
         {status.source === "free" && !status.trialStart && (
           <div className="edition-trial-card">
-            <div><Gift size={16} /><b>เริ่มทดลองใช้ {EDITIONS.proplus.label} ฟรี {EDITION_TRIAL_DAYS} วัน</b><p>เปิดทุกฟีเจอร์ทันที — ครบกำหนดระบบกลับเป็นเวอร์ชันทั่วไป (ข้อมูลทั้งหมดยังอยู่ครบ)</p></div>
+            <div><Gift size={16} /><b>เริ่มทดลองใช้ {EDITIONS.proplus.label} ฟรี {EDITION_TRIAL_DAYS} วัน</b><p>เมื่อครบกำหนดจะใช้เวอร์ชันทั่วไป โดยเก็บข้อมูลสินค้า สมาชิก และบิลเดิม</p></div>
             <button type="button" className="primary-button" onClick={() => trialMutation.mutate(undefined)} disabled={trialMutation.isPending}>
               <Sparkles size={15} /> {trialMutation.isPending ? "กำลังเริ่ม…" : "เริ่มทดลองใช้"}
             </button>
@@ -245,7 +245,7 @@ export function EditionUpgradeModal({ open, onClose, status, focusFeature, onApp
         {status.source === "trial" && (
           <div className="edition-trial-note">
             <RefreshCw size={14} />
-            <span>ช่วงทดลองใช้เหลืออีก <b>{status.trialDaysLeft} วัน</b> — ใส่รหัสลิขสิทธิ์เพื่อใช้ต่อแบบถาวร</span>
+            <span>ช่วงทดลองใช้เหลืออีก <b>{status.trialDaysLeft} วัน</b> — ใส่รหัสลิขสิทธิ์เพื่อใช้งานต่อ</span>
           </div>
         )}
       </div>

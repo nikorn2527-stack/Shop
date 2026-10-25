@@ -172,7 +172,7 @@ export function BankAccountsPanel({
     try {
       await navigator.clipboard.writeText(text);
       toast.success("คัดลอกข้อมูลบัญชีแล้ว", {
-        description: "วางในแชทให้ลูกค้าได้เลย",
+        description: "นำข้อมูลไปส่งให้ลูกค้าได้",
         duration: 2200,
       });
     } catch {

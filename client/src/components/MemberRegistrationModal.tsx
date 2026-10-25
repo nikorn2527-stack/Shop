@@ -44,7 +44,7 @@ export function MemberRegistrationModal({
     setError(message);
     blocker.warning("ข้อมูลยังไม่พร้อมบันทึก", `${message}\n${fix}`, {
       confirmLabel: "กลับไปแก้ไข",
-      hint: "ยังไม่มีข้อมูลใดถูกบันทึก — แก้ในฟอร์มแล้วกดบันทึกสมาชิกใหม่ได้เลย",
+      hint: "ยังไม่ได้ส่งข้อมูล กรุณาแก้ไขแล้วบันทึกอีกครั้ง",
     });
   };
   const [checkingExisting, setCheckingExisting] = useState(false);
@@ -111,7 +111,7 @@ export function MemberRegistrationModal({
       void utils.reports.memberBalances.invalidate();
       void utils.logs.list.invalidate();
     },
-    onError: cause => blocker.error("บันทึกสมาชิกไม่สำเร็จ", getErrorMessage(cause), { confirmLabel: "ปิดหน้าต่างนี้", hint: "ข้อมูลที่กรอกยังอยู่ครบ — แก้จุดที่ขัดข้อง แล้วกดบันทึกใหม่อีกครั้งได้เลย" }),
+    onError: cause => blocker.error("ยังยืนยันผลการบันทึกสมาชิกไม่ได้", getErrorMessage(cause), { confirmLabel: "ปิดหน้าต่างนี้", hint: "ข้อมูลในฟอร์มยังอยู่ กรุณาตรวจสอบรายชื่อสมาชิกก่อนบันทึกซ้ำ" }),
   });
   const numberMode = settingsQuery.data?.memberNumberMode ?? "running";
   const nextNumber = nextNumberQuery.data?.memberNumber;
@@ -443,8 +443,7 @@ export function MemberRegistrationModal({
                       className="outline-button compact camera-hint-inline"
                       onClick={() => setRegisterCameraOpen(true)}
                     >
-                      <Camera size={15} /> หรือถ่ายรูปจากกล้องเลย —
-                      เครื่องไหนมีเว็บแคมใช้ได้เลย
+                      <Camera size={15} /> ถ่ายรูปด้วยกล้องของเครื่อง
                     </button>
                   </>
                 )}

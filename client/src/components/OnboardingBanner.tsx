@@ -55,7 +55,7 @@ export function OnboardingBanner({
       {
         id: "store",
         label: "ตั้งค่าร้านค้า",
-        detail: "ชื่อร้าน · โลโก้ · บัญชีธนาคารรับเงินโอน — แสดงบนใบเสร็จทุกใบ",
+        detail: "ชื่อร้าน โลโก้ และบัญชีรับเงินสำหรับใบเสร็จ",
         cta: "ไปตั้งค่าร้าน",
         view: "settings" as View,
         icon: Store,
@@ -87,8 +87,8 @@ export function OnboardingBanner({
       },
       {
         id: "sales",
-        label: "ทำการขายครั้งแรก",
-        detail: "ขายสินค้าผ่าน POS · รับเงินสด/QR/หักบัญชี · พิมพ์ใบเสร็จได้ทันที",
+        label: "บันทึกการขายครั้งแรก",
+        detail: "รับชำระด้วยเงินสด QR หรือบัญชีสมาชิก และพิมพ์ใบเสร็จ",
         cta: "ไปที่หน้าร้าน / POS",
         view: "pos" as View,
         icon: ShoppingCartSimple,
@@ -112,9 +112,9 @@ export function OnboardingBanner({
           <CircleCheck size={22} weight="duotone" />
         </div>
         <div className="onboarding-body">
-          <span className="eyebrow">SETUP COMPLETE · พร้อมใช้งาน</span>
-          <h2>ระบบพร้อมใช้งานแล้ว — เริ่มขายและติดตามยอดได้เลย</h2>
-          <p>ตัวเลขสรุปจะแสดงที่นี่เมื่อมีการขายจริง · ใช้เมนูด้านซ้ายเพื่อเข้าถึงแต่ละส่วนของระบบ</p>
+          <span className="eyebrow">ตั้งค่าขั้นต้นครบแล้ว</span>
+          <h2>ตั้งค่าร้านและบันทึกการขายครั้งแรกแล้ว</h2>
+          <p>ดูยอดขายได้ที่หน้าภาพรวม หรือตรวจรายละเอียดที่เมนูรายงาน</p>
         </div>
         <div className="onboarding-actions">
           <button
@@ -148,7 +148,7 @@ export function OnboardingBanner({
       <div className="onboarding-body">
         <div className="onboarding-head">
           <div>
-            <span className="eyebrow">GETTING STARTED · ตั้งค่าร้านครั้งแรก</span>
+            <span className="eyebrow">ตั้งค่าร้านครั้งแรก</span>
             <h2>เริ่มต้นใช้งาน {doneCount}/{steps.length} ขั้นตอน</h2>
           </div>
           <div className="onboarding-progress" aria-hidden="true">

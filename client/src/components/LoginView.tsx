@@ -67,7 +67,7 @@ export function LoginView({ brand, onAuthed }: { brand?: BrandSettings | null | 
               onChange={(event) => { setUsername(event.target.value); setTransfer(null); }}
               autoComplete="username"
               autoFocus
-              placeholder="กรอกชื่อผู้ใช้ของบัญชีเจ้าหน้าที่/ผู้บริหาร"
+              placeholder="กรอกชื่อผู้ใช้"
             />
           </label>
           <label>
@@ -98,7 +98,7 @@ export function LoginView({ brand, onAuthed }: { brand?: BrandSettings | null | 
         </form>
         <div className="login-scope-note" role="note">
           <IdCard size={15} />
-          <span>ระบบนี้สำหรับ<b>เจ้าหน้าที่และผู้บริหารร้านค้า</b>เท่านั้น · สมาชิกสวัสดิการไม่มีการเข้าสู่ระบบ — ใช้สิทธิ์ที่เคาน์เตอร์ด้วยหมายเลขสมาชิก</span>
+          <span>ระบบนี้สำหรับ<b>เจ้าหน้าที่และผู้บริหารร้านค้า</b>เท่านั้น · สมาชิกใช้บัตรหรือหมายเลขสมาชิกที่เคาน์เตอร์</span>
         </div>
         <p className="login-footer">v1.0.0 · ระบบร้านค้าสวัสดิการ<span className="powered-line">⚡ Powered by <b>PNG TEAM</b></span></p>
       </div>

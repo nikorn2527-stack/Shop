@@ -73,11 +73,11 @@ export function SetupView({ brand, onAuthed }: { brand?: BrandSettings | null | 
         <div className="login-brand">
           {appLogo ? <img className="brand-logo login-logo" src={appLogo} alt={appName} /> : <div className="brand-mark"><span>{brandInitial(appName)}</span></div>}
           <b>{appName}</b>
-          <small>ตั้งค่าระบบครั้งแรก · FIRST-TIME SETUP</small>
+          <small>ตั้งค่าระบบครั้งแรก</small>
         </div>
         <div className="setup-head">
-          <h1>ลงทะเบียนผู้บริหารหลัก</h1>
-          <p>ยังไม่มีบัญชีผู้ใช้ในระบบ — สร้างบัญชีแรกของร้านเพื่อเริ่มใช้งาน</p>
+          <h1>สร้างบัญชีผู้บริหาร</h1>
+          <p>สร้างบัญชีผู้บริหารสำหรับตั้งค่าร้านและจัดการผู้ใช้</p>
         </div>
         <form className="login-form" ref={formRef} onSubmit={submit}>
           <label>
@@ -89,7 +89,7 @@ export function SetupView({ brand, onAuthed }: { brand?: BrandSettings | null | 
                 value={storeName}
                 onChange={(event) => setStoreName(event.target.value)}
                 maxLength={80}
-                placeholder="เช่น ร้านค้าสวัสดิการ บจก."
+                placeholder="เช่น ร้านค้าสวัสดิการ"
               />
             </span>
           </label>
@@ -104,7 +104,7 @@ export function SetupView({ brand, onAuthed }: { brand?: BrandSettings | null | 
               maxLength={30}
               placeholder="เช่น owner"
             />
-            <small className="setup-field-hint">ภาษาอังกฤษหรือตัวเลข ไม่มีช่องว่าง · ใช้เข้าสู่ระบบทุกครั้ง</small>
+            <small className="setup-field-hint">ชื่อสำหรับเข้าสู่ระบบ ห้ามมีช่องว่าง</small>
           </label>
           <label>
             ชื่อ-นามสกุลที่แสดง *
@@ -147,15 +147,15 @@ export function SetupView({ brand, onAuthed }: { brand?: BrandSettings | null | 
             <button type="button" className={`setup-edition-option${editionChoice === "trial" ? " active" : ""}`} role="radio" aria-checked={editionChoice === "trial"} onClick={() => setEditionChoice("trial")}>
               <span className="setup-edition-radio" aria-hidden="true" />
               <span className="setup-edition-text">
-                <b><Gift size={13} style={{ display: "inline", verticalAlign: "-2px", marginRight: 4 }} />เริ่มทดลองใช้{EDITIONS.proplus.label} {EDITION_TRIAL_DAYS} วัน (แนะนำ)</b>
-                <small>เปิดทุกฟีเจอร์ทันที — นับสต็อก กล้องสแกน นำเข้า Excel สำรองข้อมูล · ครบกำหนดกลับเป็นเวอร์ชันทั่วไป (ข้อมูลครบทุกอย่าง)</small>
+                <b><Gift size={13} style={{ display: "inline", verticalAlign: "-2px", marginRight: 4 }} />ทดลองใช้{EDITIONS.proplus.label} {EDITION_TRIAL_DAYS} วัน</b>
+                <small>ทดลองใช้นับสต็อก สแกนด้วยกล้อง นำเข้า Excel และสำรองข้อมูล เมื่อครบกำหนดจะใช้เวอร์ชันทั่วไป โดยเก็บข้อมูลเดิม</small>
               </span>
             </button>
             <button type="button" className={`setup-edition-option${editionChoice === "license" ? " active" : ""}`} role="radio" aria-checked={editionChoice === "license"} onClick={() => setEditionChoice("license")}>
               <span className="setup-edition-radio" aria-hidden="true" />
               <span className="setup-edition-text">
-                <b><KeyRound size={13} style={{ display: "inline", verticalAlign: "-2px", marginRight: 4 }} />ฉันมีรหัสลิขสิทธิ์แล้ว</b>
-                <small>ซื้อมาจากผู้พัฒนา — วางรหัสด้านล่างนี้ ระบบจะเปิดเวอร์ชันตามรหัสทันทีที่ลงทะเบียน</small>
+                <b><KeyRound size={13} style={{ display: "inline", verticalAlign: "-2px", marginRight: 4 }} />ใช้รหัสลิขสิทธิ์</b>
+                <small>กรอกรหัสเพื่อเปิดใช้เวอร์ชันที่ซื้อ</small>
               </span>
             </button>
             {editionChoice === "license" && (
@@ -173,8 +173,8 @@ export function SetupView({ brand, onAuthed }: { brand?: BrandSettings | null | 
             <button type="button" className={`setup-edition-option${editionChoice === "standard" ? " active" : ""}`} role="radio" aria-checked={editionChoice === "standard"} onClick={() => setEditionChoice("standard")}>
               <span className="setup-edition-radio" aria-hidden="true" />
               <span className="setup-edition-text">
-                <b><Crown size={13} style={{ display: "inline", verticalAlign: "-2px", marginRight: 4 }} />เริ่มที่{EDITIONS.standard.label}เลย</b>
-                <small>POS ขายหน้าร้าน · สมาชิกและกระเป๋าเงิน · สต็อกพื้นฐาน · รายงานยอดขาย — ใช้ฟรีไม่มีกำหนด</small>
+                <b><Crown size={13} style={{ display: "inline", verticalAlign: "-2px", marginRight: 4 }} />{EDITIONS.standard.label}</b>
+                <small>ขายสินค้า · สมาชิกและบัญชี · สต็อก · รายงานยอดขาย · ไม่มีค่าบริการและไม่จำกัดระยะเวลา</small>
               </span>
             </button>
           </div>
@@ -184,12 +184,12 @@ export function SetupView({ brand, onAuthed }: { brand?: BrandSettings | null | 
             </div>
           )}
           <button type="submit" className="primary-button login-submit" disabled={setupMutation.isPending}>
-            <LogIn size={16} /> {setupMutation.isPending ? "กำลังสร้างบัญชี…" : "ลงทะเบียนและเริ่มใช้งาน"}
+            <LogIn size={16} /> {setupMutation.isPending ? "กำลังสร้างบัญชี…" : "สร้างบัญชี"}
           </button>
         </form>
         <div className="login-scope-note" role="note">
           <ShieldCheck size={15} />
-          <span>หลังลงทะเบียน ระบบจะให้ตั้งรหัสผ่านใหม่อีกครั้งในครั้งแรกที่เข้าใช้งาน เพื่อยืนยันว่าไม่มีผู้อื่นรู้รหัสของคุณ</span>
+          <span>หลังสร้างบัญชี ระบบจะให้เปลี่ยนรหัสผ่านก่อนเข้าใช้งานครั้งแรก</span>
         </div>
         <p className="login-footer">v1.0.0 · ระบบร้านค้าสวัสดิการ<span className="powered-line">⚡ Powered by <b>PNG TEAM</b></span></p>
       </div>
