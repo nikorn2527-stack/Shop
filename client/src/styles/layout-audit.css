@@ -196,3 +196,39 @@
     line-height: 1.4;
   }
 }
+
+/* A touch phone in landscape may be wider than 820px but still needs the drawer. */
+@media screen and (pointer: coarse) and (max-width: 1023px) and (max-height: 500px) {
+  :root:root .app-shell:not(.pos-terminal):not(.receiving-mode) .sidebar {
+    position: fixed;
+    left: -280px;
+    top: 0;
+    width: 276px;
+    height: 100dvh;
+    z-index: 20;
+    overflow-y: auto;
+  }
+  :root:root .app-shell:not(.pos-terminal):not(.receiving-mode) .sidebar.open {
+    left: 0;
+  }
+  :root:root
+    .app-shell:not(.pos-terminal):not(.receiving-mode)
+    .workspace-menu {
+    display: inline-flex;
+    align-items: center;
+    margin: 12px 16px 0;
+    padding: 8px;
+    min-width: 44px;
+    min-height: 44px;
+    width: fit-content;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--surface);
+    color: var(--ink);
+  }
+  :root:root .app-shell:not(.pos-terminal):not(.receiving-mode) .mobile-close {
+    display: block;
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

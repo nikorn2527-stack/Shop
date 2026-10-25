@@ -1,0 +1,456 @@
+/* Desktop keeps one information hierarchy: today, metrics beside the working chart. */
+:root .app-shell .dashboard-overview {
+  min-width: 0;
+}
+:root .app-shell .dashboard-overview .onboarding-guide {
+  margin-bottom: 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+:root .app-shell .dashboard-overview .onboarding-guide > summary {
+  min-height: 36px;
+  padding: 7px 12px;
+  cursor: pointer;
+  font-size: 12px;
+}
+:root .app-shell .dashboard-overview .onboarding-guide > summary b {
+  margin-left: 6px;
+}
+:root .app-shell .dashboard-overview .onboarding-guide > summary::after {
+  content: "ดูขั้นตอน";
+  float: right;
+  color: var(--teal-dark);
+}
+:root .app-shell .dashboard-overview .onboarding-guide[open] > summary::after {
+  content: "ย่อขั้นตอน";
+}
+:root .app-shell .dashboard-overview .onboarding-guide .onboarding-banner {
+  margin: 0;
+  border: 0;
+  box-shadow: none;
+}
+:root .app-shell .dashboard-overview .onboarding-step {
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-content: start;
+}
+:root .app-shell .dashboard-overview .onboarding-step .step-count {
+  grid-column: 2;
+  flex-wrap: wrap;
+}
+:root .app-shell .dashboard-overview .onboarding-step .step-text b {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+:root .app-shell .dashboard-overview .onboarding-step .step-text small {
+  display: block;
+  overflow: visible;
+  -webkit-line-clamp: unset;
+}
+@media screen and (min-width: 1024px) {
+  :root:root .app-shell .page-content:has(> .dashboard-overview) {
+    display: flex;
+    flex-direction: column;
+    padding: 14px 20px 12px;
+    overflow-y: auto;
+  }
+  :root .app-shell .dashboard-overview {
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(180px, 1fr) auto minmax(260px, 1.2fr);
+    grid-template-rows: auto auto auto minmax(310px, 1fr);
+    gap: 6px 14px;
+  }
+  :root .app-shell .dashboard-overview > .section-header {
+    grid-template-columns: minmax(210px, 1fr) minmax(280px, 1.2fr);
+    align-items: center;
+    gap: 6px 20px;
+    margin: 0;
+    flex: 0 0 auto;
+    display: contents;
+  }
+  :root .app-shell .dashboard-overview > .section-header > .shared-search-host {
+    width: 100%;
+    margin: 0;
+    max-width: none;
+    grid-column: 3;
+    grid-row: 1 / 3;
+  }
+  :root .app-shell .dashboard-overview > .section-header > .section-actions {
+    justify-content: flex-start;
+    gap: 6px;
+    grid-column: 2;
+    grid-row: 1 / 3;
+    flex-direction: column;
+    align-items: flex-end;
+  }
+  :root .app-shell .dashboard-overview .section-header .permission-chip {
+    padding: 3px 6px;
+  }
+  :root .app-shell .dashboard-overview > .onboarding-guide {
+    flex: 0 0 auto;
+    margin: 0;
+    grid-column: 1;
+    grid-row: 2;
+  }
+  :root .app-shell .dashboard-overview > .today-snapshot {
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 6px 10px;
+    gap: 4px;
+    display: grid;
+    grid-template-columns: 130px minmax(0, 1fr);
+    align-items: center;
+    grid-column: 1 / -1;
+    grid-row: 3;
+  }
+  :root .app-shell .dashboard-overview .today-snapshot-stat {
+    padding: 5px 8px;
+  }
+  :root .app-shell .dashboard-overview .dashboard-workspace {
+    display: grid;
+    grid-template-columns: 240px minmax(0, 1fr);
+    gap: 10px;
+    flex: 1 1 0;
+    min-height: 310px;
+    grid-template-rows: minmax(0, 1fr);
+  }
+  :root .app-shell .dashboard-overview .metric-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: start;
+    margin: 0;
+    gap: 8px;
+  }
+  :root .app-shell .dashboard-overview .metric-card {
+    min-width: 0;
+    position: relative;
+    min-height: 0;
+    padding: 7px 10px;
+  }
+  :root .app-shell .dashboard-overview .metric-card strong {
+    margin: 0;
+    line-height: 24px;
+  }
+  :root .app-shell .dashboard-overview .metric-foot {
+    flex-wrap: wrap;
+    display: block;
+    margin-top: 2px;
+    padding-top: 0;
+  }
+  :root .app-shell .dashboard-overview .dash-workbench {
+    min-width: 0;
+    min-height: 0;
+  }
+  :root .app-shell .dashboard-overview .dash-tabbar {
+    padding: 5px 8px;
+    gap: 3px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  :root .app-shell .dashboard-overview .dash-tab {
+    padding: 6px 9px;
+  }
+  :root .app-shell .dashboard-overview .dash-tab-body {
+    min-height: 0;
+  }
+  :root .app-shell .dashboard-overview .chart-panel {
+    min-height: 0;
+    padding: 10px 12px;
+  }
+  :root .app-shell .dashboard-overview .chart-panel .panel-heading {
+    margin-bottom: 6px;
+  }
+  :root .app-shell .dashboard-overview .chart-panel .chart-interactive-meta {
+    margin: 0 0 6px;
+  }
+  :root .app-shell .dashboard-overview .chart-wrap.chart-wrap-line {
+    flex: 1 1 0;
+    min-height: 110px;
+    height: auto;
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    grid-template-rows: minmax(110px, 1fr) 24px;
+    gap: 4px 8px;
+    margin-top: 6px;
+  }
+  :root .app-shell .dashboard-overview .line-chart {
+    min-height: 0;
+  }
+  :root .app-shell .dashboard-overview .chart-summary {
+    padding-top: 6px;
+    margin-top: 6px;
+  }
+  :root .app-shell .dashboard-overview .onboarding-banner.complete {
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 8px 12px;
+  }
+  :root .app-shell .dashboard-overview .onboarding-banner.complete h2 {
+    font-size: 15px;
+    margin: 0;
+  }
+  :root .app-shell .dashboard-overview:has(.onboarding-guide[open]) {
+    flex: 0 0 auto;
+    min-height: 100%;
+  }
+  :root .app-shell .dashboard-overview .section-header h1 {
+    font-size: 22px;
+  }
+  :root .app-shell .dashboard-overview .today-snapshot-head {
+    flex-direction: column;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 3px;
+  }
+  :root .app-shell .dashboard-overview .metric-top {
+    min-height: 17px;
+    padding-right: 30px;
+  }
+  :root .app-shell .dashboard-overview .metric-icon {
+    position: absolute;
+    right: 10px;
+    top: 8px;
+    width: 24px;
+    height: 24px;
+  }
+  :root .app-shell .dashboard-overview .metric-foot span + span::before {
+    content: " · ";
+  }
+  :root .app-shell .dashboard-overview .chart-wrap-line .y-labels {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  :root .app-shell .dashboard-overview .chart-wrap-line .line-chart {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  :root .app-shell .dashboard-overview .chart-wrap-line .line-x-labels {
+    grid-column: 2;
+    grid-row: 2;
+    margin-left: 0;
+  }
+  :root .app-shell .dashboard-overview > .section-header > div:first-child {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  :root .app-shell .dashboard-overview .onboarding-guide > summary {
+    min-height: 26px;
+    padding: 3px 8px;
+  }
+  :root .app-shell .dashboard-overview > .dashboard-workspace {
+    grid-column: 1 / -1;
+    grid-row: 4;
+  }
+  :root .app-shell .dashboard-overview > .onboarding-guide[open],
+  :root .app-shell .dashboard-overview > .onboarding-banner.complete {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+  :root
+    .app-shell
+    .dashboard-overview:has(.onboarding-guide[open])
+    > .section-header
+    > .section-actions,
+  :root
+    .app-shell
+    .dashboard-overview:has(.onboarding-guide[open])
+    > .section-header
+    > .shared-search-host,
+  :root
+    .app-shell
+    .dashboard-overview:has(.onboarding-banner.complete)
+    > .section-header
+    > .section-actions,
+  :root
+    .app-shell
+    .dashboard-overview:has(.onboarding-banner.complete)
+    > .section-header
+    > .shared-search-host {
+    grid-row: 1;
+  }
+}
+@media (max-width: 1023px) {
+  :root .app-shell .dashboard-overview .dashboard-workspace {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  :root .app-shell .dashboard-overview .onboarding-steps-4 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  :root .app-shell .dashboard-overview .chart-wrap-line {
+    min-height: 220px;
+  }
+}
+@media screen and (max-width: 1023px) {
+  :root .app-shell .dashboard-overview .chart-wrap.chart-wrap-line {
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    grid-template-rows: minmax(180px, 1fr) 24px;
+    gap: 4px 8px;
+    min-height: 220px;
+  }
+  :root .app-shell .dashboard-overview .chart-wrap-line .y-labels {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  :root .app-shell .dashboard-overview .chart-wrap-line .line-chart {
+    grid-column: 2;
+    grid-row: 1;
+  }
+  :root .app-shell .dashboard-overview .chart-wrap-line .line-x-labels {
+    grid-column: 2;
+    grid-row: 2;
+    margin-left: 0;
+  }
+}
+@media screen and (min-width: 1024px) and (max-height: 850px) and (pointer: fine) {
+  :root .app-shell:has(.dashboard-overview) .sidebar {
+    padding-top: 10px;
+    padding-bottom: 8px;
+  }
+  :root .app-shell:has(.dashboard-overview) .sidebar .brand {
+    padding-top: 0;
+    padding-bottom: 8px;
+  }
+  :root .app-shell:has(.dashboard-overview) .sidebar .brand-mark {
+    width: 32px;
+    height: 32px;
+  }
+  :root .app-shell:has(.dashboard-overview) .sidebar nav {
+    gap: 2px;
+  }
+  :root .app-shell:has(.dashboard-overview) .sidebar nav button {
+    min-height: 32px;
+    height: 32px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+  }
+  :root .app-shell:has(.dashboard-overview) .sidebar .nav-group-label {
+    margin-top: 5px;
+    margin-bottom: 3px;
+  }
+  :root .app-shell:has(.dashboard-overview) .sidebar-footer {
+    padding-top: 6px;
+    margin-top: auto;
+  }
+  :root .app-shell:has(.dashboard-overview) .shell-account-footer {
+    gap: 4px;
+  }
+  :root
+    .app-shell:has(.dashboard-overview)
+    .shell-account-footer
+    .profile-pill {
+    min-height: 40px;
+    padding-top: 4px;
+    padding-bottom: 4px;
+  }
+  :root .app-shell:has(.dashboard-overview) .shell-account-footer .notif-bell {
+    min-height: 32px;
+    height: 32px;
+  }
+  :root .app-shell:has(.dashboard-overview) .shell-logout {
+    min-height: 32px;
+    height: 32px;
+  }
+  :root:root
+    .app-shell:has(.dashboard-overview)
+    .sidebar
+    .shell-account-footer
+    .shell-logout {
+    height: 32px;
+    min-height: 32px;
+    padding-block: 4px;
+  }
+  :root:root
+    .app-shell:has(.dashboard-overview)
+    .sidebar
+    .shell-account-footer
+    .profile-pill {
+    min-height: 36px;
+    padding-block: 2px;
+  }
+  :root:root .app-shell:has(.dashboard-overview) .sidebar .brand-text small {
+    margin-top: 0;
+  }
+  :root:root .app-shell:has(.dashboard-overview) .sidebar .nav-admin-section {
+    margin-top: 3px;
+    padding-top: 0;
+  }
+  :root:root
+    .app-shell:has(.dashboard-overview)
+    .sidebar
+    .shell-account-footer {
+    padding-top: 0;
+  }
+  :root:root .app-shell:has(.dashboard-overview) .sidebar .nav-group-label {
+    line-height: 16px;
+    margin-top: 4px;
+    margin-bottom: 2px;
+  }
+}
+@media screen and (pointer: coarse) {
+  :root
+    .app-shell
+    .dashboard-overview
+    :is(.dash-tab, .chart-controls button, .today-snapshot-stat),
+  :root .app-shell .dashboard-overview .onboarding-guide > summary {
+    min-height: 44px;
+  }
+  :root .app-shell .dashboard-overview .onboarding-close {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+:root .app-shell .dashboard-overview .onboarding-guide .onboarding-head {
+  padding-right: 36px;
+}
+/* Tablet/phone content needs natural height, not the desktop flex basis of zero. */
+:root:root .app-shell .page-content:has(> .dashboard-overview) {
+  overflow-y: auto;
+}
+@media screen and (max-width: 1023px) {
+  :root .app-shell .dashboard-overview {
+    flex: 0 0 auto;
+    width: 100%;
+  }
+  :root .app-shell .dashboard-overview .dash-workbench,
+  :root .app-shell .dashboard-overview .dash-tab-body,
+  :root .app-shell .dashboard-overview .dash-tab-body > .panel {
+    display: block;
+    flex: none;
+    overflow: visible;
+  }
+  :root .app-shell .dashboard-overview .chart-wrap.chart-wrap-line {
+    height: 260px;
+  }
+}
+/* Preserve complete labels rather than squeezing Thai words onto narrow controls. */
+:root .app-shell .dashboard-overview .chart-panel .panel-heading {
+  flex-wrap: wrap;
+}
+:root
+  .app-shell
+  .dashboard-overview
+  .chart-panel
+  .panel-heading
+  > div:first-child {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+:root .app-shell .dashboard-overview .chart-controls {
+  flex: 0 0 auto;
+}
+:root .app-shell .dashboard-overview .chart-controls button {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+:root .app-shell .dashboard-overview .today-snapshot-stat .ts-body small {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}

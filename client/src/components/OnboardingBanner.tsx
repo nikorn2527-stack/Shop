@@ -141,62 +141,65 @@ export function OnboardingBanner({
   const doneCount = steps.filter((s) => s.done).length;
 
   return (
-    <section className="onboarding-banner" aria-label="แนะนำการเริ่มต้นใช้งาน">
-      <div className="onboarding-icon-wrap">
-        <Rocket size={22} weight="duotone" />
-      </div>
-      <div className="onboarding-body">
-        <div className="onboarding-head">
-          <div>
-            <span className="eyebrow">ตั้งค่าร้านครั้งแรก</span>
-            <h2>เริ่มต้นใช้งาน {doneCount}/{steps.length} ขั้นตอน</h2>
+    <details className="onboarding-guide">
+      <summary>ขั้นตอนเริ่มใช้งาน <b>{doneCount}/{steps.length}</b></summary>
+      <section className="onboarding-banner" aria-label="แนะนำการเริ่มต้นใช้งาน">
+        <div className="onboarding-icon-wrap">
+          <Rocket size={22} weight="duotone" />
+        </div>
+        <div className="onboarding-body">
+          <div className="onboarding-head">
+            <div>
+              <span className="eyebrow">ตั้งค่าร้านครั้งแรก</span>
+              <h2>เริ่มต้นใช้งาน {doneCount}/{steps.length} ขั้นตอน</h2>
+            </div>
+            <div className="onboarding-progress" aria-hidden="true">
+              <div
+                className="onboarding-progress-bar"
+                style={{ width: `${(doneCount / steps.length) * 100}%` }}
+              />
+            </div>
           </div>
-          <div className="onboarding-progress" aria-hidden="true">
-            <div
-              className="onboarding-progress-bar"
-              style={{ width: `${(doneCount / steps.length) * 100}%` }}
-            />
+          <div className="onboarding-steps onboarding-steps-4">
+            {steps.map((step) => {
+              const Icon = step.icon;
+              return (
+                <button
+                  key={step.id}
+                  className={`onboarding-step${step.done ? " done" : ""}`}
+                  onClick={() => setView(step.view)}
+                  title={step.detail}
+                >
+                  <span className="step-icon">
+                    {step.done ? <Check size={16} weight="bold" /> : <Icon size={16} />}
+                  </span>
+                  <span className="step-text">
+                    <b>{step.label}</b>
+                    <small>{step.detail}</small>
+                  </span>
+                  <span className={`step-count${step.done ? " done" : ""}`}>
+                    {step.id === "store"
+                      ? (step.done ? <><Check size={12} weight="bold" /> ตั้งแล้ว</> : <><ArrowRight size={13} /> {step.cta}</>)
+                      : step.count > 0
+                        ? <><b>{step.count}</b> {step.countLabel}</>
+                        : <><ArrowRight size={13} /> {step.cta}</>}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
-        <div className="onboarding-steps onboarding-steps-4">
-          {steps.map((step) => {
-            const Icon = step.icon;
-            return (
-              <button
-                key={step.id}
-                className={`onboarding-step${step.done ? " done" : ""}`}
-                onClick={() => setView(step.view)}
-                title={step.detail}
-              >
-                <span className="step-icon">
-                  {step.done ? <Check size={16} weight="bold" /> : <Icon size={16} />}
-                </span>
-                <span className="step-text">
-                  <b>{step.label}</b>
-                  <small>{step.detail}</small>
-                </span>
-                <span className={`step-count${step.done ? " done" : ""}`}>
-                  {step.id === "store"
-                    ? (step.done ? <><Check size={12} weight="bold" /> ตั้งแล้ว</> : <><ArrowRight size={13} /> {step.cta}</>)
-                    : step.count > 0
-                      ? <><b>{step.count}</b> {step.countLabel}</>
-                      : <><ArrowRight size={13} /> {step.cta}</>}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-      <button
-        className="icon-button onboarding-close"
-        aria-label="ปิดแถบต้อนรับ"
-        onClick={() => {
-          try { localStorage.setItem("onboarding-dismissed", "1"); } catch {}
-          setDismissed(true);
-        }}
-      >
-        <X size={16} />
-      </button>
-    </section>
+        <button
+          className="icon-button onboarding-close"
+          aria-label="ปิดแถบต้อนรับ"
+          onClick={() => {
+            try { localStorage.setItem("onboarding-dismissed", "1"); } catch {}
+            setDismissed(true);
+          }}
+        >
+          <X size={16} />
+        </button>
+      </section>
+    </details>
   );
 }

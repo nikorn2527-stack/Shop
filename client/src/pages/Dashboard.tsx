@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import "@/styles/dashboard-layout.css";
 import {
   Activity, BarChart3, CalendarClock, CalendarDays, Check, CircleAlert, Crown, FileText, MoreHorizontal, PackageSearch, Printer, ReceiptText, ShieldCheck, ShoppingBag, Terminal, Wallet, X, UsersRound,
 } from "@/lib/icons";
@@ -15,7 +16,7 @@ import { formatAxisLabel, formatThaiDate, formatTimeShort, parseBahtFromDetail }
 
 const THAI_WEEKDAYS = ["อา.", "จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส."];
 const THAI_SHORT_MONTHS = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
-const RANGE_DAYS: Record<string, number> = { "7 วัน": 7, "30 วัน": 30, "12 เดือน": 365 };
+const RANGE_DAYS: Record<string, number> = { "7 วัน": 7, "30 วัน": 30, "365 วัน": 365 };
 
 /**
  * STYLE-9 — TodaySnapshot: a compact always-visible strip above the metric
@@ -445,90 +446,92 @@ export function Dashboard({ setView, role, userName }: { setView: (view: View) =
     salesCount: stats?.totalOrders ?? 0,
   };
   return (
-    <>
+    <div className="dashboard-overview">
       <SectionHeader eyebrow={`ภาพรวมการดำเนินงาน · ${role === "admin" ? "มุมมองผู้บริหาร" : role === "dev" ? "มุมมองผู้พัฒนา" : "มุมมองเจ้าหน้าที่"}`} title={`${greetingWord}, ${firstName}`} description="" action={<><div className={`permission-chip ${role}`}><span>{role === "admin" ? <Crown size={14} /> : role === "dev" ? <Terminal size={14} /> : <ShieldCheck size={14} />}</span>{role === "admin" ? "สิทธิ์ผู้บริหาร · วิเคราะห์เต็มรูปแบบ" : role === "dev" ? "สิทธิ์ผู้พัฒนา · เข้าถึงทุกส่วนของระบบ" : "สิทธิ์เจ้าหน้าที่ · ปฏิบัติงานหน้าร้าน"}</div><div className="permission-chip neutral" title="วันที่ปัจจุบัน"><span><CalendarDays size={14} /></span>วันนี้ · {formatThaiDate(new Date())}</div></>} />
       <OnboardingBanner progress={onboardingProgress} setView={setView} />
       {/* STYLE-9 — Today's snapshot mini-stats row (always visible, quick glance at today) */}
       <TodaySnapshot stats={stats} deposits={deposits} loading={loading} rangeDays={rangeDays} setView={setView} />
-      <div className="metric-grid">
-        <div className="metric-card highlight"><div className="metric-top"><span>ยอดขายทั้งหมด · {range}</span><span className="metric-icon green"><ShoppingBag size={18} /></span></div><strong>{loading ? "…" : money(stats?.totalSales ?? 0)}</strong><div className="metric-foot"><span>{stats?.totalOrders ?? 0} บิล</span><span>สูงสุด {money(Math.max(...(stats?.revenueByDay ?? []).map((day) => day.total), 0))} ในหนึ่งวัน</span></div></div>
-        <div className="metric-card"><div className="metric-top"><span>ออเดอร์ทั้งหมด</span><span className="metric-icon blue"><ReceiptText size={18} /></span></div><strong>{loading ? "…" : (stats?.totalOrders ?? 0).toLocaleString("th-TH")} <small>บิล</small></strong><div className="metric-foot"><span>เฉลี่ย {((stats?.totalOrders ?? 0) / rangeDays).toFixed(1)} บิล/วัน</span><span>ในช่วง{range}</span></div></div>
-        <div className="metric-card"><div className="metric-top"><span>สินค้าขายดี</span><span className="metric-icon amber"><BarChart3 size={18} /></span></div><strong>{loading ? "…" : (stats?.bestSellerCount ?? 0).toLocaleString("th-TH")} <small>ชิ้น</small></strong><div className="metric-foot warning"><span>{bestSellers[0]?.name ?? "ยังไม่มีข้อมูลการขาย"}</span><span>อันดับ 1 ในช่วง{range}</span></div></div>
-        <div className="metric-card"><div className="metric-top"><span>ยอดขายเฉลี่ยต่อวัน</span><span className="metric-icon purple"><CalendarDays size={18} /></span></div><strong>{loading ? "…" : money(stats?.avgDailySales ?? 0)}</strong><div className="metric-foot"><span>ขายไป {stats?.itemsSold ?? 0} ชิ้น</span><span>ในช่วง{range}</span></div></div>
-      </div>
-      <section className="dash-workbench" aria-label="มุมมองข้อมูลภาพรวม">
-        <div className="dash-tabbar" role="tablist" aria-label="เลือกมุมมองข้อมูล">
-          {DASH_TABS.map((item) => <button type="button" role="tab" aria-selected={tab === item.id} className={`dash-tab${tab === item.id ? " active" : ""}`} key={item.id} onClick={() => setTab(item.id)}>{item.id === "sales" ? <BarChart3 size={15} /> : item.id === "bills" ? <ReceiptText size={15} /> : item.id === "best" ? <Crown size={15} /> : item.id === "watch" ? <PackageSearch size={15} /> : item.id === "activity" ? <Activity size={15} /> : <CalendarClock size={15} />}{item.label}{item.id === "watch" && lowStock.length > 0 && <i className="tab-badge red" title={`สินค้าใกล้หมดสต็อก ${lowStock.length} รายการ`}>{lowStock.length}</i>}{item.id === "watch" && expirySoon.length > 0 && <i className="tab-badge amber" title={`ใกล้หมดอายุ ${expirySoon.length} รายการ`}>{expirySoon.length}</i>}</button>)}
-          <span className="dash-tabbar-spacer" aria-hidden="true" />
+      <div className="dashboard-workspace">
+        <div className="metric-grid">
+          <div className="metric-card highlight"><div className="metric-top"><span>ยอดขายทั้งหมด · {range}</span><span className="metric-icon green"><ShoppingBag size={18} /></span></div><strong>{loading ? "…" : money(stats?.totalSales ?? 0)}</strong><div className="metric-foot"><span>{stats?.totalOrders ?? 0} บิล</span><span>สูงสุด {money(Math.max(...(stats?.revenueByDay ?? []).map((day) => day.total), 0))} ในหนึ่งวัน</span></div></div>
+          <div className="metric-card"><div className="metric-top"><span>ออเดอร์ทั้งหมด</span><span className="metric-icon blue"><ReceiptText size={18} /></span></div><strong>{loading ? "…" : (stats?.totalOrders ?? 0).toLocaleString("th-TH")} <small>บิล</small></strong><div className="metric-foot"><span>เฉลี่ย {((stats?.totalOrders ?? 0) / rangeDays).toFixed(1)} บิล/วัน</span><span>ในช่วง{range}</span></div></div>
+          <div className="metric-card"><div className="metric-top"><span>สินค้าขายดี</span><span className="metric-icon amber"><BarChart3 size={18} /></span></div><strong>{loading ? "…" : (stats?.bestSellerCount ?? 0).toLocaleString("th-TH")} <small>ชิ้น</small></strong><div className="metric-foot warning"><span>{bestSellers[0]?.name ?? "ยังไม่มีข้อมูลการขาย"}</span><span>อันดับ 1 ในช่วง{range}</span></div></div>
+          <div className="metric-card"><div className="metric-top"><span>ยอดขายเฉลี่ยต่อวัน</span><span className="metric-icon purple"><CalendarDays size={18} /></span></div><strong>{loading ? "…" : money(stats?.avgDailySales ?? 0)}</strong><div className="metric-foot"><span>ขายไป {stats?.itemsSold ?? 0} ชิ้น</span><span>ในช่วง{range}</span></div></div>
         </div>
-        <div className="dash-tab-body" role="tabpanel">
-          {/* Round 34 — กราฟยอดขายออกแบบใหม่: เส้นเดียวอ่านง่าย + คำอธิบายครบ (จุด/ป้ายค่า/
-              เส้นเฉลี่ย/แถบสุดสัปดาห์/ป้ายวันนี้ยังไม่ครบวัน/การ์ดสรุปจุดที่เลือก) */}
-          {tab === "bills" && <RecentBillsWidget setView={setView} range={range} />}
-          {tab === "sales" && <section className="panel chart-panel interactive-chart-panel">
-            <div className="panel-heading">
-              <div>
-                <h2>ยอดขายร้านค้า</h2>
-                <p>{rangeDays > 60 ? "กราฟยอดขายรายเดือน · แตะ/คลิกจุดเพื่อดูรายละเอียด" : "กราฟยอดขายรายวัน · แตะ/คลิกจุดเพื่อดูรายละเอียด · แถบสีอ่อน = สุดสัปดาห์"}</p>
-              </div>
-              <div className="chart-controls">{["7 วัน", "30 วัน", "12 เดือน"].map((item) => <button className={range === item ? "active" : ""} onClick={() => { setRange(item); setSelectedBar(0); }} key={item}>{item}</button>)}</div>
-            </div>
-            <div className="chart-interactive-meta">
-              <span><i className="dot teal" /> ยอดขายสินค้า (บาท/วัน)</span>
-              <span><i className="avg-dash" /> เส้นค่าเฉลี่ย</span>
-              <b>{loading ? "กำลังโหลดข้อมูลจากระบบ…" : selected ? `${selected.label} · ยอดขาย ${money(selected.revenue)}` : "ยังไม่มีข้อมูล"}</b>
-            </div>
-            <div className="chart-wrap chart-wrap-line">
-              {lineGeom ? <>
-                <div className="y-labels">{chart.yLabels.map((label) => <span key={label}>{label}</span>)}</div>
-                <div className="line-chart" role="img" aria-label={`กราฟยอดขาย ${chartData.length} จุด ช่วง${range} สูงสุด ${money(Math.max(...chartData.map((point) => point.revenue), 0))} ค่าเฉลี่ย ${money(chart.avg)}`}>
-                  {rangeDays <= 60 && chartData.map((point, index) => {
-                    const weekday = new Date(`${point.date}T00:00:00`).getDay();
-                    return weekday === 0 || weekday === 6 ? <div key={`weekend-${index}`} className="weekend-band" aria-hidden="true" style={{ left: `${(index / chartData.length) * 100}%`, width: `${100 / chartData.length}%` }} /> : null;
-                  })}
-                  <svg viewBox={`0 0 ${lineGeom.width} ${lineGeom.height}`} preserveAspectRatio="none" aria-hidden="true">
-                    <defs><linearGradient id="revenue-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--chart-revenue)" stopOpacity={0.2} /><stop offset="100%" stopColor="var(--chart-revenue)" stopOpacity={0} /></linearGradient></defs>
-                    {[0.25, 0.5, 0.75, 1].map((ratio) => <line key={ratio} className="line-grid" x1="0" x2={lineGeom.width} y1={lineGeom.height * (1 - ratio)} y2={lineGeom.height * (1 - ratio)} />)}
-                    <path className="line-area" d={lineGeom.areaPath} />
-                    <path className="line-revenue" d={lineGeom.revenuePath} />
-                    {lineGeom.avgY !== null && <line className="line-avg" x1="0" x2={lineGeom.width} y1={lineGeom.avgY} y2={lineGeom.avgY} />}
-                    <line className="line-cursor" x1={lineGeom.selectedX} x2={lineGeom.selectedX} y1="0" y2={lineGeom.height} />
-                  </svg>
-                  {chartData.map((point, index) => {
-                    if (chartData.length > 14 && index !== safeSelectedBar && index !== chart.maxIndex && index !== chart.lastIndex) return null;
-                    const classes = ["chart-dot", chart.maxIndex === index && point.revenue > 0 ? "max" : "", chart.isTodayLast && index === chart.lastIndex ? "today" : "", safeSelectedBar === index ? "selected" : ""].filter(Boolean).join(" ");
-                    return <div key={`dot-${index}`} className={classes} aria-hidden="true" style={{ left: `${((index + 0.5) / chartData.length) * 100}%`, top: `${lineGeom.yPercent(point.revenue)}%` }} />;
-                  })}
-                  {chartData.length <= 14 && chartData.map((point, index) => <div key={`value-${index}`} className="chart-value" aria-hidden="true" style={{ left: `${((index + 0.5) / chartData.length) * 100}%`, top: `${Math.max(lineGeom.yPercent(point.revenue), 16)}%` }}>{compactBaht(point.revenue)}</div>)}
-                  {chartData.length > 14 && (chartData[chart.maxIndex]?.revenue ?? 0) > 0 && <div className="chart-tag max" aria-hidden="true" style={{ left: `clamp(52px, ${((chart.maxIndex + 0.5) / chartData.length) * 100}%, calc(100% - 52px))`, top: `${Math.min(lineGeom.yPercent(chartData[chart.maxIndex].revenue) + 5, 78)}%` }}>สูงสุด {compactBaht(chartData[chart.maxIndex].revenue)}</div>}
-                  {chart.isTodayLast && <div className="chart-today-pill" aria-hidden="true">วันนี้ · ยังไม่ครบวัน</div>}
-                  {chart.avg > 0 && <div className="chart-avg-chip" aria-hidden="true" style={{ top: `${Math.min(Math.max(lineGeom.yPercent(chart.avg), 8), 86)}%` }}>เฉลี่ย {compactBaht(chart.avg)}</div>}
-                  {selected && <div className="chart-tooltip" style={{ left: `clamp(2px, calc(${((safeSelectedBar + 0.5) / chartData.length) * 100}% - 89px), calc(100% - 180px))`, top: ((safeSelectedBar + 0.5) / chartData.length) * 100 >= 80 ? 30 : 8 }}>
-                    <small>{formatThaiDate(selected.date)}</small>
-                    <b>{money(selected.revenue)}</b>
-                    <div className="tt-row"><span>{rangeDays > 60 ? "เทียบเดือนก่อน" : "เทียบเมื่อวาน"}</span>{deltaChip(vsPrev, prevPoint ? "—" : "จุดแรกของช่วง")}</div>
-                    <div className="tt-row"><span>เทียบค่าเฉลี่ย</span>{deltaChip(vsAvg, "—")}</div>
-                    {selected.deposit > 0 && <div className="tt-row deposit"><span>{rangeDays > 60 ? "เติมเงินในเดือนนี้" : "เติมเงินวันนี้"}</span><em>{money(selected.deposit)}</em></div>}
-                    {chart.isTodayLast && safeSelectedBar === chart.lastIndex && <div className="tt-today-note">วันนี้ · ยังไม่ครบวัน — ตัวเลขยังเพิ่มได้ตลอดวัน</div>}
-                  </div>}
-                  <div className="line-hits">{chartData.map((point, index) => <button type="button" key={`${point.label}-${index}`} className={safeSelectedBar === index ? "selected" : ""} style={{ left: `${(index / chartData.length) * 100}%`, width: `${100 / chartData.length}%` }} onClick={() => setSelectedBar(index)} title={`${point.label}: ยอดขาย ${money(point.revenue)}${point.deposit > 0 ? ` (เติมเงิน ${money(point.deposit)})` : ""}`} aria-label={`${point.label} ยอดขาย ${money(point.revenue)}`} />)}</div>
+        <section className="dash-workbench" aria-label="มุมมองข้อมูลภาพรวม">
+          <div className="dash-tabbar" role="tablist" aria-label="เลือกมุมมองข้อมูล">
+            {DASH_TABS.map((item) => <button type="button" role="tab" aria-selected={tab === item.id} className={`dash-tab${tab === item.id ? " active" : ""}`} key={item.id} onClick={() => setTab(item.id)}>{item.id === "sales" ? <BarChart3 size={15} /> : item.id === "bills" ? <ReceiptText size={15} /> : item.id === "best" ? <Crown size={15} /> : item.id === "watch" ? <PackageSearch size={15} /> : item.id === "activity" ? <Activity size={15} /> : <CalendarClock size={15} />}{item.label}{item.id === "watch" && lowStock.length > 0 && <i className="tab-badge red" title={`สินค้าใกล้หมดสต็อก ${lowStock.length} รายการ`}>{lowStock.length}</i>}{item.id === "watch" && expirySoon.length > 0 && <i className="tab-badge amber" title={`ใกล้หมดอายุ ${expirySoon.length} รายการ`}>{expirySoon.length}</i>}</button>)}
+            <span className="dash-tabbar-spacer" aria-hidden="true" />
+          </div>
+          <div className="dash-tab-body" role="tabpanel">
+            {/* Round 34 — กราฟยอดขายออกแบบใหม่: เส้นเดียวอ่านง่าย + คำอธิบายครบ (จุด/ป้ายค่า/
+                เส้นเฉลี่ย/แถบสุดสัปดาห์/ป้ายวันนี้ยังไม่ครบวัน/การ์ดสรุปจุดที่เลือก) */}
+            {tab === "bills" && <RecentBillsWidget setView={setView} range={range} />}
+            {tab === "sales" && <section className="panel chart-panel interactive-chart-panel">
+              <div className="panel-heading">
+                <div>
+                  <h2>ยอดขายร้านค้า</h2>
+                  <p>{rangeDays > 60 ? "กราฟรายเดือนย้อนหลัง 365 วัน · เดือนแรกและเดือนปัจจุบันอาจไม่เต็มเดือน" : "กราฟยอดขายรายวัน · แตะ/คลิกจุดเพื่อดูรายละเอียด · แถบสีอ่อน = สุดสัปดาห์"}</p>
                 </div>
-                <div className="line-x-labels">{chartData.map((point, index) => <span key={`${point.label}-x-${index}`} className={safeSelectedBar === index || lineGeom.labelStep === 1 || index % lineGeom.labelStep === 0 ? `show${safeSelectedBar === index ? " picked" : ""}` : ""}>{point.label}</span>)}</div>
-              </> : <div className="chart-empty-note">ยังไม่มีข้อมูลยอดขายในช่วงนี้</div>}
-            </div>
-            <div className="chart-summary">
-              <div><span>ยอดขายรวมช่วงนี้</span><strong>{money(stats?.totalSales ?? 0)}</strong></div>
-              <div><span>ค่าเฉลี่ยต่อวัน</span><strong>{money(stats?.avgDailySales ?? 0)}</strong></div>
-              <div><span>จำนวนบิล</span><strong>{(stats?.totalOrders ?? 0).toLocaleString("th-TH")} <small>บิล</small></strong></div>
-              <div><span className="summary-with-icon"><Wallet size={12} /> เติมเงินรวมช่วงนี้</span><strong>{money(chart.totalDeposit)}</strong></div>
-            </div>
-          </section>}
-          {tab === "best" && <section className="panel best-seller-panel"><div className="panel-heading"><div><h2>สินค้าขายดี 10 อันดับ</h2><p>สรุปจากรายการขายจริงในช่วง{range} · กดรายการเพื่อเลือกข้อมูล</p></div><div className="chart-controls small">{["จำนวนขาย", "ยอดขาย"].map((item) => <button className={bestMode === item ? "active" : ""} onClick={() => { setBestMode(item); setSelectedProduct(0); }} key={item}>{item}</button>)}</div></div><div className="product-ranking-chart">{loading ? <div className="table-loading"><BarChart3 size={22} /><b>กำลังโหลดอันดับสินค้าขายดี</b><span>สรุปจากรายการขายจริงในช่วง{range}</span></div> : bestSellersRanked.length === 0 ? <div className="table-loading"><BarChart3 size={22} /><b>ยังไม่มีข้อมูลการขาย</b><span>เริ่มขายสินค้าผ่าน POS เพื่อดูอันดับ</span></div> : bestSellersRanked.map(({ name, qtyLabel, total, emoji, width, rank }, index) => <button className={`product-rank-row ${selectedProduct === index ? "selected" : ""}`} key={name} onClick={() => setSelectedProduct(index)}><span className={`rank rank-0${rank}`}>{`0${rank}`}</span><span className="product-thumb">{emoji}</span><span className="seller-name"><b>{name}</b><small>{qtyLabel}</small><i className="rank-progress"><em style={{ width: `${width}%` }} /></i></span><strong>{total}</strong><MoreHorizontal size={17} className="muted-icon" /></button>)}</div><div className="ranking-insight"><BarChart3 size={15} /><span>{bestSellersRanked[selectedProduct]?.name ?? "สินค้าขายดี"} ทำยอดสูงสุดในมุมมอง{bestMode === "ยอดขาย" ? "มูลค่า" : "จำนวน"} · คลิกแถวเพื่อเลือกข้อมูล</span></div></section>}
-          {tab === "watch" && <div className="inventory-alert-grid"><section className="panel alert-panel stock-alert-panel"><div className="alert-heading"><div><span className="eyebrow">ควรติดตามวันนี้</span><h2>สินค้าใกล้หมดสต็อก</h2><p>ช่วยวางแผนสั่งซื้อให้เพียงพอต่อการใช้งาน</p></div><span className="alert-count red">{lowStock.length}</span></div><div className="alert-list">{loading ? <div className="table-loading"><PackageSearch size={22} /><b>กำลังโหลดข้อมูลสต็อก</b><span>ดึงข้อมูลจากฐานข้อมูลสวัสดิการ</span></div> : lowStock.length === 0 ? <div className="table-loading"><PackageSearch size={22} /><b>สต็อกเพียงพอทุกรายการ</b><span>ไม่มีสินค้าที่ต่ำกว่าจุดสั่งซื้อ</span></div> : lowStock.map((row) => <button className="alert-row" key={row.id} onClick={() => setView("stock")}><span className="alert-item-icon red-bg"><PackageSearch size={15} /></span><span><b>{row.name}</b><small>เหลือ {row.stock} {row.unit} · สั่งซื้อแนะนำ {row.reorderPoint * 2} {row.unit}</small></span><span className="alert-arrow">→</span></button>)}</div><button className="alert-footer-action" onClick={() => setView("stock")}>ดูรายการและวางแผนสั่งซื้อ <span>→</span></button></section><section className="panel alert-panel expiry-alert-panel"><div className="alert-heading"><div><span className="eyebrow">ภายใน 30 วัน</span><h2>สินค้าใกล้หมดอายุ</h2><p>ตรวจสอบ Lot เพื่อวางแผนจัดจำหน่าย</p></div><span className="alert-count amber">{expirySoon.length}</span></div><div className="alert-list">{loading ? <div className="table-loading"><CalendarDays size={22} /><b>กำลังโหลดข้อมูลวันหมดอายุ</b><span>ตรวจสอบ Lot ที่ใกล้หมดอายุ</span></div> : expirySoon.length === 0 ? <div className="table-loading"><CalendarDays size={22} /><b>ไม่มีสินค้าใกล้หมดอายุ</b><span>ภายใน 30 วันข้างหน้า</span></div> : expirySoon.map((row) => <button className="alert-row" key={row.id} onClick={() => setView("stock")}><span className="alert-item-icon amber-bg"><CalendarDays size={15} /></span><span><b>{row.name}</b><small>หมดอายุ {formatThaiDate(row.expiry)} · Lot {row.lot} · เหลือ {row.qty} {row.unit}</small></span><span className="alert-arrow">→</span></button>)}</div><button className="alert-footer-action amber-action-text" onClick={() => setView("stock")}>เปิดรายงานวันหมดอายุ <span>→</span></button></section></div>}
-          {tab === "activity" && <section className="panel"><div className="panel-heading"><div><h2>กิจกรรมล่าสุดในระบบ</h2><p>ธุรกรรมและการเปลี่ยนแปลงที่บันทึกอัตโนมัติ</p></div><Activity size={19} className="muted-icon" /></div><div className="dash-activity-scroll">{loading ? <div className="table-loading"><Activity size={22} /><b>กำลังโหลดกิจกรรมล่าสุด</b><span>ดึงข้อมูลจากระบบ Log</span></div> : recentActivities.length === 0 ? <div className="table-loading"><Activity size={22} /><b>ยังไม่มีกิจกรรม</b><span>รายการจะแสดงเมื่อมีการทำธุรกรรม</span></div> : <table className="log-table compact" aria-label="รายการกิจกรรมล่าสุด"><thead><tr><th aria-label="ระดับกิจกรรม" /><th>เวลา</th><th>ผู้ทำรายการ</th><th>กิจกรรม</th><th>รายละเอียด</th></tr></thead><tbody>{recentActivities.map((log) => <tr key={log.id}><td className="log-tone-cell"><i className={`log-dot-mini tone-${log.tone ?? "green"}`} aria-hidden="true" /></td><td><small className="cell-mono">{formatTimeShort(log.createdAt)}</small></td><td><b>{log.actor}</b><small>{log.actorRole ?? ""}</small></td><td><b>{log.action}</b></td><td><span className="log-detail-text">{log.detail}</span></td></tr>)}</tbody></table>}</div>{isAdminRole(role) ? <button className="alert-footer-action" onClick={() => setView("logs")}>ดูกิจกรรมทั้งหมดในระบบ Log <span>→</span></button> : <div className="ranking-insight"><ShieldCheck size={15} /><span>ข้อมูลทุกธุรกรรมถูกบันทึกในระบบ Log อัตโนมัติ · ประวัติฉบับเต็มเปิดได้โดยผู้บริหาร</span></div>}</section>}
-          {tab === "cutoff" && <CutoffWidget role={role} userName={userName} />}
-        </div>
-      </section>
-    </>
+                <div className="chart-controls">{["7 วัน", "30 วัน", "365 วัน"].map((item) => <button className={range === item ? "active" : ""} onClick={() => { setRange(item); setSelectedBar(0); }} key={item}>{item}</button>)}</div>
+              </div>
+              <div className="chart-interactive-meta">
+                <span><i className="dot teal" /> ยอดขายสินค้า ({rangeDays > 60 ? "บาท/เดือน" : "บาท/วัน"})</span>
+                <span><i className="avg-dash" /> เส้นค่าเฉลี่ย</span>
+                <b>{loading ? "กำลังโหลดข้อมูลจากระบบ…" : selected ? `${selected.label} · ยอดขาย ${money(selected.revenue)}` : "ยังไม่มีข้อมูล"}</b>
+              </div>
+              <div className="chart-wrap chart-wrap-line">
+                {lineGeom ? <>
+                  <div className="y-labels">{chart.yLabels.map((label) => <span key={label}>{label}</span>)}</div>
+                  <div className="line-chart" role="img" aria-label={`กราฟยอดขาย ${chartData.length} จุด ช่วง${range} สูงสุด ${money(Math.max(...chartData.map((point) => point.revenue), 0))} ค่าเฉลี่ย ${money(chart.avg)}`}>
+                    {rangeDays <= 60 && chartData.map((point, index) => {
+                      const weekday = new Date(`${point.date}T00:00:00`).getDay();
+                      return weekday === 0 || weekday === 6 ? <div key={`weekend-${index}`} className="weekend-band" aria-hidden="true" style={{ left: `${(index / chartData.length) * 100}%`, width: `${100 / chartData.length}%` }} /> : null;
+                    })}
+                    <svg viewBox={`0 0 ${lineGeom.width} ${lineGeom.height}`} preserveAspectRatio="none" aria-hidden="true">
+                      <defs><linearGradient id="revenue-area" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--chart-revenue)" stopOpacity={0.2} /><stop offset="100%" stopColor="var(--chart-revenue)" stopOpacity={0} /></linearGradient></defs>
+                      {[0.25, 0.5, 0.75, 1].map((ratio) => <line key={ratio} className="line-grid" x1="0" x2={lineGeom.width} y1={lineGeom.height * (1 - ratio)} y2={lineGeom.height * (1 - ratio)} />)}
+                      <path className="line-area" d={lineGeom.areaPath} />
+                      <path className="line-revenue" d={lineGeom.revenuePath} />
+                      {lineGeom.avgY !== null && <line className="line-avg" x1="0" x2={lineGeom.width} y1={lineGeom.avgY} y2={lineGeom.avgY} />}
+                      <line className="line-cursor" x1={lineGeom.selectedX} x2={lineGeom.selectedX} y1="0" y2={lineGeom.height} />
+                    </svg>
+                    {chartData.map((point, index) => {
+                      if (chartData.length > 14 && index !== safeSelectedBar && index !== chart.maxIndex && index !== chart.lastIndex) return null;
+                      const classes = ["chart-dot", chart.maxIndex === index && point.revenue > 0 ? "max" : "", chart.isTodayLast && index === chart.lastIndex ? "today" : "", safeSelectedBar === index ? "selected" : ""].filter(Boolean).join(" ");
+                      return <div key={`dot-${index}`} className={classes} aria-hidden="true" style={{ left: `${((index + 0.5) / chartData.length) * 100}%`, top: `${lineGeom.yPercent(point.revenue)}%` }} />;
+                    })}
+                    {chartData.length <= 14 && chartData.map((point, index) => <div key={`value-${index}`} className="chart-value" aria-hidden="true" style={{ left: `${((index + 0.5) / chartData.length) * 100}%`, top: `${Math.max(lineGeom.yPercent(point.revenue), 16)}%` }}>{compactBaht(point.revenue)}</div>)}
+                    {chartData.length > 14 && (chartData[chart.maxIndex]?.revenue ?? 0) > 0 && <div className="chart-tag max" aria-hidden="true" style={{ left: `clamp(52px, ${((chart.maxIndex + 0.5) / chartData.length) * 100}%, calc(100% - 52px))`, top: `${Math.min(lineGeom.yPercent(chartData[chart.maxIndex].revenue) + 5, 78)}%` }}>สูงสุด {compactBaht(chartData[chart.maxIndex].revenue)}</div>}
+                    {chart.isTodayLast && <div className="chart-today-pill" aria-hidden="true">วันนี้ · ยังไม่ครบวัน</div>}
+                    {chart.avg > 0 && <div className="chart-avg-chip" aria-hidden="true" style={{ top: `${Math.min(Math.max(lineGeom.yPercent(chart.avg), 8), 86)}%` }}>เฉลี่ย {compactBaht(chart.avg)}</div>}
+                    {selected && <div className="chart-tooltip" style={{ left: `clamp(2px, calc(${((safeSelectedBar + 0.5) / chartData.length) * 100}% - 89px), calc(100% - 180px))`, top: ((safeSelectedBar + 0.5) / chartData.length) * 100 >= 80 ? 30 : 8 }}>
+                      <small>{formatThaiDate(selected.date)}</small>
+                      <b>{money(selected.revenue)}</b>
+                      <div className="tt-row"><span>{rangeDays > 60 ? "เทียบเดือนก่อน" : "เทียบเมื่อวาน"}</span>{deltaChip(vsPrev, prevPoint ? "—" : "จุดแรกของช่วง")}</div>
+                      <div className="tt-row"><span>เทียบค่าเฉลี่ย</span>{deltaChip(vsAvg, "—")}</div>
+                      {selected.deposit > 0 && <div className="tt-row deposit"><span>{rangeDays > 60 ? "เติมเงินในเดือนนี้" : "เติมเงินวันนี้"}</span><em>{money(selected.deposit)}</em></div>}
+                      {chart.isTodayLast && safeSelectedBar === chart.lastIndex && <div className="tt-today-note">วันนี้ · ยังไม่ครบวัน — ตัวเลขยังเพิ่มได้ตลอดวัน</div>}
+                    </div>}
+                    <div className="line-hits">{chartData.map((point, index) => <button type="button" key={`${point.label}-${index}`} className={safeSelectedBar === index ? "selected" : ""} style={{ left: `${(index / chartData.length) * 100}%`, width: `${100 / chartData.length}%` }} onClick={() => setSelectedBar(index)} title={`${point.label}: ยอดขาย ${money(point.revenue)}${point.deposit > 0 ? ` (เติมเงิน ${money(point.deposit)})` : ""}`} aria-label={`${point.label} ยอดขาย ${money(point.revenue)}`} />)}</div>
+                  </div>
+                  <div className="line-x-labels">{chartData.map((point, index) => <span key={`${point.label}-x-${index}`} className={safeSelectedBar === index || lineGeom.labelStep === 1 || index % lineGeom.labelStep === 0 ? `show${safeSelectedBar === index ? " picked" : ""}` : ""}>{point.label}</span>)}</div>
+                </> : <div className="chart-empty-note">ยังไม่มีข้อมูลยอดขายในช่วงนี้</div>}
+              </div>
+              <div className="chart-summary">
+                <div><span>ยอดขายรวมช่วงนี้</span><strong>{money(stats?.totalSales ?? 0)}</strong></div>
+                <div><span>ค่าเฉลี่ยต่อวัน</span><strong>{money(stats?.avgDailySales ?? 0)}</strong></div>
+                <div><span>จำนวนบิล</span><strong>{(stats?.totalOrders ?? 0).toLocaleString("th-TH")} <small>บิล</small></strong></div>
+                <div><span className="summary-with-icon"><Wallet size={12} /> เติมเงินรวมช่วงนี้</span><strong>{money(chart.totalDeposit)}</strong></div>
+              </div>
+            </section>}
+            {tab === "best" && <section className="panel best-seller-panel"><div className="panel-heading"><div><h2>สินค้าขายดี 10 อันดับ</h2><p>สรุปจากรายการขายจริงในช่วง{range} · กดรายการเพื่อเลือกข้อมูล</p></div><div className="chart-controls small">{["จำนวนขาย", "ยอดขาย"].map((item) => <button className={bestMode === item ? "active" : ""} onClick={() => { setBestMode(item); setSelectedProduct(0); }} key={item}>{item}</button>)}</div></div><div className="product-ranking-chart">{loading ? <div className="table-loading"><BarChart3 size={22} /><b>กำลังโหลดอันดับสินค้าขายดี</b><span>สรุปจากรายการขายจริงในช่วง{range}</span></div> : bestSellersRanked.length === 0 ? <div className="table-loading"><BarChart3 size={22} /><b>ยังไม่มีข้อมูลการขาย</b><span>เริ่มขายสินค้าผ่าน POS เพื่อดูอันดับ</span></div> : bestSellersRanked.map(({ name, qtyLabel, total, emoji, width, rank }, index) => <button className={`product-rank-row ${selectedProduct === index ? "selected" : ""}`} key={name} onClick={() => setSelectedProduct(index)}><span className={`rank rank-0${rank}`}>{`0${rank}`}</span><span className="product-thumb">{emoji}</span><span className="seller-name"><b>{name}</b><small>{qtyLabel}</small><i className="rank-progress"><em style={{ width: `${width}%` }} /></i></span><strong>{total}</strong><MoreHorizontal size={17} className="muted-icon" /></button>)}</div><div className="ranking-insight"><BarChart3 size={15} /><span>{bestSellersRanked[selectedProduct]?.name ?? "สินค้าขายดี"} ทำยอดสูงสุดในมุมมอง{bestMode === "ยอดขาย" ? "มูลค่า" : "จำนวน"} · คลิกแถวเพื่อเลือกข้อมูล</span></div></section>}
+            {tab === "watch" && <div className="inventory-alert-grid"><section className="panel alert-panel stock-alert-panel"><div className="alert-heading"><div><span className="eyebrow">ควรติดตามวันนี้</span><h2>สินค้าใกล้หมดสต็อก</h2><p>ช่วยวางแผนสั่งซื้อให้เพียงพอต่อการใช้งาน</p></div><span className="alert-count red">{lowStock.length}</span></div><div className="alert-list">{loading ? <div className="table-loading"><PackageSearch size={22} /><b>กำลังโหลดข้อมูลสต็อก</b><span>ดึงข้อมูลจากฐานข้อมูลสวัสดิการ</span></div> : lowStock.length === 0 ? <div className="table-loading"><PackageSearch size={22} /><b>สต็อกเพียงพอทุกรายการ</b><span>ไม่มีสินค้าที่ต่ำกว่าจุดสั่งซื้อ</span></div> : lowStock.map((row) => <button className="alert-row" key={row.id} onClick={() => setView("stock")}><span className="alert-item-icon red-bg"><PackageSearch size={15} /></span><span><b>{row.name}</b><small>เหลือ {row.stock} {row.unit} · สั่งซื้อแนะนำ {row.reorderPoint * 2} {row.unit}</small></span><span className="alert-arrow">→</span></button>)}</div><button className="alert-footer-action" onClick={() => setView("stock")}>ดูรายการและวางแผนสั่งซื้อ <span>→</span></button></section><section className="panel alert-panel expiry-alert-panel"><div className="alert-heading"><div><span className="eyebrow">ภายใน 30 วัน</span><h2>สินค้าใกล้หมดอายุ</h2><p>ตรวจสอบ Lot เพื่อวางแผนจัดจำหน่าย</p></div><span className="alert-count amber">{expirySoon.length}</span></div><div className="alert-list">{loading ? <div className="table-loading"><CalendarDays size={22} /><b>กำลังโหลดข้อมูลวันหมดอายุ</b><span>ตรวจสอบ Lot ที่ใกล้หมดอายุ</span></div> : expirySoon.length === 0 ? <div className="table-loading"><CalendarDays size={22} /><b>ไม่มีสินค้าใกล้หมดอายุ</b><span>ภายใน 30 วันข้างหน้า</span></div> : expirySoon.map((row) => <button className="alert-row" key={row.id} onClick={() => setView("stock")}><span className="alert-item-icon amber-bg"><CalendarDays size={15} /></span><span><b>{row.name}</b><small>หมดอายุ {formatThaiDate(row.expiry)} · Lot {row.lot} · เหลือ {row.qty} {row.unit}</small></span><span className="alert-arrow">→</span></button>)}</div><button className="alert-footer-action amber-action-text" onClick={() => setView("stock")}>เปิดรายงานวันหมดอายุ <span>→</span></button></section></div>}
+            {tab === "activity" && <section className="panel"><div className="panel-heading"><div><h2>กิจกรรมล่าสุดในระบบ</h2><p>ธุรกรรมและการเปลี่ยนแปลงที่บันทึกอัตโนมัติ</p></div><Activity size={19} className="muted-icon" /></div><div className="dash-activity-scroll">{loading ? <div className="table-loading"><Activity size={22} /><b>กำลังโหลดกิจกรรมล่าสุด</b><span>ดึงข้อมูลจากระบบ Log</span></div> : recentActivities.length === 0 ? <div className="table-loading"><Activity size={22} /><b>ยังไม่มีกิจกรรม</b><span>รายการจะแสดงเมื่อมีการทำธุรกรรม</span></div> : <table className="log-table compact" aria-label="รายการกิจกรรมล่าสุด"><thead><tr><th aria-label="ระดับกิจกรรม" /><th>เวลา</th><th>ผู้ทำรายการ</th><th>กิจกรรม</th><th>รายละเอียด</th></tr></thead><tbody>{recentActivities.map((log) => <tr key={log.id}><td className="log-tone-cell"><i className={`log-dot-mini tone-${log.tone ?? "green"}`} aria-hidden="true" /></td><td><small className="cell-mono">{formatTimeShort(log.createdAt)}</small></td><td><b>{log.actor}</b><small>{log.actorRole ?? ""}</small></td><td><b>{log.action}</b></td><td><span className="log-detail-text">{log.detail}</span></td></tr>)}</tbody></table>}</div>{isAdminRole(role) ? <button className="alert-footer-action" onClick={() => setView("logs")}>ดูกิจกรรมทั้งหมดในระบบ Log <span>→</span></button> : <div className="ranking-insight"><ShieldCheck size={15} /><span>ข้อมูลทุกธุรกรรมถูกบันทึกในระบบ Log อัตโนมัติ · ประวัติฉบับเต็มเปิดได้โดยผู้บริหาร</span></div>}</section>}
+            {tab === "cutoff" && <CutoffWidget role={role} userName={userName} />}
+          </div>
+        </section>
+      </div>
+    </div>
   );
 }

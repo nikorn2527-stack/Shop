@@ -21,8 +21,7 @@ import type { SaleHistoryEntry } from '@shared/storeTypes/sales';
  * FEAT-8 — filter pills (วันนี้ / 7 วัน / ทั้งหมด) narrow the time window.
  * FEAT-9 — voided bills show a red strikethrough + "ยกเลิก" tag.
  *
- * Hidden automatically when there are no bills yet (the OnboardingBanner
- * already covers that empty state with a CTA).
+ * Keeps an empty state visible so the Dashboard tab never becomes blank.
  *
  * Data source: `trpc.sales.list` with `limit: 20`. We fetch more than 5 so
  * the filter pills have something to slice. The displayed rows cap at 5.
@@ -96,8 +95,20 @@ export function RecentBillsWidget({
   }
 
   if (allBills.length === 0) {
-    // No bills at all yet — OnboardingBanner handles this state, hide widget
-    return null;
+    const failed = salesQuery.isError;
+    return (
+      <section className="panel recent-bills-widget" aria-label="บิลล่าสุด">
+        <div className="panel-heading"><h2>บิลล่าสุด</h2></div>
+        <div className="recent-bills-empty">
+          <ReceiptText size={28} />
+          <b>{failed ? "โหลดรายการบิลไม่สำเร็จ" : "ยังไม่มีบิลการขาย"}</b>
+          <span>{failed ? "กรุณาลองโหลดข้อมูลอีกครั้ง" : "บิลจะแสดงที่นี่หลังบันทึกการขาย"}</span>
+        </div>
+        <button type="button" className="outline-button" onClick={() => { if (failed) void salesQuery.refetch(); else setView("pos"); }}>
+          {failed ? "ลองใหม่" : "ไปที่หน้าร้าน / POS"}<ArrowRight size={14} />
+        </button>
+      </section>
+    );
   }
 
   return (
