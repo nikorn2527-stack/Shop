@@ -51,7 +51,6 @@ function TodaySnapshot({
     <section className="today-snapshot" aria-label="สรุปยอดวันนี้">
       <div className="today-snapshot-head">
         <span className="today-snapshot-label"><CalendarDays size={13} /> สรุปวันนี้</span>
-        <span className="today-snapshot-date">{formatThaiDate(new Date())}</span>
       </div>
       <div className="today-snapshot-grid">
         <button
