@@ -166,7 +166,7 @@ describe("business API permissions", () => {
     const deviceId = "12345678-1234-4234-8234-123456789012";
     registerPosTerminal(db, deviceId, 1, "Test admin");
     await expect(api.pos.checkout({ terminalDeviceId: deviceId, memberNumber: member.memberNumber, items: [{ productId: product.id, qty: 1 }], paymentMethod: "หักบัญชีสมาชิก", clientRequestId: "insufficient-wallet" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
-    await expect(api.member.wallet({ memberNumber: member.memberNumber, type: "withdrawal", amount: 10 })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(api.member.wallet({ memberNumber: member.memberNumber, type: "withdrawal", amount: 10, clientRequestId: "insufficient-withdrawal" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
     expect(getMemberDetail(db, member.memberNumber)?.member.balance).toBe(5);
     expect(db.prepare("SELECT stock FROM products WHERE id = ?").get(product.id)).toMatchObject({ stock: 1 });
     expect(db.prepare("SELECT COUNT(*) AS n FROM sales").get()).toMatchObject({ n: 0 });

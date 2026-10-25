@@ -18,7 +18,7 @@ export function insertMemberTransaction(
   input: MemberLedgerInput,
 ) {
   db.prepare(
-    `INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, actor, created_at, slip_url, client_request_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, actor, created_at, slip_url, client_request_id, request_fingerprint, receipt_snapshot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     input.memberNumber,
     input.type,
@@ -30,5 +30,7 @@ export function insertMemberTransaction(
     input.createdAt,
     input.slipImage,
     input.clientRequestId,
+    input.requestFingerprint ?? null,
+    input.receiptSnapshot ? JSON.stringify(input.receiptSnapshot) : null,
   );
 }

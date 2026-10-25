@@ -1,3 +1,4 @@
+import type { WalletReceipt } from "../../shared/storeTypes/members";
 import type { AuditLog } from "../../shared/storeTypes/reports";
 
 export type MemberLedgerInput = {
@@ -11,6 +12,8 @@ export type MemberLedgerInput = {
   createdAt: string;
   slipImage: string | null;
   clientRequestId: string | null;
+  requestFingerprint?: string | null;
+  receiptSnapshot?: WalletReceipt | null;
 };
 
 export interface MemberLedgerRepository {

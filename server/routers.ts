@@ -237,8 +237,8 @@ const memberWalletInput = z.object({
   slipImage: z.string().max(600_000).nullish(),
   // P2-b (idempotency) — client-generated key per wallet op. Retries with the
   // same key return the original ledger row instead of double-debiting/crediting
-  // the member. Optional — frontend will be updated in a follow-up.
-  clientRequestId: z.string().max(200).nullish(),
+  // the member. The current UI sends a stable UUID for each operation.
+  clientRequestId: z.string().trim().min(1).max(200),
 });
 
 const memberUpdateInput = z.object({
@@ -1181,7 +1181,7 @@ export const appRouter = router({
       const { actor, actorRole } = resolveActor(ctx, {});
       return generateBlankCards(getWelfareDb(), input.prefix, input.digits, input.count, actor, actorRole);
     })),
-    return: publicProcedure.input(z.object({ memberNumber: z.string().trim().min(1), cardNumber: z.string().trim().min(1), expectedSessionId: z.number().int().positive(), mode: z.literal("refund"), clientRequestId: z.string().max(100).optional() })).mutation(({ ctx, input }) => withStoreErrors(() => {
+    return: permissionProcedure("MEMBER.WALLET").input(z.object({ memberNumber: z.string().trim().min(1), cardNumber: z.string().trim().min(1), expectedSessionId: z.number().int().positive(), mode: z.literal("refund"), clientRequestId: z.string().max(100).optional() })).mutation(({ ctx, input }) => withStoreErrors(() => {
       requireLogin(ctx);
       const { actor, actorRole } = resolveActor(ctx, {});
       return returnMemberCard(getWelfareDb(), { ...input, actor, actorRole });
@@ -1275,7 +1275,7 @@ export const appRouter = router({
         const { actor, actorRole } = resolveActor(ctx, input);
         return withStoreErrors(() => {
           requireLogin(ctx); // P1-c — เติม/ถอนเงินสมาชิกต้องมีเซสชัน (CRITICAL — เกี่ยวกับเงิน)
-          return walletTx(getWelfareDb(), { ...input, actor, actorRole });
+          return walletTx(getWelfareDb(), { ...input, actor, actorUserId: ctx.user!.id, actorRole });
         });
       }),
     // ROUND 63 (user) — ดึงรูปหลักฐานของรายการเติม/ถอนเงินสมาชิก (แนบตอนทำรายการที่ POS)

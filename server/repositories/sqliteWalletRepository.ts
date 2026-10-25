@@ -1,3 +1,5 @@
+import { StoreError } from "../domain/storeError";
+import type { WalletReplay } from "../domain/walletRequest";
 import type { SqliteDb } from "../sqliteStore";
 import type { WalletReceipt } from "../../shared/storeTypes/members";
 import type { WalletRepository } from "./walletRepository";
@@ -35,13 +37,15 @@ export function createSqliteWalletRepository(
 function findWalletByRequestId(
   db: SqliteDb,
   requestId: string,
-): WalletReceipt | undefined {
+): WalletReplay | undefined {
   const existing = db
     .prepare(
-      `SELECT member_number AS memberNumber, type, amount, balance_after AS balanceAfter, detail FROM member_transactions WHERE client_request_id = ? LIMIT 1`,
+      `SELECT request_fingerprint AS requestFingerprint, receipt_snapshot AS receiptSnapshot, member_number AS memberNumber, type, amount, balance_after AS balanceAfter, detail FROM member_transactions WHERE client_request_id = ? LIMIT 1`,
     )
     .get(requestId) as
     | {
+        requestFingerprint: string | null;
+        receiptSnapshot: string | null;
         memberNumber: string;
         type: "deposit" | "withdrawal" | "refund";
         amount: number;
@@ -50,6 +54,14 @@ function findWalletByRequestId(
       }
     | undefined;
   if (existing) {
+    if (existing.receiptSnapshot) {
+      let receipt: WalletReceipt;
+      try {
+        receipt = JSON.parse(existing.receiptSnapshot) as WalletReceipt;
+        if (receipt.memberNumber !== existing.memberNumber || receipt.type !== existing.type || !Number.isFinite(receipt.balanceAfter)) throw new Error("Invalid wallet snapshot");
+      } catch { throw new StoreError("ข้อมูลรายการเงินเดิมไม่สมบูรณ์ กรุณาตรวจสอบประวัติธุรกรรมก่อนทำรายการใหม่"); }
+      return { receipt, requestFingerprint: existing.requestFingerprint };
+    }
     const memberRow = db
       .prepare(
         `SELECT prename, first_name, last_name, balance FROM members WHERE member_number = ?`,
@@ -62,10 +74,8 @@ function findWalletByRequestId(
           balance: number;
         }
       | undefined;
-    // Match the normal-path return shape so the inferred walletTx return
-    // type stays the strict `string`/`number` the UI consumers expect —
-    // existing.balanceAfter is only null on legacy rows that predate the
-    // balance_after column; we fall back to the live balance in that case.
+    // Legacy reconstruction is diagnostic only: replayWalletReceipt rejects
+    // keys without a fingerprint, rather than trusting a mutable live balance.
     const memberName = memberRow
       ? [memberRow.prename, memberRow.first_name, memberRow.last_name]
           .filter(Boolean)
@@ -76,7 +86,7 @@ function findWalletByRequestId(
       existing.type === "deposit"
         ? round2(balanceAfter - Math.abs(existing.amount))
         : round2(balanceAfter + Math.abs(existing.amount));
-    return {
+    return { requestFingerprint: existing.requestFingerprint, receipt: {
       memberNumber: existing.memberNumber,
       memberName,
       type: existing.type,
@@ -84,6 +94,6 @@ function findWalletByRequestId(
       balanceBefore,
       balanceAfter,
       detail: existing.detail,
-    };
+    } };
   }
 }

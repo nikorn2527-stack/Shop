@@ -18,7 +18,7 @@ backup ยังเป็น synchronous operation จึงอาจทำใ�
 
 1. **ตรวจข้อมูลการชำระที่ API — แก้แล้วในชุดต่อเนื่อง:** ดูรายละเอียดด้านล่าง การยืนยัน QR เป็นการยืนยันของแคชเชียร์ ยังไม่ใช่การตรวจยอดโอนกับธนาคารอัตโนมัติ
 2. **ยกเลิกบิลข้ามรอบ — เพิ่มตัวป้องกันแล้ว:** ปฏิเสธการ void นอกรอบปัจจุบันหรือบิลที่รวมในรอบที่ปิดแล้ว โดยไม่เปลี่ยนเงิน/สต็อก รายการคืนเงินข้ามรอบแบบมีเอกสารปรับปรุงยังไม่ได้พัฒนา
-3. **Idempotency ของ POS — เพิ่ม fingerprint และ snapshot แล้ว:** คำขอเดิมคืนบิลเดิม; key เดิมแต่ข้อมูลเปลี่ยน/บิลยกเลิก/ไม่มี fingerprint เดิมถูกปฏิเสธ รายการเงินสมาชิกผ่าน wallet API ยังใช้กลไกเดิมและต้องตรวจแยกต่อไป
+3. **Idempotency ของ POS — เพิ่ม fingerprint และ snapshot แล้ว:** คำขอเดิมคืนบิลเดิม; key เดิมแต่ข้อมูลเปลี่ยน/บิลยกเลิก/ไม่มี fingerprint เดิมถูกปฏิเสธ wallet API ได้เพิ่มการตรวจแบบเดียวกันแล้วในชุดเงินสมาชิกด้านล่าง
 4. **PostgreSQL จริงและ LAN:** มีโครงสร้าง async/transaction เบื้องต้น แต่ยังไม่มี driver/schema migration/runtime PostgreSQL ที่ใช้งานจริง การทดสอบ Windows หลักหนึ่งเครื่องกับ client อีกสองเครื่อง รวม concurrency, restart, backup/restore, firewall และสิทธิ์ผู้ใช้ยังต้องทำ
 
 ## ขอบเขต UI และพิมพ์ที่มีหลักฐานจากรอบ QC ก่อนแก้ backend
@@ -80,6 +80,30 @@ void ทำได้เฉพาะบิลในรอบปัจจุบั
 
 เพิ่ม nullable columns เท่านั้นผ่าน migration เดิมตอนเปิดฐานข้อมูล: sales.request_fingerprint, sales.receipt_snapshot, sale_items.amount, day_closures.last_sale_id, day_closures.last_member_tx_id ไม่ลบตาราง/แถว ไม่ backfill ตัวเลขหรือ metadata บิลเก่า ทดสอบจำลองไฟล์รุ่นเก่าโดยไม่มีห้าคอลัมน์นี้แล้วเปิดใหม่ ตรวจเงิน สมาชิก สินค้า และบิลยังอยู่ครบ รอบนี้ไม่เปิดหรือ migrate ไฟล์ธุรกิจจริง การอัปเดตเครื่องใช้งานจริงต้องสำรองและตรวจ restore กับสำเนาก่อน
 
-ข้อจำกัดคงเหลือ: wallet API ยังต้องตรวจ payload fingerprint แยก, ยังไม่มี workflow คืนเงินข้ามรอบ, ไม่มี bank verification และยังไม่ทดสอบ PostgreSQL/Windows LAN/เครื่องพิมพ์จริง
+ข้อจำกัด ณ ชุด POS: wallet API ตรวจต่อในชุดเงินสมาชิกด้านล่าง; ยังไม่มี workflow คืนเงินข้ามรอบ, ไม่มี bank verification และยังไม่ทดสอบ PostgreSQL/Windows LAN/เครื่องพิมพ์จริง
 
 ผลตรวจชุด retry/รอบขายล่าสุด: TypeScript และ production build ผ่าน; automated suite ผ่าน 68 ไฟล์ / 550 tests บนฐานข้อมูลแยก รวมทดสอบ upgrade ไฟล์รุ่นเก่า, snapshot failure rollback, replay หลัง restart และ boundary ในวินาทีเดียวกัน ไม่มีการเปิดหรือเปลี่ยนฐานข้อมูลธุรกิจจริง
+
+## ชุดต่อเนื่อง: คำขอซ้ำของเงินสมาชิก
+
+member.wallet API บังคับ clientRequestId ที่ไม่ว่างสำหรับฝาก ถอน และคืนเงิน หน้าร้านและหน้าสมาชิกมี UUID ต่อคำขออยู่แล้ว จึงไม่เพิ่มการกรอกข้อมูลให้ผู้ใช้ รับตัวตนผู้ทำรายการจากเซสชัน ไม่ใช้ชื่อ/ID ที่ client ส่งเพื่ออ้างตัวผู้ทำรายการ
+
+เก็บ fingerprint รวมสมาชิก ประเภทการเงิน จำนวนเงินหลังปัดสตางค์ หมายเหตุ หลักฐาน ตัวตนผู้ทำรายการ และ flag คืนเงินโดยเก็บบัตรไว้ พร้อม receipt snapshot ในแถว ledger ภายใน transaction เดียวกับยอดเงิน การคืนบัตร และ audit
+
+- คำขอเดิมคืนใบรายการเดิม แม้ restart, เปลี่ยนชื่อ/ยอดสมาชิก หรือคืนเงินครบและนำบัตรไปให้ผู้ถือใหม่แล้ว ไม่เขียน ledger/audit หรือแตะบัตรผู้ถือใหม่
+- key เดิมแต่เปลี่ยนสมาชิก จำนวนเงิน ประเภทการเงิน หมายเหตุ ตัวตนเจ้าหน้าที่ หรือเงื่อนไขคืนบัตร ถูกปฏิเสธก่อนเปลี่ยนเงิน
+- key รุ่นเก่าที่ไม่มี fingerprint ถูกปฏิเสธพร้อมให้ตรวจประวัติ ไม่ใช้ยอดคงเหลือปัจจุบันคาดเดาใบรายการเก่า
+- ถ้าบันทึก snapshot หรือขั้นตอนคืนบัตร/audit ล้มเหลว transaction rollback ทั้งหมด ทดสอบฉีดข้อผิดพลาดรวมกับชุด atomicity เดิม
+- ตรวจจำนวนเงินใน service ให้เป็น finite มากกว่า 0 และหลังปัดไม่ต่ำกว่า 0.01 บาท อยู่ในขอบเขตสตางค์ที่ JavaScript แทนค่าได้อย่างปลอดภัย
+- API คืนบัตร card.return ต้องมี MEMBER.WALLET เพิ่มเติมจาก login ป้องกัน auditor/stock officer เรียกคืนเงินผ่านอีกเส้นทาง
+- ปิดรอบบัญชีด้วย key ของรายการเงินอื่นจะถูกปฏิเสธ ไม่ปิดบัญชีโดยเข้าใจผิดว่าจ่ายเงินคืนแล้ว
+
+เพิ่ม nullable member_transactions.request_fingerprint และ receipt_snapshot ผ่าน migration เดิม พร้อมรักษาฟิลด์เหล่านี้เมื่อ migration รุ่นเก่าต้อง rebuild CHECK constraint ทดสอบเปิดไฟล์ fixture ที่ไม่มีคอลัมน์ใหม่แล้วเพิ่มคอลัมน์ โดยสมาชิก ยอดเงิน และ ledger เดิมยังครบ ไม่มีการแตะไฟล์ธุรกิจจริงหรือ backfill fingerprint เดาเอง
+
+เส้นทาง async ใช้กติกา fingerprint/snapshot เดียวกันและทดสอบการ await/rollback ผ่าน repository doubles เส้นทางนี้ยังไม่ได้ต่อ production router หรือ PostgreSQL จริง
+
+ขอบเขต: public member.wallet บังคับ key; internal legacy calls ยังละ key ได้ เส้นทางรวม card.return/closeAccount ยังใช้การตรวจผู้ถือและรอบบัตรเดิมที่ระดับนอก จึงไม่ได้รับรองว่าการ retry ทั้ง workflow จะได้ผลหน้าจอเดิมทุกครั้งหลังบัตรเปลี่ยนผู้ถือ แม้คำขอ wallet ภายในที่มี key จะไม่จ่ายซ้ำ งานคืนเงินข้ามรอบและการทดสอบ Windows/PostgreSQL/LAN/เครื่องพิมพ์จริงยังคงเหลือ
+
+ชุดเฉพาะ wallet/repository async/atomicity/สิทธิ์ ผ่าน 4 ไฟล์ / 72 tests รวม wallet.retry ใหม่ 28 tests และ async conflict อีก 1 test
+
+ผลตรวจชุดเงินสมาชิกล่าสุด: TypeScript และ production build ผ่าน; automated suite ผ่าน 69 ไฟล์ / 579 tests โดยใช้ฐานข้อมูลแยก ไม่เปิดหรือ migrate ฐานข้อมูลธุรกิจจริง

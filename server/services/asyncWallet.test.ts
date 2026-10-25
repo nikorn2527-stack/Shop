@@ -1,3 +1,4 @@
+import { walletRequestFingerprint } from "../domain/walletRequest";
 import { describe, expect, it, vi } from "vitest";
 import type { Member, WalletTxInput } from "../../shared/storeTypes/members";
 import type { AsyncWalletRepository } from "../repositories/asyncWalletRepository";
@@ -159,7 +160,7 @@ describe("async wallet service (repository contract tests)", () => {
         clientRequestId: "async-refund",
       };
       const receipt = await walletTxAsync(f.unitOfWork, input, runtime);
-      vi.mocked(f.repository.findWalletByRequestId).mockResolvedValue(receipt);
+      vi.mocked(f.repository.findWalletByRequestId).mockResolvedValue({ receipt, requestFingerprint: walletRequestFingerprint(input, 100) });
       const committed = f.state();
       expect(await walletTxAsync(f.unitOfWork, input, runtime)).toEqual(
         receipt,
@@ -172,6 +173,22 @@ describe("async wallet service (repository contract tests)", () => {
     } finally {
       db.close();
     }
+  });
+
+  it("rejects a changed async request before writing balance, ledger or card state", async () => {
+    const { db, member } = memberFixture();
+    try {
+      const f = fixture(member);
+      const input = { memberNumber: member.memberNumber, type: "deposit" as const, amount: 20, clientRequestId: "async-conflict" };
+      const receipt = await walletTxAsync(f.unitOfWork, input, runtime);
+      vi.mocked(f.repository.findWalletByRequestId).mockResolvedValue({ receipt, requestFingerprint: walletRequestFingerprint(input, 20) });
+      const committed = f.state();
+      await expect(walletTxAsync(f.unitOfWork, { ...input, amount: 30 }, runtime)).rejects.toThrow(/ข้อมูลเปลี่ยนไป/);
+      expect(f.state()).toEqual(committed);
+      expect(f.repository.setMemberBalance).toHaveBeenCalledTimes(1);
+      expect(f.repository.insertMemberTransaction).toHaveBeenCalledTimes(1);
+      expect(f.events.at(-1)).toBe("rollback");
+    } finally { db.close(); }
   });
 
   it("joins the enclosing async account closure without releasing its retained card", async () => {

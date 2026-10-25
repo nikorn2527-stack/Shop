@@ -1,3 +1,4 @@
+import { walletRequestFingerprint, replayWalletReceipt } from "../domain/walletRequest";
 import type {
   WalletReceipt,
   WalletTxInput,
@@ -17,13 +18,14 @@ export async function walletTxInAsyncTransaction(
   input: WalletTxInput,
   runtime: PaymentRuntime,
 ): Promise<WalletReceipt> {
+  const amount = validateWalletAmount(input.amount);
+  const requestFingerprint = input.clientRequestId ? walletRequestFingerprint(input, amount) : null;
   if (input.clientRequestId) {
     const existing = await repository.findWalletByRequestId(
       input.clientRequestId,
     );
-    if (existing) return existing;
+    if (existing) return replayWalletReceipt(existing, requestFingerprint!);
   }
-  const amount = validateWalletAmount(input.amount);
   const member =
     input.type === "refund"
       ? await repository.findMember(input.memberNumber?.trim() ?? "")
@@ -36,7 +38,7 @@ export async function walletTxInAsyncTransaction(
     member.memberNumber,
     plan.receipt.balanceAfter,
   );
-  await repository.insertMemberTransaction(plan.ledger);
+  await repository.insertMemberTransaction({ ...plan.ledger, requestFingerprint, receiptSnapshot: input.clientRequestId ? plan.receipt : null });
   if (plan.releaseCard) {
     const card = plan.releaseCard;
     await repository.releaseCard(

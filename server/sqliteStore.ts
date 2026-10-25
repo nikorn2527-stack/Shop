@@ -597,6 +597,8 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
   ensureColumn(db, "sales", "receipt_snapshot", "TEXT");
   ensureColumn(db, "sale_items", "amount", "REAL");
   ensureColumn(db, "member_transactions", "client_request_id", "TEXT");
+  ensureColumn(db, "member_transactions", "request_fingerprint", "TEXT");
+  ensureColumn(db, "member_transactions", "receipt_snapshot", "TEXT");
   db.exec("CREATE INDEX IF NOT EXISTS idx_sales_client_req ON sales(client_request_id) WHERE client_request_id IS NOT NULL");
   db.exec("CREATE INDEX IF NOT EXISTS idx_member_tx_client_req ON member_transactions(client_request_id) WHERE client_request_id IS NOT NULL");
   // FIX-7 (user) — ยอดเงินสดที่รับมา + ยอดเงินทอน สำหรับบิล "เงินสด" + flag ยืนยันตรวจสอบสำหรับบิล "QR / สแกน"
@@ -993,6 +995,8 @@ function upgradeMemberTransactionsTypes(db: SqliteDb) {
       actor TEXT,
       slip_url TEXT,
       client_request_id TEXT,
+      request_fingerprint TEXT,
+      receipt_snapshot TEXT,
       card_usage_session_id INTEGER,
       FOREIGN KEY (member_number) REFERENCES members(member_number)
     );
@@ -1000,10 +1004,10 @@ function upgradeMemberTransactionsTypes(db: SqliteDb) {
   db.exec(`
     INSERT INTO member_transactions_new (
       id, member_number, type, detail, amount, payment_method, balance_after,
-      created_at, actor, slip_url, client_request_id, card_usage_session_id
+      created_at, actor, slip_url, client_request_id, request_fingerprint, receipt_snapshot, card_usage_session_id
     )
       SELECT id, member_number, type, detail, amount, payment_method, balance_after,
-        created_at, actor, slip_url, client_request_id, NULL
+        created_at, actor, slip_url, client_request_id, request_fingerprint, receipt_snapshot, NULL
       FROM member_transactions;
     DROP TABLE member_transactions;
     ALTER TABLE member_transactions_new RENAME TO member_transactions;

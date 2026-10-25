@@ -1,3 +1,4 @@
+import { walletRequestFingerprint, replayWalletReceipt } from "../domain/walletRequest";
 import type {
   WalletTxInput,
   WalletReceipt,
@@ -19,11 +20,12 @@ export function walletTxInTransaction(
   runtime: PaymentRuntime,
 ): WalletReceipt {
   // Replay before card validation: a completed refund has already released it.
+  const amount = validateWalletAmount(input.amount);
+  const requestFingerprint = input.clientRequestId ? walletRequestFingerprint(input, amount) : null;
   if (input.clientRequestId) {
     const existing = repository.findWalletByRequestId(input.clientRequestId);
-    if (existing) return existing;
+    if (existing) return replayWalletReceipt(existing, requestFingerprint!);
   }
-  const amount = validateWalletAmount(input.amount);
   const member =
     input.type === "refund"
       ? repository.findMember(input.memberNumber?.trim() ?? "")
@@ -33,7 +35,7 @@ export function walletTxInTransaction(
     runtime.formatDateTime(),
   );
   repository.setMemberBalance(member.memberNumber, plan.receipt.balanceAfter);
-  repository.insertMemberTransaction(plan.ledger);
+  repository.insertMemberTransaction({ ...plan.ledger, requestFingerprint, receiptSnapshot: input.clientRequestId ? plan.receipt : null });
   if (plan.releaseCard) {
     const card = plan.releaseCard;
     repository.releaseCard(

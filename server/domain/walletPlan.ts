@@ -7,8 +7,12 @@ import { StoreError } from "./storeError";
 import { money, round2 } from "./money";
 
 export function validateWalletAmount(value: number): number {
+  if (!Number.isFinite(value)) throw new StoreError("จำนวนเงินต้องเป็นตัวเลขที่ถูกต้อง");
   if (!(value > 0)) throw new StoreError("จำนวนเงินต้องมากกว่า 0");
-  return round2(value);
+  const amount = round2(value);
+  if (amount <= 0 || !Number.isSafeInteger(Math.round(amount * 100)))
+    throw new StoreError("จำนวนเงินต้องไม่น้อยกว่า 0.01 บาท และไม่เกินขอบเขตที่ระบบรองรับ");
+  return amount;
 }
 
 /** Shared rules for synchronous SQLite and future asynchronous repositories.

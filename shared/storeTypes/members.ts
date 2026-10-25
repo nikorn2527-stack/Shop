@@ -130,14 +130,16 @@ export type WalletTxInput = {
   amount: number;
   note?: string;
   actor?: string;
+  /** Authenticated operator identity supplied by the server, never trusted from the client. */
+  actorUserId?: number;
   actorRole?: string;
   /** ROUND 63 (user) — รูปหลักฐาน (สลิปโอน/ถอน) data-URL · ไม่แนบ = ไม่ส่ง */
   slipImage?: string | null;
   /**
    * P2-b (idempotency) — client-generated key (UUID) sent once per wallet
    * operation. Retries with the SAME key return the original transaction row
-   * instead of double-debiting/crediting the member. Omitted on legacy clients
-   * → no idempotency.
+   * instead of double-debiting/crediting the member. Public wallet API requires
+   * a nonempty key; only internal legacy callers may omit it.
    */
   clientRequestId?: string | null;
 };
