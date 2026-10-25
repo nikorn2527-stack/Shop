@@ -97,6 +97,7 @@ import {
   setProductActive,
   setSettings,
   setupInitialAdmin,
+  runInTransaction,
   stockCount,
   stockCountLots,
   listOrderItems,
@@ -657,22 +658,23 @@ export const appRouter = router({
       .mutation(({ ctx, input }) =>
         withStoreErrors(() => {
           const db = getWelfareDb();
-          const user = setupInitialAdmin(db, input);
-          // ROUND 61 — เวอร์ชันที่เลือกไว้ตอนลงทะเบียน (ค่าเริ่มต้น = ทดลองใช้ 30 วัน)
           const choice = input.editionChoice ?? "trial";
-          const storeName = (input.storeName ?? "").trim();
-          if (choice === "trial") {
-            setEditionSettings(db, { trialStart: todayString() });
-          } else if (choice === "license") {
-            const key = (input.licenseKey ?? "").trim();
-            const parsed = key ? parseLicenseKey(key) : null;
-            if (!parsed) {
-              throw new TRPCError({ code: "BAD_REQUEST", message: "รหัสลิขสิทธิ์ไม่ถูกต้อง — ตรวจอักขระให้ครบทุกกลุ่ม หรือเลือก “เริ่มทดลองใช้” ก่อนแล้วค่อยใส่รหัสภายหลังได้" });
-            }
-            setEditionSettings(db, { licenseKey: key, licenseName: storeName || user.displayName });
+          const key = (input.licenseKey ?? "").trim();
+          if (choice === "license" && !(key && parseLicenseKey(key))) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: "รหัสลิขสิทธิ์ไม่ถูกต้อง — ตรวจอักขระให้ครบทุกกลุ่ม หรือเลือก “เริ่มทดลองใช้” ก่อนแล้วค่อยใส่รหัสภายหลังได้" });
           }
-          const roleThai = "ผู้บริหาร";
-          const session = createAppSession(db, user.id);
+          // Account, settings, session and audit must either all persist or all roll back.
+          const { user, session } = runInTransaction(db, () => {
+            const user = setupInitialAdmin(db, input, true);
+            if (choice === "trial") {
+              setEditionSettings(db, { trialStart: todayString() });
+            } else if (choice === "license") {
+              setEditionSettings(db, { licenseKey: key, licenseName: input.storeName?.trim() || user.displayName });
+            }
+            const session = createAppSession(db, user.id, true);
+            logAction(db, "เข้าสู่ระบบ", user.displayName, `${user.username} · สิทธิ์ ผู้บริหาร`, "blue", "ผู้บริหาร");
+            return { user, session };
+          });
           ctx.res.cookie(COOKIE_NAME, session.sessionId, {
             httpOnly: true,
             path: "/",
@@ -680,7 +682,6 @@ export const appRouter = router({
             secure: isSecureRequest(ctx.req),
             maxAge: 7 * 24 * 60 * 60 * 1000,
           });
-          logAction(db, "เข้าสู่ระบบ", user.displayName, `${user.username} · สิทธิ์ ${roleThai}`, "blue", roleThai);
           return { id: user.id, username: user.username, displayName: user.displayName, role: user.role, mustChangePassword: true };
         }),
       ),
@@ -1128,7 +1129,7 @@ export const appRouter = router({
       requireAdmin(ctx, "การยกเลิกการผูกจุดขายต้องใช้สิทธิ์ผู้บริหาร");
       return releasePosTerminal(getWelfareDb(), input.id, ctx.user!.name ?? "ผู้บริหาร");
     })),
-    checkout: publicProcedure
+    checkout: permissionProcedure("POS.SELL")
       .input(checkoutInput)
       .mutation(({ ctx, input }) => {
         const { actor, actorRole } = resolveActor(ctx, input);
@@ -1137,10 +1138,10 @@ export const appRouter = router({
           requireLogin(ctx);
           // ROUND 61 — รายการพิเศษ/ของสั่ง (บรรทัดไม่มี productId) เป็นฟีเจอร์เวอร์ชันโปรพลัส
           if (input.items.some((item) => !("productId" in item))) requireEdition("specialOrders");
-          return checkout(getWelfareDb(), { ...input, cashier: input.cashier ?? actor, actorRole });
+          return checkout(getWelfareDb(), { ...input, cashier: actor, actorRole });
         });
       }),
-    void: publicProcedure
+    void: permissionProcedure("POS.VOID")
       .input(z.object({ saleId: z.number().int(), reason: z.string().min(1).max(500) }))
       .mutation(({ input, ctx }) => {
         requireLogin(ctx);

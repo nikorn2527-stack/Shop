@@ -2936,9 +2936,9 @@ function parseCutOffTime(value: string): { hours: number; minutes: number } {
 
 /** Totals in [since, until); a transaction at cutoff belongs to the new period. */
 function periodTotals(db: SqliteDb, since: string, until = "9999-12-31 23:59:59") {
-  const salesRows = db.prepare(`SELECT COUNT(*) AS bills, COALESCE(SUM(total), 0) AS revenue, SUM(CASE WHEN payment_method = 'เงินสด' THEN total ELSE 0 END) AS cashTotal, SUM(CASE WHEN payment_method = 'QR / สแกน' THEN total ELSE 0 END) AS qrTotal, SUM(CASE WHEN payment_method = 'หักบัญชีสมาชิก' THEN total ELSE 0 END) AS walletTotal FROM sales WHERE created_at >= ? AND created_at < ?`).get(since, until) as { bills: number; revenue: number; cashTotal: number | null; qrTotal: number | null; walletTotal: number | null };
-  const piecesRow = db.prepare(`SELECT COALESCE(SUM(si.qty), 0) AS pieces FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE s.created_at >= ? AND s.created_at < ?`).get(since, until) as { pieces: number };
-  const walletRows = db.prepare(`SELECT COUNT(CASE WHEN type = 'deposit' THEN 1 END) AS depositCount, COALESCE(SUM(CASE WHEN type = 'deposit' THEN amount ELSE 0 END), 0) AS depositAmount, COUNT(CASE WHEN type = 'activation' THEN 1 END) AS activationCount, COALESCE(SUM(CASE WHEN type = 'activation' THEN amount ELSE 0 END), 0) AS activationAmount, COUNT(CASE WHEN type = 'withdrawal' THEN 1 END) AS withdrawalCount, COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN ABS(amount) ELSE 0 END), 0) AS withdrawalAmount, COUNT(CASE WHEN type = 'refund' THEN 1 END) AS refundCount, COALESCE(SUM(CASE WHEN type = 'refund' THEN ABS(amount) ELSE 0 END), 0) AS refundAmount FROM member_transactions WHERE created_at >= ? AND created_at < ?`).get(since, until) as { depositCount: number; depositAmount: number; activationCount: number; activationAmount: number; withdrawalCount: number; withdrawalAmount: number; refundCount: number; refundAmount: number };
+  const salesRows = db.prepare(`SELECT COUNT(*) AS bills, COALESCE(SUM(total), 0) AS revenue, SUM(CASE WHEN payment_method = 'เงินสด' THEN total ELSE 0 END) AS cashTotal, SUM(CASE WHEN payment_method = 'QR / สแกน' THEN total ELSE 0 END) AS qrTotal, SUM(CASE WHEN payment_method = 'หักบัญชีสมาชิก' THEN total ELSE 0 END) AS walletTotal FROM sales WHERE COALESCE(voided, 0) = 0 AND created_at >= ? AND created_at < ?`).get(since, until) as { bills: number; revenue: number; cashTotal: number | null; qrTotal: number | null; walletTotal: number | null };
+  const piecesRow = db.prepare(`SELECT COALESCE(SUM(si.qty), 0) AS pieces FROM sale_items si JOIN sales s ON s.id = si.sale_id WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at < ?`).get(since, until) as { pieces: number };
+  const walletRows = db.prepare(`SELECT COUNT(CASE WHEN type = 'deposit' THEN 1 END) AS depositCount, COALESCE(SUM(CASE WHEN type = 'deposit' THEN amount ELSE 0 END), 0) AS depositAmount, COUNT(CASE WHEN type = 'activation' THEN 1 END) AS activationCount, COALESCE(SUM(CASE WHEN type = 'activation' THEN amount ELSE 0 END), 0) AS activationAmount, COUNT(CASE WHEN type = 'withdrawal' THEN 1 END) AS withdrawalCount, COALESCE(SUM(CASE WHEN type = 'withdrawal' THEN ABS(amount) ELSE 0 END), 0) AS withdrawalAmount, COUNT(CASE WHEN type = 'refund' AND amount < 0 THEN 1 END) AS refundCount, COALESCE(SUM(CASE WHEN type = 'refund' AND amount < 0 THEN ABS(amount) ELSE 0 END), 0) AS refundAmount FROM member_transactions WHERE created_at >= ? AND created_at < ?`).get(since, until) as { depositCount: number; depositAmount: number; activationCount: number; activationAmount: number; withdrawalCount: number; withdrawalAmount: number; refundCount: number; refundAmount: number };
   return {
     bills: salesRows.bills,
     pieces: piecesRow.pieces,
@@ -3606,14 +3606,16 @@ export function findAppUserByUsername(db: SqliteDb, username: string): AppUser |
 }
 
 /** Creates a new session row (uuid) expiring in 7 days; lazily purges expired sessions. */
-export function createAppSession(db: SqliteDb, userId: number): { sessionId: string; expiresAt: string } {
+export function createAppSession(db: SqliteDb, userId: number, insideTransaction = false): { sessionId: string; expiresAt: string } {
   const now = new Date();
   const sessionId = randomUUID();
   const expiresAt = formatDateTime(addDays(now, APP_SESSION_TTL_DAYS));
-  runInTransaction(db, () => {
+  const write = () => {
     db.prepare(`DELETE FROM app_sessions WHERE expires_at < ? OR user_id = ?`).run(formatDateTime(now), userId);
     db.prepare(`INSERT INTO app_sessions (id, user_id, expires_at, created_at, last_seen_at) VALUES (?, ?, ?, ?, ?)`).run(sessionId, userId, expiresAt, formatDateTime(now), formatDateTime(now));
-  });
+  };
+  if (insideTransaction) write();
+  else runInTransaction(db, write);
   return { sessionId, expiresAt };
 }
 
@@ -3758,31 +3760,34 @@ export function countAppUsers(db: SqliteDb): number {
  * (ฐานข้อมูลใหม่) สร้างบัญชีผู้บริหารหลักพร้อมตั้ง must_change_password = 1
  * ให้เจ้าของร้านต้องเปลี่ยนรหัสผ่านอีกครั้งหลังลงทะเบียน เพื่อยืนยันว่าไม่มีผู้อื่นรู้รหัส
  */
-export function setupInitialAdmin(db: SqliteDb, input: SetupInitialAdminInput): AppUserSummary {
-  if (countAppUsers(db) > 0) {
-    throw new StoreError("ระบบถูกตั้งค่าผู้บริหารไว้แล้ว · ไม่สามารถลงทะเบียนซ้ำได้");
-  }
-  const username = input.username?.trim() ?? "";
-  if (!username) throw new StoreError("กรุณาระบุชื่อผู้ใช้");
-  if (/\s/.test(username)) throw new StoreError("ชื่อผู้ใช้ห้ามมีช่องว่าง");
-  if (username.length > 30) throw new StoreError("ชื่อผู้ใช้ต้องไม่เกิน 30 ตัวอักษร");
-  if (db.prepare(`SELECT id FROM app_users WHERE LOWER(username) = LOWER(?)`).get(username)) {
-    throw new StoreError("มีชื่อผู้ใช้นี้ในระบบแล้ว");
-  }
-  const displayName = input.displayName?.trim() ?? "";
-  if (!displayName) throw new StoreError("กรุณาระบุชื่อ-นามสกุลผู้บริหาร");
-  const issues = validatePasswordStrength(input.password, "admin");
-  if (issues.length > 0) throw new StoreError(issues.join(" · "));
-  const createdAt = formatDateTime();
-  const result = db.prepare(
-    `INSERT INTO app_users (username, password_hash, display_name, role, active, created_at, must_change_password) VALUES (?, ?, ?, 'admin', 1, ?, 1)`,
-  ).run(username, hashPassword(input.password), displayName, createdAt);
-  const storeName = input.storeName?.trim() ?? "";
-  if (storeName) {
-    setSettings(db, { storeName, appName: storeName }, displayName, "ผู้บริหาร");
-  }
-  logAction(db, "ตั้งค่าระบบครั้งแรก", displayName, `สร้างบัญชีผู้บริหารหลัก @${username} · ชื่อร้าน ${storeName || "-"}`, "green", "ผู้บริหาร");
-  return getAppUserSummaryById(db, Number(result.lastInsertRowid))!;
+export function setupInitialAdmin(db: SqliteDb, input: SetupInitialAdminInput, insideTransaction = false): AppUserSummary {
+  const write = () => {
+    if (countAppUsers(db) > 0) {
+      throw new StoreError("ระบบถูกตั้งค่าผู้บริหารไว้แล้ว · ไม่สามารถลงทะเบียนซ้ำได้");
+    }
+    const username = input.username?.trim() ?? "";
+    if (!username) throw new StoreError("กรุณาระบุชื่อผู้ใช้");
+    if (/\s/.test(username)) throw new StoreError("ชื่อผู้ใช้ห้ามมีช่องว่าง");
+    if (username.length > 30) throw new StoreError("ชื่อผู้ใช้ต้องไม่เกิน 30 ตัวอักษร");
+    if (db.prepare(`SELECT id FROM app_users WHERE LOWER(username) = LOWER(?)`).get(username)) {
+      throw new StoreError("มีชื่อผู้ใช้นี้ในระบบแล้ว");
+    }
+    const displayName = input.displayName?.trim() ?? "";
+    if (!displayName) throw new StoreError("กรุณาระบุชื่อ-นามสกุลผู้บริหาร");
+    const issues = validatePasswordStrength(input.password, "admin");
+    if (issues.length > 0) throw new StoreError(issues.join(" · "));
+    const createdAt = formatDateTime();
+    const result = db.prepare(
+      `INSERT INTO app_users (username, password_hash, display_name, role, active, created_at, must_change_password) VALUES (?, ?, ?, 'admin', 1, ?, 1)`,
+    ).run(username, hashPassword(input.password), displayName, createdAt);
+    const storeName = input.storeName?.trim() ?? "";
+    if (storeName) {
+      setSettings(db, { storeName, appName: storeName }, displayName, "ผู้บริหาร");
+    }
+    logAction(db, "ตั้งค่าระบบครั้งแรก", displayName, `สร้างบัญชีผู้บริหารหลัก @${username} · ชื่อร้าน ${storeName || "-"}`, "green", "ผู้บริหาร");
+    return getAppUserSummaryById(db, Number(result.lastInsertRowid))!;
+  };
+  return insideTransaction ? write() : runInTransaction(db, write);
 }
 
 

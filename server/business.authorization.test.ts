@@ -31,6 +31,28 @@ function caller(appRole?: string) {
 }
 
 describe("business API permissions", () => {
+  it.each(["auditor", "stock_officer"])("blocks %s from checkout and void even with a valid login", async role => {
+    await expect(caller(role).pos.checkout({ items: [{ productId: 1, qty: 1 }], paymentMethod: "เงินสด" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller(role).pos.void({ saleId: 1, reason: "Unauthorized attempt" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(db.prepare("SELECT COUNT(*) AS n FROM sales").get()).toMatchObject({ n: 0 });
+  });
+
+  it("honors revoked POS permissions for an administrator", async () => {
+    db.prepare("DELETE FROM role_permissions WHERE role_name = ? AND permission_key IN ('POS.SELL', 'POS.VOID')").run("administrator");
+    await expect(caller("administrator").pos.checkout({ items: [{ productId: 1, qty: 1 }], paymentMethod: "เงินสด" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+    await expect(caller("administrator").pos.void({ saleId: 1, reason: "Revoked" })).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("records the authenticated cashier rather than a name supplied by the client", async () => {
+    const product = createProduct(db, { name: "Identity test", price: 10, stock: 1 });
+    const deviceId = "12345678-1234-4234-8234-123456789012";
+    registerPosTerminal(db, deviceId, 1, "Admin");
+    const receipt = await caller("cashier").pos.checkout({ terminalDeviceId: deviceId, items: [{ productId: product.id, qty: 1 }], paymentMethod: "เงินสด", receivedCash: 10, cashier: "Impersonated manager" });
+    expect(receipt.cashier).toBe("Test operator");
+    expect(db.prepare("SELECT cashier FROM sales WHERE order_number = ?").get(receipt.orderNumber)).toMatchObject({ cashier: "Test operator" });
+    expect(db.prepare("SELECT actor FROM audit_logs WHERE action = 'ขายสินค้า' ORDER BY id DESC LIMIT 1").get()).toMatchObject({ actor: "Test operator" });
+  });
+
   it("exposes only branding before login and protects operational settings", async () => {
     const brand = await caller().settings.brand();
     expect(Object.keys(brand).sort()).toEqual(["appName", "appLogo", "appTheme", "appStyle", "appBackground", "loginBackground"].sort());

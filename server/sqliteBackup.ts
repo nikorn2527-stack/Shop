@@ -1,5 +1,5 @@
 import { createHash, scryptSync, createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
-import { mkdirSync, readdirSync, statSync, unlinkSync, copyFileSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
+import { mkdirSync, readdirSync, statSync, unlinkSync, copyFileSync, writeFileSync, readFileSync, existsSync, rmSync, openSync, closeSync } from "node:fs";
 import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { tmpdir } from "node:os";
@@ -152,15 +152,28 @@ export function backupSqliteDatabase({ sourcePath, backupDir, retentionDays = 30
   if (!existsSync(source)) throw new Error(`SQLite source database not found: ${source}`);
   mkdirSync(destinationDir, { recursive: true });
 
-  // Checkpoint WAL content before copying the database file.
-  const sourceDb = new DatabaseSync(source);
-  try { sourceDb.exec("PRAGMA wal_checkpoint(TRUNCATE)"); } finally { sourceDb.close(); }
-
   const file = nextBackupFileName(destinationDir, now);
   const destination = join(destinationDir, file);
-  copyFileSync(source, destination);
-  // Verify the plain SQLite copy (still unencrypted at this point).
-  verifySqliteBackup(destination);
+  // Reserve this destination exclusively. VACUUM INTO accepts an empty file,
+  // but must never replace another caller's snapshot if names race or exhaust
+  // the timestamp collision window.
+  closeSync(openSync(destination, "wx"));
+  let sourceDb: InstanceType<typeof DatabaseSync> | undefined;
+  try {
+    sourceDb = new DatabaseSync(source, { readOnly: true });
+    // SQLite reads a consistent snapshot including committed WAL pages. A raw
+    // file copy after wal_checkpoint is unsafe: checkpoint can return busy,
+    // and a writer can commit again between checkpoint and copying the file.
+    sourceDb.prepare("VACUUM INTO ?").run(destination);
+    verifySqliteBackup(destination);
+  } catch (error) {
+    // Do not expose an incomplete snapshot in the backup list or fall back to
+    // copying only the main database file when snapshot creation fails.
+    rmSync(destination, { force: true });
+    throw error;
+  } finally {
+    sourceDb?.close();
+  }
 
   // P3 — if an encryption key is configured, replace the plain .sqlite with
   // an encrypted .sqlite.enc on disk and record the flag in the manifest.

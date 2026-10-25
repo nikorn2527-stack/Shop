@@ -2,11 +2,15 @@ import { afterEach, describe, expect, it } from "vitest";
 import { existsSync, mkdtempSync, rmSync, statSync, utimesSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { createRequire } from "node:module";
 import { backupSqliteDatabase, listSqliteBackups, pruneSqliteBackups, pruneSqliteBackupsByCount, readBackupManifest, restoreSqliteBackup, verifySqliteBackup } from "./sqliteBackup";
 import { createSqliteStore, seedSqliteDemoData } from "./sqliteStore";
 import { appRouter } from "./routers";
 import { closeWelfareDb, getWelfareDb } from "./welfareStore";
 import type { TrpcContext } from "./_core/context";
+
+const require = createRequire(import.meta.url);
+const { DatabaseSync } = require("node:sqlite") as typeof import("node:sqlite");
 
 let workDir = "";
 
@@ -16,6 +20,44 @@ afterEach(() => {
 });
 
 describe("SQLite backups", () => {
+  it("includes committed WAL rows when a reader prevents checkpointing and restores the complete snapshot", () => {
+    workDir = mkdtempSync(join(tmpdir(), "png-shop-backup-wal-"));
+    const sourcePath = join(workDir, "store.sqlite");
+    const backupDir = join(workDir, "backups");
+    const writer = createSqliteStore(sourcePath);
+    seedSqliteDemoData(writer);
+    writer.exec("PRAGMA journal_mode=WAL");
+    writer.exec("PRAGMA wal_checkpoint(TRUNCATE)");
+    const reader = new DatabaseSync(sourcePath, { readOnly: true });
+    try {
+      reader.exec("BEGIN");
+      expect(reader.prepare("SELECT COUNT(*) AS n FROM members").get()).toMatchObject({ n: 2 });
+      writer.prepare("INSERT INTO members (member_number, first_name, last_name, balance, status) VALUES (?, ?, ?, ?, ?)")
+        .run("WAL-COMMITTED", "Committed", "After reader", 123.45, "active");
+      expect(writer.prepare("PRAGMA wal_checkpoint(TRUNCATE)").get()).toMatchObject({ busy: 1 });
+
+      const manifest = backupSqliteDatabase({ sourcePath, backupDir });
+      const backupPath = join(backupDir, manifest.file);
+      expect(manifest.integrity).toBe("ok");
+      const restoredPath = join(workDir, "restored.sqlite");
+      restoreSqliteBackup({ backupPath, targetPath: restoredPath });
+      const restored = new DatabaseSync(restoredPath, { readOnly: true });
+      try {
+        expect(restored.prepare("SELECT COUNT(*) AS n FROM members").get()).toMatchObject({ n: 3 });
+        expect(restored.prepare("SELECT balance FROM members WHERE member_number = ?").get("WAL-COMMITTED")).toMatchObject({ balance: 123.45 });
+        expect(restored.prepare("PRAGMA integrity_check").get()).toMatchObject({ integrity_check: "ok" });
+        expect(restored.prepare("PRAGMA foreign_key_check").all()).toEqual([]);
+      } finally { restored.close(); }
+      // The backup must not alter the live reader's snapshot or source rows.
+      expect(reader.prepare("SELECT COUNT(*) AS n FROM members").get()).toMatchObject({ n: 2 });
+      expect(writer.prepare("SELECT COUNT(*) AS n FROM members").get()).toMatchObject({ n: 3 });
+    } finally {
+      reader.exec("ROLLBACK");
+      reader.close();
+      writer.close();
+    }
+  });
+
   it("creates a verified backup with a manifest and restores it", () => {
     workDir = mkdtempSync(join(tmpdir(), "png-shop-backup-"));
     const sourcePath = join(workDir, "store.sqlite");
