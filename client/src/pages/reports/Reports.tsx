@@ -1,5 +1,5 @@
 import { normalizeBillSearch } from "@/lib/billSearch";
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuSeparator, DropdownMenuGroup } from "@/components/ui/dropdown-menu";
 import { notify } from "@/lib/notifications";
 import { SharedSearch } from "@/components/SharedSearch";
 /**
@@ -178,7 +178,7 @@ function CategoryMultiControl({ options, selected, onSelect }: {
   onSelect: (name: string) => void;
 }) {
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <button type="button" className="outline-button compact report-category-toggle" aria-label="กรองหมวดสินค้า" title={selected.length ? selected.join(", ") : "ทุกหมวด"}>
           <span className="report-category-toggle-label">{selected.length ? selected.join(", ") : "ทุกหมวด"}</span>
@@ -186,11 +186,13 @@ function CategoryMultiControl({ options, selected, onSelect }: {
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" aria-label="หมวดสินค้ารายงาน">
+        <DropdownMenuGroup>
         <DropdownMenuCheckboxItem checked={selected.length === 0} onSelect={event => event.preventDefault()} onCheckedChange={() => onSelect("")}>ทุกหมวด</DropdownMenuCheckboxItem>
         <DropdownMenuSeparator />
         {options.map(name => (
           <DropdownMenuCheckboxItem key={name} checked={selected.includes(name)} onSelect={event => event.preventDefault()} onCheckedChange={() => onSelect(name)}>{name}</DropdownMenuCheckboxItem>
         ))}
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -1785,50 +1787,41 @@ export function Reports({
                       ariaLabel="กำหนดช่วงวันที่รายงานยอดขาย"
                     />
                   <CategoryMultiControl options={categoryOptions} selected={categoryFilters} onSelect={toggleCategoryFilter} />
-                  <div className="report-staff-multi" style={{ position: "relative" }}>
-                    <button
-                      type="button"
-                      className="outline-button compact report-staff-toggle"
-                      onClick={() => setStaffFilterOpen(open => !open)}
-                      aria-label="กรองตามพนักงานขาย — เลือกหลายคนพร้อมกันได้"
-                      title="เลือกพนักงานขาย — กดเพื่อเลือกหลายคนพร้อมกัน"
-                    >
-                      {staffFilters.length === 0
-                        ? `พนักงาน: ทุกคน`
-                        : staffFilters.length === 1
-                          ? staffFilters[0]
-                          : `พนักงาน: ${staffFilters.length} คน`}{" "}
-                      <ChevronDown size={14} weight="bold" />
-                    </button>
-                    {staffFilterOpen && (
-                      <div className="report-staff-dropdown" role="listbox">
-                        <label className="report-staff-option">
-                          <input
-                            type="checkbox"
-                            checked={staffFilters.length === 0}
-                            onChange={() => { setStaffFilters([]); }}
-                          />
+                  <DropdownMenu modal={false} open={staffFilterOpen} onOpenChange={setStaffFilterOpen}>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        className="outline-button compact report-staff-toggle"
+                        aria-label="กรองตามพนักงานขาย — เลือกหลายคนพร้อมกันได้"
+                        title="เลือกพนักงานขาย — กดเพื่อเลือกหลายคนพร้อมกัน"
+                      >
+                        {staffFilters.length === 0
+                          ? `พนักงาน: ทุกคน`
+                          : staffFilters.length === 1
+                            ? staffFilters[0]
+                            : `พนักงาน: ${staffFilters.length} คน`}{" "}
+                        <ChevronDown size={14} weight="bold" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" aria-label="พนักงานขายรายงาน">
+                      <DropdownMenuGroup>
+                        <DropdownMenuCheckboxItem checked={staffFilters.length === 0} onSelect={event => event.preventDefault()} onCheckedChange={() => setStaffFilters([])}>
                           ทุกคน ({cashierOptions.reduce((s, o) => s + o.bills, 0).toLocaleString("th-TH")} บิล)
-                        </label>
+                        </DropdownMenuCheckboxItem>
+                        <DropdownMenuSeparator />
                         {cashierOptions.map(option => (
-                          <label key={option.cashier} className="report-staff-option">
-                            <input
-                              type="checkbox"
-                              checked={staffFilters.includes(option.cashier)}
-                              onChange={() => {
-                                setStaffFilters(prev =>
-                                  prev.includes(option.cashier)
-                                    ? prev.filter(c => c !== option.cashier)
-                                    : [...prev, option.cashier]
-                                );
-                              }}
-                            />
+                          <DropdownMenuCheckboxItem
+                            key={option.cashier}
+                            checked={staffFilters.includes(option.cashier)}
+                            onSelect={event => event.preventDefault()}
+                            onCheckedChange={() => setStaffFilters(prev => prev.includes(option.cashier) ? prev.filter(c => c !== option.cashier) : [...prev, option.cashier])}
+                          >
                             {option.cashier} · {option.bills.toLocaleString("th-TH")} บิล
-                          </label>
+                          </DropdownMenuCheckboxItem>
                         ))}
-                      </div>
-                    )}
-                  </div>
+                      </DropdownMenuGroup>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
                 <div
                   className="report-export-actions"
@@ -2816,7 +2809,7 @@ export function Reports({
                     placeholder="กรองตามสมาชิก — คีย์เลขสมาชิก หรือยิงบาร์โค้ด"
                     inputId="tx-member-filter-input"
                   />
-                  <DropdownMenu>
+                  <DropdownMenu modal={false}>
                     <DropdownMenuTrigger asChild>
                       <button type="button" className="outline-button tx-type-trigger" aria-label={`ประเภทธุรกรรม: ${txTypes.length ? txTypes.map(type => TX_TYPE_LABEL[type]).join(" / ") : "ทั้งหมด"}`} title={txTypes.length ? txTypes.map(type => TX_TYPE_LABEL[type]).join(" / ") : "ทุกประเภทธุรกรรม"}>
                         <span>{txTypes.length === 0 ? "ทั้งหมด" : txTypes.length === 1 ? TX_TYPE_LABEL[txTypes[0]] : `เลือก ${txTypes.length} ประเภท`}</span>
@@ -2824,9 +2817,11 @@ export function Reports({
                       </button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="tx-type-menu" aria-label="ประเภทธุรกรรม (เลือกได้หลายประเภท)">
+                      <DropdownMenuGroup>
                       <DropdownMenuCheckboxItem checked={txTypes.length === 0} onCheckedChange={() => setTxTypes([])} onSelect={event => event.preventDefault()}>ทั้งหมด</DropdownMenuCheckboxItem>
                       <DropdownMenuSeparator />
                       {(["purchase", "deposit", "withdrawal", "activation", "refund"] as const).map(value => <DropdownMenuCheckboxItem key={value} checked={txTypes.includes(value)} onCheckedChange={() => toggleTxType(value)} onSelect={event => event.preventDefault()}>{TX_TYPE_LABEL[value]}</DropdownMenuCheckboxItem>)}
+                      </DropdownMenuGroup>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>

@@ -72,9 +72,9 @@ export function ThaiDatePicker({ value, onChange, min, max, ariaLabel = "เล�
       if (wrapRef.current && !wrapRef.current.contains(event.target as Node) && !popRef.current?.contains(event.target as Node)) setOpen(false);
     };
     const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
-    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("pointerdown", onDocClick, true);
     document.addEventListener("keydown", onKey);
-    return () => { document.removeEventListener("mousedown", onDocClick); document.removeEventListener("keydown", onKey); window.removeEventListener("resize", updatePosition); window.removeEventListener("scroll", updatePosition, true); };
+    return () => { document.removeEventListener("pointerdown", onDocClick, true); document.removeEventListener("keydown", onKey); window.removeEventListener("resize", updatePosition); window.removeEventListener("scroll", updatePosition, true); };
   }, [open, viewMonth, viewYear]);
   const minDate = useMemo(() => fromIso(min ?? "") ?? null, [min]);
   const maxDate = useMemo(() => fromIso(max ?? "") ?? null, [max]);

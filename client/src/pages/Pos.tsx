@@ -669,7 +669,7 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
     }
     onFocusProductConsumed?.();
   }, [focusProductId, productsQuery.isLoading, products, onFocusProductConsumed]);
-  const pickScanProduct = (product: Product) => { addProduct(product); setQuery(""); closeScanDrop(); focusScan(); };
+  const pickScanProduct = (product: Product) => { addProduct(product); setQuery(""); focusScan(); closeScanDrop(); };
   const pickScanMember = (member: MemberLite) => { setQuery(""); closeScanDrop(); openMemberVerify(member); };
   // ROUND 55 — codeArg = รหัสที่มาจากกล้อง: เข้าสู่ตรวจสมาชิก/สินค้าเหมือนปืนสแกนทุกประการ
   const handleScanSubmit = (codeArg?: string) => {
@@ -1087,8 +1087,8 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
     const onDoc = (event: MouseEvent) => {
       if (scanHeroRef.current && !scanHeroRef.current.contains(event.target as Node)) { setScanOpen(false); setScanHighlight(-1); }
     };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
+    document.addEventListener("pointerdown", onDoc, true);
+    return () => document.removeEventListener("pointerdown", onDoc, true);
   }, []);
   useEffect(() => {
     if (scanHighlight < 0) return;

@@ -104,8 +104,8 @@ export function MemberScanPicker({
     const onDoc = (event: MouseEvent) => {
       if (wrapRef.current && !wrapRef.current.contains(event.target as Node)) setOpen(false);
     };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
+    document.addEventListener("pointerdown", onDoc, true);
+    return () => document.removeEventListener("pointerdown", onDoc, true);
   }, []);
 
   const pick = (member: MemberLite | null) => {
@@ -376,8 +376,8 @@ export function ProductScanPicker({
     const onDoc = (event: MouseEvent) => {
       if (wrapRef.current && !wrapRef.current.contains(event.target as Node)) setOpen(false);
     };
-    document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
+    document.addEventListener("pointerdown", onDoc, true);
+    return () => document.removeEventListener("pointerdown", onDoc, true);
   }, []);
 
   useEffect(() => {

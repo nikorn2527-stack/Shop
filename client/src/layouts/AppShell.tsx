@@ -252,10 +252,10 @@ export function AppShell({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") setNotifOpen(false);
     };
-    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("pointerdown", onPointerDown, true);
     document.addEventListener("keydown", onKeyDown);
     return () => {
-      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("pointerdown", onPointerDown, true);
       document.removeEventListener("keydown", onKeyDown);
     };
   }, [notifOpen]);

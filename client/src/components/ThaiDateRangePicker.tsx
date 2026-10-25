@@ -86,12 +86,12 @@ export function ThaiDateRangePicker({
     const closeEscape = (event: KeyboardEvent) => { if (event.key === "Escape") setOpen(false); };
     window.addEventListener("resize", updatePosition);
     window.addEventListener("scroll", updatePosition, true);
-    document.addEventListener("mousedown", closeOutside);
+    document.addEventListener("pointerdown", closeOutside, true);
     document.addEventListener("keydown", closeEscape);
     return () => {
       window.removeEventListener("resize", updatePosition);
       window.removeEventListener("scroll", updatePosition, true);
-      document.removeEventListener("mousedown", closeOutside);
+      document.removeEventListener("pointerdown", closeOutside, true);
       document.removeEventListener("keydown", closeEscape);
     };
   }, [open, viewMonth, viewYear]);
