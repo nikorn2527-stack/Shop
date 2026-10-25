@@ -13,6 +13,8 @@ import type {
 import { StoreError } from "../domain/storeError";
 import { money, round2 } from "../domain/money";
 
+import { catalogLinePricing } from "../domain/checkoutPricing";
+
 const WALLET_PAYMENT = "หักบัญชีสมาชิก";
 
 function summarizeItems(items: { name: string; qty: number; unit: string }[]) {
@@ -63,7 +65,7 @@ export function checkoutInTransaction(
     { name: string; price: number; qty: number; unit: string }
   >();
   for (const item of input.items) {
-    if (!Number.isInteger(item.qty) || item.qty <= 0)
+    if (!Number.isSafeInteger(item.qty) || item.qty <= 0)
       throw new StoreError("จำนวนต้องมากกว่า 0");
     if ("productId" in item) {
       if (!Number.isInteger(item.productId) || item.productId <= 0)
@@ -84,7 +86,7 @@ export function checkoutInTransaction(
     } else {
       const name = item.name.trim();
       if (!name) throw new StoreError("กรุณาระบุชื่อรายการพิเศษ");
-      if (!(item.price > 0))
+      if (!Number.isFinite(item.price) || !(item.price > 0))
         throw new StoreError("ราคารายการพิเศษต้องมากกว่า 0");
       const unit = item.unit?.trim() || "รายการ";
       const key = `${name.toLowerCase()}|${item.price}|${unit}`;
@@ -131,15 +133,15 @@ export function checkoutInTransaction(
   }[] = [
     ...Array.from(merged.values()).map((line) => {
       const product = products.get(line.productId)!;
-      const unitPrice = line.price ?? product.price;
+      const pricing = catalogLinePricing(product, line);
       return {
         productId: line.productId,
-        name: line.label ? `${product.name} · ${line.label}` : product.name,
-        unit: line.unit ?? product.unit,
+        name: pricing.name,
+        unit: pricing.unit,
         qty: line.qty,
-        price: unitPrice,
+        price: pricing.price,
         cost: product.cost,
-        amount: round2(unitPrice * line.qty),
+        amount: pricing.amount,
       };
     }),
     ...Array.from(specials.values()).map((special) => ({
@@ -150,9 +152,17 @@ export function checkoutInTransaction(
     })),
   ];
   const subtotal = round2(items.reduce((sum, item) => sum + item.amount, 0));
-  const discount = round2(Math.max(0, input.discount ?? 0));
+  if (!Number.isFinite(subtotal) || !Number.isFinite(input.discount ?? 0) || (input.discount ?? 0) < 0)
+    throw new StoreError("ยอดรวมสินค้าหรือส่วนลดไม่ถูกต้อง");
+  const discount = round2(input.discount ?? 0);
   if (discount > subtotal) throw new StoreError("ส่วนลดมากกว่ายอดรวมสินค้า");
   const total = round2(subtotal - discount);
+  // Legacy internal callers may omit cash details. The public API requires them.
+  const receivedCash = input.paymentMethod === "เงินสด" && input.receivedCash != null
+    ? round2(input.receivedCash) : null;
+  if (receivedCash !== null && (!Number.isFinite(receivedCash) || receivedCash < total || receivedCash < 0))
+    throw new StoreError("ยอดรับเงินสดไม่เพียงพอหรือไม่ถูกต้อง");
+  const changeDue = receivedCash === null ? null : round2(receivedCash - total);
 
   let member: Member | undefined;
   if (input.memberNumber?.trim())
@@ -186,18 +196,8 @@ export function checkoutInTransaction(
     createdAt,
     slipImage,
     clientRequestId: input.clientRequestId ?? null,
-    receivedCash:
-      input.paymentMethod === "เงินสด"
-        ? typeof input.receivedCash === "number"
-          ? round2(input.receivedCash)
-          : null
-        : null,
-    changeDue:
-      input.paymentMethod === "เงินสด"
-        ? typeof input.changeDue === "number"
-          ? round2(input.changeDue)
-          : null
-        : null,
+    receivedCash,
+    changeDue,
     paymentVerified:
       input.paymentMethod === "QR / สแกน" ? !!input.paymentVerified : null,
     terminalId: terminal?.id ?? null,
@@ -294,18 +294,8 @@ export function checkoutInTransaction(
     terminalId: terminal?.id ?? null,
     terminalNumber: terminal?.number ?? null,
     // FIX-7 — ส่งยอดเงินสด/ทอน และ flag ยืนยันกลับไปแสดงในใบเสร็จ
-    receivedCash:
-      input.paymentMethod === "เงินสด"
-        ? typeof input.receivedCash === "number"
-          ? round2(input.receivedCash)
-          : null
-        : null,
-    changeDue:
-      input.paymentMethod === "เงินสด"
-        ? typeof input.changeDue === "number"
-          ? round2(input.changeDue)
-          : null
-        : null,
+    receivedCash,
+    changeDue,
     paymentVerified:
       input.paymentMethod === "QR / สแกน" ? !!input.paymentVerified : null,
   };

@@ -161,6 +161,7 @@ describe("POS browser registration and historical attribution", () => {
       terminalDeviceId: device,
       items: [{ productId: product.id, qty: 1 }],
       paymentMethod: "เงินสด",
+      receivedCash: 10,
       clientRequestId: "station-api-retry",
     });
     expect(receipt).toMatchObject({ terminalNumber: 2 });
@@ -180,6 +181,7 @@ describe("POS browser registration and historical attribution", () => {
         terminalDeviceId: device,
         items: [{ productId: 1, qty: 1 }],
         paymentMethod: "เงินสด",
+      receivedCash: 10,
       })
     ).rejects.toThrow(/ยังไม่ได้กำหนดจุดขาย/);
     expect(salesList(db)).toHaveLength(0);

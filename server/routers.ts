@@ -98,6 +98,7 @@ import {
   setSettings,
   setupInitialAdmin,
   runInTransaction,
+  hasPermission,
   stockCount,
   stockCountLots,
   listOrderItems,
@@ -328,6 +329,13 @@ const checkoutInput = z.object({
   // FIX-7 (user) — แคชเชียร์ยืนยันตรวจสอบการชำระแล้ว (เฉพาะ "QR / สแกน")
   // บังคับให้ติ๊ก checkbox ก่อนปุ่ม "ยืนยันการชำระเงิน" ถึงจะ enable
   paymentVerified: z.boolean().nullish(),
+}).superRefine((input, ctx) => {
+  if (input.paymentMethod === "เงินสด" && input.receivedCash == null) {
+    ctx.addIssue({ code: "custom", path: ["receivedCash"], message: "กรุณาระบุยอดรับเงินสดก่อนชำระเงิน" });
+  }
+  if (input.paymentMethod === "QR / สแกน" && input.paymentVerified !== true) {
+    ctx.addIssue({ code: "custom", path: ["paymentVerified"], message: "กรุณาตรวจสอบและยืนยันการชำระ QR ก่อนบันทึกบิล" });
+  }
 });
 
 const productCreateInput = z.object({
@@ -1136,9 +1144,18 @@ export const appRouter = router({
         return withStoreErrors(() => {
           // P1-c — การขายต้องมีเซสชันเจ้าหน้าที่ เพื่อให้ติดตามตัวผู้ขายได้
           requireLogin(ctx);
-          // ROUND 61 — รายการพิเศษ/ของสั่ง (บรรทัดไม่มี productId) เป็นฟีเจอร์เวอร์ชันโปรพลัส
-          if (input.items.some((item) => !("productId" in item))) requireEdition("specialOrders");
-          return checkout(getWelfareDb(), { ...input, cashier: actor, actorRole });
+          const db = getWelfareDb();
+          const role = ctx.user!.appRole ?? (ctx.user!.role === "admin" ? "administrator" : "cashier");
+          if ((input.discount ?? 0) > 0 && !hasPermission(db, role, "POS.DISCOUNT")) {
+            throw new TRPCError({ code: "FORBIDDEN", message: "บัญชีนี้ไม่มีสิทธิ์ให้ส่วนลด" });
+          }
+          if (input.items.some((item) => !("productId" in item))) {
+            if (!hasPermission(db, role, "POS.SPECIAL")) {
+              throw new TRPCError({ code: "FORBIDDEN", message: "บัญชีนี้ไม่มีสิทธิ์ขายรายการพิเศษ" });
+            }
+            requireEdition("specialOrders");
+          }
+          return checkout(db, { ...input, cashier: actor, actorRole });
         });
       }),
     void: permissionProcedure("POS.VOID")
