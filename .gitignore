@@ -139,3 +139,6 @@ tool-results/
 
 # Structural migration reports may include customer database aggregates.
 migration-reports/
+
+# Isolated Windows/LAN test database, backups and local session secret
+.lan-test/
