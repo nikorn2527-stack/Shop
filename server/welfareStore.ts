@@ -1,4 +1,5 @@
 import { resolve } from "node:path";
+import { requireSqliteProvider } from "./database/provider";
 import { openWelfareStore, type SqliteDb } from "./sqliteStore";
 
 let welfareDb: SqliteDb | undefined;
@@ -28,6 +29,7 @@ export function getBackupDir(): string {
  * Lazy on purpose: tests importing the router must not touch the real file.
  */
 export function getWelfareDb(): SqliteDb {
+  requireSqliteProvider();
   welfareDb ??= openWelfareStore(getWelfareDbPath());
   return welfareDb;
 }

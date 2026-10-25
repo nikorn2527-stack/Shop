@@ -18,6 +18,7 @@
     "promote:admin": "tsx scripts/promote-admin.ts",
     "check:db": "tsx scripts/check-db.ts",
     "db:postgres:preflight": "tsx scripts/postgres-preflight.ts",
+    "db:postgres:export": "tsx scripts/postgres-export.ts",
     "db:push": "drizzle-kit generate && drizzle-kit migrate"
   },
   "dependencies": {

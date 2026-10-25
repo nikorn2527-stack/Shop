@@ -142,3 +142,6 @@ migration-reports/
 
 # Isolated Windows/LAN test database, backups and local session secret
 .lan-test/
+
+# Private SQL rehearsal exports contain customer data, password hashes and sessions.
+migration-private/

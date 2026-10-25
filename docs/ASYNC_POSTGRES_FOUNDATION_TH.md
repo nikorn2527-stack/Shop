@@ -2,7 +2,7 @@
 
 ## สถานะ
 
-เพิ่มโครงสร้างและทดสอบสัญญาการทำงานแล้ว แต่ยังไม่มีไลบรารี `pg`, PostgreSQL server, business repository หรือการย้ายข้อมูลจริง แอปยังใช้ SQLite เช่นเดิม ไม่เปิดเส้นทางให้เลือก PostgreSQL และไม่ใส่ await ลงใน transaction wrapper ของ SQLite
+เพิ่มโครงสร้างและทดสอบสัญญาการทำงานแล้ว รวมถึง [schema และเครื่องมือสร้าง SQL สำหรับซ้อมย้าย 25 ตาราง](POSTGRES_REHEARSAL_TH.md) ที่ยังไม่ได้รันนำเข้าบน PostgreSQL จริง แต่ยังไม่มีไลบรารี `pg`, PostgreSQL server, business repository หรือการย้ายข้อมูลจริง แอปยังใช้ SQLite เช่นเดิม ไม่เปิดเส้นทางให้เลือก PostgreSQL และไม่ใส่ await ลงใน transaction wrapper ของ SQLite
 
 | ส่วน | หน้าที่ |
 | --- | --- |
