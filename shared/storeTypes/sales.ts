@@ -95,6 +95,8 @@ export type CheckoutInput = {
   memberNumber?: string | null;
   discount?: number;
   cashier?: string;
+  /** Server-supplied authenticated identity; public checkout ignores client-supplied values. */
+  cashierUserId?: number;
   actorRole?: string;
   /** ROUND 63 (user) — รูปหลักฐานการชำระ (สลิปโอน/สแกนจ่าย) data-URL · ไม่แนบ = ไม่ส่ง */
   slipImage?: string | null;

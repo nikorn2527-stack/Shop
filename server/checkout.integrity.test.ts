@@ -16,7 +16,7 @@ afterEach(() => { db.close(); vi.clearAllMocks(); });
 function api() {
   return appRouter.createCaller({ user: { id: 1, name: "Cashier", role: "user", appRole: "cashier" } as TrpcContext["user"], req: { headers: {} } as TrpcContext["req"], res: {} as TrpcContext["res"] });
 }
-function bill() { return { terminalDeviceId: deviceId, items: [{ productId, qty: 1 }], paymentMethod: "เงินสด" as const, receivedCash: 100 }; }
+function bill() { return { clientRequestId: "integrity-attempt", terminalDeviceId: deviceId, items: [{ productId, qty: 1 }], paymentMethod: "เงินสด" as const, receivedCash: 100 }; }
 function expectUnchanged() {
   expect(db.prepare("SELECT stock FROM products WHERE id=?").get(productId)).toMatchObject({ stock: 10 });
   for (const table of ["sales", "sale_items", "member_transactions", "stock_movements"]) {
@@ -24,6 +24,10 @@ function expectUnchanged() {
   }
 }
 describe("checkout API payment integrity", () => {
+  it.each([undefined, null, "", "   "])("requires a nonempty request ID before payment: %s", async clientRequestId => {
+    await expect(api().pos.checkout({ ...bill(), clientRequestId })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expectUnchanged();
+  });
   it.each([undefined, null, 0, 99, NaN, Infinity])("rejects missing, invalid or insufficient cash: %s", async receivedCash => {
     await expect(api().pos.checkout({ ...bill(), receivedCash })).rejects.toMatchObject({ code: "BAD_REQUEST" });
     expectUnchanged();
@@ -34,6 +38,7 @@ describe("checkout API payment integrity", () => {
     expect(receipt).toMatchObject({ total: 100, receivedCash: 150, changeDue: 50, paymentVerified: null });
     expect(db.prepare("SELECT received_cash, change_due FROM sales").get()).toMatchObject({ received_cash: 150, change_due: 50 });
     await expect(api().pos.checkout(input)).resolves.toEqual(receipt);
+    await expect(api().pos.checkout({ ...input, items: [{ productId, qty: 2 }] })).rejects.toMatchObject({ code: "BAD_REQUEST" });
     expect(db.prepare("SELECT stock FROM products WHERE id=?").get(productId)).toMatchObject({ stock: 9 });
   });
   it.each([undefined, null, false])("requires QR cashier confirmation: %s", async paymentVerified => {

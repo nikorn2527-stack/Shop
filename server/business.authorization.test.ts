@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TrpcContext } from "./_core/context";
-import { createSqliteStore, createProduct, createBlankCards, registerMember, registerPosTerminal, getMemberDetail, ensureRbacSeed, type SqliteDb } from "./sqliteStore";
+import { createSqliteStore, closeBusinessDay, createProduct, createBlankCards, registerMember, registerPosTerminal, getMemberDetail, ensureRbacSeed, type SqliteDb } from "./sqliteStore";
 
 const store = vi.hoisted(() => ({ get: vi.fn() }));
 vi.mock("./welfareStore", () => ({
@@ -47,10 +47,23 @@ describe("business API permissions", () => {
     const product = createProduct(db, { name: "Identity test", price: 10, stock: 1 });
     const deviceId = "12345678-1234-4234-8234-123456789012";
     registerPosTerminal(db, deviceId, 1, "Admin");
-    const receipt = await caller("cashier").pos.checkout({ terminalDeviceId: deviceId, items: [{ productId: product.id, qty: 1 }], paymentMethod: "เงินสด", receivedCash: 10, cashier: "Impersonated manager" });
+    const receipt = await caller("cashier").pos.checkout({ terminalDeviceId: deviceId, items: [{ productId: product.id, qty: 1 }], paymentMethod: "เงินสด", receivedCash: 10, clientRequestId: "cashier-identity", cashier: "Impersonated manager" });
     expect(receipt.cashier).toBe("Test operator");
     expect(db.prepare("SELECT cashier FROM sales WHERE order_number = ?").get(receipt.orderNumber)).toMatchObject({ cashier: "Test operator" });
     expect(db.prepare("SELECT actor FROM audit_logs WHERE action = 'ขายสินค้า' ORDER BY id DESC LIMIT 1").get()).toMatchObject({ actor: "Test operator" });
+  });
+
+  it("maps cancellation of a closed-period bill to BAD_REQUEST without reversing stock", async () => {
+    const product = createProduct(db, { name: "Closed receipt", price: 10, stock: 2 });
+    const deviceId = "12345678-1234-4234-8234-123456789012";
+    registerPosTerminal(db, deviceId, 1, "Admin");
+    const api = caller("administrator");
+    await api.pos.checkout({ terminalDeviceId: deviceId, items: [{ productId: product.id, qty: 1 }], paymentMethod: "เงินสด", receivedCash: 10, clientRequestId: "closed-bill" });
+    closeBusinessDay(db, { actor: "Admin" });
+    const sale = db.prepare("SELECT id FROM sales").get() as { id: number };
+    await expect(api.pos.void({ saleId: sale.id, reason: "Closed period" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(db.prepare("SELECT stock FROM products WHERE id=?").get(product.id)).toMatchObject({ stock: 1 });
+    expect(db.prepare("SELECT COUNT(*) AS n FROM refunds").get()).toMatchObject({ n: 0 });
   });
 
   it("exposes only branding before login and protects operational settings", async () => {
@@ -152,7 +165,7 @@ describe("business API permissions", () => {
     const product = createProduct(db, { name: "API expensive", price: 10, stock: 1 });
     const deviceId = "12345678-1234-4234-8234-123456789012";
     registerPosTerminal(db, deviceId, 1, "Test admin");
-    await expect(api.pos.checkout({ terminalDeviceId: deviceId, memberNumber: member.memberNumber, items: [{ productId: product.id, qty: 1 }], paymentMethod: "หักบัญชีสมาชิก" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(api.pos.checkout({ terminalDeviceId: deviceId, memberNumber: member.memberNumber, items: [{ productId: product.id, qty: 1 }], paymentMethod: "หักบัญชีสมาชิก", clientRequestId: "insufficient-wallet" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
     await expect(api.member.wallet({ memberNumber: member.memberNumber, type: "withdrawal", amount: 10 })).rejects.toMatchObject({ code: "BAD_REQUEST" });
     expect(getMemberDetail(db, member.memberNumber)?.member.balance).toBe(5);
     expect(db.prepare("SELECT stock FROM products WHERE id = ?").get(product.id)).toMatchObject({ stock: 1 });

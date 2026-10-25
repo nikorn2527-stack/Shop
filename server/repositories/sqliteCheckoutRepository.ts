@@ -1,3 +1,4 @@
+import { StoreError } from "../domain/storeError";
 import type { SqliteDb } from "../sqliteStore";
 import type { CheckoutReceipt } from "../../shared/storeTypes/sales";
 import type { CheckoutRepository } from "./checkoutRepository";
@@ -26,6 +27,9 @@ export function createSqliteCheckoutRepository(
   const repository: CheckoutRepository = {
     findCheckoutByRequestId: (requestId) =>
       findCheckoutByRequestId(db, requestId),
+    saveCheckoutReceipt: (saleId, receipt) => {
+      db.prepare("UPDATE sales SET receipt_snapshot = ? WHERE id = ?").run(JSON.stringify(receipt), saleId);
+    },
     findTerminal: delegates.findTerminal,
     findProduct: delegates.findProduct,
     requireUsableMember: delegates.requireUsableMember,
@@ -39,7 +43,7 @@ export function createSqliteCheckoutRepository(
     insertSale(input) {
       const result = db
         .prepare(
-          `INSERT INTO sales (order_number, payment_method, member_number, subtotal, discount, total, cashier, created_at, slip_url, client_request_id, received_cash, change_due, payment_verified, terminal_id, terminal_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO sales (order_number, payment_method, member_number, subtotal, discount, total, cashier, created_at, slip_url, client_request_id, received_cash, change_due, payment_verified, terminal_id, terminal_number, request_fingerprint) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           input.orderNumber,
@@ -57,12 +61,13 @@ export function createSqliteCheckoutRepository(
           input.paymentVerified == null ? null : input.paymentVerified ? 1 : 0,
           input.terminalId ?? null,
           input.terminalNumber ?? null,
+          input.requestFingerprint,
         );
       return Number(result.lastInsertRowid);
     },
     insertSaleItem(saleId, item) {
       itemInsert ??= db.prepare(
-        "INSERT INTO sale_items (sale_id, product_id, name, qty, price, cost, unit) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        "INSERT INTO sale_items (sale_id, product_id, name, qty, price, cost, unit, amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
       );
       return Number(
         itemInsert.run(
@@ -73,6 +78,7 @@ export function createSqliteCheckoutRepository(
           item.price,
           item.cost,
           item.unit,
+          item.amount,
         ).lastInsertRowid,
       );
     },
@@ -103,13 +109,16 @@ export function createSqliteCheckoutRepository(
 function findCheckoutByRequestId(
   db: SqliteDb,
   requestId: string,
-): CheckoutReceipt | undefined {
+): ReturnType<CheckoutRepository["findCheckoutByRequestId"]> {
   const existing = db
     .prepare(
-      `SELECT id, order_number AS orderNumber, created_at AS createdAt, subtotal, discount, total, payment_method AS paymentMethod, member_number AS memberNumber, cashier, terminal_id AS terminalId, terminal_number AS terminalNumber, received_cash AS receivedCash, change_due AS changeDue, payment_verified AS paymentVerified FROM sales WHERE client_request_id = ? LIMIT 1`,
+      `SELECT request_fingerprint AS requestFingerprint, receipt_snapshot AS receiptSnapshot, COALESCE(voided, 0) AS voided, id, order_number AS orderNumber, created_at AS createdAt, subtotal, discount, total, payment_method AS paymentMethod, member_number AS memberNumber, cashier, terminal_id AS terminalId, terminal_number AS terminalNumber, received_cash AS receivedCash, change_due AS changeDue, payment_verified AS paymentVerified FROM sales WHERE client_request_id = ? LIMIT 1`,
     )
     .get(requestId) as
     | {
+        requestFingerprint: string | null;
+        receiptSnapshot: string | null;
+        voided: number;
         terminalId: string | null;
         terminalNumber: number | null;
         id: number;
@@ -127,9 +136,17 @@ function findCheckoutByRequestId(
       }
     | undefined;
   if (existing) {
+    if (existing.receiptSnapshot) {
+      let receipt: CheckoutReceipt;
+      try {
+        receipt = JSON.parse(existing.receiptSnapshot) as CheckoutReceipt;
+        if (receipt.orderNumber !== existing.orderNumber || !Array.isArray(receipt.items)) throw new Error("Invalid snapshot");
+      } catch { throw new StoreError("ข้อมูลบิลเดิมไม่สมบูรณ์ กรุณาตรวจสอบประวัติบิลก่อนชำระอีกครั้ง"); }
+      return { receipt, requestFingerprint: existing.requestFingerprint, voided: existing.voided === 1 };
+    }
     const itemRows = db
       .prepare(
-        `SELECT product_id AS productId, name, COALESCE(unit, 'ชิ้น') AS unit, qty, price, ROUND(qty * price, 2) AS amount FROM sale_items WHERE sale_id = ?`,
+        `SELECT product_id AS productId, name, COALESCE(unit, 'ชิ้น') AS unit, qty, price, COALESCE(amount, ROUND(qty * price, 2)) AS amount FROM sale_items WHERE sale_id = ?`,
       )
       .all(existing.id) as {
       productId: number | null;
@@ -139,8 +156,8 @@ function findCheckoutByRequestId(
       price: number;
       amount: number;
     }[];
-    // Replay memberName + balanceAfter the same way salesList() does so the
-    // reprinted slip is byte-identical to the original.
+    // Reconstruct legacy receipts for diagnosis. A public retry cannot trust
+    // an old key without its original request fingerprint.
     let memberName: string | null = null;
     let balanceAfter: number | null = null;
     if (existing.memberNumber) {
@@ -166,7 +183,7 @@ function findCheckoutByRequestId(
         { balanceAfter: number | null } | undefined;
       balanceAfter = balanceRow?.balanceAfter ?? null;
     }
-    return {
+    return { requestFingerprint: existing.requestFingerprint, voided: existing.voided === 1, receipt: {
       orderNumber: existing.orderNumber,
       createdAt: existing.createdAt,
       items: itemRows,
@@ -189,6 +206,6 @@ function findCheckoutByRequestId(
           : existing.paymentVerified === 0
             ? false
             : null,
-    };
+    } };
   }
 }

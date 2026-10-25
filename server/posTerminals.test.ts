@@ -181,7 +181,8 @@ describe("POS browser registration and historical attribution", () => {
         terminalDeviceId: device,
         items: [{ productId: 1, qty: 1 }],
         paymentMethod: "เงินสด",
-      receivedCash: 10,
+        receivedCash: 10,
+        clientRequestId: "unregistered-terminal",
       })
     ).rejects.toThrow(/ยังไม่ได้กำหนดจุดขาย/);
     expect(salesList(db)).toHaveLength(0);

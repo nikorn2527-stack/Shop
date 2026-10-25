@@ -318,9 +318,8 @@ const checkoutInput = z.object({
   slipImage: z.string().max(600_000).nullish(),
   // P2-b (idempotency) — client-generated key per checkout attempt. Retries
   // with the same key return the original receipt instead of writing a second
-  // bill. Frontend will be updated to send a UUID per attempt in a follow-up;
-  // for now the field is optional so the existing UI keeps working.
-  clientRequestId: z.string().max(200).nullish(),
+  // bill. Every public checkout must carry a stable per-attempt key.
+  clientRequestId: z.string().trim().min(1).max(200),
   // FIX-7 (user) — ยอดเงินสดที่รับมา (เฉพาะ "เงินสด") — ใช้พิมพ์ "รับเงินมา X / ทอน Y" ท้ายใบเสร็จ
   // null สำหรับ QR/wallet — backend จะ ignore ถ้าไม่ใช่เงินสด
   receivedCash: z.number().min(0).nullish(),
@@ -1155,7 +1154,7 @@ export const appRouter = router({
             }
             requireEdition("specialOrders");
           }
-          return checkout(db, { ...input, cashier: actor, actorRole });
+          return checkout(db, { ...input, cashier: actor, cashierUserId: ctx.user!.id, actorRole });
         });
       }),
     void: permissionProcedure("POS.VOID")

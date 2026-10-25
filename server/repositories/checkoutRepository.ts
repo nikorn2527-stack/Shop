@@ -16,10 +16,12 @@ export type SaleInsert = Omit<
 > & {
   slipImage: string | null;
   clientRequestId: string | null;
+  requestFingerprint: string | null;
 };
 
 export interface CheckoutRepository extends MemberLedgerRepository {
-  findCheckoutByRequestId(requestId: string): CheckoutReceipt | undefined;
+  findCheckoutByRequestId(requestId: string): { receipt: CheckoutReceipt; requestFingerprint: string | null; voided: boolean } | undefined;
+  saveCheckoutReceipt(saleId: number, receipt: CheckoutReceipt): void;
   findTerminal(deviceId: string): PosTerminal | null;
   findProduct(productId: number): Product | undefined;
   requireUsableMember(memberNumber: string): Member;

@@ -13,6 +13,7 @@ import type {
 import { StoreError } from "../domain/storeError";
 import { money, round2 } from "../domain/money";
 
+import { checkoutRequestFingerprint } from "../domain/checkoutRequest";
 import { catalogLinePricing } from "../domain/checkoutPricing";
 
 const WALLET_PAYMENT = "หักบัญชีสมาชิก";
@@ -34,9 +35,15 @@ export function checkoutInTransaction(
   // or wallet balance. The client is expected to send the SAME clientRequestId
   // for every retry of one logical checkout. We replay the original receipt
   // (items + totals + balanceAfter) so the UI shows the same slip again.
+  const requestFingerprint = input.clientRequestId ? checkoutRequestFingerprint(input) : null;
   if (input.clientRequestId) {
     const existing = repository.findCheckoutByRequestId(input.clientRequestId);
-    if (existing) return existing;
+    if (existing) {
+      if (existing.voided) throw new StoreError(`บิล ${existing.receipt.orderNumber} ถูกยกเลิกแล้ว กรุณาตรวจสอบประวัติบิลก่อนทำรายการใหม่`);
+      if (!existing.requestFingerprint) throw new StoreError(`พบรายการเดิม ${existing.receipt.orderNumber} แต่ยืนยันข้อมูลคำขอเก่าไม่ได้ กรุณาตรวจสอบประวัติบิลก่อนชำระซ้ำ`);
+      if (existing.requestFingerprint !== requestFingerprint) throw new StoreError(`รหัสคำขอนี้ใช้กับบิล ${existing.receipt.orderNumber} แล้ว แต่ข้อมูลเปลี่ยนไป กรุณาตรวจสอบประวัติบิลก่อนทำรายการใหม่`);
+      return existing.receipt;
+    }
   }
   const terminal =
     input.terminalDeviceId === undefined
@@ -196,6 +203,7 @@ export function checkoutInTransaction(
     createdAt,
     slipImage,
     clientRequestId: input.clientRequestId ?? null,
+    requestFingerprint,
     receivedCash,
     changeDue,
     paymentVerified:
@@ -268,7 +276,7 @@ export function checkoutInTransaction(
     createdAt,
   });
 
-  return {
+  const receipt: CheckoutReceipt = {
     orderNumber,
     createdAt,
     items: items.map(({ productId, name, unit, qty, price, amount }) => ({
@@ -299,6 +307,8 @@ export function checkoutInTransaction(
     paymentVerified:
       input.paymentMethod === "QR / สแกน" ? !!input.paymentVerified : null,
   };
+  if (input.clientRequestId) repository.saveCheckoutReceipt(saleId, receipt);
+  return receipt;
 }
 
 export function checkout(
