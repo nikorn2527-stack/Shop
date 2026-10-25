@@ -1,0 +1,44 @@
+/* First-run setup uses the available width; short and zoomed screens may scroll safely. */
+.setup-screen.login-screen { padding: 16px; overflow: hidden; }
+.setup-screen .setup-card.login-card { width: min(980px, 100%); padding: 16px 28px; }
+.setup-screen .login-brand { flex-direction: row; justify-content: flex-start; gap: 10px; margin-bottom: 8px; text-align: left; flex-wrap: wrap; }
+.setup-screen .login-brand .brand-mark,
+.setup-screen .login-brand .login-logo { width: 36px; height: 36px; }
+.setup-screen .login-brand .brand-mark span { font-size: 19px; }
+.setup-screen .login-brand small { margin-left: auto; }
+.setup-screen .setup-head { margin: 0 0 12px; }
+.setup-screen .setup-form { gap: 16px; }
+.setup-screen .setup-columns { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 28px; }
+.setup-screen .setup-columns section { min-width: 0; }
+.setup-screen .setup-columns h2 { margin: 0 0 12px; font-size: 14px; }
+.setup-screen .setup-account-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
+.setup-screen .setup-field-wide { grid-column: 1 / -1; }
+.setup-screen .setup-form input { min-height: 40px; padding: 9px 12px; font-size: 14px; margin-top: 4px; }
+.setup-screen .setup-store-input { margin-top: 4px; }
+.setup-screen .setup-store-input input { margin-top: 0; }
+.setup-screen .setup-field-hint { margin-top: 3px; }
+.setup-screen .login-password input { padding-right: 46px; }
+.setup-screen .login-password button { width: 36px; height: 36px; right: 3px; }
+.setup-screen .pw-meter { margin-top: 12px; }
+.setup-screen .setup-version { border-left: 1px solid var(--line); padding-left: 28px; }
+.setup-screen .setup-edition-picker { margin: 0; gap: 10px; }
+.setup-screen .setup-edition-option { width: 100%; min-height: 68px; padding: 12px; }
+.setup-screen .setup-edition-key-input { display: block; margin: 0; }
+.setup-screen .setup-edition-key-input input { font-size: 13px; }
+.setup-screen .setup-actions { display: grid; grid-template-columns: minmax(0, 1fr) 220px; gap: 10px 24px; align-items: center; border-top: 1px solid var(--line); padding-top: 14px; }
+.setup-screen .setup-actions .login-scope-note { margin: 0; }
+.setup-screen .setup-version .login-error { margin: 12px 0 0; }
+.setup-screen .setup-actions .login-submit { margin: 0; min-height: 44px; }
+.setup-screen .login-footer { margin-top: 12px; }
+.setup-screen .login-footer .powered-line { display: inline; margin-left: 10px; }
+@media (max-width: 699px) {
+  .setup-screen.login-screen { padding: 16px 12px; }
+  .setup-screen .setup-card.login-card { padding: 20px 18px 16px; }
+  .setup-screen .login-brand small { width: 100%; margin-left: 46px; }
+  .setup-screen .setup-columns { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .setup-screen .setup-version { border-left: 0; border-top: 1px solid var(--line); padding: 16px 0 0; }
+  .setup-screen .setup-actions { grid-template-columns: minmax(0, 1fr); }
+  .setup-screen .setup-account-fields { grid-template-columns: minmax(0, 1fr); }
+  .setup-screen .setup-form input { font-size: 16px; min-height: 44px; }
+  .setup-screen .login-password button { width: 44px; height: 44px; }
+}
