@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TrpcContext } from "./_core/context";
-import { createSqliteStore, createProduct, ensureRbacSeed, type SqliteDb } from "./sqliteStore";
+import { createSqliteStore, createProduct, createBlankCards, registerMember, registerPosTerminal, getMemberDetail, ensureRbacSeed, type SqliteDb } from "./sqliteStore";
 
 const store = vi.hoisted(() => ({ get: vi.fn() }));
 vi.mock("./welfareStore", () => ({
@@ -95,6 +95,47 @@ describe("business API permissions", () => {
       { productId: product.id, purchaseQty: 1, paidAmount: 1, sellingPrice: 25, expectedSellingPrice: 19 },
     ] })).rejects.toMatchObject({ code: "BAD_REQUEST" });
     expect(db.prepare("SELECT stock, price FROM products WHERE id = ?").get(product.id)).toMatchObject({ stock: 0, price: 20 });
+  });
+
+  it("preserves payment APIs and retries through deposit, wallet checkout and full refund", async () => {
+    const api = caller("administrator");
+    createBlankCards(db, ["API-PAYMENT"]);
+    const member = registerMember(db, { firstName: "API", lastName: "Payments", cardNumber: "API-PAYMENT", initialDeposit: 50 }).member;
+    const product = createProduct(db, { name: "API sale", price: 10 });
+    await api.stock.receiveBatch({ entries: [{ productId: product.id, purchaseQty: 5, paidAmount: 15 }] });
+    const deviceId = "12345678-1234-4234-8234-123456789012";
+    registerPosTerminal(db, deviceId, 1, "Test admin");
+    const deposit = { memberNumber: member.memberNumber, type: "deposit" as const, amount: 10, clientRequestId: "api-payment-deposit" };
+    const deposited = await api.member.wallet(deposit);
+    expect(deposited).toMatchObject({ balanceBefore: 50, balanceAfter: 60 });
+    await expect(api.member.wallet(deposit)).resolves.toEqual(deposited);
+    const input = { terminalDeviceId: deviceId, memberNumber: member.memberNumber, items: [{ productId: product.id, qty: 2 }], paymentMethod: "หักบัญชีสมาชิก" as const, clientRequestId: "api-payment-sale" };
+    const sale = await api.pos.checkout(input);
+    expect(sale).toMatchObject({ total: 20, balanceAfter: 40, terminalNumber: 1, memberName: "API Payments" });
+    await expect(api.pos.checkout(input)).resolves.toEqual(sale);
+    expect(db.prepare("SELECT stock FROM products WHERE id = ?").get(product.id)).toMatchObject({ stock: 3 });
+    const refund = { memberNumber: member.memberNumber, type: "refund" as const, amount: 40, clientRequestId: "api-payment-refund" };
+    const refunded = await api.member.wallet(refund);
+    expect(refunded).toMatchObject({ balanceBefore: 40, balanceAfter: 0 });
+    await expect(api.member.wallet(refund)).resolves.toEqual(refunded);
+    expect(getMemberDetail(db, member.memberNumber)?.member).toMatchObject({ balance: 0, cardNumber: null });
+    expect(db.prepare("SELECT COUNT(*) AS n FROM sales").get()).toMatchObject({ n: 1 });
+    expect(db.prepare("SELECT COUNT(*) AS n FROM member_transactions WHERE type IN ('deposit','purchase','refund')").get()).toMatchObject({ n: 3 });
+  });
+
+  it("keeps payment validation errors mapped to BAD_REQUEST without changing money or stock", async () => {
+    const api = caller("administrator");
+    createBlankCards(db, ["API-POOR"]);
+    const member = registerMember(db, { firstName: "Low", lastName: "Balance", cardNumber: "API-POOR", initialDeposit: 5 }).member;
+    const product = createProduct(db, { name: "API expensive", price: 10, stock: 1 });
+    const deviceId = "12345678-1234-4234-8234-123456789012";
+    registerPosTerminal(db, deviceId, 1, "Test admin");
+    await expect(api.pos.checkout({ terminalDeviceId: deviceId, memberNumber: member.memberNumber, items: [{ productId: product.id, qty: 1 }], paymentMethod: "หักบัญชีสมาชิก" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    await expect(api.member.wallet({ memberNumber: member.memberNumber, type: "withdrawal", amount: 10 })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(getMemberDetail(db, member.memberNumber)?.member.balance).toBe(5);
+    expect(db.prepare("SELECT stock FROM products WHERE id = ?").get(product.id)).toMatchObject({ stock: 1 });
+    expect(db.prepare("SELECT COUNT(*) AS n FROM sales").get()).toMatchObject({ n: 0 });
+    expect(db.prepare("SELECT COUNT(*) AS n FROM member_transactions WHERE type != 'activation'").get()).toMatchObject({ n: 0 });
   });
 
   it("allows stock officers to read inventory using their actual app role", async () => {

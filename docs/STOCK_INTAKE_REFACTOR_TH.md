@@ -39,4 +39,4 @@ repository และ service รอบนี้เป็น **synchronous** เ�
 
 ขั้นต่อไปต้องออกแบบ service/repository แบบ async พร้อม transaction ที่ยืม pool connection หนึ่งตัวตลอดรายการ รวมถึง API error mapping และทุกจุดที่เรียกฐานข้อมูล ไม่เสียบ PostgreSQL เข้า synchronous port นี้โดยตรง สำหรับ PostgreSQL ต้องมีการล็อกแถวสินค้าก่อนคำนวณ/ตรวจราคา ลำดับล็อกสม่ำเสมอ และตัวออกเลข Lot ที่ป้องกันเลขชนกัน จากนั้นตรวจการรับเข้าชนกับการขายจริงตามคู่มือ `LOCAL_THREE_MACHINE_TEST_TH.md`
 
-ยังต้องแยกงานขาย/เงินสมาชิกและ helper ที่เหลือ ออกแบบ PostgreSQL schema/migration ตรวจเทียบยอด สำรอง/กู้คืน และทดสอบบน Windows ก่อนจัดทำตัวติดตั้งสำหรับลูกค้า
+แยก service งานขายและเงินสมาชิกต่อแล้ว ดู [รายละเอียดและการทดสอบ](PAYMENT_SERVICES_REFACTOR_TH.md) ยังต้องทำ async boundary และ helper ที่เหลือ ออกแบบ PostgreSQL schema/migration ตรวจเทียบยอด สำรอง/กู้คืน และทดสอบบน Windows ก่อนจัดทำตัวติดตั้งสำหรับลูกค้า

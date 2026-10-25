@@ -1,3 +1,11 @@
+import { createSqliteCheckoutRepository } from "./repositories/sqliteCheckoutRepository";
+import { createSqliteWalletRepository } from "./repositories/sqliteWalletRepository";
+import { checkout as checkoutService } from "./services/checkout";
+import {
+  walletTx as walletTxService,
+  walletTxInTransaction,
+} from "./services/wallet";
+
 import { StoreError } from "./domain/storeError";
 export { StoreError } from "./domain/storeError";
 import { money, round2 } from "./domain/money";
@@ -191,7 +199,6 @@ export type {
   ChangeOwnPasswordInput,
   UpdateAppUserInput,
 } from "../shared/storeTypes/access";
-import { PAYMENT_METHODS } from "../shared/storeTypes/sales";
 import { reportSellingValue } from "../shared/reportValuation";
 import { findPosShortcutConflicts, posShortcutConflictMessage } from "../shared/posShortcuts";
 import { memberNumberHead, nextMemberNumberSequence, type MemberNumberFormat } from "../shared/memberNumber";
@@ -1079,7 +1086,6 @@ export function suspendMember(db: SqliteDb, memberNumber: string) {
 // ---------------------------------------------------------------------------
 
 
-const WALLET_PAYMENT = "หักบัญชีสมาชิก";
 
 const pad2 = (value: number) => String(value).padStart(2, "0");
 
@@ -1962,10 +1968,6 @@ function nextOrderNumber(db: SqliteDb, date = new Date()) {
   return `${prefix}${String((row?.maxSeq ?? 0) + 1).padStart(3, "0")}`;
 }
 
-function summarizeItems(items: { name: string; qty: number; unit: string }[]) {
-  const head = items.slice(0, 3).map((item) => `${item.name} ${item.qty} ${item.unit}`).join(", ");
-  return items.length > 3 ? `${head} และอีก ${items.length - 3} รายการ` : head;
-}
 
 
 
@@ -2034,201 +2036,34 @@ export function releasePosTerminal(db: SqliteDb, id: string, actor: string) {
 
 
 
-export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
-  // P2-b (idempotency) — short-circuit a retried submit BEFORE touching stock
-  // or wallet balance. The client is expected to send the SAME clientRequestId
-  // for every retry of one logical checkout. We replay the original receipt
-  // (items + totals + balanceAfter) so the UI shows the same slip again.
-  if (input.clientRequestId) {
-    const existing = db.prepare(`SELECT id, order_number AS orderNumber, created_at AS createdAt, subtotal, discount, total, payment_method AS paymentMethod, member_number AS memberNumber, cashier, terminal_id AS terminalId, terminal_number AS terminalNumber, received_cash AS receivedCash, change_due AS changeDue, payment_verified AS paymentVerified FROM sales WHERE client_request_id = ? LIMIT 1`).get(input.clientRequestId) as
-      | { terminalId: string | null; terminalNumber: number | null; id: number; orderNumber: string; createdAt: string; subtotal: number; discount: number; total: number; paymentMethod: string; memberNumber: string | null; cashier: string | null; receivedCash: number | null; changeDue: number | null; paymentVerified: number | null }
-      | undefined;
-    if (existing) {
-      const itemRows = db.prepare(`SELECT product_id AS productId, name, COALESCE(unit, 'ชิ้น') AS unit, qty, price, ROUND(qty * price, 2) AS amount FROM sale_items WHERE sale_id = ?`).all(existing.id) as { productId: number | null; name: string; unit: string; qty: number; price: number; amount: number }[];
-      // Replay memberName + balanceAfter the same way salesList() does so the
-      // reprinted slip is byte-identical to the original.
-      let memberName: string | null = null;
-      let balanceAfter: number | null = null;
-      if (existing.memberNumber) {
-        const memberRow = db.prepare(`SELECT prename, first_name, last_name FROM members WHERE member_number = ?`).get(existing.memberNumber) as { prename: string | null; first_name: string; last_name: string } | undefined;
-        if (memberRow) {
-          memberName = [memberRow.prename, memberRow.first_name, memberRow.last_name].filter(Boolean).join(" ").trim() || null;
-        }
-        const balanceRow = db.prepare(`SELECT balance_after AS balanceAfter FROM member_transactions WHERE member_number = ? AND detail LIKE ? ORDER BY id DESC LIMIT 1`).get(existing.memberNumber, `บิล #${existing.orderNumber} ·%`) as { balanceAfter: number | null } | undefined;
-        balanceAfter = balanceRow?.balanceAfter ?? null;
-      }
-      return {
-        orderNumber: existing.orderNumber,
-        createdAt: existing.createdAt,
-        items: itemRows,
-        subtotal: existing.subtotal,
-        discount: existing.discount,
-        total: existing.total,
-        paymentMethod: existing.paymentMethod,
-        memberNumber: existing.memberNumber,
-        memberName,
-        balanceAfter,
-        cashier: existing.cashier,
-        terminalId: existing.terminalId,
-        terminalNumber: existing.terminalNumber,
-        // FIX-7 — replay ยอดเงินสด/ทอน และ flag ยืนยันด้วย (null/undefined สำหรับบิลเก่า)
-        receivedCash: existing.receivedCash ?? null,
-        changeDue: existing.changeDue ?? null,
-        paymentVerified: existing.paymentVerified === 1 ? true : existing.paymentVerified === 0 ? false : null,
-      };
-    }
-  }
-  const terminal = input.terminalDeviceId === undefined ? null : getPosTerminal(db, input.terminalDeviceId);
-  if (input.terminalDeviceId !== undefined && !terminal) throw new StoreError("เครื่องนี้ยังไม่ได้กำหนดจุดขาย กรุณาให้ผู้บริหารตั้งค่าจุดขายก่อนชำระเงิน");
-  if (!input.items?.length) throw new StoreError("ยังไม่มีสินค้าในบิล");
-  if (!PAYMENT_METHODS.includes(input.paymentMethod)) throw new StoreError("วิธีชำระเงินไม่ถูกต้อง");
-  // Catalog lines merge by productId+price+label (round 31-12: money-mode
-  // tiers of the same product stay separate lines — น้ำแข็ง ฿1 / ฿5 / ฿10);
-  // special ("รายการพิเศษ") lines merge by lowercased name+price+unit.
-  type MergedLine = { productId: number; qty: number; price?: number; unit?: string; label?: string };
-  const merged = new Map<string, MergedLine>();
-  const specials = new Map<string, { name: string; price: number; qty: number; unit: string }>();
-  for (const item of input.items) {
-    if (!Number.isInteger(item.qty) || item.qty <= 0) throw new StoreError("จำนวนต้องมากกว่า 0");
-    if ("productId" in item) {
-      if (!Number.isInteger(item.productId) || item.productId <= 0) throw new StoreError("รหัสสินค้าไม่ถูกต้อง");
-      const unitPrice = item.price !== undefined ? Math.round(item.price * 10000) / 10000 : undefined;
-      const key = `${item.productId}|${unitPrice ?? ""}|${item.label ?? ""}`;
-      const existing = merged.get(key);
-      merged.set(key, { productId: item.productId, qty: (existing?.qty ?? 0) + item.qty, price: unitPrice, unit: item.unit, label: item.label });
-    } else {
-      const name = item.name.trim();
-      if (!name) throw new StoreError("กรุณาระบุชื่อรายการพิเศษ");
-      if (!(item.price > 0)) throw new StoreError("ราคารายการพิเศษต้องมากกว่า 0");
-      const unit = item.unit?.trim() || "รายการ";
-      const key = `${name.toLowerCase()}|${item.price}|${unit}`;
-      const existing = specials.get(key);
-      specials.set(key, { name, price: item.price, qty: (existing?.qty ?? 0) + item.qty, unit });
-    }
-  }
-  const isWallet = input.paymentMethod === WALLET_PAYMENT;
-  if (isWallet && !input.memberNumber?.trim()) throw new StoreError("กรุณาเลือกสมาชิกก่อนชำระแบบหักบัญชีสมาชิก");
+const paymentRuntime = { now: () => new Date(), formatDateTime };
 
-  const products = new Map<number, SqliteProduct>();
-  const qtyByProduct = new Map<number, number>();
-  for (const line of Array.from(merged.values())) {
-    qtyByProduct.set(line.productId, (qtyByProduct.get(line.productId) ?? 0) + line.qty);
-  }
-  for (const [productId, totalQty] of Array.from(qtyByProduct.entries())) {
-    const product = getProductById(db, productId);
-    if (!product || !product.active) throw new StoreError(`ไม่พบสินค้ารหัส ${productId} ในระบบ`);
-    if (product.stock < totalQty) throw new StoreError(`สต็อกไม่พอ · ${product.name} เหลือ ${product.stock} ${product.unit}`);
-    products.set(productId, product);
-  }
-
-  const items: { productId: number | null; name: string; unit: string; qty: number; price: number; cost: number; amount: number }[] = [
-    ...Array.from(merged.values()).map((line) => {
-      const product = products.get(line.productId)!;
-      const unitPrice = line.price ?? product.price;
-      return { productId: line.productId, name: line.label ? `${product.name} · ${line.label}` : product.name, unit: line.unit ?? product.unit, qty: line.qty, price: unitPrice, cost: product.cost, amount: round2(unitPrice * line.qty) };
-    }),
-    ...Array.from(specials.values()).map((special) => ({ ...special, productId: null, cost: 0, amount: round2(special.price * special.qty) })),
-  ];
-  const subtotal = round2(items.reduce((sum, item) => sum + item.amount, 0));
-  const discount = round2(Math.max(0, input.discount ?? 0));
-  if (discount > subtotal) throw new StoreError("ส่วนลดมากกว่ายอดรวมสินค้า");
-  const total = round2(subtotal - discount);
-
-  let member: SqliteMember | undefined;
-  if (input.memberNumber?.trim()) member = requireUsableMemberCard(db, input.memberNumber);
-  if (isWallet && member) {
-    if (member.balance < total) throw new StoreError(`ยอดเงินคงเหลือไม่พอ · ยอดชำระ ${money(total)} คงเหลือ ${money(member.balance)}`);
-  }
-
-  const now = new Date();
-  const createdAt = formatDateTime(now);
-  const orderNumber = nextOrderNumber(db, now);
-  const cashier = input.cashier?.trim() || "เจ้าหน้าที่ร้านค้า";
-  // ROUND 63 — แนบหลักฐานการชำระไปกับบิล (ส่วนใหญ่คือสลิป QR / สแกน) · จำกัดความยาวกัน URL ผิดปกติ
-  const slipImage = typeof input.slipImage === "string" && input.slipImage.startsWith("data:image/") ? input.slipImage.slice(0, 600_000) : null;
-
-  return runInTransaction(db, () => {
-    const saleResult = db.prepare(`INSERT INTO sales (order_number, payment_method, member_number, subtotal, discount, total, cashier, created_at, slip_url, client_request_id, received_cash, change_due, payment_verified, terminal_id, terminal_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
-      orderNumber,
-      input.paymentMethod,
-      member?.memberNumber ?? (input.memberNumber?.trim() || null),
-      subtotal,
-      discount,
-      total,
-      cashier,
-      createdAt,
-      slipImage,
-      input.clientRequestId ?? null,
-      // FIX-7 — บิลเงินสดเก็บยอดรับ/ทอน · บิล QR เก็บ flag ยืนยัน · บิล wallet = null ทั้งคู่
-      input.paymentMethod === "เงินสด" ? (typeof input.receivedCash === "number" ? round2(input.receivedCash) : null) : null,
-      input.paymentMethod === "เงินสด" ? (typeof input.changeDue === "number" ? round2(input.changeDue) : null) : null,
-      input.paymentMethod === "QR / สแกน" ? (input.paymentVerified ? 1 : 0) : null,
-      terminal?.id ?? null,
-      terminal?.number ?? null,
-    );
-    const saleId = Number(saleResult.lastInsertRowid);
-    const insertItem = db.prepare(`INSERT INTO sale_items (sale_id, product_id, name, qty, price, cost, unit) VALUES (?, ?, ?, ?, ?, ?, ?)`);
-    const updateStock = db.prepare(`UPDATE products SET stock = stock - ? WHERE id = ?`);
-    const lotShortfalls: { name: string; unit: string; qty: number }[] = [];
-    for (const item of items) {
-      const itemResult = insertItem.run(saleId, item.productId, item.name, item.qty, item.price, item.cost, item.unit);
-      const saleItemId = Number(itemResult.lastInsertRowid);
-      if (item.productId == null) continue; // รายการพิเศษ — no product/stock row behind it
-      updateStock.run(item.qty, item.productId);
-        recordMovement(db, { type: 'SALE', productId: item.productId, qtyDelta: -item.qty, unitCost: item.cost, refType: 'sale', refId: saleId, reason: `บิล ${orderNumber}`, actor: input.cashier?.trim() || undefined, actorRole: input.actorRole ?? undefined });
-      const allocation = deductLotsFifo(db, item.productId, item.qty, saleItemId);
-      const shortfall = allocation.shortfall;
-      if (shortfall > 0 && db.prepare(`SELECT 1 FROM stock_lots WHERE product_id = ? AND received_value_satang IS NOT NULL`).get(item.productId)) {
-        throw new StoreError("จำนวนในล็อตไม่ตรงกับสต็อก กรุณาตรวจสอบล็อตก่อนขาย");
-      }
-      const costSatang = allocation.costSatang + Math.round(shortfall * item.cost * 100);
-      db.prepare(`UPDATE sale_items SET cost_total_satang = ? WHERE id = ?`).run(costSatang, saleItemId);
-      if (shortfall > 0) lotShortfalls.push({ name: item.name, unit: item.unit, qty: shortfall });
-    }
-
-    let balanceAfter: number | null = null;
-    if (isWallet && member) {
-      balanceAfter = round2(member.balance - total);
-      db.prepare(`UPDATE members SET balance = ? WHERE member_number = ?`).run(balanceAfter, member.memberNumber);
-      db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, actor, created_at) VALUES (?, 'purchase', ?, ?, ?, ?, ?, ?)`).run(
-        member.memberNumber,
-        `บิล #${orderNumber} · ${summarizeItems(items)}`,
-        -total,
-        input.paymentMethod,
-        balanceAfter,
-        cashier,
-        createdAt,
+function checkoutUnitOfWork(db: SqliteDb) {
+  return createSqliteCheckoutRepository(db, {
+    findTerminal: (deviceId) => getPosTerminal(db, deviceId),
+    findProduct: (productId) => getProductById(db, productId),
+    requireUsableMember: (number) => requireUsableMemberCard(db, number),
+    nextOrderNumber: (date) => nextOrderNumber(db, date),
+    deductLots: (productId, quantity, saleItemId) =>
+      deductLotsFifo(db, productId, quantity, saleItemId),
+    recordMovement: (input) => recordMovement(db, input),
+    appendAudit: (input) => {
+      logAction(
+        db,
+        input.action,
+        input.actor,
+        input.detail,
+        input.tone,
+        input.actorRole,
+        input.createdAt,
       );
-    } else if (member) {
-      // Cash / QR member bill — snapshot the untouched balance for the slip.
-      balanceAfter = round2(member.balance);
-    }
-
-    const lotNote = lotShortfalls.length
-      ? ` · ตัดยอด Lot ไม่ครบ: ${lotShortfalls.map((row) => `${row.name} ${row.qty} ${row.unit}`).join(", ")} (แนะนำนับสต็อกแยกล็อต)`
-      : "";
-    logAction(db, "ขายสินค้า", cashier, `บิล #${orderNumber} · ${money(total)}${member ? ` · หักบัญชี ${member.memberNumber}` : ""}${slipImage ? " · แนบหลักฐานการชำระแล้ว" : ""}${lotNote}`, "blue", input.actorRole ?? null, createdAt);
-
-    return {
-      orderNumber,
-      createdAt,
-      items: items.map(({ productId, name, unit, qty, price, amount }) => ({ productId, name, unit, qty, price, amount })),
-      subtotal,
-      discount,
-      total,
-      paymentMethod: input.paymentMethod,
-      memberNumber: member?.memberNumber ?? null,
-      memberName: member ? [member.prename, member.firstName, member.lastName].filter(Boolean).join(" ") : null,
-      balanceAfter,
-      cashier,
-      terminalId: terminal?.id ?? null,
-      terminalNumber: terminal?.number ?? null,
-      // FIX-7 — ส่งยอดเงินสด/ทอน และ flag ยืนยันกลับไปแสดงในใบเสร็จ
-      receivedCash: input.paymentMethod === "เงินสด" ? (typeof input.receivedCash === "number" ? round2(input.receivedCash) : null) : null,
-      changeDue: input.paymentMethod === "เงินสด" ? (typeof input.changeDue === "number" ? round2(input.changeDue) : null) : null,
-      paymentVerified: input.paymentMethod === "QR / สแกน" ? !!input.paymentVerified : null,
-    };
+    },
+    transaction: (work) => runInTransaction(db, work),
   });
+}
+
+export function checkout(db: SqliteDb, input: CheckoutInput): CheckoutReceipt {
+  return checkoutService(checkoutUnitOfWork(db), input, paymentRuntime);
 }
 
 // --- sales history (receipt reprint) ---------------------------------------
@@ -2464,110 +2299,35 @@ export function setMemberStatus(db: SqliteDb, memberNumber: string, suspended: b
 
 
 
-export function walletTx(db: SqliteDb, input: WalletTxInput) {
-  // P2-b (idempotency) — short-circuit a retried submit BEFORE touching the
-  // member's balance. The client is expected to send the SAME clientRequestId
-  // for every retry of one logical wallet operation. We replay the original
-  // ledger row so the UI shows the same slip/result again.
-  if (input.clientRequestId) {
-    const existing = db.prepare(`SELECT member_number AS memberNumber, type, amount, balance_after AS balanceAfter, detail FROM member_transactions WHERE client_request_id = ? LIMIT 1`).get(input.clientRequestId) as
-      | { memberNumber: string; type: "deposit" | "withdrawal" | "refund"; amount: number; balanceAfter: number | null; detail: string }
-      | undefined;
-    if (existing) {
-      const memberRow = db.prepare(`SELECT prename, first_name, last_name, balance FROM members WHERE member_number = ?`).get(existing.memberNumber) as { prename: string | null; first_name: string; last_name: string; balance: number } | undefined;
-      // Match the normal-path return shape so the inferred walletTx return
-      // type stays the strict `string`/`number` the UI consumers expect —
-      // existing.balanceAfter is only null on legacy rows that predate the
-      // balance_after column; we fall back to the live balance in that case.
-      const memberName = memberRow
-        ? [memberRow.prename, memberRow.first_name, memberRow.last_name].filter(Boolean).join(" ")
-        : "";
-      const balanceAfter = existing.balanceAfter ?? memberRow?.balance ?? 0;
-      const balanceBefore = existing.type === "deposit"
-        ? round2(balanceAfter - Math.abs(existing.amount))
-        : round2(balanceAfter + Math.abs(existing.amount));
-      return {
-        memberNumber: existing.memberNumber,
-        memberName,
-        type: existing.type,
-        amount: Math.abs(existing.amount),
-        balanceBefore,
-        balanceAfter,
-        detail: existing.detail,
-      };
-    }
-  }
-  if (!(input.amount > 0)) throw new StoreError("จำนวนเงินต้องมากกว่า 0");
-  const amount = round2(input.amount);
-  // Refund is a recovery operation: it must remain available for lost/damaged cards.
-  const member = input.type === "refund"
-    ? getMemberByNumber(db, input.memberNumber?.trim() ?? "")
-    : requireUsableMemberCard(db, input.memberNumber);
-  if (!member) throw new StoreError(`ไม่พบสมาชิก ${input.memberNumber} ในระบบ`);
-  if (input.type === "refund" && member.status !== "active") throw new StoreError(`สมาชิกถูกระงับการใช้งาน · ${member.memberNumber}`);
-  // FIX-4 issue 3 — SQLite stores REAL as IEEE-754 double, so a stored 99.99
-  // may come back as 99.98999999999. Comparing raw balance < amount would
-  // reject a refund that exactly matches the displayed balance. Round both
-  // sides to 2 decimals before the check (refund = return-all-money case).
-  const roundedBalance = round2(member.balance);
-  if (input.type !== "deposit" && roundedBalance < amount) {
-    throw new StoreError(`ยอดเงินคงเหลือไม่พอ · ${input.type === "refund" ? "คืนบัตร" : "ถอน"} ${money(amount)} คงเหลือ ${money(roundedBalance)}`);
-  }
-  const signedAmount = input.type === "deposit" ? amount : -amount;
-  const balanceAfter = round2(member.balance + signedAmount);
-  const note = input.note?.trim();
-  const fallbackDetail = input.type === "deposit"
-    ? "เติมเงินเข้าบัญชีสมาชิก · เงินสด"
-    : input.type === "refund"
-      ? "คืนบัตรเงินสด · จ่ายเงินคืนตามยอดคงเหลือ"
-      : "ถอนเงินจากบัญชีสมาชิก · เงินสด";
-  const detail = note || fallbackDetail;
-  const actor = input.actor?.trim() || "เจ้าหน้าที่ร้านค้า";
-  const createdAt = formatDateTime();
-  // ROUND 63 — รูปหลักฐานที่แนบมากับการเติม/ถอน (เช่น สลิปโอนเข้า) เก็บไปกับรายการ
-  const slipImage = typeof input.slipImage === "string" && input.slipImage.startsWith("data:image/") ? input.slipImage.slice(0, 600_000) : null;
-  const writeWallet = () => {
-    db.prepare(`UPDATE members SET balance = ? WHERE member_number = ?`).run(balanceAfter, member.memberNumber);
-    db.prepare(`INSERT INTO member_transactions (member_number, type, detail, amount, payment_method, balance_after, actor, created_at, slip_url, client_request_id) VALUES (?, ?, ?, ?, 'เงินสด', ?, ?, ?, ?, ?)`).run(
-      member.memberNumber,
-      input.type,
-      detail,
-      signedAmount,
-      balanceAfter,
-      actor,
-      createdAt,
-      slipImage,
-      input.clientRequestId ?? null,
-    );
-    // Record the refund in the holding round before closing and releasing the card.
-    if (input.type === "refund" && balanceAfter === 0 && member.cardNumber && !input.retainCard) {
-      releasePhysicalCardTx(db, member.cardNumber, actor, input.actorRole, "คืนเงินครบยอดและรับคืนบัตร");
-    }
-    logAction(
-      db,
-      input.type === "deposit" ? "เติมเงินสมาชิก" : input.type === "refund" ? "คืนบัตรเงินสด" : "ถอนเงินสมาชิก",
-      actor,
-      `${member.memberNumber} · ${money(amount)} · ${note || "เงินสด"}${slipImage ? " · แนบหลักฐานแล้ว" : ""}`,
-      input.type === "deposit" ? "green" : input.type === "refund" ? "amber" : "purple",
-      input.actorRole ?? null,
-      createdAt,
-    );
-  };
-  // Account closure owns the enclosing transaction; ordinary wallet operations own theirs.
-  if (input.retainCard) writeWallet();
-  else runInTransaction(db, writeWallet);
-  return {
-    memberNumber: member.memberNumber,
-    memberName: [member.prename, member.firstName, member.lastName].filter(Boolean).join(" "),
-    type: input.type,
-    amount,
-    balanceBefore: member.balance,
-    balanceAfter,
-    detail,
-  };
+function walletUnitOfWork(db: SqliteDb) {
+  return createSqliteWalletRepository(db, {
+    findMember: (number) => getMemberByNumber(db, number),
+    requireUsableMember: (number) => requireUsableMemberCard(db, number),
+    releaseCard: (cardNumber, actor, actorRole, note) => {
+      releasePhysicalCardTx(db, cardNumber, actor, actorRole, note);
+    },
+    appendAudit: (input) => {
+      logAction(
+        db,
+        input.action,
+        input.actor,
+        input.detail,
+        input.tone,
+        input.actorRole,
+        input.createdAt,
+      );
+    },
+    transaction: (work) => runInTransaction(db, work),
+  });
 }
 
-
+export function walletTx(db: SqliteDb, input: WalletTxInput) {
+  const unitOfWork = walletUnitOfWork(db);
+  // Account closure owns the enclosing transaction; ordinary operations own theirs.
+  return input.retainCard
+    ? walletTxInTransaction(unitOfWork.repository, input, paymentRuntime)
+    : walletTxService(unitOfWork, input, paymentRuntime);
+}
 
 /** Updates only the provided member profile fields. Undefined keeps the current value; empty idCard/phone clears them. */
 export function updateMember(db: SqliteDb, input: UpdateMemberInput): SqliteMember {

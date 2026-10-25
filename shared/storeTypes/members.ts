@@ -172,3 +172,14 @@ export type MemberSpendingStats = {
   lastPurchaseAt: string | null;
   topProducts: { name: string; qty: number; total: number }[];
 };
+
+/** Result of a deposit, withdrawal or refund, including idempotent replay. */
+export type WalletReceipt = {
+  memberNumber: string;
+  memberName: string;
+  type: "deposit" | "withdrawal" | "refund";
+  amount: number;
+  balanceBefore: number;
+  balanceAfter: number;
+  detail: string;
+};
