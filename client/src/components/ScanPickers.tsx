@@ -11,6 +11,8 @@ import { MemberAvatar } from "./MemberAvatar";
 import { MemberCardModal } from "./MemberCardModal";
 import { BarcodeCameraModal } from "./BarcodeCameraModal";
 import { SharedSearch } from "./SharedSearch";
+import { usePickerNavigation } from "@/hooks/usePickerNavigation";
+import "@/styles/picker-navigation.css";
 
 /**
  * Round 37 (req 36) — ปิดประวัติการคีย์/ยิงของช่องกรอกข้อมูลทุกช่อง:
@@ -156,6 +158,15 @@ export function MemberScanPicker({
     else { setTerm(value); setOpen(true); }
   };
 
+  const listOpen = open && !selected && !pending && term.trim() !== "";
+  const navigation = usePickerNavigation({
+    keys: [...(allowGeneralCustomer ? ["general"] : []), ...suggestions.filter(member => member.status !== "suspended").map(member => member.memberNumber)],
+    open: listOpen,
+    onOpen: () => setOpen(true), onClose: () => setOpen(false),
+    onPick: key => pick(key === "general" ? null : suggestions.find(member => member.memberNumber === key)!),
+    onCommit: () => commit(),
+  });
+
   return (
     <SharedSearch label="สมาชิก" priority={20} enabled={!selected && !local && inputId !== "pos-member-input"}>
     <div className="member-scan-wrap" ref={wrapRef}>
@@ -198,6 +209,7 @@ export function MemberScanPicker({
               onKeyDownCapture={scanLayout.onKeyDownCapture}
               onChange={(event) => {
                 setTerm(event.target.value);
+                navigation.reset();
                 // Round 44 — เปิดรายการเฉพาะตอนมีคำค้นจริง (คีย์/สแกน)
                 setOpen(event.target.value.trim() !== "");
               }}
@@ -205,12 +217,8 @@ export function MemberScanPicker({
                 // Round 44 — ช่องเปล่าโฟกัสเฉย ๆ ไม่โชว์ dropdown จนกว่าจะเริ่มค้นหา
                 if (term.trim() !== "") setOpen(true);
               }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  commit();
-                }
-              }}
+              onKeyDown={navigation.onKeyDown}
+              {...navigation.inputProps}
               placeholder={placeholder}
               aria-label={inputLabel}
               autoFocus={autoFocus}
@@ -231,6 +239,7 @@ export function MemberScanPicker({
                 onClick={() => {
                   // Round 44 — ล้างคำค้น = ปิดรายการด้วย (ช่องเปล่าต้องเงียบ)
                   setTerm("");
+                  navigation.reset();
                   setOpen(false);
                   inputRef.current?.focus();
                 }}
@@ -244,9 +253,9 @@ export function MemberScanPicker({
           </div>
         </>
       )}
-      {open && !selected && !pending && (
-        <div className="member-scan-list" role="listbox" aria-label="รายการสมาชิกที่ตรงกับที่คีย์">
-          {allowGeneralCustomer && <button type="button" className="member-option" onClick={() => pick(null)}>
+      {listOpen && (
+        <div className="member-scan-list" id={navigation.listId} role="listbox" aria-label="รายการสมาชิกที่ตรงกับที่คีย์">
+          {allowGeneralCustomer && <button type="button" className={`member-option${navigation.activeKey === "general" ? " keyboard-active" : ""}`} id={navigation.optionId("general")} role="option" aria-selected={navigation.activeKey === "general"} onClick={() => pick(null)}>
             <div>
               <b>บุคคลทั่วไป</b>
               <small>ชำระเงินสดหรือ QR</small>
@@ -270,7 +279,8 @@ export function MemberScanPicker({
             suggestions.map((member) => (
               <button
                 type="button"
-                className="member-option"
+                className={`member-option${navigation.activeKey === member.memberNumber ? " keyboard-active" : ""}`}
+                id={navigation.optionId(member.memberNumber)} role="option" aria-selected={navigation.activeKey === member.memberNumber}
                 key={member.memberNumber}
                 disabled={member.status === "suspended"}
                 onClick={() => pick(member)}
@@ -427,6 +437,14 @@ export function ProductScanPicker({
     }
   };
 
+  const listOpen = open && !selected && term.trim() !== "";
+  const navigation = usePickerNavigation({
+    keys: suggestions.map(product => String(product.id)), open: listOpen,
+    onOpen: () => setOpen(true), onClose: () => setOpen(false),
+    onPick: key => pick(suggestions.find(product => String(product.id) === key)!),
+    onCommit: () => commit(),
+  });
+
   return (
     <SharedSearch label="เลือกสินค้า · รับเข้า / นับสต็อก" priority={30} enabled={!selected && !local}>
     <div className="product-scan-wrap" ref={wrapRef}>
@@ -471,16 +489,13 @@ export function ProductScanPicker({
             onKeyDownCapture={scanLayout.onKeyDownCapture}
             onChange={(event) => {
               setTerm(event.target.value);
+              navigation.reset();
               setMissed("");
               setOpen(true);
             }}
             onFocus={() => setOpen(true)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                commit();
-              }
-            }}
+            onKeyDown={navigation.onKeyDown}
+            {...navigation.inputProps}
             placeholder={placeholder}
             aria-label="ค้นหาสินค้าด้วยบาร์โค้ด รหัส SKU หรือชื่อ"
           />
@@ -499,6 +514,8 @@ export function ProductScanPicker({
               className="scan-clear"
               onClick={() => {
                 setTerm("");
+                navigation.reset();
+                setOpen(false);
                 inputRef.current?.focus();
               }}
               aria-label="ล้างช่องค้นหาสินค้า"
@@ -510,8 +527,8 @@ export function ProductScanPicker({
           )}
         </div>
       )}
-      {open && !selected && term.trim() !== "" && (
-        <div className="member-scan-list product-scan-list" role="listbox" aria-label="สินค้าที่ตรงกับที่คีย์">
+      {listOpen && (
+        <div className="member-scan-list product-scan-list" id={navigation.listId} role="listbox" aria-label="สินค้าที่ตรงกับที่คีย์">
           {missed ? (
             <div className="member-option disabled">
               <div>
@@ -531,7 +548,8 @@ export function ProductScanPicker({
             suggestions.map((product) => (
               <button
                 type="button"
-                className="member-option"
+                className={`member-option${navigation.activeKey === String(product.id) ? " keyboard-active" : ""}`}
+                id={navigation.optionId(String(product.id))} role="option" aria-selected={navigation.activeKey === String(product.id)}
                 key={product.id}
                 onClick={() => pick(product)}
               >

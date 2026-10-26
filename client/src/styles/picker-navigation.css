@@ -1,0 +1,6 @@
+/* Keyboard selection stays visible while focus remains in the search field. */
+.member-option.keyboard-active:not(:disabled) {
+  background: #eaf5ff;
+  outline: 2px solid #6b9bcd;
+  outline-offset: -2px;
+}
