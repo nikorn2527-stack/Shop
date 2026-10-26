@@ -50,7 +50,7 @@ if (!config) {
 if (args.includes('--prepare')) { console.log('Isolated folders prepared. Run pnpm test:lan to start; no database was opened.'); process.exit(0); }
 const env = {
   ...process.env,
-  NODE_ENV: 'production', TZ: 'Asia/Bangkok', PORT: String(port),
+  NODE_ENV: 'production', SHOP_RELEASE_CHANNEL: 'windows-final', DEPLOYMENT_MODE: 'onpremise', TZ: 'Asia/Bangkok', PORT: String(port),
   SQLITE_DB_PATH: dbPath, SQLITE_BACKUP_DIR: path.join(work, 'backups'), SQLITE_BACKUP_RETENTION_DAYS: '30',
   SEED_DEMO_DATA: '0', JWT_SECRET: config.secret, DATABASE_URL: '',
   HTTPS: args.includes('--https') ? '1' : '0', HTTPS_CERT_DIR: path.join(work, 'https'),

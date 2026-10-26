@@ -25,6 +25,8 @@ export function SetupView({ brand, onAuthed }: { brand?: BrandSettings | null | 
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   // ROUND 61 — เลือกเวอร์ชันตอนลงทะเบียนครั้งแรก: ทดลองใช้ 30 วัน (แนะนำ) / มีรหัสลิขสิทธิ์ / เริ่มที่ทั่วไป
+  const experience = trpc.system.experience.useQuery();
+  const managed = experience.data?.enforceEditionLimits === false;
   const [editionChoice, setEditionChoice] = useState<"trial" | "license" | "standard">("trial");
   const [licenseKey, setLicenseKey] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
@@ -54,14 +56,14 @@ export function SetupView({ brand, onAuthed }: { brand?: BrandSettings | null | 
     if (issues.length > 0) { setError(issues.join(" · ")); return; }
     if (password !== confirm) { setError("รหัสผ่านทั้งสองช่องไม่ตรงกัน"); return; }
     // ROUND 61 — เลือกใช้รหัสลิขสิทธิ์ต้องกรอกรหัสก่อน (ระบบตรวจความถูกต้องตอนสร้างบัญชี)
-    if (editionChoice === "license" && licenseKey.trim().length < 8) { setError("กรุณาพิมพ์รหัสลิขสิทธิ์ให้ครบทุกกลุ่ม หรือเลือก “เริ่มทดลองใช้” ก่อน"); return; }
+    if (!managed && editionChoice === "license" && licenseKey.trim().length < 8) { setError("กรุณาพิมพ์รหัสลิขสิทธิ์ให้ครบทุกกลุ่ม หรือเลือก “เริ่มทดลองใช้” ก่อน"); return; }
     setError("");
     setupMutation.mutate({
       username: trimmedUsername,
       displayName: trimmedName,
       password,
       storeName: storeName.trim() || undefined,
-      editionChoice,
+      editionChoice: managed ? "standard" : editionChoice,
       licenseKey: editionChoice === "license" ? licenseKey.trim().toUpperCase() : undefined,
     });
   };
@@ -150,8 +152,8 @@ export function SetupView({ brand, onAuthed }: { brand?: BrandSettings | null | 
               <PasswordMeter password={password} min={8} />
             </section>
             <section className="setup-version" aria-labelledby="setup-version-title">
-              <h2 id="setup-version-title">เวอร์ชันที่ต้องการใช้</h2>
-              <div className="setup-edition-picker" role="radiogroup" aria-label="เลือกเวอร์ชันเริ่มใช้งาน">
+              <h2 id="setup-version-title">{managed ? "พร้อมใช้งานทุกฟีเจอร์" : "เวอร์ชันที่ต้องการใช้"}</h2>
+              {!managed && <div className="setup-edition-picker" role="radiogroup" aria-label="เลือกเวอร์ชันเริ่มใช้งาน">
                 <button type="button" className={`setup-edition-option${editionChoice === "trial" ? " active" : ""}`} role="radio" aria-checked={editionChoice === "trial"} onClick={() => setEditionChoice("trial")}>
                   <span className="setup-edition-radio" aria-hidden="true" />
                   <span className="setup-edition-text">
@@ -186,6 +188,7 @@ export function SetupView({ brand, onAuthed }: { brand?: BrandSettings | null | 
                   </span>
                 </button>
               </div>
+              }
               {error && (
                 <div className="login-error" role="alert">
                   <ShieldCheck size={15} /> {error}

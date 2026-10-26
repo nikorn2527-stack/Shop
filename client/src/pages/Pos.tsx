@@ -106,7 +106,7 @@ function formatBillQty(qty: number, unit: string) {
 }
 
 export type PosBillDraft = { cart: CartItem[]; discount: string; memberNumber: string | null };
-export type PosCheckoutRuntime = { attempt: { current: { fingerprint: string; requestId: string } | null }; submitting: { current: boolean } };
+export type PosCheckoutRuntime = { attempt: { current: { fingerprint: string; requestId: string; terminalDeviceId?: string } | null }; submitting: { current: boolean } };
 
 export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onFocusProductConsumed, onOpenMember, billDraft, setBillDraft, checkoutRuntime, onPaymentPendingChange, paymentPending }: { shortcut: string; setShortcut: (value: string) => void; role: Role; userName: string; focusProductId?: number | null; onFocusProductConsumed?: () => void; onOpenMember: (memberNumber: string) => void; billDraft: PosBillDraft; setBillDraft: Dispatch<SetStateAction<PosBillDraft>>; checkoutRuntime: PosCheckoutRuntime; onPaymentPendingChange: (pending: boolean) => void; paymentPending: boolean }) {
   // ROUND 61 — สิทธิ์เวอร์ชัน: กล้องสแกน + รายการพิเศษ/ของสั่ง เป็นฟีเจอร์เวอร์ชันโปรพลัส
@@ -744,7 +744,7 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
   const requestPayment = (method: PaymentMethod) => {
     toast.dismiss();
     if (cart.length === 0) return;
-    if (!terminal.deviceId || (!terminal.data && !checkoutAttemptRef.current)) { setTerminalOpen(true); return; }
+    if (terminal.requireRegistration && (!terminal.deviceId || (!terminal.data && !checkoutAttemptRef.current))) { setTerminalOpen(true); return; }
     if (method === "หักบัญชีสมาชิก" && !selectedMember) {
       setError("เลือกสมาชิกก่อนชำระแบบหักบัญชี");
       setMessage("สแกนหรือค้นหาสมาชิกก่อน ระบบเก็บสินค้าในตะกร้าไว้ให้");
@@ -790,10 +790,11 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
   const completePayment = (method: PaymentMethod) => {
     if (cart.length === 0 || checkoutSubmittingRef.current || checkoutMutation.isPending) return;
     if (discountValue > subtotal) { setError("ส่วนลดมากกว่ายอดรวมสินค้า"); blocker.warning("ส่วนลดมากกว่ายอดรวมสินค้า", "ปรับส่วนลดให้ไม่เกินยอดรวมก่อนยืนยัน"); return; }
-    if (!terminal.deviceId || (!terminal.data && !checkoutAttemptRef.current)) { setPayConfirm(null); setTerminalOpen(true); return; }
+    if (terminal.requireRegistration && (!terminal.deviceId || (!terminal.data && !checkoutAttemptRef.current))) { setPayConfirm(null); setTerminalOpen(true); return; }
     clearNotices();
     const payload = {
-      terminalDeviceId: terminal.deviceId,
+      // Keep terminal metadata stable across a lost-response retry.
+      terminalDeviceId: checkoutAttemptRef.current ? checkoutAttemptRef.current.terminalDeviceId : terminal.data ? terminal.deviceId ?? undefined : undefined,
       items: cart.map((item) => item.special
         ? { name: item.name, price: item.price, qty: item.qty, unit: item.unit }
         : item.variant
@@ -815,7 +816,7 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
     // with the same key so the server replays its receipt instead of charging twice.
     const fingerprint = JSON.stringify(payload);
     if (checkoutAttemptRef.current?.fingerprint !== fingerprint) {
-      checkoutAttemptRef.current = { fingerprint, requestId: crypto.randomUUID() };
+      checkoutAttemptRef.current = { fingerprint, requestId: crypto.randomUUID(), terminalDeviceId: payload.terminalDeviceId };
     }
     checkoutSubmittingRef.current = true;
     onPaymentPendingChange(true);
@@ -1097,7 +1098,7 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
   return <>
     {terminalOpen && <WorkflowDialog title="ตั้งค่าจุดขาย" onClose={() => setTerminalOpen(false)} busy={paymentPending} className="pos-terminal-dialog"><div className="modal-heading"><b>ตั้งค่าจุดขาย</b><button type="button" className="icon-button" aria-label="ปิดตั้งค่าจุดขาย" onClick={() => setTerminalOpen(false)}><X size={18} /></button></div><PosTerminalSettings canManage={isAdminRole(role)} locked={paymentPending} /></WorkflowDialog>}
     {inventoryQuickOpen && <div className="modal-backdrop pos-inventory-backdrop" role="dialog" aria-modal="true" aria-label="เพิ่มสินค้าใหม่และรับเข้าสินค้า" onClick={() => setInventoryQuickOpen(false)}><div className="pos-inventory-modal" onClick={(event) => event.stopPropagation()}><div className="pos-inventory-modal-body"><Stock role={role} userName={userName} initialAction={inventoryQuickAction} embeddedAction onClose={() => setInventoryQuickOpen(false)} /></div></div></div>}
-    <SectionHeader eyebrow="หน้าร้าน / จุดขายสินค้า" title="POS · ขายสินค้า" description="สแกนบาร์โค้ดที่ช่องด้านบน · สินค้าไม่มีบาร์โค้ดปรับจำนวนได้ที่การ์ดด้านขวา · สรุปยอดและปุ่มชำระเงินล็อคอยู่ด้านล่างตลอดเวลา" action={<div className="pos-header-actions"><button type="button" className="pos-status terminal-badge" data-unregistered={!terminal.data || undefined} disabled={paymentPending} onClick={() => setTerminalOpen(true)} title="กำหนดจุดขายให้เบราว์เซอร์นี้">{terminal.isLoading ? "กำลังตรวจสอบจุดขาย…" : terminal.data ? terminalLabel(terminal.data.number) : "กำหนดจุดขาย"}</button></div>} />
+    <SectionHeader eyebrow="หน้าร้าน / จุดขายสินค้า" title="POS · ขายสินค้า" description="สแกนบาร์โค้ดที่ช่องด้านบน · สินค้าไม่มีบาร์โค้ดปรับจำนวนได้ที่การ์ดด้านขวา · สรุปยอดและปุ่มชำระเงินล็อคอยู่ด้านล่างตลอดเวลา" action={<div className="pos-header-actions"><button type="button" className="pos-status terminal-badge" data-unregistered={terminal.requireRegistration && !terminal.data || undefined} disabled={paymentPending} onClick={() => setTerminalOpen(true)} title="กำหนดจุดขายให้เบราว์เซอร์นี้">{terminal.isLoading ? "กำลังตรวจสอบจุดขาย…" : terminal.data ? terminalLabel(terminal.data.number) : terminal.requireRegistration ? "กำหนดจุดขาย" : "จุดขาย (ไม่บังคับ)"}</button></div>} />
     <div className="pos-layout pos-premium-layout">
       <section className="panel cart-panel pos-premium-bill" ref={cartPanelRef}>
         <div className="pos-sale-workspace">

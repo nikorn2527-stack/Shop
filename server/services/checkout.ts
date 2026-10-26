@@ -1,3 +1,4 @@
+import { getRuntimePolicy } from "../runtimePolicy";
 import type { Product } from "../../shared/storeTypes/inventory";
 import type { Member } from "../../shared/storeTypes/members";
 import type {
@@ -45,11 +46,14 @@ export function checkoutInTransaction(
       return existing.receipt;
     }
   }
+  const policy = getRuntimePolicy();
+  if (policy.channel === "windows-final" && !input.terminalDeviceId)
+    throw new StoreError("กรุณากำหนดจุดขายก่อนชำระเงิน");
   const terminal =
     input.terminalDeviceId === undefined
       ? null
       : repository.findTerminal(input.terminalDeviceId);
-  if (input.terminalDeviceId !== undefined && !terminal)
+  if (policy.requirePosRegistration && input.terminalDeviceId !== undefined && !terminal)
     throw new StoreError(
       "เครื่องนี้ยังไม่ได้กำหนดจุดขาย กรุณาให้ผู้บริหารตั้งค่าจุดขายก่อนชำระเงิน",
     );

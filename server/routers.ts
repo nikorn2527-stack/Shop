@@ -1,3 +1,4 @@
+import { getRuntimePolicy } from "./runtimePolicy";
 import { withStoreErrors } from "./_core/storeErrors";
 import { previewOpeningStock, importOpeningStock } from "./openingStockImport";
 import { QR_BANKS, validateBankPaymentQr } from "@shared/paymentQr";
@@ -302,7 +303,7 @@ const orderUpdateInput = z.object({
 // (special/custom line: weighed goods, services, ad-hoc charges — no product row,
 // no stock movement). sale_items.product_id is nullable on purpose for these.
 const checkoutInput = z.object({
-  terminalDeviceId: z.string().uuid("กรุณาตั้งค่าจุดขายสำหรับเครื่องนี้ก่อนชำระเงิน"),
+  terminalDeviceId: z.string().uuid("รหัสเครื่องไม่ถูกต้อง").optional(),
   items: z
     .array(z.union([
       z.object({ productId: z.number().int().positive(), qty: z.number().int().positive(), price: z.number().positive().optional(), unit: z.string().max(30).optional(), label: z.string().max(120).optional() }),
@@ -329,6 +330,9 @@ const checkoutInput = z.object({
   // บังคับให้ติ๊ก checkbox ก่อนปุ่ม "ยืนยันการชำระเงิน" ถึงจะ enable
   paymentVerified: z.boolean().nullish(),
 }).superRefine((input, ctx) => {
+  if (getRuntimePolicy().requirePosRegistration && !input.terminalDeviceId) {
+    ctx.addIssue({ code: "custom", path: ["terminalDeviceId"], message: "กรุณากำหนดจุดขายก่อนชำระเงิน" });
+  }
   if (input.paymentMethod === "เงินสด" && input.receivedCash == null) {
     ctx.addIssue({ code: "custom", path: ["receivedCash"], message: "กรุณาระบุยอดรับเงินสดก่อนชำระเงิน" });
   }
@@ -655,7 +659,7 @@ export const appRouter = router({
       ),
   }),
   auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
+    me: publicProcedure.query(({ ctx }) => ctx.user ? { ...ctx.user, mustChangePassword: getRuntimePolicy().forceInitialPasswordChange && Boolean(ctx.user.mustChangePassword) } : null),
     /** ROUND 36 (ข้อ 31) — สถานะลงทะเบียนครั้งแรก: needsSetup = ยังไม่มีบัญชีผู้ใช้เลย */
     setupStatus: publicProcedure.query(() => withStoreErrors(() => ({ needsSetup: countAppUsers(getWelfareDb()) === 0 }))),
     /** ROUND 36 (ข้อ 31) — ลงทะเบียนผู้บริหารหลัก (ระบบใหม่เท่านั้น) แล้วเข้าสู่ระบบทันที
@@ -665,7 +669,7 @@ export const appRouter = router({
       .mutation(({ ctx, input }) =>
         withStoreErrors(() => {
           const db = getWelfareDb();
-          const choice = input.editionChoice ?? "trial";
+          const choice = getRuntimePolicy().enforceEditionLimits ? input.editionChoice ?? "trial" : "standard";
           const key = (input.licenseKey ?? "").trim();
           if (choice === "license" && !(key && parseLicenseKey(key))) {
             throw new TRPCError({ code: "BAD_REQUEST", message: "รหัสลิขสิทธิ์ไม่ถูกต้อง — ตรวจอักขระให้ครบทุกกลุ่ม หรือเลือก “เริ่มทดลองใช้” ก่อนแล้วค่อยใส่รหัสภายหลังได้" });
@@ -689,7 +693,7 @@ export const appRouter = router({
             secure: isSecureRequest(ctx.req),
             maxAge: 7 * 24 * 60 * 60 * 1000,
           });
-          return { id: user.id, username: user.username, displayName: user.displayName, role: user.role, mustChangePassword: true };
+          return { id: user.id, username: user.username, displayName: user.displayName, role: user.role, mustChangePassword: getRuntimePolicy().forceInitialPasswordChange };
         }),
       ),
     /** ROUND 36 (ข้อ 31) — เปลี่ยนรหัสผ่านของตัวเอง (บังคับตอน first login / ตั้งใหม่โดยผู้บริหาร) */
@@ -771,7 +775,7 @@ export const appRouter = router({
           } else {
             logAction(db, "เข้าสู่ระบบ", user.displayName, `${user.username} · สิทธิ์ ${roleThai}`, "blue", roleThai);
           }
-          return { id: user.id, username: user.username, displayName: user.displayName, role: user.role, mustChangePassword: user.mustChangePassword === 1 };
+          return { id: user.id, username: user.username, displayName: user.displayName, role: user.role, mustChangePassword: getRuntimePolicy().forceInitialPasswordChange && user.mustChangePassword === 1 };
         }),
       ),
     logout: publicProcedure.mutation(({ ctx }) => {

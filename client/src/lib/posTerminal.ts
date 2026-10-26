@@ -29,11 +29,12 @@ function readDeviceId(): string | null {
 }
 export function usePosTerminal() {
   const [deviceId] = useState(readDeviceId);
+  const policy = trpc.system.experience.useQuery();
   const query = trpc.pos.terminal.useQuery(
     { deviceId: deviceId ?? "" },
     { enabled: !!deviceId, refetchOnWindowFocus: true }
   );
-  return { deviceId, ...query };
+  return { deviceId, requireRegistration: policy.data?.requirePosRegistration ?? true, ...query };
 }
 export function terminalLabel(number: number) {
   return `จุดขายที่ ${String(number).padStart(2, "0")}`;

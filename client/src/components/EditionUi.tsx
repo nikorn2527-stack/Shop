@@ -196,7 +196,7 @@ export function EditionUpgradeModal({ open, onClose, status, focusFeature, onApp
           </div>
           <button className="icon-button" onClick={onClose} aria-label="ปิดหน้าต่าง"><X size={17} /></button>
         </div>
-        {focusFeature && (
+        {focusFeature && status.source !== "managed" && (
           <div className="edition-focus-feature" role="note">
             <CircleAlert size={15} />
             <span>
@@ -205,8 +205,8 @@ export function EditionUpgradeModal({ open, onClose, status, focusFeature, onApp
             </span>
           </div>
         )}
-        <EditionCompareTable current={status.edition} />
-        <div className="edition-apply">
+        {status.source !== "managed" && <EditionCompareTable current={status.edition} />}
+        {status.source !== "managed" && <div className="edition-apply">
           <div className="edition-apply-title"><KeyRound size={15} /> มีรหัสลิขสิทธิ์อยู่แล้ว</div>
           <div className="edition-key-row">
             <input
@@ -234,6 +234,7 @@ export function EditionUpgradeModal({ open, onClose, status, focusFeature, onApp
             <div className="edition-apply-error">ลิขสิทธิ์เดิมหมดอายุแล้ว — ใส่รหัสใหม่เพื่อเปิดใช้งานต่อ</div>
           )}
         </div>
+        }
         {status.source === "free" && !status.trialStart && (
           <div className="edition-trial-card">
             <div><Gift size={16} /><b>เริ่มทดลองใช้ {EDITIONS.proplus.label} ฟรี {EDITION_TRIAL_DAYS} วัน</b><p>เมื่อครบกำหนดจะใช้เวอร์ชันทั่วไป โดยเก็บข้อมูลสินค้า สมาชิก และบิลเดิม</p></div>

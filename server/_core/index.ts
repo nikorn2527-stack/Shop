@@ -1,3 +1,4 @@
+import { getRuntimePolicy } from "../runtimePolicy";
 import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
@@ -74,6 +75,8 @@ function startCutoffScheduler() {
 }
 
 async function startServer() {
+  const policy = getRuntimePolicy();
+  console.log(`[Startup] channel=${policy.channel}`);
   const database = verifyWelfareDbStartup();
   const release = process.env.RAILWAY_GIT_COMMIT_SHA ?? process.env.APP_VERSION ?? "local";
   console.log(`[Startup] release=${release} database=${database.path} quick_check=${database.quickCheck}`);

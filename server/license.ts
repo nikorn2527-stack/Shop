@@ -1,3 +1,4 @@
+import { getRuntimePolicy } from "./runtimePolicy";
 /**
  * ROUND 61 (user) — รหัสลิขสิทธิ์แบบออฟไลน์ สำหรับระบบเวอร์ชัน 3 แบบ
  * -------------------------------------------------------------------
@@ -146,7 +147,7 @@ export function parseLicenseKey(rawKey: string): LicenseKeyInfo | null {
 
 export type EditionStatus = {
   edition: Edition;
-  source: "license" | "trial" | "free";
+  source: "license" | "trial" | "free" | "managed";
   /** ชื่อผู้ถือลิขสิทธิ์ (พิมพ์ตอนใช้รหัส) */
   licensedTo: string | null;
   /** วันหมดอายุลิขสิทธิ์ "YYYY-MM-DD" · null = ถาวร */
@@ -166,6 +167,9 @@ export type EditionStatus = {
  * · นอกเหนือจากนี้ → ทั่วไป
  */
 export function resolveEditionStatus(settings: Pick<StoreSettings, "licenseKey" | "licenseName" | "trialStart">): EditionStatus {
+  if (!getRuntimePolicy().enforceEditionLimits) {
+    return { edition: "proplus", source: "managed", licensedTo: null, licenseExpiresAt: null, licenseState: "none", trialStart: null, trialDaysLeft: null, features: [...EDITION_FEATURES.proplus] };
+  }
   const key = (settings.licenseKey ?? "").trim();
   const trialStart = (settings.trialStart ?? "").trim();
   let licenseState: EditionStatus["licenseState"] = "none";

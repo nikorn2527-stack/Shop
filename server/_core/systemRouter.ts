@@ -1,3 +1,4 @@
+import { getRuntimePolicy } from "../runtimePolicy";
 import os from "node:os";
 import { statSync } from "node:fs";
 import { z } from "zod";
@@ -35,6 +36,7 @@ import type { TrpcContext } from "./context";
  * any monitoring system without tRPC-specific wrappers.
  */
 export const systemRouter = router({
+  experience: publicProcedure.query(() => getRuntimePolicy()),
   health: publicProcedure
     .input(
       z

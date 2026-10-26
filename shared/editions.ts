@@ -131,9 +131,10 @@ export function editionAtLeast(edition: Edition, minimum: Edition): boolean {
 /** ป้ายสถานย่อ เช่น "ทดลองใช้ · เหลือ 12 วัน" */
 export function editionStatusLabel(status: {
   edition: Edition;
-  source: "license" | "trial" | "free";
+  source: "license" | "trial" | "free" | "managed";
   trialDaysLeft?: number | null;
 }): string {
+  if (status.source === "managed") return "เปิดใช้งานครบทุกฟีเจอร์";
   if (status.source === "trial") {
     const left = status.trialDaysLeft ?? 0;
     return `ทดลองใช้โปรพลัส · เหลือ ${left} วัน`;
