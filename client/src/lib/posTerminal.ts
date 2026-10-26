@@ -1,3 +1,4 @@
+import { createBrowserUuid } from "./browserUuid";
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 
@@ -13,14 +14,7 @@ function readDeviceId(): string | null {
       )
     )
       return saved;
-    // getRandomValues also works on HTTP LAN installations without randomUUID.
-    const bytes = crypto.getRandomValues(new Uint8Array(16));
-    bytes[6] = (bytes[6] & 15) | 64;
-    bytes[8] = (bytes[8] & 63) | 128;
-    const hex = Array.from(bytes, n => n.toString(16).padStart(2, "0")).join(
-      ""
-    );
-    const id = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+    const id = createBrowserUuid();
     localStorage.setItem(DEVICE_KEY, id);
     return localStorage.getItem(DEVICE_KEY) === id ? id : null;
   } catch {

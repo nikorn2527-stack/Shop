@@ -1,3 +1,4 @@
+import { createBrowserUuid } from "@/lib/browserUuid";
 import { PosTerminalSettings } from "@/components/PosTerminalSettings";
 import { terminalLabel, usePosTerminal } from "@/lib/posTerminal";
 import { resolveProductArtwork } from "@shared/productIcons";
@@ -816,7 +817,7 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
     // with the same key so the server replays its receipt instead of charging twice.
     const fingerprint = JSON.stringify(payload);
     if (checkoutAttemptRef.current?.fingerprint !== fingerprint) {
-      checkoutAttemptRef.current = { fingerprint, requestId: crypto.randomUUID(), terminalDeviceId: payload.terminalDeviceId };
+      checkoutAttemptRef.current = { fingerprint, requestId: createBrowserUuid(), terminalDeviceId: payload.terminalDeviceId };
     }
     checkoutSubmittingRef.current = true;
     onPaymentPendingChange(true);
@@ -855,7 +856,7 @@ export function Pos({ shortcut, setShortcut, role, userName, focusProductId, onF
       slipImage: slipDataUrl || null,
     } as Omit<Parameters<typeof walletMutation.mutate>[0], "clientRequestId">;
     const fingerprint = JSON.stringify(walletPayload);
-    if (walletRequestRef.current?.fingerprint !== fingerprint) walletRequestRef.current = { fingerprint, id: crypto.randomUUID() };
+    if (walletRequestRef.current?.fingerprint !== fingerprint) walletRequestRef.current = { fingerprint, id: createBrowserUuid() };
     walletMutation.mutate({ ...walletPayload, clientRequestId: walletRequestRef.current.id });
   };
   const finishWallet = () => {

@@ -1,3 +1,4 @@
+import { createBrowserUuid } from "@/lib/browserUuid";
 import { QR_BANKS } from "@shared/paymentQr";
 import { BankQrInput } from "./BankQrInput";
 import { notify } from "@/lib/notifications";
@@ -136,7 +137,7 @@ export function BankAccountsPanel({
       return;
     }
     const cleaned: BankAccount = {
-      id: draft.id || crypto.randomUUID(),
+      id: draft.id || createBrowserUuid(),
       bankCode: draft.bankCode.trim() || draft.bankName.trim().slice(0, 20),
       bankName: draft.bankName.trim(),
       accountNumber: draft.accountNumber.trim(),

@@ -1,3 +1,4 @@
+import { createBrowserUuid } from "@/lib/browserUuid";
 import { WorkflowDialog } from "./WorkflowDialog";
 import { useEffect, useState } from "react";
 import { trpc } from "@/lib/trpc";
@@ -32,7 +33,7 @@ export function MemberCardActionsModal({ memberNumber, onClose, onSuccess, initi
   const [code, setCode] = useState(initialCardNumber);
   const [error, setError] = useState("");
   const [confirm, setConfirm] = useState(false);
-  const [requestId] = useState(() => crypto.randomUUID());
+  const [requestId] = useState(() => createBrowserUuid());
 
   // Wallet-style card return flow (mirrors deposit/withdrawal/refund UI in MemberDetail)
   const [returnStep, setReturnStep] = useState<"form" | "confirm" | "success">("form");
