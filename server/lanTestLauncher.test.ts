@@ -9,7 +9,7 @@ beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), "shop-lan-launch-"));
   for (const folder of ["scripts", "dist", "node_modules"]) mkdirSync(join(root, folder));
   copyFileSync(fileURLToPath(new URL("../scripts/lan-test.mjs", import.meta.url)), join(root, "scripts/lan-test.mjs"));
-  writeFileSync(join(root, "dist/index.js"), "require('node:fs').writeFileSync('received-env.json', JSON.stringify({db:process.env.SQLITE_DB_PATH,backup:process.env.SQLITE_BACKUP_DIR,seed:process.env.SEED_DEMO_DATA,mode:process.env.NODE_ENV,tz:process.env.TZ,secret:process.env.JWT_SECRET.length}));");
+  writeFileSync(join(root, "dist/index.js"), "require('node:fs').writeFileSync('received-env.json', JSON.stringify({db:process.env.SQLITE_DB_PATH,backup:process.env.SQLITE_BACKUP_DIR,seed:process.env.SEED_DEMO_DATA,mode:process.env.NODE_ENV,tz:process.env.TZ,channel:process.env.SHOP_RELEASE_CHANNEL,secret:process.env.JWT_SECRET.length}));");
 });
 afterEach(() => rmSync(root, { recursive: true, force: true }));
 function run(...args: string[]) {
@@ -31,7 +31,13 @@ describe("isolated LAN test launcher", () => {
   it("overrides inherited business paths and demo seeding before starting the app", () => {
     expect(run("--prepare", "--port", "43002").status).toBe(0);
     const result = run(); expect(result.status).toBe(0);
-    expect(JSON.parse(readFileSync(join(root, "received-env.json"), "utf8"))).toMatchObject({ db: join(root, ".lan-test/store.sqlite"), backup: join(root, ".lan-test/backups"), seed: "0", mode: "production", tz: "Asia/Bangkok", secret: 96 });
+    expect(JSON.parse(readFileSync(join(root, "received-env.json"), "utf8"))).toMatchObject({ db: join(root, ".lan-test/store.sqlite"), backup: join(root, ".lan-test/backups"), seed: "0", mode: "production", tz: "Asia/Bangkok", channel: "windows-final", secret: 96 });
+    expect(existsSync(join(root, "BUSINESS-DO-NOT-OPEN.sqlite"))).toBe(false);
+  });
+  it("runs customer trial policy on the same isolated database when --live is explicit", () => {
+    expect(run("--prepare", "--port", "43003").status).toBe(0);
+    const result = run("--live"); expect(result.status).toBe(0);
+    expect(JSON.parse(readFileSync(join(root, "received-env.json"), "utf8"))).toMatchObject({ db: join(root, ".lan-test/store.sqlite"), channel: "railway-live", seed: "0" });
     expect(existsSync(join(root, "BUSINESS-DO-NOT-OPEN.sqlite"))).toBe(false);
   });
   it("refuses linked test directories and unmarked existing databases", () => {

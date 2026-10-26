@@ -1,3 +1,4 @@
+import { createBrowserUuid } from "@/lib/browserUuid";
 import { useRef as useRequestRef } from "react";
 import { notify } from "@/lib/notifications";
 ﻿import { ActionButton } from "@/components/ActionButton";
@@ -395,7 +396,7 @@ export function MemberDetail({
       actorRole,
     } as Omit<Parameters<typeof walletMutation.mutate>[0], "clientRequestId">;
     const fingerprint = JSON.stringify(walletPayload);
-    if (walletRequestRef.current?.fingerprint !== fingerprint) walletRequestRef.current = { fingerprint, id: crypto.randomUUID() };
+    if (walletRequestRef.current?.fingerprint !== fingerprint) walletRequestRef.current = { fingerprint, id: createBrowserUuid() };
     walletMutation.mutate({ ...walletPayload, clientRequestId: walletRequestRef.current.id });
   };
   return (

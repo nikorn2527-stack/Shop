@@ -1,3 +1,4 @@
+import { createBrowserUuid } from "@/lib/browserUuid";
 import { useRef, useState } from 'react';
 import { trpc } from '@/lib/trpc';
 import { memberFullName, money, type MemberLite } from '@/pages/pageData';
@@ -41,7 +42,7 @@ function ReturnCardReview({ memberNumber, onBack, onClose, onReturned }: {
   const [received, setReceived] = useState(false);
   const [review, setReview] = useState<{ cardNumber: string; sessionId: number; amount: number; name: string } | null>(null);
   const [error, setError] = useState('');
-  const requestId = useRef(crypto.randomUUID());
+  const requestId = useRef(createBrowserUuid());
   const inFlight = useRef(false);
   const release = trpc.card.return.useMutation({
     onSuccess: async () => {

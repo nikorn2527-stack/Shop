@@ -7,10 +7,10 @@
 | ช่องทาง | Branch | คำสั่งเริ่มระบบ | นโยบาย |
 |---|---|---|---|
 | Railway ที่ผู้ใช้ใช้งาน | `main` | `pnpm start:railway` | `railway-live` |
-| Windows Final | `release/windows-final` | `pnpm.cmd start:windows` | `windows-final` |
-| ทดสอบ LAN | ชุด Windows ที่กำลังตรวจ | `pnpm.cmd test:lan` | `windows-final` บน `.lan-test` |
+| เตรียมปิดงาน Final | `main-v2` | รอรวมงานและตรวจรับก่อนปล่อย | เตรียมใช้ `windows-final` |
+| ลูกค้าทดสอบ Local/LAN | `main` | `pnpm.cmd test:lan:live` | `railway-live` บน `.lan-test` |
 
-ทั้งสอง branch เริ่มจากโค้ดร่วมกัน หลังจากนี้งานข้อบังคับ/ตัวติดตั้งที่ยังไม่พร้อมใช้งานต้องทำบน `release/windows-final` เท่านั้น ส่วนฟีเจอร์ร่วมที่พร้อมใช้งานให้ตรวจและเลือกขึ้น `main` เป็นราย commit ไม่ merge งาน Final ทั้งชุดกลับเข้าระบบที่ผู้ใช้กำลังใช้อยู่ `main-v2` และ `dev` เดิมไม่ได้ย้ายหรือแก้ไข
+`main` เป็นชุดที่ให้ลูกค้าทดสอบใช้งานจริง ทั้ง Railway และ Local ส่วน `main-v2` เป็นสายเตรียมปิดงาน Final ยังไม่ใช่เวอร์ชันส่งมอบ ทั้งสองสายมีประวัติต่างกัน ต้องตรวจและรวมงานเดิมก่อนปิด Final ไม่เขียนทับหรือ force-push ข้ามงานเดิม รอบนี้ยังไม่เปลี่ยนโค้ดใน `main-v2` ส่วน branch `release/windows-final` และ `test/windows-lan` ที่สร้างไว้ก่อนยืนยันชื่อเป็นเพียง snapshot ไม่ใช่ช่องทางอัปเดตที่ให้ลูกค้าใช้
 
 ## นโยบายการใช้งาน
 
@@ -33,7 +33,7 @@
 ## ขั้นตอนนำฟีเจอร์ขึ้น Railway
 
 1. ตรวจว่า Railway service ชี้ `main` และตรวจ commit ที่กำลังปล่อยทุกครั้ง
-2. ทำงาน Windows/ข้อบังคับ Final ใน `release/windows-final` ไม่ push งานชุดติดตั้งเข้า branch ที่ Railway auto-deploy
+2. ทำงานข้อบังคับ/ตัวติดตั้งเพื่อปิด Final ใน `main-v2` ไม่ push งานชุดติดตั้งเข้า branch ที่ Railway auto-deploy
 3. แยก commit ของฟีเจอร์ร่วมออกจาก commit ของข้อบังคับชุดติดตั้ง เลือกเฉพาะฟีเจอร์ที่ต้องการไปสาย Railway และตรวจ dependency ของ commit ด้วย
 4. ทดสอบบน staging ซึ่งใช้ฐานข้อมูลจำลองหรือสำเนาที่แยกจาก production และ secret คนละชุด ห้ามชี้ staging ไปที่ Volume จริง
 5. ก่อนปล่อย ตรวจ diff, schema migration, สำรอง SQLite ด้วยเครื่องมือสำรองของระบบ และตรวจไฟล์สำรอง การอัปเดตหน้าจอไม่ควรมีการนำเข้าหรือรีเซ็ตข้อมูล

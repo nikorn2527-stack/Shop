@@ -5,11 +5,13 @@
 
 ---
 
+สำหรับชุดลูกค้าทดสอบบน Windows/LAN ให้ใช้ branch `main` และขั้นตอนใน [คู่มือทดสอบ Windows/LAN](WINDOWS_LAN_TEST_TH.md) คำสั่ง `pnpm.cmd test:lan:live` ใช้โหมดเดียวกับ Railway และฐานข้อมูล `.lan-test/store.sqlite` แยกจากโหมดพัฒนาในคู่มือนี้
+
 ## 1. สิ่งที่ต้องมีก่อน (ติดตั้งครั้งเดียว)
 
 | โปรแกรม | เวอร์ชันขั้นต่ำ | ตรวจสอบ | ดาวน์โหลด |
 |---|---|---|---|
-| **Node.js** | **22 ขึ้นไป** (สำคัญ — ใช้ `node:sqlite` ในตัว) | `node --version` | https://nodejs.org (เลือก LTS) |
+| **Node.js** | **24 LTS ขึ้นไป** (ตรงกับชุดทดสอบ Windows/LAN และใช้ `node:sqlite` ในตัว) | `node --version` | https://nodejs.org (เลือก LTS) |
 | **pnpm** | 10 ขึ้นไป | `pnpm --version` | `corepack enable` หรือ `npm i -g pnpm` |
 | **Git** | ใดก็ได้ | `git --version` | https://git-scm.com |
 

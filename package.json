@@ -22,7 +22,8 @@
     "db:postgres:export": "tsx scripts/postgres-export.ts",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "start:railway": "cross-env NODE_ENV=production DEPLOYMENT_MODE=cloud CLOUD_PROVIDER=railway SHOP_RELEASE_CHANNEL=railway-live node dist/index.js",
-    "start:windows": "cross-env NODE_ENV=production DEPLOYMENT_MODE=onpremise SHOP_RELEASE_CHANNEL=windows-final node dist/index.js"
+    "start:windows": "cross-env NODE_ENV=production DEPLOYMENT_MODE=onpremise SHOP_RELEASE_CHANNEL=windows-final node dist/index.js",
+    "test:lan:live": "node scripts/lan-test.mjs --live"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.693.0",

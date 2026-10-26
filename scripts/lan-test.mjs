@@ -12,7 +12,7 @@ const work = path.join(root, '.lan-test');
 const dbPath = path.join(work, 'store.sqlite');
 const args = process.argv.slice(2);
 const actions = args.filter(arg => ['--check', '--prepare', '--backup'].includes(arg));
-const allowed = new Set(['--check', '--prepare', '--backup', '--https', '--port']);
+const allowed = new Set(['--check', '--prepare', '--backup', '--https', '--port', '--live']);
 let portFlag;
 for (let i = 0; i < args.length; i++) {
   if (!allowed.has(args[i])) throw new Error(`Unknown option: ${args[i]}`);
@@ -31,7 +31,7 @@ let config = fs.existsSync(configPath) ? JSON.parse(fs.readFileSync(configPath, 
 if (config && (config.version !== 1 || config.purpose !== 'shop-lan-test' || typeof config.secret !== 'string' || config.secret.length < 32 || !Number.isInteger(config.port) || config.port < 1024 || config.port > 65535)) throw new Error('Invalid test configuration; existing files were not changed');
 if (fs.existsSync(dbPath) && !config) throw new Error('Existing database without a LAN test marker; refusing to open it');
 const port = portFlag ?? config?.port ?? 3001;
-console.log(`SHOP LAN TEST — SQLite on the main machine; PostgreSQL is not enabled\nTest database: ${dbPath}\nApp port: ${port}`);
+console.log(`SHOP LAN TEST (${args.includes('--live') ? 'customer live policy' : 'Final policy'}) — SQLite on the main machine; PostgreSQL is not enabled\nTest database: ${dbPath}\nApp port: ${port}`);
 if (args.includes('--check')) { console.log('Prerequisites passed. No database opened or files changed.'); process.exit(0); }
 if (!args.includes('--prepare') && !args.includes('--backup')) {
   await new Promise((resolve, reject) => {
@@ -50,7 +50,7 @@ if (!config) {
 if (args.includes('--prepare')) { console.log('Isolated folders prepared. Run pnpm test:lan to start; no database was opened.'); process.exit(0); }
 const env = {
   ...process.env,
-  NODE_ENV: 'production', SHOP_RELEASE_CHANNEL: 'windows-final', DEPLOYMENT_MODE: 'onpremise', TZ: 'Asia/Bangkok', PORT: String(port),
+  NODE_ENV: 'production', SHOP_RELEASE_CHANNEL: args.includes('--live') ? 'railway-live' : 'windows-final', DEPLOYMENT_MODE: 'onpremise', TZ: 'Asia/Bangkok', PORT: String(port),
   SQLITE_DB_PATH: dbPath, SQLITE_BACKUP_DIR: path.join(work, 'backups'), SQLITE_BACKUP_RETENTION_DAYS: '30',
   SEED_DEMO_DATA: '0', JWT_SECRET: config.secret, DATABASE_URL: '',
   HTTPS: args.includes('--https') ? '1' : '0', HTTPS_CERT_DIR: path.join(work, 'https'),
