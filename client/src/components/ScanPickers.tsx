@@ -111,6 +111,11 @@ export function MemberScanPicker({
   }, []);
 
   const pick = (member: MemberLite | null) => {
+    // Every entry path (keyboard, exact scan, camera and click) shares this guard.
+    if (member?.status === "suspended") {
+      blocker.warning("บัตรสมาชิกถูกระงับการใช้จ่าย", `${memberFullName(member)} · ${member.memberNumber}\nตรวจสอบกับผู้บริหารก่อนใช้รายการนี้`);
+      return;
+    }
     if (member && requireConfirm) {
       setPending(member);
       setTerm("");
@@ -125,12 +130,15 @@ export function MemberScanPicker({
 
   const confirmPending = () => {
     if (!pending) return;
-    if (pending.status === "suspended") {
+    // Member data may refresh while the verification card is open.
+    const current = members.find(member => member.memberNumber === pending.memberNumber);
+    if (!current) return;
+    if (current.status === "suspended") {
       // ROUND 78 — บัตรถูกระงับ: เด้งกลางจอให้ชัด (เดิม toast มุมขวาล่างมองไม่เห็น)
-      blocker.warning("บัตรสมาชิกถูกระงับการใช้จ่าย", `${memberFullName(pending)} · ${pending.memberNumber}\nตรวจสอบกับผู้บริหารก่อนใช้รายการนี้`);
+      blocker.warning("บัตรสมาชิกถูกระงับการใช้จ่าย", `${memberFullName(current)} · ${current.memberNumber}\nตรวจสอบกับผู้บริหารก่อนใช้รายการนี้`);
       return;
     }
-    onSelect(pending);
+    onSelect(current);
     setPending(null);
     inputRef.current?.focus();
   };
@@ -255,7 +263,7 @@ export function MemberScanPicker({
       )}
       {listOpen && (
         <div className="member-scan-list" id={navigation.listId} role="listbox" aria-label="รายการสมาชิกที่ตรงกับที่คีย์">
-          {allowGeneralCustomer && <button type="button" className={`member-option${navigation.activeKey === "general" ? " keyboard-active" : ""}`} id={navigation.optionId("general")} role="option" aria-selected={navigation.activeKey === "general"} onClick={() => pick(null)}>
+          {allowGeneralCustomer && <button type="button" tabIndex={-1} className={`member-option${navigation.activeKey === "general" ? " keyboard-active" : ""}`} id={navigation.optionId("general")} role="option" aria-selected={navigation.activeKey === "general"} onClick={() => pick(null)}>
             <div>
               <b>บุคคลทั่วไป</b>
               <small>ชำระเงินสดหรือ QR</small>
@@ -282,7 +290,9 @@ export function MemberScanPicker({
                 className={`member-option${navigation.activeKey === member.memberNumber ? " keyboard-active" : ""}`}
                 id={navigation.optionId(member.memberNumber)} role="option" aria-selected={navigation.activeKey === member.memberNumber}
                 key={member.memberNumber}
+                tabIndex={-1}
                 disabled={member.status === "suspended"}
+                aria-disabled={member.status === "suspended"}
                 onClick={() => pick(member)}
               >
                 <MemberAvatar member={member} size={34} />
@@ -551,6 +561,7 @@ export function ProductScanPicker({
                 className={`member-option${navigation.activeKey === String(product.id) ? " keyboard-active" : ""}`}
                 id={navigation.optionId(String(product.id))} role="option" aria-selected={navigation.activeKey === String(product.id)}
                 key={product.id}
+                tabIndex={-1}
                 onClick={() => pick(product)}
               >
                 <div className="product-scan-option">
