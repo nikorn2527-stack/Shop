@@ -62,7 +62,15 @@ const childArgs = args.includes('--backup')
 if (!args.includes('--backup')) {
   const scheme = env.HTTPS === '1' ? 'https' : 'http';
   console.log(`Main machine: ${scheme}://localhost:${port}`);
-  for (const list of Object.values(os.networkInterfaces())) for (const item of list ?? []) {
+  // Address discovery only prints connection hints; it must not prevent startup
+  // on hosts where the OS restricts network-interface enumeration.
+  let interfaces = {};
+  try {
+    interfaces = os.networkInterfaces();
+  } catch {
+    console.warn('LAN addresses could not be listed; the app will still start. Use the main machine URL above locally.');
+  }
+  for (const list of Object.values(interfaces)) for (const item of list ?? []) {
     if (item.family === 'IPv4' && !item.internal) console.log(`Client browsers: ${scheme}://${item.address}:${port}`);
   }
   console.log('Create your own TEST admin, name the store LAN TEST, and use different accounts on each computer.\nCtrl+C stops the server. Files remain for the next test. No reset or business-data import is performed.');

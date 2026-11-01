@@ -113,6 +113,14 @@ export function useScanLayout() {
 
   const onKeyDownCapture = useCallback((event: React.KeyboardEvent<HTMLElement>) => {
     const state = burstRef.current;
+    // IME keystrokes describe composition, not a barcode-gun burst. Discard
+    // them so the next Enter cannot rebuild a Thai name from physical keys.
+    if (event.nativeEvent.isComposing || event.keyCode === 229) {
+      state.chars = [];
+      state.times = [];
+      state.enterAt = 0;
+      return;
+    }
     const now = event.timeStamp || performance.now();
     if (event.key === "Enter") { state.enterAt = now; return; }
     if (event.key === "Backspace") { state.chars = []; state.times = []; return; }
