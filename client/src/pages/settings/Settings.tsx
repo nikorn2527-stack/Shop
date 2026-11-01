@@ -168,6 +168,7 @@ type SettingsForm = {
   appLogo: string;
   appBackground: string;
   loginBackground: string;
+  loginOrganizationName: string;
   appTheme: string;
   /** ROUND 38 (ข้อ 38) — บุคลิกการออกแบบทั้งระบบ: shop | apple | microsoft | android */
   appStyle: string;
@@ -234,6 +235,7 @@ const SETTINGS_FIELD_LABELS: [keyof SettingsForm, string][] = [
   ["appLogo", "โลโก้"],
   ["appBackground", "ภาพพื้นหลังพื้นที่ทำงาน"],
   ["loginBackground", "ภาพพื้นหลังหน้าเข้าสู่ระบบ"],
+  ["loginOrganizationName", "ชื่อหน่วยงานหน้าเข้าสู่ระบบ"],
   ["appTheme", "สีธีม"],
   ["appStyle", "สไตล์หน้าตาแอป"],
   ["posRailHidden", "เมนูลัดหน้าร้าน (POS)"],
@@ -2115,9 +2117,13 @@ export function Settings({
                 </div>
                 <div className="background-settings login-background-settings">
                   <h3>รูปแบบหน้าเข้าสู่ระบบ</h3>
+                  <label>
+                    ชื่อหน่วยงานหน้าเข้าสู่ระบบ
+                    <input value={form?.loginOrganizationName ?? ""} disabled={!form} maxLength={160} placeholder="เช่น โรงพยาบาลธัญญารักษ์อุดรธานี" onChange={event => updateForm({ loginOrganizationName: event.target.value })} />
+                  </label>
                   <BackgroundImageUpload target="login" hasImage={Boolean(form?.loginBackground)} disabled={!form} onChange={event => onBackgroundPick(event, "loginBackground")} />
                   {form?.loginBackground && <>
-                    <div className="login-background-preview"><img src={form.loginBackground} alt="ตัวอย่างภาพพื้นหลังหน้าเข้าสู่ระบบ" /><div><b>{form.appName || "ร้านค้าสวัสดิการ"}</b><span>เข้าสู่ระบบ</span></div></div>
+                    <div className="login-background-preview"><img src={form.loginBackground} alt="ตัวอย่างภาพพื้นหลังหน้าเข้าสู่ระบบ" /><div><b>{form.appName || "ร้านค้าสวัสดิการ"}</b>{form.loginOrganizationName && <small>{form.loginOrganizationName}</small>}<span>เข้าสู่ระบบ</span></div></div>
                     <button type="button" className="outline-button" onClick={() => updateForm({ loginBackground: "" })}>ใช้พื้นเรียบ · นำภาพหน้าเข้าสู่ระบบออก</button>
                   </>}
                 </div>

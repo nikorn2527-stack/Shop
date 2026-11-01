@@ -14,7 +14,7 @@ import { applyThermalPrintProfile, resolveThermalPaperWidth, type ThermalPaperWi
  * (เปลี่ยนสีเน้นแยกทีหลังได้ตามปกติผ่านพาเลตต์สี)
  */
 
-export type BrandSettings = { appName: string; appLogo: string; appTheme: string; appStyle?: string; appBackground?: string; loginBackground?: string };
+export type BrandSettings = { appName: string; appLogo: string; appTheme: string; appStyle?: string; appBackground?: string; loginBackground?: string; loginOrganizationName?: string };
 
 /**
  * สีหลักมาตรฐานของระบบ — ส้มและเขียวสำเร็จ LINE ใช้ชุดเดียวทั้งแอป
@@ -139,6 +139,7 @@ export function applyBrand(brand: Partial<BrandSettings> | null | undefined): Br
     appLogo,
     appBackground,
     loginBackground: resolveBackgroundImage(brand.loginBackground),
+    loginOrganizationName: (brand.loginOrganizationName ?? "").trim().slice(0, 160),
     appTheme,
     appStyle: resolveUiStyle(appStyle),
   };
@@ -161,6 +162,7 @@ export function readBrandCache(): BrandSettings | null {
       appLogo: parsed.appLogo || "",
       appBackground: parsed.appBackground || "",
       loginBackground: resolveBackgroundImage(parsed.loginBackground),
+      loginOrganizationName: (parsed.loginOrganizationName ?? "").trim().slice(0, 160),
       appTheme: normalizeTheme(parsed.appTheme),
       appStyle: resolveUiStyle(parsed.appStyle),
     };

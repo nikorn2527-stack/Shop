@@ -43,6 +43,8 @@ export type StoreSettings = {
   appLogo: string;
   appBackground: string;
   loginBackground: string;
+  /** Organization displayed only on the welcome screen, not on printed documents. */
+  loginOrganizationName: string;
   /** สีธีมหลัก: preset id เช่น "emerald" หรือ hex "#007a55" */
   appTheme: string;
   /** ROUND 75 (user) — หน้าแจ้งผลหลังชำระเงิน ไม่เด้งไปหน้าสั่งพิมพ์อีกต่อไป:

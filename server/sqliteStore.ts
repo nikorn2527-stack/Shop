@@ -2875,6 +2875,7 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   appLogo: "",
   appBackground: "",
   loginBackground: "",
+  loginOrganizationName: "",
   appTheme: "indigo",
   // ROUND 75 — เมนูลัดหน้าร้าน: "" = เปิดใช้ทุกปุ่มบนรางซ้าย POS
   posRailHidden: "",

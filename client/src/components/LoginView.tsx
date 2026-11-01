@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { Eye, EyeOff, IdCard, LogIn, ShieldCheck } from "@/lib/icons";
+import { Eye, EyeOff, ShieldCheck } from "@/lib/icons";
 import { trpc } from "@/lib/trpc";
 import { getErrorMessage } from "@/pages/viewFormat";
 import { brandInitial, resolveBackgroundImage, type BrandSettings } from "@/theme";
@@ -14,6 +14,7 @@ import { FeedbackDialog } from "./WorkflowDialog";
 export function LoginView({ brand, onAuthed }: { brand?: BrandSettings | null | undefined; onAuthed: () => void }) {
   const appName = (brand?.appName ?? "").trim() || "ร้านค้าสวัสดิการ";
   const appLogo = brand?.appLogo ?? "";
+  const organizationName = (brand?.loginOrganizationName ?? "").trim();
   const backgroundImage = resolveBackgroundImage(brand?.loginBackground);
   const [failedBackground, setFailedBackground] = useState("");
   const showBackground = Boolean(backgroundImage && failedBackground !== backgroundImage);
@@ -47,61 +48,63 @@ export function LoginView({ brand, onAuthed }: { brand?: BrandSettings | null | 
   };
 
   return (
-    <div className={`login-screen${showBackground ? " login-with-background" : ""}`}>
+    <div className={`login-screen login-welcome-screen${showBackground ? " login-with-background" : ""}`}>
       {showBackground && <><img className="login-background-image" src={backgroundImage} alt="" onError={() => setFailedBackground(backgroundImage)} /><div className="login-background-shade" aria-hidden="true" /></>}
       <i className="login-blob teal" aria-hidden="true" />
       <i className="login-blob amber" aria-hidden="true" />
-      <div className="login-card">
-        <div className="login-brand">
-          {appLogo ? <img className="brand-logo login-logo" src={appLogo} alt={appName} /> : <div className="brand-mark"><span>{brandInitial(appName)}</span></div>}
-          <b>{appName}</b>
-          <small>ระบบหน้าร้านและบัญชีสมาชิก</small>
-        </div>
-        <form className="login-form" onSubmit={submit}>
-          <label>
-            ชื่อผู้ใช้
-            <input
-              name="username"
-              disabled={loginMutation.isPending}
-              value={username}
-              onChange={(event) => { setUsername(event.target.value); setTransfer(null); }}
-              autoComplete="username"
-              autoFocus
-              placeholder="กรอกชื่อผู้ใช้"
-            />
-          </label>
-          <label>
-            รหัสผ่าน
-            <span className="login-password">
+      <main className="login-welcome-content">
+        <header className="login-welcome-heading">
+          {appLogo ? <img className="login-welcome-logo" src={appLogo} alt={`โลโก้${appName}`} /> : <div className="login-welcome-initial" aria-hidden="true">{brandInitial(appName)}</div>}
+          <h1>ยินดีต้อนรับสู่{appName}</h1>
+          {organizationName && <p>{organizationName}</p>}
+        </header>
+        <div className="login-card">
+          <h2 id="login-form-heading">เข้าสู่ระบบ</h2>
+          <form className="login-form" onSubmit={submit} aria-labelledby="login-form-heading">
+            <label>
+              ชื่อผู้ใช้
               <input
-                name="password"
+                name="username"
                 disabled={loginMutation.isPending}
-                type={showPassword ? "text" : "password"}
-                value={password}
-                onChange={(event) => { setPassword(event.target.value); setTransfer(null); }}
-                autoComplete="current-password"
-                placeholder="กรอกรหัสผ่าน"
+                value={username}
+                onChange={(event) => { setUsername(event.target.value); setTransfer(null); }}
+                autoComplete="username"
+                autoFocus
+                placeholder="กรอกชื่อผู้ใช้"
               />
-              <button type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}>
-                {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-              </button>
-            </span>
-          </label>
-          {error && !transfer && (
-            <div className="login-error" role="alert">
-              <ShieldCheck size={15} /> {error}
-            </div>
-          )}
-          <button type="submit" className="primary-button login-submit" disabled={loginMutation.isPending || !username.trim() || !password}>
-            <LogIn size={16} /> {loginMutation.isPending ? "กำลังตรวจสอบ…" : "เข้าสู่ระบบ"}
-          </button>
-        </form>
-        <div className="login-scope-note" role="note">
-          <IdCard size={15} />
-          <span>ระบบนี้สำหรับ<b>เจ้าหน้าที่และผู้บริหารร้านค้า</b>เท่านั้น · สมาชิกใช้บัตรหรือหมายเลขสมาชิกที่เคาน์เตอร์</span>
+            </label>
+            <label>
+              รหัสผ่าน
+              <span className="login-password">
+                <input
+                  name="password"
+                  disabled={loginMutation.isPending}
+                  type={showPassword ? "text" : "password"}
+                  value={password}
+                  onChange={(event) => { setPassword(event.target.value); setTransfer(null); }}
+                  autoComplete="current-password"
+                  placeholder="กรอกรหัสผ่าน"
+                />
+                <button type="button" onClick={() => setShowPassword((visible) => !visible)} aria-label={showPassword ? "ซ่อนรหัสผ่าน" : "แสดงรหัสผ่าน"}>
+                  {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                </button>
+              </span>
+            </label>
+            {error && !transfer && (
+              <div className="login-error" role="alert">
+                <ShieldCheck size={15} /> {error}
+              </div>
+            )}
+            <button type="submit" className="primary-button login-submit" disabled={loginMutation.isPending || !username.trim() || !password}>
+              {loginMutation.isPending ? "กำลังตรวจสอบ…" : "เข้าสู่ระบบ"}
+            </button>
+          </form>
+          <div className="login-scope-note" role="note">
+            <span>ระบบนี้สำหรับ<b>เจ้าหน้าที่และผู้บริหารร้านค้า</b>เท่านั้น · สมาชิกใช้บัตรหรือหมายเลขสมาชิกที่เคาน์เตอร์</span>
+          </div>
         </div>
-        <p className="login-footer">v1.0.0 · ระบบร้านค้าสวัสดิการ<span className="powered-line">⚡ Powered by <b>PNG TEAM</b></span></p>
-      </div>
+        <p className="login-footer">Powered by <b>PNG TEAM</b></p>
+      </main>
       {transfer && <FeedbackDialog tone="warning" title="บัญชีนี้เข้าใช้งานอยู่แล้ว" description="การย้ายมาเครื่องนี้จะออกจากระบบที่เครื่องเดิม กรุณาตรวจให้แน่ใจว่างานที่เครื่องเดิมเสร็จแล้วก่อนยืนยัน" className="login-session-dialog" pending={loginMutation.isPending} error={error} actionLabel="ยืนยันย้ายมาเครื่องนี้" onAction={() => {
         if (loginMutation.isPending || loginInFlight.current) return;
         loginInFlight.current = true;

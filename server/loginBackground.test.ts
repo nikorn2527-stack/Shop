@@ -2,6 +2,20 @@ import { describe, expect, it } from "vitest";
 import { openWelfareStore, getSettings, setSettings, listAuditLogs } from "./sqliteStore";
 
 describe("login background settings", () => {
+  it("keeps a login-only organization name without changing shop or receipt branding", () => {
+    const db = openWelfareStore(":memory:");
+    try {
+      const before = getSettings(db);
+      expect(before.loginOrganizationName).toBe("");
+      setSettings(db, { loginOrganizationName: "โรงพยาบาลธัญญารักษ์อุดรธานี" });
+      const after = getSettings(db);
+      expect(after.loginOrganizationName).toBe("โรงพยาบาลธัญญารักษ์อุดรธานี");
+      expect(after.appName).toBe(before.appName);
+      expect(after.appLogo).toBe(before.appLogo);
+      expect(after.storeName).toBe(before.storeName);
+      expect(after.storeAddress).toBe(before.storeAddress);
+    } finally { db.close(); }
+  });
   it("keeps login and workspace images independent and omits image payloads from audit logs", () => {
     const db = openWelfareStore(":memory:");
     try {

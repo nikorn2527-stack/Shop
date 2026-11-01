@@ -1,0 +1,51 @@
+/* Login only: workspace, setup, password-change and printed surfaces keep their styles. */
+@media screen {
+  :root:root .login-welcome-screen {
+    --login-ink: #104b36;
+    min-height: 100svh;
+    padding: 36px 24px;
+    overflow: clip;
+    background: #edf7f0;
+    isolation: isolate;
+  }
+  .login-welcome-screen .login-background-image { position: fixed; z-index: -2; object-position: center; }
+  .login-welcome-screen .login-background-shade { position: fixed; z-index: -1; background: rgb(255 255 255 / 8%); pointer-events: none; }
+  .login-welcome-screen > .login-blob { display: none; }
+  .login-welcome-content { position: relative; z-index: 1; width: min(840px, 100%); display: grid; justify-items: center; gap: 28px; margin: auto; }
+  .login-welcome-heading { width: 100%; display: grid; justify-items: center; gap: 10px; text-align: center; color: var(--login-ink); }
+  .login-welcome-logo { display: block; width: 58px; height: 58px; object-fit: contain; margin-bottom: 4px; }
+  .login-welcome-initial { display: grid; place-items: center; width: 54px; height: 54px; border-radius: 14px; background: #fff; font-size: 24px; font-weight: 700; }
+  .login-welcome-heading h1 { margin: 0; font-size: clamp(25px, 2.9vw, 38px); line-height: 1.5; font-weight: 700; overflow-wrap: anywhere; text-wrap: balance; }
+  .login-welcome-heading p { margin: 0; font-size: clamp(19px, 2.1vw, 28px); line-height: 1.5; overflow-wrap: anywhere; text-wrap: balance; }
+  :root:root .login-welcome-screen .login-card { width: min(420px, 100%); box-sizing: border-box; padding: 28px; border: 1px solid rgb(255 255 255 / 88%); border-radius: 24px; background: #fff; box-shadow: 0 16px 45px rgb(23 61 43 / 10%); animation: none; }
+  .login-welcome-screen .login-card h2 { margin: 0 0 24px; font-size: 27px; line-height: 1.5; font-weight: 700; text-align: center; color: var(--login-ink); }
+  .login-welcome-screen .login-form { gap: 18px; }
+  .login-welcome-screen .login-form label { color: #34443d; font-size: 15px; font-weight: 600; line-height: 1.5; }
+  :root:root .login-welcome-screen .login-form input { box-sizing: border-box; height: 48px; margin-top: 6px; padding: 10px 14px; border: 1px solid #d7dfdb; border-radius: 10px; color: #263d32; background: #fff; font: inherit; font-size: 16px; }
+  .login-welcome-screen .login-form input::placeholder { color: #7a867f; }
+  :root:root .login-welcome-screen .login-form input:focus-visible { outline: 3px solid #65dc98; outline-offset: 2px; border-color: #35815a; }
+  .login-welcome-screen .login-password input { padding-right: 52px; }
+  .login-welcome-screen .login-password button { width: 40px; height: 40px; right: 4px; color: #64776c; }
+  :root:root .login-welcome-screen .login-form .login-submit { height: 50px; margin-top: 4px; border: 1px solid #65dc98; border-radius: 10px; background: #65dc98; color: #104b36; -webkit-text-fill-color: #104b36; font-size: 17px; font-weight: 700; box-shadow: none; }
+  :root:root .login-welcome-screen .login-form .login-submit:hover:not(:disabled) { background: #52cc87; border-color: #52cc87; }
+  :root:root .login-welcome-screen .login-form .login-submit:disabled { background: #c8efda; border-color: #c8efda; color: #436453; -webkit-text-fill-color: #436453; opacity: 1; }
+  :root:root .login-welcome-screen button:focus-visible { outline: 3px solid #258257; outline-offset: 3px; }
+  .login-welcome-screen .login-scope-note { display: block; margin: 16px 0 0; padding: 0; border: 0; background: transparent; color: #627268; font-size: 11px; line-height: 1.7; text-align: center; }
+  .login-welcome-screen .login-scope-note b { color: inherit; }
+  .login-welcome-screen .login-footer { margin: -12px 0 0; color: #52675b; font-size: 12px; }
+  @media (max-width: 560px) {
+    :root:root .login-welcome-screen { padding: 24px 16px; }
+    .login-welcome-content { gap: 22px; }
+    .login-welcome-logo { width: 50px; height: 50px; }
+    .login-welcome-heading { gap: 6px; }
+    .login-welcome-heading h1 { font-size: 25px; }
+    .login-welcome-heading p { font-size: 19px; }
+    :root:root .login-welcome-screen .login-card { padding: 24px; border-radius: 20px; }
+    .login-welcome-screen .login-card h2 { font-size: 25px; margin-bottom: 20px; }
+  }
+  @media (max-height: 650px) and (min-width: 561px) {
+    :root:root .login-welcome-screen { padding-block: 20px; }
+    .login-welcome-content { gap: 16px; }
+    .login-welcome-logo { width: 42px; height: 42px; }
+  }
+}

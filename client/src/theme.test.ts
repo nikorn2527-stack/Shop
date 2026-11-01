@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeTheme, resolveThemeColor, applyThemeColor, resolveBackgroundImage } from './theme';
+import { normalizeTheme, resolveThemeColor, applyThemeColor, resolveBackgroundImage, applyBrand, readBrandCache } from './theme';
 import { vi } from 'vitest';
 
 describe('standard application palette', () => {
@@ -47,5 +47,20 @@ describe('background images', () => {
     for (const value of [undefined, '', 'https://example.com/photo.jpg', 'data:image/svg+xml;base64,YWJj', 'data:image/png;base64,' + 'A'.repeat(1_500_000)]) {
       expect(resolveBackgroundImage(value)).toBe('');
     }
+  });
+});
+
+describe('login organization branding cache', () => {
+  it('persists the organization name and accepts an old cache without one', () => {
+    const values = new Map<string, string>();
+    vi.stubGlobal('localStorage', { getItem: (key: string) => values.get(key) ?? null, setItem: (key: string, value: string) => values.set(key, value) });
+    vi.stubGlobal('document', { documentElement: { dataset: {}, style: { setProperty() {} } }, title: '' });
+    try {
+      values.set('png-brand-v1', JSON.stringify({ appName: 'ร้านค้าสวัสดิการ' }));
+      expect(readBrandCache()?.loginOrganizationName).toBe('');
+      applyBrand({ appName: 'ร้านค้าสวัสดิการ', loginOrganizationName: ' โรงพยาบาลธัญญารักษ์อุดรธานี ' });
+      expect(readBrandCache()?.loginOrganizationName).toBe('โรงพยาบาลธัญญารักษ์อุดรธานี');
+      expect(readBrandCache()?.appName).toBe('ร้านค้าสวัสดิการ');
+    } finally { vi.unstubAllGlobals(); }
   });
 });

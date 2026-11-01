@@ -20,6 +20,7 @@ import "./styles/member-card.css";
 import "./styles/receiving.css";
 import "./styles/layout-audit.css";
 import "./styles/input-layout.css";
+import "./styles/login-welcome.css";
 
 const queryClient = new QueryClient();
 
