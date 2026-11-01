@@ -2,11 +2,21 @@ import { describe, expect, it } from "vitest";
 import { openWelfareStore, getSettings, setSettings, listAuditLogs } from "./sqliteStore";
 
 describe("login background settings", () => {
+  it("defaults to the approved welcome screen and retains an explicit plain selection", () => {
+    const db = openWelfareStore(":memory:");
+    try {
+      expect(getSettings(db)).toMatchObject({ loginBackgroundMode: "default", loginOrganizationName: "โรงพยาบาลธัญญารักษ์อุดรธานี" });
+      setSettings(db, { loginBackgroundMode: "plain", loginOrganizationName: "" });
+      expect(getSettings(db)).toMatchObject({ loginBackgroundMode: "plain", loginOrganizationName: "โรงพยาบาลธัญญารักษ์อุดรธานี" });
+      setSettings(db, { loginBackgroundMode: "default" });
+      expect(getSettings(db).appBackground).toBe("");
+    } finally { db.close(); }
+  });
   it("keeps a login-only organization name without changing shop or receipt branding", () => {
     const db = openWelfareStore(":memory:");
     try {
       const before = getSettings(db);
-      expect(before.loginOrganizationName).toBe("");
+      expect(before.loginOrganizationName).toBe("โรงพยาบาลธัญญารักษ์อุดรธานี");
       setSettings(db, { loginOrganizationName: "โรงพยาบาลธัญญารักษ์อุดรธานี" });
       const after = getSettings(db);
       expect(after.loginOrganizationName).toBe("โรงพยาบาลธัญญารักษ์อุดรธานี");

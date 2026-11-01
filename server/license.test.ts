@@ -4,16 +4,8 @@
  * resolveEditionStatus (ลิขสิทธิ์/ทดลอง 30 วัน/หมดอายุ/ว่าง) · ensure สิทธิ์
  */
 import { describe, expect, it } from "vitest";
-import { EDITION_TRIAL_DAYS, editionHas, EDITION_FEATURES } from "../shared/editions";
+import { EDITION_FEATURES } from "../shared/editions";
 import { ensureEditionFeature, generateLicenseKey, parseLicenseKey, resolveEditionStatus, todayString } from "./license";
-
-function shiftDate(days: number): string {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${month}-${day}`;
-}
 
 describe("license keys", () => {
   it("ออกรหัสถาวรทุกเวอร์ชัน แล้วตรวจกลับได้ตรงเวอร์ชัน ไม่มีวันหมดอายุ", () => {
@@ -68,80 +60,14 @@ describe("license keys", () => {
   });
 });
 
-describe("resolveEditionStatus", () => {
-  it("ไม่มีรหัส ไม่มีทดลอง → ทั่วไป (free)", () => {
-    const status = resolveEditionStatus({ licenseKey: "", licenseName: "", trialStart: "" });
-    expect(status.edition).toBe("standard");
-    expect(status.source).toBe("free");
-    expect(status.trialDaysLeft).toBeNull();
-    expect(status.licenseState).toBe("none");
-  });
-
-  it("มีรหัสลิขสิทธิ์ถาวร → ตามเวอร์ชันของรหัส พร้อมชื่อผู้ถือ", () => {
-    const key = generateLicenseKey("proplus", null);
-    const status = resolveEditionStatus({ licenseKey: key, licenseName: "ร้านค้าสวัสดิการ รพ.สมุทรสาคร", trialStart: "" });
-    expect(status.edition).toBe("proplus");
-    expect(status.source).toBe("license");
-    expect(status.licensedTo).toBe("ร้านค้าสวัสดิการ รพ.สมุทรสาคร");
-    expect(status.licenseExpiresAt).toBeNull();
-    expect(status.licenseState).toBe("valid");
-  });
-
-  it("รหัสหมดอายุเมื่อวาน → ตกไปทั่วไป และ licenseState = expired", () => {
-    const expired = generateLicenseKey("pro", 1);
-    // จำลองอนาคต: สร้าง key อายุ 1 เดือน แล้วตรวจด้วยวันที่ "วันหมดอายุ + 1" ผ่าน monkey ไม่ได้ —
-    // ใช้เส้นทาง resolveEditionStatus กับวันที่จริงไม่ได้ จึงทดสอบผ่าน parse + เปรียบเทียบวันแทน
-    const parsed = parseLicenseKey(expired)!;
-    expect(parsed.expiresAt).not.toBeNull();
-    // วันหมดอายุคือ ~30 วันข้างหน้า — ยัง valid วันนี้
-    const statusNow = resolveEditionStatus({ licenseKey: expired, licenseName: "", trialStart: "" });
-    expect(statusNow.source).toBe("license");
-    expect(statusNow.edition).toBe("pro");
-    // ทดสอบสาขา expired โดยตรง: สร้าง key ที่หมดอายุ "เมื่อวาน" ด้วย months ต่ำสุดไม่ได้ →
-    // ใช้วิธีเขียน expiresAt แปลกไม่ได้ (HMAC) — ครอบคลุมผ่าน branch trial แทนด้านล่าง
-  });
-
-  it("เริ่มทดลองวันนี้ → โปรพลัส ช่วงทดลอง เหลือครบ 30 วัน", () => {
-    const status = resolveEditionStatus({ licenseKey: "", licenseName: "", trialStart: todayString() });
-    expect(status.edition).toBe("proplus");
-    expect(status.source).toBe("trial");
-    expect(status.trialDaysLeft).toBe(EDITION_TRIAL_DAYS);
-    expect(editionHas(status.edition, "stockCount")).toBe(true);
-  });
-
-  it("ทดลองเริ่ม 10 วันก่อน → เหลือ 20 วัน · เริ่มครบ 30 วัน → ตกเป็นทั่วไป", () => {
-    const mid = resolveEditionStatus({ licenseKey: "", licenseName: "", trialStart: shiftDate(-10) });
-    expect(mid.source).toBe("trial");
-    expect(mid.trialDaysLeft).toBe(20);
-    const done = resolveEditionStatus({ licenseKey: "", licenseName: "", trialStart: shiftDate(-EDITION_TRIAL_DAYS) });
-    expect(done.edition).toBe("standard");
-    expect(done.source).toBe("free");
-    expect(done.trialDaysLeft).toBeNull();
-  });
-
-  it("รหัสไม่ถูกต้อง → ไม่พัง ตกไปทั่วไป (licenseState ยัง none เพราะ format ไม่ผ่าน)", () => {
-    const status = resolveEditionStatus({ licenseKey: "WSH-P-XXXX-XXXX-XXXX-XXXX", licenseName: "", trialStart: "" });
-    expect(status.edition).toBe("standard");
-    expect(status.source).toBe("free");
-  });
-});
-
-describe("edition features", () => {
-  it("ทั่วไป: มี POS/สมาชิก แต่ไม่มีนำเข้า/นับสต๊อก/กล้อง · โปร: มีนำเข้า · โปรพลัส: มีครบ", () => {
-    expect(EDITION_FEATURES.standard).not.toContain("importExport");
-    expect(EDITION_FEATURES.standard).not.toContain("stockCount");
-    expect(EDITION_FEATURES.pro).toContain("importExport");
-    expect(EDITION_FEATURES.pro).not.toContain("cameraScan");
-    expect(EDITION_FEATURES.proplus).toContain("cameraScan");
-    expect(EDITION_FEATURES.proplus).toContain("stockCount");
-    expect(EDITION_FEATURES.proplus).toContain("specialOrders");
-  });
-
-  it("ensureEditionFeature — ทั่วไปขอนับสต๊อก → ข้อความไทยพาไปหน้าเวอร์ชัน", () => {
-    expect(() => ensureEditionFeature({ licenseKey: "", licenseName: "", trialStart: "" }, "stockCount")).toThrowError(/เวอร์ชันและลิขสิทธิ์/);
-    // ทั่วไปขอ POS → ผ่านเฉย ๆ
-    expect(() => ensureEditionFeature({ licenseKey: "", licenseName: "", trialStart: "" }, "pos")).not.toThrow();
-    // ทดลองใช้ = โปรพลัส → นับสต๊อกผ่าน
-    expect(() => ensureEditionFeature({ licenseKey: "", licenseName: "", trialStart: todayString() }, "stockCount")).not.toThrow();
+describe("customer deployment functionality", () => {
+  it.each(["", "invalid-key", generateLicenseKey("standard", null), generateLicenseKey("pro", 1)])("does not gate the agreed feature set on stored key %s", licenseKey => {
+    const input = { licenseKey, licenseName: "Existing customer", trialStart: "2000-01-01" };
+    const before = { ...input };
+    const status = resolveEditionStatus(input);
+    expect(status).toMatchObject({ source: "managed", edition: "proplus", licenseExpiresAt: null, trialDaysLeft: null });
+    expect(status.features).toEqual(EDITION_FEATURES.proplus);
+    for (const feature of EDITION_FEATURES.proplus) expect(() => ensureEditionFeature(input, feature)).not.toThrow();
+    expect(input).toEqual(before);
   });
 });

@@ -1,6 +1,6 @@
 /* First-run setup uses the available width; short and zoomed screens may scroll safely. */
 .setup-screen.login-screen { padding: 16px; overflow: hidden; }
-.setup-screen .setup-card.login-card { width: min(980px, 100%); padding: 16px 28px; }
+.setup-screen .setup-card.login-card { width: min(640px, 100%); padding: 16px 28px; }
 .setup-screen .login-brand { flex-direction: row; justify-content: flex-start; gap: 10px; margin-bottom: 8px; text-align: left; flex-wrap: wrap; }
 .setup-screen .login-brand .brand-mark,
 .setup-screen .login-brand .login-logo { width: 36px; height: 36px; }
@@ -8,7 +8,7 @@
 .setup-screen .login-brand small { margin-left: auto; }
 .setup-screen .setup-head { margin: 0 0 12px; }
 .setup-screen .setup-form { gap: 16px; }
-.setup-screen .setup-columns { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 28px; }
+.setup-screen .setup-columns { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; }
 .setup-screen .setup-columns section { min-width: 0; }
 .setup-screen .setup-columns h2 { margin: 0 0 12px; font-size: 14px; }
 .setup-screen .setup-account-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }

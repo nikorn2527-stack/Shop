@@ -1,3 +1,4 @@
+import { resolveLoginBackgroundImage } from "@shared/loginBranding";
 import { PosTerminalSettings } from "@/components/PosTerminalSettings";
 import { parsePosShortcutKeys, getPosShortcutKey, findPosShortcutConflicts, posShortcutConflictMessage } from "@/lib/posShortcuts";
 import { BackgroundImageUpload } from "@/components/BackgroundImageUpload";
@@ -43,7 +44,6 @@ import {
   Camera,
   Check,
   ChevronDown,
-  CircleHelp,
   Cloud,
   Copy,
   CreditCard,
@@ -56,7 +56,6 @@ import {
   HardDriveDownload,
   Image as ImageIcon,
   ImagePlus,
-  KeyRound,
   LayoutDashboard,
   LockKeyhole,
   LogOut,
@@ -90,16 +89,10 @@ import {
   Wrench,
   X,
   CircleAlert,
+  Info,
 } from "@/lib/icons";
 import { toast } from "sonner";
 import {
-  EDITIONS,
-  editionStatusLabel,
-} from "@shared/editions";
-import {
-  DevKeygenTool,
-  EditionCompareTable,
-  EditionUpgradeModal,
   useEditionStatus,
 } from "@/components/EditionUi";
 import type { Role, View } from "../pageData";
@@ -168,6 +161,7 @@ type SettingsForm = {
   appLogo: string;
   appBackground: string;
   loginBackground: string;
+  loginBackgroundMode: "default" | "custom" | "plain";
   loginOrganizationName: string;
   appTheme: string;
   /** ROUND 38 (ข้อ 38) — บุคลิกการออกแบบทั้งระบบ: shop | apple | microsoft | android */
@@ -235,6 +229,7 @@ const SETTINGS_FIELD_LABELS: [keyof SettingsForm, string][] = [
   ["appLogo", "โลโก้"],
   ["appBackground", "ภาพพื้นหลังพื้นที่ทำงาน"],
   ["loginBackground", "ภาพพื้นหลังหน้าเข้าสู่ระบบ"],
+  ["loginBackgroundMode", "รูปแบบพื้นหลังหน้าเข้าสู่ระบบ"],
   ["loginOrganizationName", "ชื่อหน่วยงานหน้าเข้าสู่ระบบ"],
   ["appTheme", "สีธีม"],
   ["appStyle", "สไตล์หน้าตาแอป"],
@@ -657,10 +652,10 @@ export function Settings({
   // ROUND 61 — สถานะเวอร์ชัน 3 แบบ (แท็บเวอร์ชันและลิขสิทธิ์ + ปุ่มล็อกตามจุดต่าง ๆ)
   const edition = useEditionStatus();
   const canImportExport = edition.status?.has("importExport") ?? false;
-  const [upgradeOpen, setUpgradeOpen] = useState(false);
   const membersQuery = trpc.member.list.useQuery();
   const logsStatsQuery = trpc.logs.list.useQuery({ limit: 200 });
   const [tab, setTab] = useState<SettingsTab>("receipt");
+  const appInfoQuery = trpc.system.health.useQuery(undefined, { enabled: tab === "edition" });
   // ROUND 61 — ป้ายเวอร์ชันที่ sidebar กดแล้วพามาแท็บเวอร์ชันโดยตรง
   useEffect(() => {
     if (initialTab) setTab(initialTab);
@@ -1427,7 +1422,7 @@ export function Settings({
       try {
         const image = await shrinkLogoToDataUrl(String(reader.result), 1600);
         if (image.length > 1_500_000) throw new Error("ภาพหลังย่อยังใหญ่เกินไป กรุณาเลือกรูปขนาดเล็กลง");
-        updateForm({ [target]: image });
+        updateForm({ [target]: image, ...(target === "loginBackground" ? { loginBackgroundMode: "custom" as const } : {}) });
         if (target === "appBackground") applyBackground(image);
         setError("");
       } catch (error) {
@@ -1493,7 +1488,7 @@ export function Settings({
               },
             ]
           : []),
-        { id: "edition", label: "เวอร์ชันและลิขสิทธิ์", icon: Crown },
+        { id: "edition", label: "เกี่ยวกับระบบ", icon: Info },
       ],
     },
   ];
@@ -2121,10 +2116,11 @@ export function Settings({
                     ชื่อหน่วยงานหน้าเข้าสู่ระบบ
                     <input value={form?.loginOrganizationName ?? ""} disabled={!form} maxLength={160} placeholder="เช่น โรงพยาบาลธัญญารักษ์อุดรธานี" onChange={event => updateForm({ loginOrganizationName: event.target.value })} />
                   </label>
-                  <BackgroundImageUpload target="login" hasImage={Boolean(form?.loginBackground)} disabled={!form} onChange={event => onBackgroundPick(event, "loginBackground")} />
-                  {form?.loginBackground && <>
-                    <div className="login-background-preview"><img src={form.loginBackground} alt="ตัวอย่างภาพพื้นหลังหน้าเข้าสู่ระบบ" /><div><b>{form.appName || "ร้านค้าสวัสดิการ"}</b>{form.loginOrganizationName && <small>{form.loginOrganizationName}</small>}<span>เข้าสู่ระบบ</span></div></div>
-                    <button type="button" className="outline-button" onClick={() => updateForm({ loginBackground: "" })}>ใช้พื้นเรียบ · นำภาพหน้าเข้าสู่ระบบออก</button>
+                  <button type="button" className="outline-button" disabled={!form} onClick={() => updateForm({ loginBackground: "", loginBackgroundMode: "default" })}>ใช้ภาพพื้นหลังมาตรฐาน</button>
+                  <BackgroundImageUpload target="login" hasImage={Boolean(form && resolveLoginBackgroundImage(form))} disabled={!form} onChange={event => onBackgroundPick(event, "loginBackground")} />
+                  {form && resolveLoginBackgroundImage(form) && <>
+                    <div className="login-background-preview"><img src={resolveLoginBackgroundImage(form)} alt="ตัวอย่างภาพพื้นหลังหน้าเข้าสู่ระบบ" /><div><b>{form.appName || "ร้านค้าสวัสดิการ"}</b>{form.loginOrganizationName && <small>{form.loginOrganizationName}</small>}<span>เข้าสู่ระบบ</span></div></div>
+                    <button type="button" className="outline-button" onClick={() => updateForm({ loginBackground: "", loginBackgroundMode: "plain" })}>ใช้พื้นเรียบ · นำภาพหน้าเข้าสู่ระบบออก</button>
                   </>}
                 </div>
                 <div className="brand-live-preview" aria-label="ตัวอย่างหน้าจอ">
@@ -2889,104 +2885,18 @@ export function Settings({
             </>
           )}
           {tab === "edition" && (
-            <>
-              <section className="settings-section edition-section">
-                <div className="settings-section-head">
-                  <h2>เวอร์ชันที่ใช้งานอยู่</h2>
-                  <p>
-                    ตามลิขสิทธิ์ของร้าน — เปลี่ยนได้ทุกเมื่อด้วยรหัสลิขสิทธิ์
-                    (ไม่กระทบข้อมูลทั้งหมด)
-                  </p>
-                </div>
-                {edition.status ? (
-                  <>
-                    <div className="edition-status-card">
-                      <div
-                        className={`edition-status-icon tone-${EDITIONS[edition.status.edition].tone}`}
-                      >
-                        <Crown size={22} />
-                      </div>
-                      <div className="edition-status-body">
-                        <b>{editionStatusLabel(edition.status)}</b>
-                        <p>{EDITIONS[edition.status.edition].caption}</p>
-                        <div className="edition-status-chips">
-                          {edition.status.licensedTo && (
-                            <span>
-                              ผู้ถือลิขสิทธิ์: {edition.status.licensedTo}
-                            </span>
-                          )}
-                          {edition.status.licenseExpiresAt && (
-                            <span>
-                              ลิขสิทธิ์ถึง {edition.status.licenseExpiresAt}
-                            </span>
-                          )}
-                          {edition.status.source === "trial" && (
-                            <span className="trial">
-                              ทดลองใช้เหลือ {edition.status.trialDaysLeft} วัน
-                            </span>
-                          )}
-                          {edition.status.licenseState === "expired" && (
-                            <span>
-                              รหัสเดิมหมดอายุแล้ว — ใส่รหัสใหม่ด้านล่าง
-                            </span>
-                          )}
-                          <span>
-                            ข้อมูลร้านค้าทั้งหมดปลอดภัยไม่ว่าเวอร์ชันไหน
-                          </span>
-                        </div>
-                      </div>
-                      <div
-                        style={{
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 7,
-                        }}
-                      >
-                        <button
-                          type="button"
-                          className="primary-button"
-                          onClick={() => setUpgradeOpen(true)}
-                        >
-                          <KeyRound size={15} /> ใช้รหัสลิขสิทธิ์ /
-                          เริ่มทดลองใช้
-                        </button>
-                        <button
-                          type="button"
-                          className="outline-button"
-                          onClick={() => void edition.refetch()}
-                        >
-                          <RefreshCw size={15} /> ตรวจสถานะใหม่
-                        </button>
-                      </div>
-                    </div>
-                    <EditionCompareTable current={edition.status.edition} />
-                    <div className="settings-inline-note">
-                      <CircleHelp size={16} />
-                      <span>
-                        เปลี่ยนเวอร์ชันได้โดยเก็บข้อมูลสินค้า สมาชิก และบิลเดิม
-                        ฟังก์ชันที่ใช้ได้ขึ้นอยู่กับเวอร์ชันที่เลือก
-                        เวอร์ชันทั่วไปไม่มีค่าบริการ และทดลองใช้โปรพลัสได้ 30 วัน
-                      </span>
-                    </div>
-                    {isDevRole && <DevKeygenTool />}
-                  </>
-                ) : (
-                  <div className="table-loading">
-                    <Crown size={22} />
-                    <b>กำลังตรวจสอบเวอร์ชัน…</b>
-                    <span>อ่านลิขสิทธิ์จากเซิร์ฟเวอร์</span>
-                  </div>
-                )}
-                {upgradeOpen && (
-                  <EditionUpgradeModal
-                    open
-                    onClose={() => setUpgradeOpen(false)}
-                    status={edition.status}
-                    onApplied={() => void edition.refetch()}
-                  />
-                )}
-              </section>
-            </>
+            <section className="settings-section" aria-labelledby="about-system-heading">
+              <div className="settings-section-head">
+                <h2 id="about-system-heading">เกี่ยวกับระบบ</h2>
+              </div>
+              <dl className="about-system-details">
+                <div><dt>ชื่อระบบ</dt><dd>{settingsQuery.data?.appName || "ร้านค้าสวัสดิการ"}</dd></div>
+                {settingsQuery.data?.loginOrganizationName && <div><dt>หน่วยงาน</dt><dd>{settingsQuery.data.loginOrganizationName}</dd></div>}
+                <div><dt>เวอร์ชันโปรแกรม</dt><dd>{appInfoQuery.data?.version ?? (appInfoQuery.isError ? "ตรวจสอบเวอร์ชันไม่ได้" : "กำลังตรวจสอบ…")}</dd></div>
+                <div><dt>ผู้พัฒนา</dt><dd>PNG TEAM</dd></div>
+              </dl>
+              {appInfoQuery.isError && <button type="button" className="outline-button" onClick={() => void appInfoQuery.refetch()}><RefreshCw size={15} /> ตรวจสอบเวอร์ชันใหม่</button>}
+            </section>
           )}
           {tab === "import" && (
             <>

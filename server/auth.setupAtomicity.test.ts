@@ -15,14 +15,12 @@ function device() {
   return { api, cookie };
 }
 describe("initial setup atomicity", () => {
-  it("rejects an invalid license without consuming initial setup", async () => {
+  it("ignores obsolete license choices without starting a trial or storing a key", async () => {
     const { api, cookie } = device();
-    const before = getSettings(db);
-    await expect(api.auth.setup({ ...input, editionChoice: "license", licenseKey: "INVALID" })).rejects.toMatchObject({ code: "BAD_REQUEST" });
-    expect(await api.auth.setupStatus()).toEqual({ needsSetup: true });
-    expect(getSettings(db)).toEqual(before);
-    expect(cookie).not.toHaveBeenCalled();
-    await expect(api.auth.setup({ ...input, editionChoice: "standard" })).resolves.toMatchObject({ username: "owner" });
+    await expect(api.auth.setup({ ...input, editionChoice: "license", licenseKey: "INVALID" })).resolves.toMatchObject({ username: "owner" });
+    expect(await api.auth.setupStatus()).toEqual({ needsSetup: false });
+    expect(getSettings(db)).toMatchObject({ licenseKey: "", trialStart: "" });
+    expect(cookie).toHaveBeenCalledTimes(1);
   });
   it.each(["session", "login audit"])("rolls back account and settings after a late %s failure", async stage => {
     const { api, cookie } = device();

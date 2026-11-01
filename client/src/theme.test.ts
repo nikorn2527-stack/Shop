@@ -1,6 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { normalizeTheme, resolveThemeColor, applyThemeColor, resolveBackgroundImage, applyBrand, readBrandCache } from './theme';
 import { vi } from 'vitest';
+import { resolveLoginBackgroundImage, DEFAULT_LOGIN_BACKGROUND } from '@shared/loginBranding';
+
+describe('approved login defaults', () => {
+  it('shows the approved image for old empty settings, retaining custom and explicit plain choices', () => {
+    expect(resolveLoginBackgroundImage({})).toBe(DEFAULT_LOGIN_BACKGROUND);
+    expect(resolveLoginBackgroundImage({ loginBackground: '' })).toBe(DEFAULT_LOGIN_BACKGROUND);
+    const custom = 'data:image/webp;base64,YWJj';
+    expect(resolveLoginBackgroundImage({ loginBackground: custom })).toBe(custom);
+    expect(resolveLoginBackgroundImage({ loginBackgroundMode: 'plain', loginBackground: custom })).toBe('');
+    expect(resolveLoginBackgroundImage({ loginBackgroundMode: 'custom', loginBackground: 'https://example.com/photo.jpg' })).toBe('');
+  });
+});
 
 describe('standard application palette', () => {
   it('migrates legacy saved colors to the shared orange and LINE green palette', () => {
@@ -57,7 +69,7 @@ describe('login organization branding cache', () => {
     vi.stubGlobal('document', { documentElement: { dataset: {}, style: { setProperty() {} } }, title: '' });
     try {
       values.set('png-brand-v1', JSON.stringify({ appName: 'ร้านค้าสวัสดิการ' }));
-      expect(readBrandCache()?.loginOrganizationName).toBe('');
+      expect(readBrandCache()?.loginOrganizationName).toBe('โรงพยาบาลธัญญารักษ์อุดรธานี');
       applyBrand({ appName: 'ร้านค้าสวัสดิการ', loginOrganizationName: ' โรงพยาบาลธัญญารักษ์อุดรธานี ' });
       expect(readBrandCache()?.loginOrganizationName).toBe('โรงพยาบาลธัญญารักษ์อุดรธานี');
       expect(readBrandCache()?.appName).toBe('ร้านค้าสวัสดิการ');

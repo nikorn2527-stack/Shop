@@ -43,6 +43,7 @@ export type StoreSettings = {
   appLogo: string;
   appBackground: string;
   loginBackground: string;
+  loginBackgroundMode: "default" | "custom" | "plain";
   /** Organization displayed only on the welcome screen, not on printed documents. */
   loginOrganizationName: string;
   /** สีธีมหลัก: preset id เช่น "emerald" หรือ hex "#007a55" */

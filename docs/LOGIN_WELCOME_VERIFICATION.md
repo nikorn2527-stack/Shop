@@ -1,3 +1,5 @@
+> Updated by the customer release: approved image and hospital name now appear by default. See CUSTOMER_RELEASE_VERIFICATION.md; the earlier manual configuration steps below describe the first release only.
+
 # Hospital login verification
 
 Base: cached origin/main 0086647. Branch: feat/hospital-login. No production writes, deployment or git push.

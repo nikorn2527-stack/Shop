@@ -10,7 +10,9 @@ export function resolveRuntimePolicy(env: Record<string, string | undefined>) {
     channel: channel as ReleaseChannel,
     requirePosRegistration: !relaxed,
     forceInitialPasswordChange: !relaxed,
-    enforceEditionLimits: !relaxed,
+    // Customer delivery has a fixed feature set on both cloud and local servers.
+    // Roles, password policy and POS registration remain separate controls.
+    enforceEditionLimits: false,
   };
 }
 export const getRuntimePolicy = () => resolveRuntimePolicy(process.env);

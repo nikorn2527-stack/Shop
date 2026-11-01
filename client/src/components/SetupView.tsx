@@ -1,7 +1,6 @@
 import { useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { Crown, Eye, EyeOff, Gift, KeyRound, LogIn, ShieldCheck, Store } from "@/lib/icons";
-import { EDITIONS, EDITION_TRIAL_DAYS } from "@shared/editions";
+import { Eye, EyeOff, LogIn, ShieldCheck, Store } from "@/lib/icons";
 import { trpc } from "@/lib/trpc";
 import { getErrorMessage } from "@/pages/viewFormat";
 import { brandInitial, type BrandSettings } from "@/theme";
@@ -24,11 +23,6 @@ export function SetupView({ brand, onAuthed }: { brand?: BrandSettings | null | 
   const [confirm, setConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
-  // ROUND 61 — เลือกเวอร์ชันตอนลงทะเบียนครั้งแรก: ทดลองใช้ 30 วัน (แนะนำ) / มีรหัสลิขสิทธิ์ / เริ่มที่ทั่วไป
-  const experience = trpc.system.experience.useQuery();
-  const managed = experience.data?.enforceEditionLimits === false;
-  const [editionChoice, setEditionChoice] = useState<"trial" | "license" | "standard">("trial");
-  const [licenseKey, setLicenseKey] = useState("");
   const formRef = useRef<HTMLFormElement>(null);
   const setupMutation = trpc.auth.setup.useMutation({
     onSuccess: () => {
@@ -55,16 +49,13 @@ export function SetupView({ brand, onAuthed }: { brand?: BrandSettings | null | 
     const issues = passwordIssues(password, { min: 8 });
     if (issues.length > 0) { setError(issues.join(" · ")); return; }
     if (password !== confirm) { setError("รหัสผ่านทั้งสองช่องไม่ตรงกัน"); return; }
-    // ROUND 61 — เลือกใช้รหัสลิขสิทธิ์ต้องกรอกรหัสก่อน (ระบบตรวจความถูกต้องตอนสร้างบัญชี)
-    if (!managed && editionChoice === "license" && licenseKey.trim().length < 8) { setError("กรุณาพิมพ์รหัสลิขสิทธิ์ให้ครบทุกกลุ่ม หรือเลือก “เริ่มทดลองใช้” ก่อน"); return; }
     setError("");
     setupMutation.mutate({
       username: trimmedUsername,
       displayName: trimmedName,
       password,
       storeName: storeName.trim() || undefined,
-      editionChoice: managed ? "standard" : editionChoice,
-      licenseKey: editionChoice === "license" ? licenseKey.trim().toUpperCase() : undefined,
+      editionChoice: "standard",
     });
   };
 
@@ -151,55 +142,13 @@ export function SetupView({ brand, onAuthed }: { brand?: BrandSettings | null | 
               </div>
               <PasswordMeter password={password} min={8} />
             </section>
-            <section className="setup-version" aria-labelledby="setup-version-title">
-              <h2 id="setup-version-title">{managed ? "พร้อมใช้งานทุกฟีเจอร์" : "เวอร์ชันที่ต้องการใช้"}</h2>
-              {!managed && <div className="setup-edition-picker" role="radiogroup" aria-label="เลือกเวอร์ชันเริ่มใช้งาน">
-                <button type="button" className={`setup-edition-option${editionChoice === "trial" ? " active" : ""}`} role="radio" aria-checked={editionChoice === "trial"} onClick={() => setEditionChoice("trial")}>
-                  <span className="setup-edition-radio" aria-hidden="true" />
-                  <span className="setup-edition-text">
-                    <b><Gift size={13} style={{ display: "inline", verticalAlign: "-2px", marginRight: 4 }} />ทดลองใช้{EDITIONS.proplus.label} {EDITION_TRIAL_DAYS} วัน</b>
-                    <small>ทดลองใช้นับสต็อก สแกนด้วยกล้อง นำเข้า Excel และสำรองข้อมูล เมื่อครบกำหนดจะใช้เวอร์ชันทั่วไป โดยเก็บข้อมูลเดิม</small>
-                  </span>
-                </button>
-                <button type="button" className={`setup-edition-option${editionChoice === "license" ? " active" : ""}`} role="radio" aria-checked={editionChoice === "license"} onClick={() => setEditionChoice("license")}>
-                  <span className="setup-edition-radio" aria-hidden="true" />
-                  <span className="setup-edition-text">
-                    <b><KeyRound size={13} style={{ display: "inline", verticalAlign: "-2px", marginRight: 4 }} />ใช้รหัสลิขสิทธิ์</b>
-                    <small>กรอกรหัสเพื่อเปิดใช้เวอร์ชันที่ซื้อ</small>
-                  </span>
-                </button>
-                {editionChoice === "license" && (
-                  <span className="setup-edition-key-input">
-                    <input
-                      value={licenseKey}
-                      onChange={(event) => setLicenseKey(event.target.value.toUpperCase())}
-                      placeholder="WSH-X-XXXX-XXXX-XXXX-XXXX"
-                      aria-label="รหัสลิขสิทธิ์"
-                      maxLength={40}
-                      spellCheck={false}
-                    />
-                  </span>
-                )}
-                <button type="button" className={`setup-edition-option${editionChoice === "standard" ? " active" : ""}`} role="radio" aria-checked={editionChoice === "standard"} onClick={() => setEditionChoice("standard")}>
-                  <span className="setup-edition-radio" aria-hidden="true" />
-                  <span className="setup-edition-text">
-                    <b><Crown size={13} style={{ display: "inline", verticalAlign: "-2px", marginRight: 4 }} />{EDITIONS.standard.label}</b>
-                    <small>ขายสินค้า · สมาชิกและบัญชี · สต็อก · รายงานยอดขาย · ไม่มีค่าบริการและไม่จำกัดระยะเวลา</small>
-                  </span>
-                </button>
-              </div>
-              }
-              {error && (
-                <div className="login-error" role="alert">
-                  <ShieldCheck size={15} /> {error}
-                </div>
-              )}
-            </section>
+
           </div>
+          {error && <div className="login-error" role="alert"><ShieldCheck size={15} /> {error}</div>}
           <div className="setup-actions">
             <div className="login-scope-note" role="note">
               <ShieldCheck size={15} />
-              <span>หลังสร้างบัญชี ระบบจะให้เปลี่ยนรหัสผ่านก่อนเข้าใช้งานครั้งแรก</span>
+              <span>บัญชีผู้บริหารใช้จัดการผู้ใช้และตั้งค่าระบบ</span>
             </div>
             <button type="submit" className="primary-button login-submit" disabled={setupMutation.isPending}>
               <LogIn size={16} /> {setupMutation.isPending ? "กำลังสร้างบัญชี…" : "สร้างบัญชี"}

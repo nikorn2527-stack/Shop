@@ -1,4 +1,5 @@
 import { createSqliteCheckoutRepository } from "./repositories/sqliteCheckoutRepository";
+import { DEFAULT_LOGIN_ORGANIZATION_NAME } from "../shared/loginBranding";
 import { createSqliteWalletRepository } from "./repositories/sqliteWalletRepository";
 import { checkout as checkoutService } from "./services/checkout";
 import {
@@ -2878,7 +2879,8 @@ export const DEFAULT_STORE_SETTINGS: StoreSettings = {
   appLogo: "",
   appBackground: "",
   loginBackground: "",
-  loginOrganizationName: "",
+  loginBackgroundMode: "default",
+  loginOrganizationName: DEFAULT_LOGIN_ORGANIZATION_NAME,
   appTheme: "indigo",
   // ROUND 75 — เมนูลัดหน้าร้าน: "" = เปิดใช้ทุกปุ่มบนรางซ้าย POS
   posRailHidden: "",
@@ -3133,7 +3135,7 @@ export function getSettings(db: SqliteDb): StoreSettings {
   const row = db.prepare(`SELECT value FROM store_settings WHERE key = ?`).get(SETTINGS_KEY) as { value: string } | undefined;
   const stored = row ? (JSON.parse(row.value) as Partial<StoreSettings>) : {};
   const settings = { ...DEFAULT_STORE_SETTINGS, ...stored, memberNumberMode: getMemberNumberMode(db) };
-  return { ...settings, promptpayActive: !!settings.promptpayId.trim() && settings.promptpayActive !== false };
+  return { ...settings, loginOrganizationName: settings.loginOrganizationName.trim() || DEFAULT_LOGIN_ORGANIZATION_NAME, promptpayActive: !!settings.promptpayId.trim() && settings.promptpayActive !== false };
 }
 
 export function setSettings(db: SqliteDb, patch: Partial<StoreSettings>, actor = "ผู้บริหาร", actorRole?: string | null): StoreSettings {

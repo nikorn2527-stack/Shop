@@ -3,7 +3,8 @@ import type { FormEvent } from "react";
 import { Eye, EyeOff, ShieldCheck } from "@/lib/icons";
 import { trpc } from "@/lib/trpc";
 import { getErrorMessage } from "@/pages/viewFormat";
-import { brandInitial, resolveBackgroundImage, type BrandSettings } from "@/theme";
+import { brandInitial, type BrandSettings } from "@/theme";
+import { DEFAULT_LOGIN_ORGANIZATION_NAME, resolveLoginBackgroundImage } from "@shared/loginBranding";
 import { FeedbackDialog } from "./WorkflowDialog";
 
 /**
@@ -14,8 +15,8 @@ import { FeedbackDialog } from "./WorkflowDialog";
 export function LoginView({ brand, onAuthed }: { brand?: BrandSettings | null | undefined; onAuthed: () => void }) {
   const appName = (brand?.appName ?? "").trim() || "ร้านค้าสวัสดิการ";
   const appLogo = brand?.appLogo ?? "";
-  const organizationName = (brand?.loginOrganizationName ?? "").trim();
-  const backgroundImage = resolveBackgroundImage(brand?.loginBackground);
+  const organizationName = (brand?.loginOrganizationName ?? "").trim() || DEFAULT_LOGIN_ORGANIZATION_NAME;
+  const backgroundImage = resolveLoginBackgroundImage(brand ?? {});
   const [failedBackground, setFailedBackground] = useState("");
   const showBackground = Boolean(backgroundImage && failedBackground !== backgroundImage);
   const loginInFlight = useRef(false);
