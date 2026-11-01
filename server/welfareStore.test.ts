@@ -1547,7 +1547,7 @@ describe("user management", () => {
     expect(users.map((user) => user.username)).toEqual(["kanyanat", "woraphot"]);
     expect(users.map((user) => user.id)).toEqual([...users.map((user) => user.id)].sort((a, b) => a - b));
     for (const user of users) {
-      expect(Object.keys(user).sort()).toEqual(["active", "createdAt", "displayName", "failedAttempts", "id", "lockedUntil", "mustChangePassword", "role", "username"]);
+      expect(Object.keys(user).sort()).toEqual(["active", "createdAt", "displayName", "englishName", "failedAttempts", "fullName", "id", "lockedUntil", "mustChangePassword", "role", "username"]);
     }
     expect(JSON.stringify(users)).not.toContain("scrypt");
   });

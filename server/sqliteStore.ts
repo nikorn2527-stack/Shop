@@ -524,6 +524,9 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
     created_at TEXT NOT NULL
   );`);
   ensureColumn(db, "app_users", "failed_attempts", "INTEGER NOT NULL DEFAULT 0");
+  ensureColumn(db, "app_users", "full_name", "TEXT NOT NULL DEFAULT ''");
+  ensureColumn(db, "app_users", "english_name", "TEXT NOT NULL DEFAULT ''");
+  db.exec("UPDATE app_users SET full_name = display_name WHERE full_name = ''");
   // ROUND 36 (ข้อ 31) — บังคับเปลี่ยนรหัสผ่านครั้งแรก: 1 = บัญชีใหม่/รหัสที่ผู้บริหารตั้งให้ ต้องเปลี่ยนก่อนใช้งาน
   ensureColumn(db, "app_users", "must_change_password", "INTEGER NOT NULL DEFAULT 0");
   ensureColumn(db, "products", "size", "TEXT");
@@ -3567,7 +3570,7 @@ export function verifyPassword(plain: string, stored: string): boolean {
   }
 }
 
-const APP_USER_SELECT = `SELECT id, username, password_hash AS passwordHash, display_name AS displayName, role, active, created_at AS createdAt, failed_attempts AS failedAttempts, locked_until AS lockedUntil, must_change_password AS mustChangePassword FROM app_users`;
+const APP_USER_SELECT = `SELECT id, username, password_hash AS passwordHash, display_name AS displayName, COALESCE(NULLIF(full_name, ''), display_name) AS fullName, english_name AS englishName, role, active, created_at AS createdAt, failed_attempts AS failedAttempts, locked_until AS lockedUntil, must_change_password AS mustChangePassword FROM app_users`;
 
 // --- login rate limiting (failed-password lockout) ----------------------------
 
@@ -3739,7 +3742,7 @@ export function revokeOtherAppSessions(db: SqliteDb, keepSessionId: string, acto
 
 
 
-const APP_USER_SUMMARY_SELECT = `SELECT id, username, display_name AS displayName, role, active, created_at AS createdAt, failed_attempts AS failedAttempts, locked_until AS lockedUntil, must_change_password AS mustChangePassword FROM app_users`;
+const APP_USER_SUMMARY_SELECT = `SELECT id, username, display_name AS displayName, COALESCE(NULLIF(full_name, ''), display_name) AS fullName, english_name AS englishName, role, active, created_at AS createdAt, failed_attempts AS failedAttempts, locked_until AS lockedUntil, must_change_password AS mustChangePassword FROM app_users`;
 
 function getAppUserSummaryById(db: SqliteDb, userId: number): AppUserSummary | undefined {
   const row = db.prepare(`${APP_USER_SUMMARY_SELECT} WHERE id = ?`).get(userId) as AppUserSummary | undefined;
@@ -3863,7 +3866,7 @@ export function changeOwnPassword(db: SqliteDb, input: ChangeOwnPasswordInput): 
 
 /** Creates a login account with a scrypt-hashed password and audits it. */
 export function createAppUser(db: SqliteDb, input: CreateAppUserInput): AppUserSummary {
-  const username = input.username?.trim() ?? "";
+  const username = input.username?.trim().toLowerCase() ?? "";
   if (!USERNAME_PATTERN.test(username)) {
     throw new StoreError("ชื่อผู้ใช้ต้องเป็นตัวอักษรอังกฤษ ตัวเลข จุด หรือขีดล่าง ความยาว 3-30 ตัวอักษร");
   }
@@ -3877,12 +3880,18 @@ export function createAppUser(db: SqliteDb, input: CreateAppUserInput): AppUserS
   }
   const displayName = input.displayName?.trim() ?? "";
   if (!displayName) throw new StoreError("กรุณาระบุชื่อ-นามสกุลผู้ใช้");
+  const fullName = input.fullName?.trim() ?? displayName;
+  if (!fullName || fullName.length > 160) throw new StoreError("กรุณาระบุชื่อ-นามสกุล ไม่เกิน 160 ตัวอักษร");
+  const englishName = input.englishName?.trim() ?? "";
+  if (englishName.length > 160) throw new StoreError("ชื่อภาษาอังกฤษต้องไม่เกิน 160 ตัวอักษร");
   const createdAt = formatDateTime();
   // ROUND 36 — บัญชีใหม่ทุกบทบาทต้องเปลี่ยนรหัสผ่านเมื่อเข้าสู่ระบบครั้งแรก
-  const result = db.prepare(`INSERT INTO app_users (username, password_hash, display_name, role, active, created_at, must_change_password) VALUES (?, ?, ?, ?, 1, ?, 1)`).run(
+  const result = db.prepare(`INSERT INTO app_users (username, password_hash, display_name, full_name, english_name, role, active, created_at, must_change_password) VALUES (?, ?, ?, ?, ?, ?, 1, ?, 1)`).run(
     username,
     hashPassword(input.password),
     displayName,
+    fullName,
+    englishName,
     storedRoleFor(input.role),
     createdAt,
   );
@@ -3899,6 +3908,12 @@ export function updateAppUser(db: SqliteDb, input: UpdateAppUserInput): AppUserS
   if (!user) throw new StoreError("ไม่พบผู้ใช้ระบบรายนี้");
   if (input.displayName !== undefined && !input.displayName.trim()) {
     throw new StoreError("กรุณาระบุชื่อ-นามสกุลผู้ใช้");
+  }
+  if (input.fullName !== undefined && (!input.fullName.trim() || input.fullName.trim().length > 160)) {
+    throw new StoreError("กรุณาระบุชื่อ-นามสกุล ไม่เกิน 160 ตัวอักษร");
+  }
+  if (input.englishName !== undefined && input.englishName.trim().length > 160) {
+    throw new StoreError("ชื่อภาษาอังกฤษต้องไม่เกิน 160 ตัวอักษร");
   }
   const newPassword = typeof input.password === "string" && input.password !== "" ? input.password : undefined;
   // ROUND 36 (ข้อ 31) — รหัสที่ผู้บริหารตั้งให้ผู้อื่น ต้องผ่านกฎความแข็งแรงตามบทบาท
@@ -3931,6 +3946,20 @@ export function updateAppUser(db: SqliteDb, input: UpdateAppUserInput): AppUserS
   const assignments: string[] = [];
   const values: (string | number)[] = [];
   const changedLabels: string[] = [];
+  if (input.fullName !== undefined && (input.fullName.trim() !== user.fullName || nextDisplayName !== undefined)) {
+    assignments.push("full_name = ?");
+    values.push(input.fullName.trim());
+    if (input.fullName.trim() !== user.fullName) changedLabels.push("ชื่อ-นามสกุลเต็ม");
+  } else if (nextDisplayName !== undefined && input.fullName === undefined) {
+    // A legacy client changing only displayName must not discard the original full name.
+    assignments.push("full_name = ?");
+    values.push(user.fullName || user.displayName);
+  }
+  if (input.englishName !== undefined && input.englishName.trim() !== (user.englishName ?? "")) {
+    assignments.push("english_name = ?");
+    values.push(input.englishName.trim());
+    changedLabels.push("ชื่อภาษาอังกฤษ");
+  }
   if (nextDisplayName !== undefined) {
     assignments.push("display_name = ?");
     values.push(nextDisplayName);

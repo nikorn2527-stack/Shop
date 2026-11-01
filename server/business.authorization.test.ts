@@ -68,7 +68,7 @@ describe("business API permissions", () => {
 
   it("exposes only branding before login and protects operational settings", async () => {
     const brand = await caller().settings.brand();
-    expect(Object.keys(brand).sort()).toEqual(["appName", "appLogo", "appTheme", "appStyle", "appBackground", "loginBackground"].sort());
+    expect(Object.keys(brand).sort()).toEqual(["appName", "appLogo", "appTheme", "appStyle", "appBackground", "loginBackground", "loginOrganizationName"].sort());
     expect(brand.loginBackground).toBe("");
     await expect(caller().settings.get()).rejects.toMatchObject({ code: "UNAUTHORIZED" });
   });

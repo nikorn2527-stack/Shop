@@ -38,6 +38,8 @@ export type AppUser = {
   username: string;
   passwordHash: string;
   displayName: string;
+  fullName?: string;
+  englishName?: string;
   role: AppUserRole;
   active: number;
   createdAt: string;
@@ -70,6 +72,8 @@ export type AppUserSummary = {
   id: number;
   username: string;
   displayName: string;
+  fullName?: string;
+  englishName?: string;
   role: AppUserRole;
   active: number;
   createdAt: string;
@@ -83,6 +87,8 @@ export type CreateAppUserInput = {
   username: string;
   password: string;
   displayName: string;
+  fullName?: string;
+  englishName?: string;
   role: AppUserRole;
   actor?: string;
   actorRole?: string | null;
@@ -108,6 +114,8 @@ export type ChangeOwnPasswordInput = {
 export type UpdateAppUserInput = {
   userId: number;
   displayName?: string;
+  fullName?: string;
+  englishName?: string;
   role?: AppUserRole;
   active?: boolean;
   password?: string;

@@ -630,12 +630,16 @@ const userCreateInput = z.object({
   username: z.string().min(1, "กรุณาระบุชื่อผู้ใช้"),
   password: z.string().min(1, "กรุณากรอกรหัสผ่าน"),
   displayName: z.string().min(1, "กรุณาระบุชื่อ-นามสกุล"),
+  fullName: z.string().trim().min(1).max(160).optional(),
+  englishName: z.string().trim().max(160).optional(),
   role: z.enum(["staff", "admin", "dev"]),
 });
 
 const userUpdateInput = z.object({
   userId: z.number().int().positive(),
   displayName: z.string().optional(),
+  fullName: z.string().trim().min(1).max(160).optional(),
+  englishName: z.string().trim().max(160).optional(),
   role: z.enum(["staff", "admin", "dev"]).optional(),
   active: z.boolean().optional(),
   password: z.string().optional(),
@@ -852,6 +856,8 @@ export const appRouter = router({
           return updateAppUser(getWelfareDb(), {
             userId: input.userId,
             displayName: input.displayName,
+            fullName: input.fullName,
+            englishName: input.englishName,
             role: input.role,
             active: input.active,
             password: input.password,
