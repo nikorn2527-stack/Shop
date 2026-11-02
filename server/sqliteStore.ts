@@ -1,4 +1,6 @@
 import { createSqliteCheckoutRepository } from "./repositories/sqliteCheckoutRepository";
+import { repairImportedProductArtwork } from "./migrations/importedProductArtwork";
+import { backupSqliteDatabase } from "./sqliteBackup";
 import { DEFAULT_LOGIN_ORGANIZATION_NAME } from "../shared/loginBranding";
 import { createSqliteWalletRepository } from "./repositories/sqliteWalletRepository";
 import { checkout as checkoutService } from "./services/checkout";
@@ -640,6 +642,14 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
   initializeCardUsageSessions(db);
   // RBAC — seed roles + permissions (idempotent)
   ensureRbacSeed(db);
+  repairImportedProductArtwork(db, {
+    now: formatDateTime(),
+    backup: filename === ":memory:" ? undefined : () => backupSqliteDatabase({
+      sourcePath: filename,
+      backupDir: process.env.SQLITE_BACKUP_DIR ?? "data/backups",
+      retentionDays: 3650,
+    }).file,
+  });
   return db;
 }
 
