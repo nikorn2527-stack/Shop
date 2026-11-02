@@ -1,4 +1,5 @@
 import { getRuntimePolicy } from "../runtimePolicy";
+import { openingBalanceCorrectionStatus } from "../migrations/confirmedOpeningBalance";
 import os from "node:os";
 import { statSync } from "node:fs";
 import { z } from "zod";
@@ -70,6 +71,7 @@ export const systemRouter = router({
         db: {
           connected: dbConnected,
           sizeBytes: dbSizeBytes,
+          maintenance: { openingBalance: dbConnected ? openingBalanceCorrectionStatus(getWelfareDb()) : "unavailable" },
         },
         memory: {
           usedMB: mb(mem.rss),
