@@ -1,3 +1,4 @@
+import { buildStockInventoryDocument } from "@/lib/stockInventoryDocument";
 import { ProductLabelPrintModal } from "@/components/ProductLabelPrintModal";
 import { RowActionButton } from "@/components/RowActionButton";
 import { ReceivePriceInsight } from "@/components/ReceivePriceInsight";
@@ -694,27 +695,24 @@ export function Stock({ role, userName, initialAction, embeddedAction = false, r
   const restoreProduct = (product: Product) => {
     setActiveMutation.mutate({ productId: product.id, active: true, actor, actorRole });
   };
-  // Round 32-26 — รายการคงคลัง: ส่งออก CSV/Excel + สั่งพิมพ์ พร้อมแถว "ยอดยกมา" นำหน้าตาราง
+  // Export current stock with the same Item/code/name order as the report.
   const stockExportRows = () => {
     const totalQty = filteredCards.reduce((sum, card) => sum + card.product.stock, 0);
-    const openingValue = filteredCards.reduce((sum, card) => sum + reportSellingValue(card.product.stock, card.product.price), 0);
-    const rows: string[][] = [
-      ["สินค้า", "รหัส SKU", "บาร์โค้ด", "หน่วยขาย", "คงเหลือ", "ราคาขาย/หน่วย", "มูลค่ารวม (ราคาขาย)", "ล็อต", "หมดอายุถัดไป", "สถานะ"],
-      ["ยอดยกมา — มูลค่าคงคลังตามตัวกรอง", "", "", "", exportCount(totalQty), "", exportNumber(openingValue), "", "", `สินค้า ${filteredCards.length} รายการ`],
+    const value = filteredCards.reduce((sum, card) => sum + reportSellingValue(card.product.stock, card.product.price), 0);
+    return [
+      ["Item", "รหัส/บาร์โค้ด", "ชื่อสินค้า", "หน่วย", "คงเหลือ", "ราคาต่อหน่วย", "มูลค่าคงเหลือ", "สถานะ", "รหัส SKU", "ล็อต", "หมดอายุถัดไป"],
       ...filteredCards.map((card) => [
-        card.product.name, card.product.sku, card.product.barcode ?? "—", card.product.unit, exportCount(card.product.stock),
-        exportNumber(card.product.price), exportNumber(reportSellingValue(card.product.stock, card.product.price)),
-        exportCount(card.lots.length), formatExpiry(card.nextExpiry), card.status,
+        exportCount(card.product.itemNumber), card.product.barcode?.trim() || card.product.sku, card.product.name,
+        card.product.unit, exportCount(card.product.stock), exportNumber(card.product.price),
+        exportNumber(reportSellingValue(card.product.stock, card.product.price)), card.status,
+        card.product.sku, exportCount(card.lots.length), formatExpiry(card.nextExpiry),
       ]),
-      ["รวมตามตัวกรอง", "", "", "", exportCount(totalQty), "", exportNumber(openingValue), exportCount(filteredCards.reduce((sum, card) => sum + card.lots.length, 0)), "", ""],
+      ["รวม", "", `${filteredCards.length} รายการ`, "", exportCount(totalQty), "", exportNumber(value), "", "", exportCount(filteredCards.reduce((sum, card) => sum + card.lots.length, 0)), ""],
     ];
-    return rows;
   };
   const openStockExportPreview = async (preferred?: ExportFormat, direct = false) => {
     if (!canExport) { setUpgradeFeature("importExport"); return; } // ROUND 61 — ส่งออก/พิมพ์รายงานเป็นฟีเจอร์โปร
     if (filteredCards.length === 0) { setNotice("ยังไม่มีรายการคงคลังตามตัวกรองที่จะพิมพ์"); return; }
-    const totalQty = filteredCards.reduce((sum, card) => sum + card.product.stock, 0);
-    const openingValue = filteredCards.reduce((sum, card) => sum + reportSellingValue(card.product.stock, card.product.price), 0);
     const state: ExportPreviewState = {
       kind: "stock",
       title: "รายงานสินค้าคงคลัง",
@@ -722,24 +720,12 @@ export function Stock({ role, userName, initialAction, embeddedAction = false, r
       label: "สินค้าคงคลัง",
       fileName: "stock-report", sheetName: "รายการคงคลัง",
       rows: stockExportRows(),
-      numericCols: [4, 5, 6, 7],
+      numericCols: [0, 4, 5, 6, 9],
       preferred: preferred ?? "print",
-      doc: {
-        fileName: "stock-report.pdf", title: "รายงานสินค้าคงคลัง",
-        periodLabel: `ณ วันที่พิมพ์ ${new Date().toLocaleDateString("th-TH", { timeZone: "Asia/Bangkok", day: "numeric", month: "long", year: "numeric" })} · หมวด ${stockCategory} · ตามตัวกรอง${statusFilter !== "ทั้งหมด" ? `สถานะ ${statusFilter}` : "ทั้งหมด"}${manageSearch.trim() ? ` และคำค้น “${manageSearch.trim()}”` : ""}`,
-        meta: [["ยอดยกมา", `สินค้า ${filteredCards.length} รายการ · ${totalQty.toLocaleString("th-TH")} หน่วย`], ["มูลค่าคงคลังรวม (ราคาขาย)", money(openingValue)], ["ล็อตทั้งหมด", `${filteredCards.reduce((sum, card) => sum + card.lots.length, 0)} ล็อต`]],
-        columns: ["สินค้า", "รหัส/บาร์โค้ด", "หน่วย", "คงเหลือ", "ราคาขาย/หน่วย", "มูลค่ารวม", "สถานะ"], numericCols: [3, 4, 5],
-        columnWidths: ["23%", "24%", "8%", "10%", "11%", "15%", "9%"], nowrapCols: [1],
-        rows: [
-          ["ยอดยกมา — มูลค่าคงคลังตามตัวกรอง", `${filteredCards.length} รายการ`, "", exportCount(totalQty), "", exportNumber(openingValue), ""],
-          ...filteredCards.map((card) => [card.product.name, card.product.barcode ?? card.product.sku, card.product.unit, exportCount(card.product.stock), exportNumber(card.product.price), exportNumber(reportSellingValue(card.product.stock, card.product.price)), card.status]),
-        ],
-        totalsRow: ["รวมตามตัวกรอง", `${filteredCards.length} รายการ`, "", exportCount(totalQty), "", exportNumber(openingValue), ""],
-        brandName: "ร้านค้าสวัสดิการ", footnote: "แถวแรกคือยอดยกมา (มูลค่าคงคลัง ณ วันที่พิมพ์) · รายละเอียดล็อตและวันหมดอายุดูได้จากหน้าจอรายการคงคลัง",
-      },
+      doc: buildStockInventoryDocument(filteredCards, `ณ วันที่พิมพ์ ${new Date().toLocaleDateString("th-TH", { timeZone: "Asia/Bangkok", day: "numeric", month: "long", year: "numeric" })} · หมวด ${stockCategory} · ตามตัวกรอง${statusFilter !== "ทั้งหมด" ? `สถานะ ${statusFilter}` : "ทั้งหมด"}${manageSearch.trim() ? ` และคำค้น “${manageSearch.trim()}”` : ""}`),
       hasTotalsRow: true,
       downloadNoticeBase: "รายงานสินค้าคงคลัง",
-      printNotice: "สั่งพิมพ์รายงานคงคลังแล้ว — เอกสาร A4 พร้อมแถวยอดยกมา",
+      printNotice: "สั่งพิมพ์รายงานคงคลังแล้ว — เอกสาร A4 เรียงตาม Item",
     };
     if (direct && preferred) {
       await runDocPreviewState(state, preferred);
