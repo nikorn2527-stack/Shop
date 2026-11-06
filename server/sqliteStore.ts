@@ -2742,15 +2742,25 @@ export function memberTransactions(db: SqliteDb, input: MemberTransactionsInput 
 
 
 /**
- * ROUND 65 — รายงาน "ยอดเงินในบัตร" ทุกใบในระบบ (ยอดทั้งหมด/ยอดจ่าย/คงเหลือ
+ * รายงาน "ยอดเงินในบัตร" ของสมาชิกปัจจุบัน รวมยอดศูนย์ (ยอดทั้งหมด/ยอดจ่าย/คงเหลือ
  * คำนวณจาก member_transactions ทั้งหมด) · เรียงตามหมายเลขสมาชิก · ค้นหาได้จาก
  * ชื่อ/เลขสมาชิก/รหัสบัตร/รหัสผู้ป่วย
  */
 export function memberBalances(db: SqliteDb, input: MemberBalancesInput = {}): MemberBalanceRow[] {
   const search = input.search?.trim();
-  const where = search
-    ? ` WHERE (m.first_name || ' ' || m.last_name || ' ' || m.member_number || ' ' || COALESCE(m.card_number, '') || ' ' || COALESCE(m.patient_code, '')) LIKE ?`
-    : "";
+  // No clinical departure flag exists here. Hide only completed account/card
+  // returns recorded by the official flows, never zero balance or no card alone.
+  // A later assignment/replacement makes the member current again.
+  const where = ` WHERE NOT (
+    m.balance = 0 AND NULLIF(TRIM(m.card_number), '') IS NULL
+    AND (m.account_closed = 1 OR COALESCE((
+      SELECT CASE WHEN ca.action = 'release' AND ca.note IN (
+        'รับคืนบัตรยอดศูนย์', 'คืนเงินครบยอดและรับคืนบัตร'
+      ) THEN 1 ELSE 0 END
+      FROM card_assignments ca WHERE ca.member_number = m.member_number
+      ORDER BY ca.id DESC LIMIT 1
+    ), 0) = 1)
+  )${search ? ` AND (m.first_name || ' ' || m.last_name || ' ' || m.member_number || ' ' || COALESCE(m.card_number, '') || ' ' || COALESCE(m.patient_code, '')) LIKE ?` : ''}`;
   const params = search ? [`%${search}%`] : [];
   return db.prepare(`
     SELECT m.id, m.member_number AS memberNumber, m.card_number AS cardNumber, m.patient_code AS patientCode,

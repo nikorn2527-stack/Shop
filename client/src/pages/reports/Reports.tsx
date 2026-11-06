@@ -1,3 +1,4 @@
+import { memberBalanceExport } from "@/lib/memberBalanceExport";
 import { normalizeBillSearch } from "@/lib/billSearch";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuSeparator, DropdownMenuGroup } from "@/components/ui/dropdown-menu";
 import { notify } from "@/lib/notifications";
@@ -326,7 +327,6 @@ export function Reports({
   };
   // ROUND 65 — ช่องค้นหาของรายงานใหม่: ยอดเงินในบัตร + สินค้าคงคลัง (debounce เหมือนประวัติบิล)
   const [balanceSearch, setBalanceSearch] = useState("");
-  const [includeZeroBalances, setIncludeZeroBalances] = useState(false);
   const [debouncedBalanceSearch, setDebouncedBalanceSearch] = useState("");
   const [stockSearch, setStockSearch] = useState("");
   const [debouncedStockSearch, setDebouncedStockSearch] = useState("");
@@ -534,10 +534,7 @@ export function Reports({
     { search: debouncedBalanceSearch || undefined },
     { enabled: reportTab === "balances", refetchOnMount: "always", refetchOnWindowFocus: "always" }
   );
-  const balanceRows = useMemo(
-    () => (balancesQuery.data ?? []).filter(row => includeZeroBalances || row.balance !== 0),
-    [balancesQuery.data, includeZeroBalances]
-  );
+  const balanceRows = balancesQuery.data ?? [];
   const stockBalanceQuery = trpc.reports.stockBalance.useQuery(
     {
       from: effectiveFrom,
@@ -1410,40 +1407,15 @@ export function Reports({
   const balancesDocConfig = (): ReportDocConfig => ({
     fileName: hospitalPreset === "balances" ? "hospital-member-card-balance.pdf" : "member-card-balances.pdf",
     title: hospitalPreset === "balances" ? "รายงานแสดงยอดเงินในบัตรเงินสด" : "รายงานยอดเงินในบัตรสมาชิก",
-    periodLabel: `ณ วันที่สร้างรายงาน ${formatThaiDate(new Date())} · ${includeZeroBalances ? "รวมสมาชิกยอด 0 บาท" : "เฉพาะยอดคงเหลือไม่เท่ากับ 0 บาท"}${debouncedBalanceSearch ? ` · ค้นหา “${debouncedBalanceSearch}”` : ""}`,
+    periodLabel: `ณ วันที่สร้างรายงาน ${formatThaiDate(new Date())} · สมาชิกที่ยังอยู่ รวมยอด 0 บาท${debouncedBalanceSearch ? ` · ค้นหา “${debouncedBalanceSearch}”` : ""}`,
     meta: [
       ["จำนวนสมาชิก", `${balanceTotals.members.toLocaleString("th-TH")} ราย`],
       ["ยอดเงินเข้ารวม", money(balanceTotals.totalIn)],
       ["คงเหลือรวม", money(balanceTotals.balance)],
     ],
-    columns: [
-      "ลำดับ",
-      "เลขสมาชิก",
-      "ชื่อสมาชิก",
-      "วันที่เปิดใช้บัตร",
-      "ยอดทั้งหมด (บาท)",
-      "ยอดจ่าย (บาท)",
-      "คงเหลือ (บาท)",
-    ],
-    numericCols: [4, 5, 6],
-    rows: balanceRows.map((row, index) => [
-      exportCount(index + 1),
-      row.memberNumber,
-      memberFullName(row),
-      formatThaiDate(row.createdAt),
-      exportNumber(row.totalIn),
-      exportNumber(row.totalOut),
-      exportNumber(row.balance),
-    ]),
-    totalsRow: [
-      "รวม",
-      `${balanceTotals.members} ราย`,
-      "",
-      "",
-      exportNumber(balanceTotals.totalIn),
-      exportNumber(balanceTotals.totalOut),
-      exportNumber(balanceTotals.balance),
-    ],
+    ...memberBalanceExport(balanceRows),
+    compact: true,
+    nowrapCols: [0, 1, 2, 4, 5, 6, 7],
     brandName: "ร้านค้าสวัสดิการ",
   });
   const openBalancesExportPreview = async (preferred?: ExportFormat, direct = false) => {
@@ -1459,35 +1431,7 @@ export function Reports({
       label: "ยอดเงินในบัตร",
       fileName: "member-card-balances",
       sheetName: "ยอดเงินในบัตร",
-      rows: [
-        [
-          "ลำดับ",
-          "เลขสมาชิก",
-          "ชื่อ-นามสกุล",
-          "วันที่เปิดใช้สมาชิก",
-          "ยอดทั้งหมด (บาท)",
-          "ยอดจ่าย (บาท)",
-          "คงเหลือ (บาท)",
-        ],
-        ...balanceRows.map((row, index) => [
-          exportCount(index + 1),
-          row.memberNumber,
-          memberFullName(row),
-          formatThaiDate(row.createdAt),
-          exportNumber(row.totalIn),
-          exportNumber(row.totalOut),
-          exportNumber(row.balance),
-        ]),
-        [
-          "รวม",
-          `${balanceTotals.members} ราย`,
-          "",
-          "",
-          exportNumber(balanceTotals.totalIn),
-          exportNumber(balanceTotals.totalOut),
-          exportNumber(balanceTotals.balance),
-        ],
-      ],
+      rows: [doc.columns, ...doc.rows, ...(doc.totalsRow ? [doc.totalsRow] : [])],
       numericCols: doc.numericCols ?? [],
       preferred: preferred ?? "pdf",
       doc,
@@ -3258,15 +3202,7 @@ export function Reports({
                       aria-label="ค้นหารายงานยอดเงินในบัตร"
                     />
                   </div></SharedSearch>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={includeZeroBalances}
-                      onChange={event => setIncludeZeroBalances(event.target.checked)}
-                      data-testid="include-zero-balances"
-                    />{" "}
-                    แสดงสมาชิกทั้งหมด รวมยอด 0 บาท
-                  </label>
+                  <span>สมาชิกที่ยังอยู่ รวมยอด 0 บาท</span>
                 </div>
                 <div
                   className="report-export-actions"
