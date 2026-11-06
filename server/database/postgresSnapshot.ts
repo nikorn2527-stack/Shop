@@ -31,6 +31,7 @@ function fileSha256(path: string) {
 }
 
 const canonicalTriggers: Record<string, string> = {
+  allocate_product_item_number: "7f8cd058b21f4c1daca2177349cc49478538b7f3a7de3569de20f18598b1e8c0",
   card_session_assignment:
     "9a39cf34822ace64633ad667bffa0a88e9c96b65b6f5f840a0a798185dc9fe6f",
   member_transactions_created_at_default:
@@ -86,7 +87,7 @@ export function postgresSchema() {
     }
     tables.push({ name: match[1], columns });
   }
-  if (tables.length !== 25 || tables.some(table => !table.columns.length))
+  if (tables.length !== 26 || tables.some(table => !table.columns.length))
     throw new Error("PostgreSQL schema manifest is incomplete");
   return {
     sql,

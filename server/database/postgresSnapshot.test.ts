@@ -100,7 +100,8 @@ describe("PostgreSQL migration rehearsal export (offline, not PG integration)", 
     expect(hash(source)).toBe(before);
     expect(result.sourceSha256).toBe(before);
     expect(result.postgresAppReady).toBe(false);
-    expect(Object.keys(result.tables)).toHaveLength(25);
+    expect(Object.keys(result.tables)).toHaveLength(26);
+    expect(result.tables.product_item_sequence).toBe("1");
     expect(result.tables.members).toBe("1");
     expect(result.tables.app_sessions).toBe("1");
     expect(sql).toContain("'00001'");

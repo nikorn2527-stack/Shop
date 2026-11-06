@@ -1,3 +1,4 @@
+import { initializeProductItemNumbers } from "./migrations/productItemNumbers";
 import { createSqliteCheckoutRepository } from "./repositories/sqliteCheckoutRepository";
 import { repairImportedProductArtwork } from "./migrations/importedProductArtwork";
 import { confirmImportedOpeningBalance } from "./migrations/confirmedOpeningBalance";
@@ -659,6 +660,14 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
       retentionDays: 3650,
     }).file,
   });
+  initializeProductItemNumbers(db, {
+    now: formatDateTime(),
+    backup: filename === ":memory:" ? undefined : () => backupSqliteDatabase({
+      sourcePath: filename,
+      backupDir: process.env.SQLITE_BACKUP_DIR ?? "data/backups",
+      retentionDays: 3650,
+    }).file,
+  });
   return db;
 }
 
@@ -1298,13 +1307,13 @@ export function setSchemaVersion(db: SqliteDb, version: string): void {
 
 export function listProducts(db: SqliteDb, includeInactive = false): SqliteProduct[] {
   if (includeInactive) {
-    return db.prepare(`SELECT id, sku, barcode, name, category, emoji, color, size, image_url AS imageUrl, quick_pick AS quickPick, sell_mode AS sellMode, price_tiers AS priceTiers, unit, price, cost, stock, reorder_point AS reorderPoint, active, created_at AS createdAt FROM products ORDER BY active DESC, id`).all() as unknown as SqliteProduct[];
+    return db.prepare(`SELECT id, item_number AS itemNumber, sku, barcode, name, category, emoji, color, size, image_url AS imageUrl, quick_pick AS quickPick, sell_mode AS sellMode, price_tiers AS priceTiers, unit, price, cost, stock, reorder_point AS reorderPoint, active, created_at AS createdAt FROM products ORDER BY active DESC, item_number, id`).all() as unknown as SqliteProduct[];
   }
-  return db.prepare(`SELECT id, sku, barcode, name, category, emoji, color, size, image_url AS imageUrl, quick_pick AS quickPick, sell_mode AS sellMode, price_tiers AS priceTiers, unit, price, cost, stock, reorder_point AS reorderPoint, active, created_at AS createdAt FROM products WHERE active = 1 ORDER BY id`).all() as unknown as SqliteProduct[];
+  return db.prepare(`SELECT id, item_number AS itemNumber, sku, barcode, name, category, emoji, color, size, image_url AS imageUrl, quick_pick AS quickPick, sell_mode AS sellMode, price_tiers AS priceTiers, unit, price, cost, stock, reorder_point AS reorderPoint, active, created_at AS createdAt FROM products WHERE active = 1 ORDER BY item_number, id`).all() as unknown as SqliteProduct[];
 }
 
 function getProductById(db: SqliteDb, productId: number): SqliteProduct | undefined {
-  return db.prepare(`SELECT id, sku, barcode, name, category, emoji, color, size, image_url AS imageUrl, quick_pick AS quickPick, sell_mode AS sellMode, price_tiers AS priceTiers, unit, price, cost, stock, reorder_point AS reorderPoint, active, created_at AS createdAt FROM products WHERE id = ?`).get(productId) as SqliteProduct | undefined;
+  return db.prepare(`SELECT id, item_number AS itemNumber, sku, barcode, name, category, emoji, color, size, image_url AS imageUrl, quick_pick AS quickPick, sell_mode AS sellMode, price_tiers AS priceTiers, unit, price, cost, stock, reorder_point AS reorderPoint, active, created_at AS createdAt FROM products WHERE id = ?`).get(productId) as SqliteProduct | undefined;
 }
 
 
@@ -2801,13 +2810,13 @@ export function stockBalanceReport(db: SqliteDb, input: StockBalanceInput = {}):
   const categoryFilter = categoryWhere("products", input);
   if (categoryFilter.sql !== "") whereParts.push(categoryFilter.sql.replace(/^\s*AND\s+/i, ""));
   const where = whereParts.length > 0 ? ` WHERE ${whereParts.join(" AND ")}` : "";
-  const products = db.prepare(`SELECT id, sku, barcode, name, unit, category, stock, price, active FROM products${where} ORDER BY id`).all(...params, ...categoryFilter.params) as unknown as { id: number; sku: string; barcode: string | null; name: string; unit: string; category: string; stock: number; price: number; active: number }[];
-  const codeOrder = new Intl.Collator("th", {numeric: true, sensitivity: "base"});
+  const products = db.prepare(`SELECT id, item_number AS itemNumber, sku, barcode, name, unit, category, stock, price, active FROM products${where} ORDER BY item_number, id`).all(...params, ...categoryFilter.params) as unknown as { id: number; itemNumber: number; sku: string; barcode: string | null; name: string; unit: string; category: string; stock: number; price: number; active: number }[];
   return products.map((product) => {
     const sold = soldByProduct.get(product.id) ?? 0;
     const received = receivedByProduct.get(product.id) ?? 0;
     return {
       productId: product.id,
+      itemNumber: product.itemNumber,
       code: product.barcode?.trim() || product.sku,
       sku: product.sku,
       barcode: product.barcode,
@@ -2822,7 +2831,7 @@ export function stockBalanceReport(db: SqliteDb, input: StockBalanceInput = {}):
       sellingPrice: product.price,
       sellingValue: reportSellingValue(product.stock, product.price),
     };
-  }).sort((left,right)=>codeOrder.compare(left.code,right.code) || left.productId-right.productId);
+  });
 }
 
 export function dashboardStats(db: SqliteDb, rangeDays = 30): DashboardStats {

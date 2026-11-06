@@ -532,7 +532,7 @@ export function Reports({
   // ROUND 65 — รายงานใหม่: ยอดเงินในบัตรทุกใบ + สินค้าคงคลังตามช่วงเวลา (ยอดยกมา/ยอดขาย/คงเหลือ)
   const balancesQuery = trpc.reports.memberBalances.useQuery(
     { search: debouncedBalanceSearch || undefined },
-    { enabled: reportTab === "balances" }
+    { enabled: reportTab === "balances", refetchOnMount: "always", refetchOnWindowFocus: "always" }
   );
   const balanceRows = useMemo(
     () => (balancesQuery.data ?? []).filter(row => includeZeroBalances || row.balance !== 0),
@@ -1243,7 +1243,7 @@ export function Reports({
         exportNumber(total),
       ],
       brandName: "ร้านค้าสวัสดิการ",
-      compact: true, // ตาราง 7 คอลัมน์ — ลดขนาดตามฟอร์มให้อยู่บรรทัดเดียว
+      compact: true, // Keep the hospital template compact with its permanent Item column.
     };
   };
   const openBillsExportPreview = async (preferred?: ExportFormat, direct = false) => {
@@ -1512,17 +1512,17 @@ export function Reports({
       ["มูลค่าคงเหลือตามราคาขายปัจจุบัน", money(stockTotals.sellingValue)],
     ],
     columns: hospitalPreset === "stock"
-      ? ["รหัสสินค้า", "ชื่อสินค้า", "ยอดยกมา", "ยอดขาย", "คงเหลือ", "ราคาต่อหน่วย", "มูลค่าคงเหลือ"]
-      : ["ลำดับ", "รหัสสินค้า", "ชื่อสินค้า", "หน่วย", "ยอดยกมา", "ยอดขาย", "คงเหลือ", "ราคาต่อหน่วย", "มูลค่าคงเหลือ"],
-    numericCols: hospitalPreset === "stock" ? [2, 3, 4, 5, 6] : [4, 5, 6, 7, 8],
-    rows: stockBalanceRows.map((row, index) => hospitalPreset === "stock"
-      ? [row.code, row.name, exportCount(row.opening), exportCount(row.sold), exportCount(row.remaining), exportNumber(row.sellingPrice), exportNumber(row.sellingValue)]
-      : [exportCount(index + 1), row.code, row.name, row.unit, exportCount(row.opening), exportCount(row.sold), exportCount(row.remaining), exportNumber(row.sellingPrice), exportNumber(row.sellingValue)]),
+      ? ["Item", "รหัสสินค้า", "ชื่อสินค้า", "ยอดยกมา", "ยอดขาย", "คงเหลือ", "ราคาต่อหน่วย", "มูลค่าคงเหลือ"]
+      : ["Item", "รหัสสินค้า", "ชื่อสินค้า", "หน่วย", "ยอดยกมา", "ยอดขาย", "คงเหลือ", "ราคาต่อหน่วย", "มูลค่าคงเหลือ"],
+    numericCols: hospitalPreset === "stock" ? [3, 4, 5, 6, 7] : [4, 5, 6, 7, 8],
+    rows: stockBalanceRows.map((row) => hospitalPreset === "stock"
+      ? [exportCount(row.itemNumber), row.code, row.name, exportCount(row.opening), exportCount(row.sold), exportCount(row.remaining), exportNumber(row.sellingPrice), exportNumber(row.sellingValue)]
+      : [exportCount(row.itemNumber), row.code, row.name, row.unit, exportCount(row.opening), exportCount(row.sold), exportCount(row.remaining), exportNumber(row.sellingPrice), exportNumber(row.sellingValue)]),
     totalsRow: hospitalPreset === "stock"
-      ? ["รวม", `${stockTotals.items} รายการ`, exportCount(stockTotals.opening), exportCount(stockTotals.sold), exportCount(stockTotals.remaining), "", exportNumber(stockTotals.sellingValue)]
+      ? ["รวม", `${stockTotals.items} รายการ`, "", exportCount(stockTotals.opening), exportCount(stockTotals.sold), exportCount(stockTotals.remaining), "", exportNumber(stockTotals.sellingValue)]
       : ["รวม", `${stockTotals.items} รายการ`, "", "", exportCount(stockTotals.opening), exportCount(stockTotals.sold), exportCount(stockTotals.remaining), "", exportNumber(stockTotals.sellingValue)],
     brandName: "ร้านค้าสวัสดิการ",
-    compact: true, // ตาราง 7 คอลัมน์ — ลดขนาดตามฟอร์มให้อยู่บรรทัดเดียว
+    compact: true, // Keep the hospital template compact with its permanent Item column.
   });
   const openStockBalanceExportPreview = async (preferred?: ExportFormat, direct = false) => {
     if (stockBalanceRows.length === 0) {
@@ -1539,7 +1539,7 @@ export function Reports({
       sheetName: "สินค้าคงคลัง",
       rows: [
         [
-          "ลำดับ",
+          "Item",
           "รหัสสินค้า",
           "ชื่อสินค้า",
           "หน่วย",
@@ -1549,8 +1549,8 @@ export function Reports({
           "ราคาต่อหน่วย",
           "มูลค่าคงเหลือ",
         ],
-        ...stockBalanceRows.map((row, index) => [
-          exportCount(index + 1),
+        ...stockBalanceRows.map((row) => [
+          exportCount(row.itemNumber),
           row.code,
           row.name,
           row.unit,
@@ -3110,7 +3110,7 @@ export function Reports({
                   >
                     <thead>
                       <tr>
-                        <th className="hide-sm">ลำดับ</th>
+                        <th className="hide-sm">Item</th>
                         <th>รหัสสินค้า</th>
                         <th>ชื่อสินค้า</th>
                         <th className="hide-sm">หน่วย</th>
@@ -3122,10 +3122,10 @@ export function Reports({
                       </tr>
                     </thead>
                     <tbody>
-                      {stockBalanceRows.map((row, index) => (
+                      {stockBalanceRows.map((row) => (
                         <tr key={row.productId}>
                           <td className="hide-sm cell-mono">
-                            {exportCount(index + 1)}
+                            {exportCount(row.itemNumber)}
                           </td>
                           <td>
                             <small
@@ -3337,6 +3337,7 @@ export function Reports({
                       <tr>
                         <th className="hide-sm">ลำดับ</th>
                         <th>เลขสมาชิก</th>
+                        <th>เลขบัตรปัจจุบัน</th>
                         <th>ชื่อ-นามสกุล</th>
                         <th className="hide-sm">วันที่เปิดใช้สมาชิก</th>
                         <th className="num hide-sm">ยอดทั้งหมด</th>
@@ -3363,6 +3364,7 @@ export function Reports({
                               {row.memberNumber}
                             </small>
                           </td>
+                          <td className="cell-mono">{row.cardNumber?.trim() || "—"}</td>
                           <td>
                             <span className="cell-strong">
                               {memberFullName(row)}
