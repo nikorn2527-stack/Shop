@@ -15753,3 +15753,7 @@ body:has(.modal-backdrop) .shortcuts-fab { display: none; }
 
 .product-label-modal input:not([type=checkbox]),.product-label-modal select{min-height:40px;border:1px solid #cbd9ea;border-radius:9px;padding:8px 10px;font-size:14px;background:#fff;color:#17304e;max-width:100%;box-sizing:border-box}
 @media(max-width:600px){.product-label-modal input:not([type=checkbox]),.product-label-modal select{min-height:44px}}
+
+/* Configured store address is shared by receipt previews, exports and print. */
+.receipt-brand-text { min-width: 0; max-width: 100%; }
+.receipt-brand-text .receipt-address { display: block; margin-top: 4px; white-space: pre-line; overflow-wrap: anywhere; line-height: 1.5; }
