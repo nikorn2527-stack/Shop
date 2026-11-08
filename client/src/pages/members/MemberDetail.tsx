@@ -1342,7 +1342,7 @@ export function MemberDetail({
                 : "ถอนเงินจากบัญชีสมาชิก",
             `คงเหลือ ${money(walletResult.balanceAfter)}`,
           ]}
-          onPrint={() => { setWalletPrintPreview(false); closeWalletSlip(); }}
+          stayOpenAfterPrint
           onClose={() => setWalletPrintPreview(false)}
         />
       )}

@@ -110,7 +110,7 @@ export function MemberCardActionsModal({ memberNumber, onClose, onSuccess, initi
   return (
     <WorkflowDialog title="จัดการบัตรสมาชิก" onClose={onClose} busy={busy} className="form-modal">
         {printPreview && (
-          <PrintPreviewModal targetId="member-card-return-slip" title="สลิปคืนบัตรสมาชิก" onClose={() => setPrintPreview(false)} />
+          <PrintPreviewModal stayOpenAfterPrint targetId="member-card-return-slip" title="สลิปคืนบัตรสมาชิก" onClose={() => setPrintPreview(false)} />
         )}
         <div className="modal-heading">
           <h2>{labels[action]}</h2>
