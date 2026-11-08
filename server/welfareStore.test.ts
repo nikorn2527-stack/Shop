@@ -287,7 +287,7 @@ describe("POS checkout", () => {
       cashier: "น.ส.กัญญาณัฐ พ.",
     });
 
-    expect(receipt.orderNumber).toMatch(/^RC-\d{6}-\d{3}$/);
+    expect(receipt.orderNumber).toMatch(/^\d{8}$/);
     expect(receipt.total).toBe(59);
     expect(receipt.subtotal).toBe(59);
     expect(receipt.memberName).toBeNull();
@@ -436,7 +436,7 @@ describe("FIFO lot deduction at checkout", () => {
       paymentMethod: "เงินสด",
     });
 
-    expect(receipt.orderNumber).toMatch(/^RC-/);
+    expect(receipt.orderNumber).toMatch(/^\d{8}$/);
     expect(productBySku(database, "DRK-002").stock).toBe(coffee.stock - 3);
     expect(listAuditLogs(database, 1)[0].detail).not.toContain("ตัดยอด Lot ไม่ครบ");
   });

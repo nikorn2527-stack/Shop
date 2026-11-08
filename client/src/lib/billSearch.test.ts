@@ -2,6 +2,11 @@ import { describe, expect, it } from "vitest";
 import { normalizeBillSearch } from "./billSearch";
 
 describe("bill history search identifiers", () => {
+  it("supports the new monthly Buddhist receipt number in text and scanner payloads", () => {
+    expect(normalizeBillSearch("69110001\r\n")).toBe("69110001");
+    expect(normalizeBillSearch('{"orderNumber":"69110001"}')).toBe("69110001");
+    expect(normalizeBillSearch("https://shop.example/receipt?bill=69110001")).toBe("69110001");
+  });
   it("keeps receipt separators so server LIKE queries can find a complete receipt", () => {
     expect(normalizeBillSearch(" RC-261023-001\r\n")).toBe("RC-261023-001");
   });

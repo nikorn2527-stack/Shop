@@ -1,3 +1,4 @@
+import { bangkokParts } from "../shared/storeTime";
 import { initializeDocumentPrinting } from "./documentPrinting";
 import { initializeProductItemNumbers } from "./migrations/productItemNumbers";
 import { createSqliteCheckoutRepository } from "./repositories/sqliteCheckoutRepository";
@@ -2006,9 +2007,16 @@ function yyMMdd(date: Date) {
 }
 
 function nextOrderNumber(db: SqliteDb, date = new Date()) {
-  const prefix = `RC-${yyMMdd(date)}-`;
-  const row = db.prepare(`SELECT MAX(CAST(SUBSTR(order_number, 11) AS INTEGER)) AS maxSeq FROM sales WHERE order_number LIKE ?`).get(`${prefix}%`) as { maxSeq: number | null };
-  return `${prefix}${String((row?.maxSeq ?? 0) + 1).padStart(3, "0")}`;
+  const { year, month } = bangkokParts(date);
+  const prefix = `${String((year + 543) % 100).padStart(2, "0")}${pad2(month)}`;
+  // Exact eight-digit format only. Legacy daily RC numbers remain unchanged.
+  // Allocate inside checkout's transaction; the unique constraint prevents duplicates.
+  // Voided receipts also reserve their numbers.
+  const row = db.prepare(`SELECT MAX(CAST(SUBSTR(order_number, 5, 4) AS INTEGER)) AS maxSeq
+    FROM sales WHERE order_number GLOB ?`).get(`${prefix}[0-9][0-9][0-9][0-9]`) as { maxSeq: number | null };
+  const sequence = (row.maxSeq ?? 0) + 1;
+  if (sequence > 9999) throw new StoreError("เลขที่ใบเสร็จเดือนนี้ครบ 9999 รายการแล้ว กรุณาติดต่อผู้ดูแลระบบ");
+  return `${prefix}${String(sequence).padStart(4, "0")}`;
 }
 
 
