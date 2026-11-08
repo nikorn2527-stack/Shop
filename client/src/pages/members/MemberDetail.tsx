@@ -1,3 +1,5 @@
+import { useSlipDocument } from "@/hooks/useSlipDocument";
+import { SlipCopyMark, SlipDocumentOptions } from "@/components/SlipDocumentOptions";
 import { createBrowserUuid } from "@/lib/browserUuid";
 import { useRef as useRequestRef } from "react";
 import { notify } from "@/lib/notifications";
@@ -192,9 +194,12 @@ export function MemberDetail({
       : walletOpen === "refund"
         ? "คืนบัตรเงินสด"
         : "ถอนเงิน";
+  const [walletDocumentKey, setWalletDocumentKey] = useState("");
+  const slipDocument = useSlipDocument(walletDocumentKey ? {kind: "wallet_request", key: walletDocumentKey} : null);
   const walletRequestRef = useRequestRef<{ fingerprint: string; id: string } | null>(null);
   const walletMutation = trpc.member.wallet.useMutation({
     onSuccess: result => {
+      setWalletDocumentKey(walletRequestRef.current?.id ?? "");
       walletRequestRef.current = null;
       // ROUND 77 — ไม่ปิดโมดัลทันที: เปลี่ยนเป็นหน้าสลิกให้พิมพ์/ดาวน์โหลดก่อน
       setWalletResult(result);
@@ -241,7 +246,7 @@ export function MemberDetail({
             : "ถอนเงิน";
       await downloadSlipFile(
         "member-wallet-slip",
-        `สลิป${kindLabel}-${walletResult.memberNumber}-${stamp}`,
+        `สลิป${kindLabel}-${walletResult.memberNumber}-${stamp}${slipDocument.variant === "copy" ? "-สำเนา" : ""}`,
         format
       );
     } finally {
@@ -794,6 +799,7 @@ export function MemberDetail({
                         <small>บันทึกลงรายการธุรกรรมของสมาชิกแล้ว</small>
                       </div>
                     </div>
+                    <SlipCopyMark variant={slipDocument.variant} />
                     <div className="receipt-divider" />
                     <div className="receipt-meta">
                       <span>
@@ -846,6 +852,7 @@ export function MemberDetail({
                       <small>ข้อมูลถูกบันทึกในประวัติระบบ แล้ว</small>
                     </div>
                   </div>
+                  <SlipDocumentOptions variant={slipDocument.variant} onChange={slipDocument.setVariant} disabled={Boolean(walletSlipBusy)} />
                   <div className="wallet-success-actions">
                     <button
                       className="outline-button"
@@ -1324,7 +1331,7 @@ export function MemberDetail({
       )}
       {walletPrintPreview && walletResult && (
         <PrintPreviewModal
-          targetId="member-wallet-slip"
+          targetId="member-wallet-slip" onBeforePrint={slipDocument.beforePrint} documentVersion={slipDocument.variant}
           title={
             walletResult.type === "deposit"
               ? "พรีวิวก่อนพิมพ์สลิปเติมเงิน"

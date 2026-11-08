@@ -45,6 +45,7 @@ export function PrintPreviewModal({
   showContentLength = true,
   showPrintHelp = true,
   onPrint,
+  onBeforePrint,
   stayOpenAfterPrint = false,
   onClose,
   documentVersion,
@@ -65,6 +66,7 @@ export function PrintPreviewModal({
   showPrintHelp?: boolean;
   /** เรียกหลังสั่ง window.print() แล้ว (ใช้ทำ toast / ล้าง state) */
   onPrint?: () => void;
+  onBeforePrint?: () => Promise<void>;
   /** Keep financial slips available for repeated printing until explicitly closed. */
   stayOpenAfterPrint?: boolean;
   onClose: () => void;
@@ -125,6 +127,7 @@ export function PrintPreviewModal({
     printingRef.current = true; setPrinting(true);
     toast.dismiss();
     try {
+      await onBeforePrint?.();
       const result = await printElementDocument(
         targetId,
         paper === "thermal" ? thermalProfile.paperWidthMm : undefined,

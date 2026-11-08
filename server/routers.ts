@@ -1,3 +1,4 @@
+import { issueDocumentPrint } from "./documentPrinting";
 import { getRuntimePolicy } from "./runtimePolicy";
 import { withStoreErrors } from "./_core/storeErrors";
 import { previewOpeningStock, importOpeningStock } from "./openingStockImport";
@@ -647,6 +648,28 @@ const userUpdateInput = z.object({
 });
 
 export const appRouter = router({
+  printing: router({
+    issue: publicProcedure
+      .input(z.object({
+        document: z.object({
+          kind: z.enum(["sale", "wallet", "wallet_request", "card_return"]),
+          key: z.string().trim().min(1).max(200),
+        }),
+        requestId: z.string().uuid(),
+      }))
+      .mutation(({ ctx, input }) => {
+        requireLogin(ctx);
+        try {
+          return issueDocumentPrint(getWelfareDb(), input.document, input.requestId, resolveActor(ctx, {}).actor);
+        } catch (error) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: error instanceof Error ? error.message : "บันทึกประวัติพิมพ์ไม่สำเร็จ",
+          });
+        }
+      }),
+  }),
+
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
   system: systemRouter,
   // ROUND 56 (user) — โซนเครื่องมือติดตั้งระบบ (บัญชีผู้พัฒนาเท่านั้น): ตัวเลขตรวจรับข้อมูล

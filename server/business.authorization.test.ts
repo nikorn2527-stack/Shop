@@ -31,6 +31,18 @@ function caller(appRole?: string) {
 }
 
 describe("business API permissions", () => {
+  it("authenticates print metadata and records the server actor without modifying sales", async () => {
+    const product = createProduct(db, {name:"Print identity",price:10,stock:1});
+    registerPosTerminal(db,"12345678-1234-4234-8234-123456789012",1,"Admin");
+    const receipt = await caller("cashier").pos.checkout({terminalDeviceId:"12345678-1234-4234-8234-123456789012",items:[{productId:product.id,qty:1}],paymentMethod:"เงินสด",receivedCash:10,clientRequestId:"print-sale"});
+    const input = {document:{kind:"sale" as const,key:receipt.orderNumber},requestId:"12345678-1234-4234-8234-123456789013"};
+    await expect(caller().printing.issue(input)).rejects.toMatchObject({code:"UNAUTHORIZED"});
+    const before = db.prepare("SELECT * FROM sales").all();
+    expect(await caller("cashier").printing.issue(input)).toMatchObject({ordinal:1,variant:"original",actor:"Test operator"});
+    expect(await caller("cashier").printing.issue({...input,requestId:"12345678-1234-4234-8234-123456789014"})).toMatchObject({ordinal:2,variant:"copy"});
+    expect(db.prepare("SELECT * FROM sales").all()).toEqual(before);
+  });
+
   it.each(["auditor", "stock_officer"])("blocks %s from checkout and void even with a valid login", async role => {
     await expect(caller(role).pos.checkout({ items: [{ productId: 1, qty: 1 }], paymentMethod: "เงินสด" })).rejects.toMatchObject({ code: "FORBIDDEN" });
     await expect(caller(role).pos.void({ saleId: 1, reason: "Unauthorized attempt" })).rejects.toMatchObject({ code: "FORBIDDEN" });

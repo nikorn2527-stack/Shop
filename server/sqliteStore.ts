@@ -1,3 +1,4 @@
+import { initializeDocumentPrinting } from "./documentPrinting";
 import { initializeProductItemNumbers } from "./migrations/productItemNumbers";
 import { createSqliteCheckoutRepository } from "./repositories/sqliteCheckoutRepository";
 import { repairImportedProductArtwork } from "./migrations/importedProductArtwork";
@@ -668,6 +669,7 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
       retentionDays: 3650,
     }).file,
   });
+  initializeDocumentPrinting(db, formatDateTime());
   return db;
 }
 

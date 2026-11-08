@@ -7,6 +7,7 @@ export function transactionReceipt(row: MemberTransactionRow): CheckoutReceipt |
   const amount = Math.abs(row.amount);
   return {
     orderNumber: `TX-${row.id}`,
+    documentRef: {kind: "wallet", key: String(row.id)},
     createdAt: row.createdAt,
     items: [{ productId: null, name: label, unit: "รายการ", qty: 1, price: amount, amount }],
     subtotal: amount,

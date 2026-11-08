@@ -15760,3 +15760,9 @@ body:has(.modal-backdrop) .shortcuts-fab { display: none; }
 
 /* Sale receipt identity: readable on screen, in exports and on thermal paper. */
 #receipt-paper .receipt-customer > .receipt-member-name { font-size: 15px; line-height: 1.6; font-weight: 700; }
+
+.slip-copy-mark { text-align: center; font-size: 13px; font-weight: 700; margin: 4px 0 8px; color: #111; }
+.slip-document-options { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0; font-size: 12px; }
+.slip-document-options select { border: 1px solid #cbd5e1; border-radius: 8px; padding: 6px 10px; background: white; color: #0f172a; }
+.slip-document-options small { color: #64748b; }
+@media print { .slip-document-options { display: none !important; } }

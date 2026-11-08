@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CheckoutReceipt } from '@shared/storeTypes/sales';
 const state = vi.hoisted(() => ({ settings: {appName:'ร้านทดสอบ',storeAddress:'',receiptPaperWidth:'58',bankAccounts:[]} }));
-vi.mock('@/lib/trpc',()=>({trpc:{settings:{get:{useQuery:()=>({data:state.settings})}}}}));
+vi.mock('@/lib/trpc',()=>({trpc:{printing:{issue:{useMutation:()=>({mutateAsync:vi.fn()})}},settings:{get:{useQuery:()=>({data:state.settings})}}}}));
 // Radix portals are browser-only; test the real printable document inside them.
 vi.mock('./WorkflowDialog',()=>({WorkflowDialog:({children}:{children:unknown})=>children}));
 import { ReceiptModal } from './ReceiptModal';
@@ -19,5 +19,14 @@ describe('store address in the shared receipt document',()=>{
  it('omits an empty address and escapes configured text as text',()=>{
   state.settings.storeAddress='  ';expect(render()).not.toContain('class="receipt-address"');
   state.settings.storeAddress='<img src=x onerror=alert(1)>';const html=render();expect(html).toContain('&lt;img');expect(html).not.toContain('<img src=x');
+ });
+});
+
+describe('receipt copy markup',()=>{
+ it('starts a reopened document as copy and exposes original/copy download choices',()=>{
+  const html=renderToStaticMarkup(createElement(ReceiptModal,{receipt,onClose:()=>{},mode:'reprint'}));
+  expect(html).toContain('class="slip-copy-mark">สำเนา');
+  expect(html).toContain('รูปแบบเอกสารดาวน์โหลด');
+  expect(render()).not.toContain('class="slip-copy-mark"');
  });
 });
