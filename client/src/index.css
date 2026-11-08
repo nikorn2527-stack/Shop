@@ -3469,7 +3469,7 @@ th { font-weight: 600; }
 .wallet-confirm-actions .outline-button, .wallet-confirm-actions .primary-button { flex: 1; height: 38px; }
 .wallet-success { display: flex; flex-direction: column; gap: 12px; }
 .wallet-slip { margin: 0 auto; width: 300px; max-width: 100%; }
-.wallet-success-actions { display: flex; gap: 8px; }
+.wallet-success-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .wallet-success-actions .outline-button, .wallet-success-actions .primary-button { flex: 1; }
 /* slip has its own print isolation โ€” เธเธธเนเธกเธเธดเธกเธเนเธชเธฅเธดเธเธ—เธตเนเธซเธเนเธฒเธเธฅเธฅเธฑเธเธเน */
 @media print {
