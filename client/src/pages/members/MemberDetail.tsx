@@ -502,7 +502,7 @@ export function MemberDetail({
             disabled={detailQuery.isLoading}
             onClick={() => setStatementOpen(true)}
           >
-            <FileText size={15} /> ส่งออกรายงานธุรกรรม
+            <FileText size={15} /> สเตทเมนต์ / Export
           </button>
           <button className="outline-button" onClick={() => setCardOpen(true)}>
             <IdCard size={15} /> บัตรสมาชิก
@@ -1395,16 +1395,7 @@ export function MemberDetail({
         />
       )}
       {statementOpen && (
-        <StatementModal
-          member={
-            detailQuery.data?.member ?? {
-              ...member,
-              createdAt: new Date().toISOString(),
-            }
-          }
-          transactions={transactions}
-          onClose={() => setStatementOpen(false)}
-        />
+        <StatementModal memberNumber={member.memberNumber} onClose={() => setStatementOpen(false)} />
       )}
     </>
   );

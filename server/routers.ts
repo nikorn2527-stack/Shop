@@ -1,3 +1,4 @@
+import { getMemberStatement } from "./memberStatement";
 import { issueDocumentPrint } from "./documentPrinting";
 import { getRuntimePolicy } from "./runtimePolicy";
 import { withStoreErrors } from "./_core/storeErrors";
@@ -1279,6 +1280,16 @@ export const appRouter = router({
           return detail;
         }),
       ),
+    statement: publicProcedure
+      .input(z.object({
+        memberNumber: z.string().trim().min(1).max(100),
+        from: z.string().max(10).optional(),
+        to: z.string().max(10).optional(),
+      }))
+      .query(({ ctx, input }) => withStoreErrors(() => {
+        requireLogin(ctx);
+        return getMemberStatement(getWelfareDb(), input);
+      })),
     stats: publicProcedure
       .input(memberDetailInput)
       .query(({ ctx, input }) => withStoreErrors(() => {

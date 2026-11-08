@@ -1,155 +1,212 @@
+import { useMemo, useState } from "react";
 import { WorkflowDialog } from "./WorkflowDialog";
-import { useEffect, useMemo, useState } from "react";
-import { Download, FileText, Printer, X } from "@/lib/icons";
-import { money } from "../pages/pageData";
-import { WALLET_TX_META } from "../pages/viewFormat";
-import { trpc } from "@/lib/trpc";
-import { downloadReportPdf, printReportDoc, type ReportDocConfig } from "@/reportDoc";
-import { buildReportDocumentHtml, thaiStamp } from "@shared/reportDoc";
 import { A4DocumentPreview } from "./A4DocumentPreview";
+import { ThaiDateRangePicker } from "./ThaiDateRangePicker";
+import { FileCsv, FileSpreadsheet, FilePdf, Printer, X } from "@/lib/icons";
+import { trpc } from "@/lib/trpc";
+import { downloadCsvFile, downloadXlsxFile } from "@/exportUtils";
+import { downloadReportPdf, printReportDoc } from "@/reportDoc";
+import { buildReportDocumentHtml } from "@shared/reportDoc";
+import { bangkokParts } from "@shared/storeTime";
+import { memberStatementExport } from "@/lib/memberStatementExport";
+import type { ExportFormat } from "./ExportPreviewModal";
 
-/** A wallet transaction row as returned by member.detail (DESC order, ≤50). */
-export type StatementTx = {
-  id: number;
-  type: string;
-  detail: string;
-  amount: number;
-  balanceAfter: number | null;
-  createdAt: string;
-  cardNumber: string | null;
-};
-
-/** Member fields the statement document renders. */
-export type StatementMember = {
+/** Dedicated read-only source: full history, independent of the 50-row profile preview. */
+export function StatementModal({
+  memberNumber,
+  onClose,
+}: {
   memberNumber: string;
-  prename?: string | null;
-  firstName: string;
-  lastName: string;
-  type: string;
-  balance: number;
-  status: "active" | "suspended";
-  createdAt: string;
-  phone?: string | null;
-  idCard?: string | null;
-  cardNumber?: string | null;
-};
-
-const TX_LIMIT = 50;
-
-function formatFullThaiDate(value: string) {
-  const date = new Date(value.includes("T") ? value : value.replace(" ", "T"));
-  if (Number.isNaN(date.getTime())) return value;
-  const months = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
-  return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear() + 543}`;
-}
-
-function formatStatementTime(value: string) {
-  const date = new Date(value.includes("T") ? value : value.replace(" ", "T"));
-  if (Number.isNaN(date.getTime())) return value;
-  const months = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear() + 543} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-}
-
-/**
- * Member account statement — formal A4 document (uses the SAME unified template
- * as other reports: REPORT_DOC_CSS + server vector PDF + client print).
- * owner: 'อยากได้เอกสารที่เป็นทางการกว่านี้เหมือนรายงานอื่นๆ + ช่องประเภทไม่ต้องมีกรอบ'
- * → ใช้ buildReportDocumentHtml (template เดียวกับรายงานอื่น) → ประเภทเป็น plain text ไม่มี badge
- * → PDF ผ่าน server Chromium (vector) ไม่ใช่ html2canvas raster
- */
-export function StatementModal({ member, transactions, onClose }: { member: StatementMember; transactions: StatementTx[]; onClose: () => void }) {
-  const [busy, setBusy] = useState(false);
-  const settingsQuery = trpc.settings.get.useQuery(undefined);
-  const brandName = (settingsQuery.data?.appName ?? "").trim() || "ร้านค้าสวัสดิการ";
-  const displayName = [member.prename?.trim() || "", member.firstName, member.lastName].filter(Boolean).join(" ");
-  const generatedAt = useMemo(() => new Date(), []);
-  const ordered = useMemo(() => [...transactions].reverse(), [transactions]);
-  const totals = useMemo(() => {
-    const sum = (type: string) => transactions.filter((tx) => tx.type === type).reduce((acc, tx) => acc + tx.amount, 0);
-    const deposits = Math.abs(sum("deposit"));
-    const withdrawals = Math.abs(sum("withdrawal"));
-    const purchases = Math.abs(sum("purchase"));
-    const net = transactions.reduce((acc, tx) => acc + tx.amount, 0);
-    return { deposits, withdrawals, purchases, count: transactions.length, truncated: transactions.length >= TX_LIMIT, net };
-  }, [transactions]);
-
-  // P1-UX: map statement data → ReportDocConfig (unified template = เหมือนรายงานอื่น)
-  const config: ReportDocConfig = useMemo(() => ({
-    fileName: `statement-${member.memberNumber}`,
-    title: "รายงานยอดเงินคงเหลือและประวัติการทำรายการ",
-    periodLabel: `${displayName} · ${member.memberNumber} · ออกเมื่อ ${formatFullThaiDate(generatedAt.toISOString())}`,
-    meta: [
-      ["สมาชิก", displayName],
-      ["หมายเลขสมาชิก", member.memberNumber],
-      ["เลขบัตรปัจจุบัน", member.cardNumber?.trim() || "—"],
-      ["ประเภทสมาชิก", member.type],
-      ["สมาชิกตั้งแต่", formatFullThaiDate(member.createdAt)],
-      ["สถานะ", member.status === "active" ? "ใช้งานอยู่" : "ระงับการใช้งาน"],
-      ["เบอร์โทร", member.phone?.trim() || "—"],
-    ],
-    summaryBlocks: [
-      ["ยอดคงเหลือปัจจุบัน", money(member.balance)],
-      ["เติมเงินรวม", money(totals.deposits)],
-      ["ถอนเงินรวม", money(totals.withdrawals)],
-      ["ซื้อสินค้ารวม", money(totals.purchases)],
-      ["จำนวนรายการ", `${totals.count} รายการ`],
-      ["มูลค่าสุทธิ", `${totals.net >= 0 ? "+" : "−"}${money(Math.abs(totals.net))}`],
-    ],
-    columns: ["วันและเวลา", "เลขบัตร", "ประเภท", "รายละเอียด", "จำนวนเงิน", "ยอดคงเหลือ"],
-    numericCols: [4, 5],
-    rows: ordered.map((tx) => [
-      formatStatementTime(tx.createdAt),
-      tx.cardNumber ?? "—",
-      WALLET_TX_META[tx.type]?.label ?? tx.type,
-      tx.detail || "—",
-      `${tx.amount > 0 ? "+" : "−"}${money(Math.abs(tx.amount))}`,
-      tx.balanceAfter === null ? "—" : money(tx.balanceAfter),
-    ]),
-    totalsRow: [
-      `รวมทั้งหมด ${totals.count} รายการ`,
-      "",
-      "",
-      "",
-      `${totals.net >= 0 ? "+" : "−"}${money(Math.abs(totals.net))}`,
-      money(member.balance),
-    ],
-    brandName,
-    footnote: totals.truncated
-      ? `แสดงรายการล่าสุด ${TX_LIMIT} รายการ (จากทั้งหมดในระบบ) · ติดต่อเจ้าหน้าที่เพื่อขอรายงานฉบับเต็ม`
-      : `รวมทั้งสิ้น ${totals.count} รายการ · ยอดเงินคงเหลือสุดท้าย ${money(member.balance)}`,
-    compact: false,
-  }), [member, displayName, generatedAt, ordered, totals, brandName]);
-
-  // On-screen A4 preview uses the same template, including the printable safe area.
-  const docHtml = useMemo(
-    () => buildReportDocumentHtml(config, { mode: "preview", stampText: `ออกเมื่อ ${thaiStamp(generatedAt)}` }),
-    [config, generatedAt],
+  onClose: () => void;
+}) {
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [busy, setBusy] = useState<ExportFormat | null>(null);
+  const [error, setError] = useState("");
+  const settings = trpc.settings.get.useQuery(undefined);
+  const statement = trpc.member.statement.useQuery(
+    { memberNumber, from, to },
+    { staleTime: 0, refetchOnMount: "always" }
   );
-
-  const downloadPdf = async () => { setBusy(true); try { await downloadReportPdf(config); } finally { setBusy(false); } };
-  const printStatement = () => { printReportDoc(config); };
-
-
-
-
-
-  return <WorkflowDialog title="รายการเดินบัญชีสมาชิก" onClose={onClose} className="statement-modal">
-    <div className="modal-heading">
-      <div>
-        <span className="eyebrow">MEMBER STATEMENT</span>
-        <h2>รายงานยอดเงินคงเหลือสมาชิก</h2>
-        <p>{displayName} · {member.memberNumber} · {totals.count} รายการ · ออกรายงาน {formatFullThaiDate(generatedAt.toISOString())}</p>
+  const generatedAt = useMemo(() => new Date(), [statement.data]);
+  const exportData = useMemo(
+    () =>
+      statement.data
+        ? memberStatementExport(statement.data, {
+            brandName: settings.data?.appName?.trim() || "ร้านค้าสวัสดิการ",
+            storeAddress: settings.data?.storeAddress,
+            generatedAt,
+          })
+        : null,
+    [statement.data, settings.data, generatedAt]
+  );
+  const html = useMemo(
+    () =>
+      exportData
+        ? buildReportDocumentHtml(exportData.doc, {
+            mode: "preview",
+            stampText: "",
+          })
+        : "",
+    [exportData]
+  );
+  const unavailable =
+    Boolean(busy) || statement.isFetching || statement.isError || !exportData;
+  const run = async (format: ExportFormat) => {
+    if (unavailable || !exportData) return;
+    setBusy(format);
+    setError("");
+    try {
+      if (format === "csv")
+        downloadCsvFile(exportData.fileName, exportData.rows);
+      else if (format === "xlsx")
+        downloadXlsxFile(
+          exportData.fileName,
+          "สเตทเมนต์สมาชิก",
+          exportData.rows,
+          exportData.numericCols
+        );
+      else if (format === "pdf") await downloadReportPdf(exportData.doc);
+      else printReportDoc(exportData.doc);
+    } catch (cause) {
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : "ส่งออกไม่สำเร็จ กรุณาลองอีกครั้ง"
+      );
+    } finally {
+      setBusy(null);
+    }
+  };
+  const thisMonth = () => {
+    const now = bangkokParts(new Date());
+    const month = String(now.month).padStart(2, "0");
+    setFrom(`${now.year}-${month}-01`);
+    setTo(`${now.year}-${month}-${String(now.day).padStart(2, "0")}`);
+  };
+  const formats = [
+    { key: "csv", label: "CSV", Icon: FileCsv },
+    { key: "xlsx", label: "Excel", Icon: FileSpreadsheet },
+    { key: "pdf", label: "PDF", Icon: FilePdf },
+    { key: "print", label: "พิมพ์", Icon: Printer },
+  ] as const;
+  return (
+    <WorkflowDialog
+      title="สเตทเมนต์สมาชิก"
+      onClose={onClose}
+      busy={Boolean(busy)}
+      className="statement-modal"
+    >
+      <div className="modal-heading">
+        <div>
+          <span className="eyebrow">MEMBER STATEMENT</span>
+          <h2>สเตทเมนต์สมาชิก</h2>
+          <p>
+            เลขสมาชิก {memberNumber} ·
+            รายการเงินในบัตรและรายละเอียดสินค้าแยกตามบิล
+          </p>
+        </div>
+        <button
+          type="button"
+          className="icon-button"
+          aria-label="ปิดสเตทเมนต์"
+          disabled={Boolean(busy)}
+          onClick={onClose}
+        >
+          <X size={17} />
+        </button>
       </div>
-      <button className="icon-button" onClick={onClose} aria-label="ปิดหน้าต่าง"><X size={17} /></button>
-    </div>
-    <div className="statement-stage">
-      <A4DocumentPreview html={docHtml} label="พรีวิวเอกสาร A4" />
-    </div>
-    <div className="statement-actions modal-actions">
-      <span className="statement-hint"><FileText size={14} /> A4 · {totals.count} รายการ · เอกสารทางการ (template เดียวกับรายงานอื่น)</span>
-      <button className="outline-button statement-export-pdf" disabled={busy} onClick={downloadPdf} title="ดาวน์โหลดรายงานเป็น PDF vector (เหมือนรายงานอื่น)"><Download size={16} /> {busy ? "กำลังสร้าง PDF..." : "ดาวน์โหลด PDF"}</button>
-      <button className="outline-button statement-export-print" onClick={printStatement} title="พิมพ์รายงาน A4"><Printer size={16} /> พิมพ์รายงาน</button>
-    </div>
-  </WorkflowDialog>;
+      <div className="statement-filters">
+        <label>
+          <span>ช่วงวันที่ทำรายการ</span>
+          <ThaiDateRangePicker
+            from={from}
+            to={to}
+            onChange={(a, b) => {
+              if (!busy) {
+                setFrom(a);
+                setTo(b);
+              }
+            }}
+            ariaLabel="เลือกช่วงวันที่สเตทเมนต์"
+            placeholder="ประวัติทั้งหมด"
+          />
+        </label>
+        <button
+          type="button"
+          className="outline-button"
+          disabled={Boolean(busy)}
+          onClick={() => {
+            setFrom("");
+            setTo("");
+          }}
+        >
+          ทั้งหมด
+        </button>
+        <button
+          type="button"
+          className="outline-button"
+          disabled={Boolean(busy)}
+          onClick={thisMonth}
+        >
+          เดือนนี้
+        </button>
+      </div>
+      {(error || statement.isError) && (
+        <div className="notice-bar error" role="alert">
+          {error || statement.error?.message}
+          <button
+            type="button"
+            className="outline-button"
+            disabled={Boolean(busy)}
+            onClick={() => {
+              setError("");
+              void statement.refetch();
+            }}
+          >
+            ลองอีกครั้ง
+          </button>
+        </div>
+      )}
+      <div className="statement-stage">
+        {statement.isFetching ? (
+          <p role="status">กำลังโหลดสเตทเมนต์และรายละเอียดสินค้า…</p>
+        ) : !statement.isError && exportData ? (
+          <>
+            <p className="statement-hint" role="status">
+              {statement.data?.entries.length === 0
+                ? "ไม่มีรายการในช่วงที่เลือก · แสดงยอดยกมาและยอดปลายช่วง"
+                : `${statement.data?.ledgerCount} รายการเงินในบัตร · ${statement.data?.purchaseCount} บิลซื้อสินค้า`}
+            </p>
+            <A4DocumentPreview html={html} label="พรีวิวสเตทเมนต์สมาชิก A4" />
+          </>
+        ) : null}
+      </div>
+      <div className="statement-actions modal-actions">
+        <span className="statement-hint">A4 · ครบทุกรายการในช่วงที่เลือก</span>
+        <div className="preview-format-list">
+          {formats.map(({ key, label, Icon }) => (
+            <button
+              key={key}
+              type="button"
+              className={`preview-format-btn format-${key}`}
+              disabled={unavailable}
+              onClick={() => void run(key)}
+            >
+              <Icon size={16} />
+              <b>{busy === key ? "กำลังดำเนินการ…" : label}</b>
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          className="ghost-button"
+          disabled={Boolean(busy)}
+          onClick={onClose}
+        >
+          ปิด
+        </button>
+      </div>
+    </WorkflowDialog>
+  );
 }
