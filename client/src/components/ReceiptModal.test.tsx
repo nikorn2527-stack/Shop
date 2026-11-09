@@ -14,7 +14,7 @@ afterEach(()=>vi.unstubAllGlobals());
 describe('store address in the shared receipt document',()=>{
  it.each(['58','72','80'])('shows configured address below store name on %s mm receipts',width=>{
   state.settings.receiptPaperWidth=width;state.settings.storeAddress='  โรงพยาบาลธัญญารักษ์อุดรธานี\nที่อยู่ทดสอบ 123 หมู่ 4  ';
-  const html=render();expect(html).toContain('โรงพยาบาลธัญญารักษ์อุดรธานี\nที่อยู่ทดสอบ 123 หมู่ 4');expect(html.indexOf('ร้านทดสอบ')).toBeLessThan(html.indexOf('ที่อยู่ทดสอบ'));expect(html).toContain('class="receipt-address"');
+  const html=render();expect(html).toContain('โรงพยาบาลธัญญารักษ์อุดรธานี');expect(html).toContain('ที่อยู่ทดสอบ 123 หมู่ 4');expect(html.indexOf('ร้านทดสอบ')).toBeLessThan(html.indexOf('ที่อยู่ทดสอบ'));expect(html).toContain('class="receipt-address"');
  });
  it('omits an empty address and escapes configured text as text',()=>{
   state.settings.storeAddress='  ';expect(render()).not.toContain('class="receipt-address"');
@@ -28,5 +28,13 @@ describe('receipt copy markup',()=>{
   expect(html).toContain('class="slip-copy-mark">สำเนา');
   expect(html).toContain('รูปแบบเอกสารดาวน์โหลด');
   expect(render()).not.toContain('class="slip-copy-mark"');
+ });
+});
+
+describe('receipt reference and time rows',()=>{
+ it('renders the number, date and unbroken time as three individual rows',()=>{
+  const html=render();expect(html.match(/class="receipt-meta-row"/g)).toHaveLength(3);
+  expect(html).toContain('เลขที่ใบเสร็จ');expect(html).toContain('12:00 น.');
+  expect(html).toContain('white-space:nowrap;text-align:right');
  });
 });
