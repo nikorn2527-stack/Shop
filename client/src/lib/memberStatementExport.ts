@@ -1,3 +1,4 @@
+import { bangkokParts, parseBangkokDate } from "@shared/storeTime";
 import type {
   MemberStatement,
   StatementEntry,
@@ -15,6 +16,14 @@ function entryLabel(entry: StatementEntry) {
   if (entry.type === "refund" && entry.amount > 0) return "คืนเงินจากยกเลิกบิล";
   const base = WALLET_TX_META[entry.type]?.label ?? entry.type;
   return `${base}${entry.kind === "purchase" ? ` · ${entry.paymentMethod ?? "ไม่ระบุวิธีชำระ"}` : ""}${entry.purchase?.voided ? " · บิลยกเลิก" : ""}`;
+}
+/** Compact Buddhist date, with Bangkok time, to keep the whole identifier on one line. */
+function statementDate(value: string) {
+  const date = parseBangkokDate(value);
+  if (!date) return value;
+  const p = bangkokParts(date);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(p.day)}/${pad(p.month)}/${pad((p.year + 543) % 100)} ${pad(p.hour)}:${pad(p.minute)}`;
 }
 /** Same rows and balances for preview, CSV, Excel, PDF and print. */
 export function memberStatementExport(
@@ -34,7 +43,9 @@ export function memberStatementExport(
       "",
       "",
       "ยอดยกมา",
-      "ยอดเงินในบัตรก่อนช่วงที่เลือก",
+      "",
+      "",
+      "",
       "",
       "",
       exportNumber(statement.openingBalance),
@@ -42,25 +53,26 @@ export function memberStatementExport(
   ];
   for (const entry of statement.entries) {
     const purchase = entry.purchase;
+    // Product names and quantities live only in their own rows, never repeated in the bill summary.
     const detail = [
-      entry.detail,
+      entryLabel(entry),
       purchase
-        ? `ยอดบิล ${money(purchase.total)}${purchase.discount ? ` · ส่วนลด ${money(purchase.discount)}` : ""}`
-        : "",
-      entry.cardNumber ? `บัตรขณะทำรายการ ${entry.cardNumber}` : "",
-      entry.kind === "purchase"
-        ? entry.paymentMethod === "หักบัญชีสมาชิก"
-          ? "ข้อมูลบิลประกอบรายการบัญชี"
-          : "ชำระนอกบัตร · ไม่หักยอดในบัตร"
+        ? `รวมบิล ${money(purchase.total)}${purchase.discount ? ` · ส่วนลด ${money(purchase.discount)}` : ""}`
+        : entry.detail,
+      entry.cardNumber ? `บัตร ${entry.cardNumber}` : "",
+      entry.kind === "purchase" && entry.paymentMethod !== "หักบัญชีสมาชิก"
+        ? "ไม่หักยอดในบัตร"
         : "",
     ]
       .filter(Boolean)
       .join(" · ");
     rows.push([
-      formatHistoryDate(entry.createdAt),
+      statementDate(entry.createdAt),
       entry.reference,
-      entryLabel(entry),
       detail,
+      "",
+      "",
+      "",
       entry.amount > 0 ? exportNumber(entry.amount) : "",
       entry.amount < 0 ? exportNumber(-entry.amount) : "",
       entry.balanceAfter === null ? "—" : exportNumber(entry.balanceAfter),
@@ -70,17 +82,19 @@ export function memberStatementExport(
         maximumFractionDigits: 4,
       });
       rows.push([
-        "",
+        statementDate(entry.createdAt),
         purchase!.orderNumber,
-        "สินค้า",
-        `${item.name} · ${quantity} ${item.unit} × ${money(item.price)} = ${money(item.amount)}`,
+        item.name,
+        `${quantity} ${item.unit}`,
+        exportNumber(item.price),
+        exportNumber(item.amount),
         "",
         "",
         "",
       ]);
     }
   }
-  const numericCols = [4, 5, 6];
+  const numericCols = [4, 5, 6, 7, 8];
   const fileName = `statement-${member.memberNumber}-${statement.from || "all"}-${statement.to || "current"}`;
   const doc: ReportDocConfig = {
     fileName,
@@ -108,15 +122,28 @@ export function memberStatementExport(
       ["ยอดซื้อสินค้า (ไม่รวมบิลยกเลิก)", money(statement.purchaseTotal)],
     ],
     columns: [
-      "วันและเวลา",
+      "วัน–เวลา",
       "เลขอ้างอิง",
-      "รายการ / วิธีชำระ",
-      "รายละเอียด",
-      "เงินเข้าบัตร",
-      "เงินออกบัตร",
+      "รายการ / ชื่อสินค้า",
+      "จำนวน",
+      "ราคา",
+      "รวมสินค้า",
+      "เงินเข้า",
+      "เงินออก",
       "ยอดในบัตร",
     ],
-    columnWidths: ["15%", "12%", "14%", "29%", "10%", "10%", "10%"],
+    columnWidths: [
+      "13.5%",
+      "13.5%",
+      "24.5%",
+      "9%",
+      "7%",
+      "7%",
+      "8.5%",
+      "8.5%",
+      "8.5%",
+    ],
+    nowrapCols: [0, 1, 3, 4, 5, 6, 7, 8],
     numericCols,
     rows,
     totalsRow: [
@@ -124,13 +151,15 @@ export function memberStatementExport(
       "",
       "ยอดปลายช่วง",
       "",
+      "",
+      "",
       exportNumber(statement.incoming),
       exportNumber(statement.outgoing),
       exportNumber(statement.closingBalance),
     ],
     compact: true,
     footnote:
-      "จำนวนเงินเป็นบาท · ยอดยกมาและยอดในบัตรคำนวณจากประวัติเงินในระบบ · การซื้อเงินสด/QR แสดงเพื่อประกอบรายละเอียดและไม่หักยอดในบัตร · บิลยกเลิกยังแสดงประวัติเดิมพร้อมรายการคืนเงินที่อยู่ในช่วงวันที่เลือก",
+      "วันที่เป็น พ.ศ. 2 หลัก · ราคาเป็นราคาต่อหน่วย · จำนวนเงินเป็นบาท · เงินเข้า/เงินออกหมายถึงยอดในบัตร และแสดงครั้งเดียวต่อบิล ไม่หักซ้ำตามแถวสินค้า · ยอดยกมาและยอดในบัตรคำนวณจากประวัติเงินในระบบ · การซื้อเงินสด/QR แสดงเพื่อประกอบรายละเอียดและไม่หักยอดในบัตร · บิลยกเลิกยังแสดงประวัติเดิมพร้อมรายการคืนเงินที่อยู่ในช่วงวันที่เลือก",
   };
   const exportRows = [
     [doc.title],

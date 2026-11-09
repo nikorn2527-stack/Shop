@@ -96,30 +96,40 @@ describe("single member statement export mapping", () => {
       "",
       "",
       "ยอดยกมา",
-      "ยอดเงินในบัตรก่อนช่วงที่เลือก",
+      "",
+      "",
+      "",
       "",
       "",
       "500.00",
     ]);
+    const product = result.doc.rows.find(
+      r => r[2] === "สินค้าชื่อเต็มจากบิลเดิม"
+    );
+    expect(product).toEqual([
+      "02/04/69 09:00",
+      "69040001",
+      "สินค้าชื่อเต็มจากบิลเดิม",
+      "2 ชิ้น",
+      "15.00",
+      "30.00",
+      "",
+      "",
+      "",
+    ]);
+    expect(result.doc.rows.filter(r => r[3])).toHaveLength(2);
     expect(
-      result.doc.rows.some(
-        r =>
-          r[3].includes("สินค้าชื่อเต็มจากบิลเดิม") && r[3].includes("2 ชิ้น")
-      )
-    ).toBe(true);
-    expect(
-      result.doc.rows
-        .find(r => r[1] === "69040002" && r[2] !== "สินค้า")
-        ?.slice(4)
+      result.doc.rows.find(r => r[1] === "69040002" && !r[3])?.slice(6)
     ).toEqual(["", "", "—"]);
-    expect(result.doc.totalsRow?.slice(4)).toEqual([
+    expect(result.doc.totalsRow?.slice(6)).toEqual([
       "10.00",
       "30.00",
       "480.00",
     ]);
+    expect(result.doc.nowrapCols).toEqual(expect.arrayContaining([0, 1, 3]));
     expect(result.doc.periodLabel).toContain("เม.ย.");
     expect(result.doc.meta).toContainEqual(["เลขสมาชิก", "000001"]);
-    expect(result.numericCols).toEqual([4, 5, 6]);
+    expect(result.numericCols).toEqual([4, 5, 6, 7, 8]);
     expect(result.numericCols).not.toContain(1);
     expect(result.rows).toContainEqual(result.doc.columns);
   });
@@ -140,11 +150,11 @@ describe("single member statement export mapping", () => {
     expect(result.doc.rows.some(r => r[2].includes("ยกเลิก"))).toBe(true);
     expect(
       result.doc.rows.some(
-        r => r[2] === "คืนเงินจากยกเลิกบิล" && r[4] === "30.00"
+        r => r[2].startsWith("คืนเงินจากยกเลิกบิล") && r[6] === "30.00"
       )
     ).toBe(true);
-    expect(
-      result.doc.rows.some(r => r[3].includes("สินค้าชื่อเต็มจากบิลเดิม"))
-    ).toBe(true);
+    expect(result.doc.rows.some(r => r[2] === "สินค้าชื่อเต็มจากบิลเดิม")).toBe(
+      true
+    );
   });
 });

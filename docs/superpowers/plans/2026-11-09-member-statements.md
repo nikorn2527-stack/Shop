@@ -21,3 +21,11 @@
 - Browser comparison of members, transactions, sales, sale items, products, lots, card sessions/assignments, settings and audit logs was identical before/after the statement operations. Login/logout were outside that comparison.
 - Browser verification exposed the shared date picker's body portal being blocked by modal pointer handling. It now portals into the nearest dialog when present; ordinary page pickers continue using document.body. The real range-picker regression and all existing date-picker tests passed.
 - No schema/migration changes, simulated transactions added by this feature, production access or Railway deployment. Private demo exports and browser artifacts remain outside the repository.
+
+## Follow-up: one product per readable row
+- User requested dates, receipt numbers and product details to stop wrapping unnecessarily, with one item per row.
+- Compact Bangkok Buddhist dates (DD/MM/YY HH:mm) and receipt references are kept together. Separate item name, quantity/unit, unit price and item total columns replace the long combined description. Bill summaries no longer repeat product names; complete notes and historical card references remain available in the bill/transaction row.
+- Card incoming/outgoing and balance appear once per transaction/bill only. Product rows contain no additional card movements. Numeric export columns move to indexes 4–8, while member and receipt identifiers remain text.
+- Focused tests: 15 passed, including statement balances and shared report rendering. TypeScript and build passed.
+- Browser verified all 66 product names, quantities, dates and receipt references fit on one line without overlap in the demo document. CSV/XLSX/PDF, repeated print, date filtering and mobile layout passed; business-table snapshots remained identical. A4 output reduced from six to four pages. Only statement presentation/export mapping changed, with no database or server changes.
+- Private refreshed examples: shop-member-statement-rows-review. No Railway deployment.
