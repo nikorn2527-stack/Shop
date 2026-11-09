@@ -51,6 +51,7 @@ export function memberStatementExport(
       exportNumber(statement.openingBalance),
     ],
   ];
+  const groupStartRows: number[] = [];
   for (const entry of statement.entries) {
     const purchase = entry.purchase;
     // Product names and quantities live only in their own rows, never repeated in the bill summary.
@@ -66,6 +67,7 @@ export function memberStatementExport(
     ]
       .filter(Boolean)
       .join(" · ");
+    groupStartRows.push(rows.length);
     rows.push([
       statementDate(entry.createdAt),
       entry.reference,
@@ -82,9 +84,9 @@ export function memberStatementExport(
         maximumFractionDigits: 4,
       });
       rows.push([
-        statementDate(entry.createdAt),
-        purchase!.orderNumber,
-        item.name,
+        "",
+        "",
+        `• ${item.name}`,
         `${quantity} ${item.unit}`,
         exportNumber(item.price),
         exportNumber(item.amount),
@@ -145,6 +147,7 @@ export function memberStatementExport(
     ],
     nowrapCols: [0, 1, 3, 4, 5, 6, 7, 8],
     numericCols,
+    groupStartRows,
     rows,
     totalsRow: [
       "รวม",
@@ -159,7 +162,7 @@ export function memberStatementExport(
     ],
     compact: true,
     footnote:
-      "วันที่เป็น พ.ศ. 2 หลัก · ราคาเป็นราคาต่อหน่วย · จำนวนเงินเป็นบาท · เงินเข้า/เงินออกหมายถึงยอดในบัตร และแสดงครั้งเดียวต่อบิล ไม่หักซ้ำตามแถวสินค้า · ยอดยกมาและยอดในบัตรคำนวณจากประวัติเงินในระบบ · การซื้อเงินสด/QR แสดงเพื่อประกอบรายละเอียดและไม่หักยอดในบัตร · บิลยกเลิกยังแสดงประวัติเดิมพร้อมรายการคืนเงินที่อยู่ในช่วงวันที่เลือก",
+      "วันที่เป็น พ.ศ. 2 หลัก · ราคาเป็นราคาต่อหน่วย · จำนวนเงินเป็นบาท · สินค้าใต้หัวบิลเป็นรายละเอียดของบิลนั้น · เงินเข้า/เงินออกหมายถึงยอดในบัตร และแสดงครั้งเดียวต่อบิล ไม่หักซ้ำตามแถวสินค้า · ยอดยกมาและยอดในบัตรคำนวณจากประวัติเงินในระบบ · การซื้อเงินสด/QR แสดงเพื่อประกอบรายละเอียดและไม่หักยอดในบัตร · บิลยกเลิกยังแสดงประวัติเดิมพร้อมรายการคืนเงินที่อยู่ในช่วงวันที่เลือก",
   };
   const exportRows = [
     [doc.title],

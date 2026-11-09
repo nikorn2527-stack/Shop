@@ -104,12 +104,12 @@ describe("single member statement export mapping", () => {
       "500.00",
     ]);
     const product = result.doc.rows.find(
-      r => r[2] === "สินค้าชื่อเต็มจากบิลเดิม"
+      r => r[2] === "• สินค้าชื่อเต็มจากบิลเดิม"
     );
     expect(product).toEqual([
-      "02/04/69 09:00",
-      "69040001",
-      "สินค้าชื่อเต็มจากบิลเดิม",
+      "",
+      "",
+      "• สินค้าชื่อเต็มจากบิลเดิม",
       "2 ชิ้น",
       "15.00",
       "30.00",
@@ -153,8 +153,65 @@ describe("single member statement export mapping", () => {
         r => r[2].startsWith("คืนเงินจากยกเลิกบิล") && r[6] === "30.00"
       )
     ).toBe(true);
-    expect(result.doc.rows.some(r => r[2] === "สินค้าชื่อเต็มจากบิลเดิม")).toBe(
-      true
-    );
+    expect(
+      result.doc.rows.some(r => r[2] === "• สินค้าชื่อเต็มจากบิลเดิม")
+    ).toBe(true);
+  });
+  it("keeps all product lines directly under their own bill heading with one card deduction", () => {
+    const first = statement.entries[1];
+    const data: MemberStatement = {
+      ...statement,
+      closingBalance: 475,
+      outgoing: 35,
+      purchaseTotal: 75,
+      entries: [
+        statement.entries[0],
+        {
+          ...first,
+          amount: -35,
+          balanceAfter: 475,
+          purchase: {
+            ...first.purchase!,
+            subtotal: 35,
+            total: 35,
+            items: [
+              ...first.purchase!.items,
+              {
+                name: "สินค้าลำดับที่สอง",
+                qty: 1,
+                unit: "ชิ้น",
+                price: 5,
+                amount: 5,
+              },
+            ],
+          },
+        },
+        statement.entries[2],
+      ],
+    };
+    const result = memberStatementExport(data, { brandName: "ร้านทดสอบ" });
+    const rows = result.doc.rows;
+    const firstHeader = rows.findIndex(r => r[1] === "69040001");
+    const nextHeader = rows.findIndex(r => r[1] === "69040002");
+    expect(nextHeader).toBe(firstHeader + 3);
+    expect(
+      rows.slice(firstHeader + 1, nextHeader).map(r => r.slice(0, 3))
+    ).toEqual([
+      ["", "", "• สินค้าชื่อเต็มจากบิลเดิม"],
+      ["", "", "• สินค้าลำดับที่สอง"],
+    ]);
+    expect(result.doc.groupStartRows).toEqual([1, firstHeader, nextHeader]);
+    const sum = (index: number) =>
+      rows.reduce(
+        (total, row) => total + Number((row[index] || "0").replaceAll(",", "")),
+        0
+      );
+    expect(sum(6)).toBe(10);
+    expect(sum(7)).toBe(35);
+    expect(
+      rows
+        .slice(firstHeader + 1, nextHeader)
+        .every(r => r.slice(6).every(cell => cell === ""))
+    ).toBe(true);
   });
 });
