@@ -3,7 +3,6 @@ import { initializeDocumentPrinting } from "./documentPrinting";
 import { initializeProductItemNumbers } from "./migrations/productItemNumbers";
 import { createSqliteCheckoutRepository } from "./repositories/sqliteCheckoutRepository";
 import { repairImportedProductArtwork } from "./migrations/importedProductArtwork";
-import { confirmImportedOpeningBalance } from "./migrations/confirmedOpeningBalance";
 import { backupSqliteDatabase } from "./sqliteBackup";
 import { DEFAULT_LOGIN_ORGANIZATION_NAME } from "../shared/loginBranding";
 import { createSqliteWalletRepository } from "./repositories/sqliteWalletRepository";
@@ -654,14 +653,8 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
       retentionDays: 3650,
     }).file,
   });
-  confirmImportedOpeningBalance(db, {
-    now: formatDateTime(),
-    backup: filename === ":memory:" ? undefined : () => backupSqliteDatabase({
-      sourcePath: filename,
-      backupDir: process.env.SQLITE_BACKUP_DIR ?? "data/backups",
-      retentionDays: 3650,
-    }).file,
-  });
+  // Historical balance corrections require explicit maintenance, never an app startup.
+
   initializeProductItemNumbers(db, {
     now: formatDateTime(),
     backup: filename === ":memory:" ? undefined : () => backupSqliteDatabase({

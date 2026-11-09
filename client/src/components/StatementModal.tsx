@@ -62,7 +62,7 @@ export function StatementModal({
       else if (format === "xlsx")
         downloadXlsxFile(
           exportData.fileName,
-          "สเตทเมนต์สมาชิก",
+          "รายการเดินบัญชีสมาชิก",
           exportData.rows,
           exportData.numericCols
         );
@@ -92,7 +92,7 @@ export function StatementModal({
   ] as const;
   return (
     <WorkflowDialog
-      title="สเตทเมนต์สมาชิก"
+      title="รายการเดินบัญชีสมาชิก"
       onClose={onClose}
       busy={Boolean(busy)}
       className="statement-modal"
@@ -100,7 +100,7 @@ export function StatementModal({
       <div className="modal-heading">
         <div>
           <span className="eyebrow">MEMBER STATEMENT</span>
-          <h2>สเตทเมนต์สมาชิก</h2>
+          <h2>รายการเดินบัญชีสมาชิก</h2>
           <p>
             เลขสมาชิก {memberNumber} ·
             รายการเงินในบัตรและรายละเอียดสินค้าแยกตามบิล
@@ -109,7 +109,7 @@ export function StatementModal({
         <button
           type="button"
           className="icon-button"
-          aria-label="ปิดสเตทเมนต์"
+          aria-label="ปิดรายการเดินบัญชี"
           disabled={Boolean(busy)}
           onClick={onClose}
         >
@@ -128,7 +128,7 @@ export function StatementModal({
                 setTo(b);
               }
             }}
-            ariaLabel="เลือกช่วงวันที่สเตทเมนต์"
+            ariaLabel="เลือกช่วงวันที่รายการเดินบัญชี"
             placeholder="ประวัติทั้งหมด"
           />
         </label>
@@ -170,7 +170,7 @@ export function StatementModal({
       )}
       <div className="statement-stage">
         {statement.isFetching ? (
-          <p role="status">กำลังโหลดสเตทเมนต์และรายละเอียดสินค้า…</p>
+          <p role="status">กำลังโหลดรายการเดินบัญชีและรายละเอียดสินค้า…</p>
         ) : !statement.isError && exportData ? (
           <>
             <p className="statement-hint" role="status">
@@ -178,7 +178,7 @@ export function StatementModal({
                 ? "ไม่มีรายการในช่วงที่เลือก · แสดงยอดยกมาและยอดปลายช่วง"
                 : `${statement.data?.ledgerCount} รายการเงินในบัตร · ${statement.data?.purchaseCount} บิลซื้อสินค้า`}
             </p>
-            <A4DocumentPreview html={html} label="พรีวิวสเตทเมนต์สมาชิก A4" />
+            <A4DocumentPreview html={html} label="พรีวิวรายการเดินบัญชีสมาชิก A4" />
           </>
         ) : null}
       </div>

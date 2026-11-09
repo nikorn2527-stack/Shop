@@ -502,7 +502,7 @@ export function MemberDetail({
             disabled={detailQuery.isLoading}
             onClick={() => setStatementOpen(true)}
           >
-            <FileText size={15} /> สเตทเมนต์ / Export
+            <FileText size={15} /> รายการเดินบัญชี / Export
           </button>
           <button className="outline-button" onClick={() => setCardOpen(true)}>
             <IdCard size={15} /> บัตรสมาชิก

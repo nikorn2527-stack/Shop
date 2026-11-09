@@ -29,3 +29,7 @@
 - Focused tests: 15 passed, including statement balances and shared report rendering. TypeScript and build passed.
 - Browser verified all 66 product names, quantities, dates and receipt references fit on one line without overlap in the demo document. CSV/XLSX/PDF, repeated print, date filtering and mobile layout passed; business-table snapshots remained identical. A4 output reduced from six to four pages. Only statement presentation/export mapping changed, with no database or server changes.
 - Private refreshed examples: shop-member-statement-rows-review. No Railway deployment.
+
+- Terminology requested by the user: all Thai UI labels, document titles, accessible labels and the Excel sheet name use รายการเดินบัญชี instead of สเตทเมนต์. Internal identifiers and financial data are unchanged.
+
+- Pre-release follow-up: historical opening-balance correction was removed from normal app startup to meet the latest no-financial-adjustment requirement. Full release verification now passes 717 tests; see 2026-11-09-release-safety.md.

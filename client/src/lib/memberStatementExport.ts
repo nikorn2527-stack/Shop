@@ -98,7 +98,7 @@ export function memberStatementExport(
   const fileName = `statement-${member.memberNumber}-${statement.from || "all"}-${statement.to || "current"}`;
   const doc: ReportDocConfig = {
     fileName,
-    title: "สเตทเมนต์สมาชิก · รายการเดินบัญชีและการซื้อสินค้า",
+    title: "รายการเดินบัญชีสมาชิก",
     periodLabel: range,
     brandName: options.brandName,
     meta: [
