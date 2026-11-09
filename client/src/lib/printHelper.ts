@@ -1,3 +1,4 @@
+import { capturePrintStyles } from "./printStyles";
 import { buildThermalPageCss, getThermalPrintProfile } from "./thermalPrint";
 
 /**
@@ -181,7 +182,7 @@ export async function printElementDocument(targetId: string, widthMm?: number): 
   const thermalProfile = widthMm ? getThermalPrintProfile(widthMm) : null;
   const clone = source.cloneNode(true) as HTMLElement;
   clone.style.cssText = thermalProfile ? `width:${thermalProfile.printableWidthMm}mm;box-sizing:border-box;margin:0;height:auto;max-height:none;overflow:visible` : "";
-  const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'), el => el.outerHTML).join("");
+  const styles = capturePrintStyles();
   let heightMm = 297;
   let runtimeCss = thermalProfile
     ? buildThermalPageCss(thermalProfile, 1000, targetId)

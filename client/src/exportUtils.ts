@@ -1,3 +1,4 @@
+import { capturePrintStyles, applyPrintStylesSnapshot } from "@/lib/printStyles";
 import * as XLSX from "xlsx";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
@@ -108,7 +109,8 @@ export function downloadXlsxFile(fileName: string, sheetName: string, rows: stri
 export async function downloadSlipFile(elementId: string, fileName: string, format: "pdf" | "image"): Promise<void> {
   const element = document.getElementById(elementId);
   if (!element) return;
-  const canvas = await html2canvas(element, { scale: 2.5, backgroundColor: "#ffffff" });
+  const printStyles = capturePrintStyles();
+  const canvas = await html2canvas(element, { scale: 2.5, backgroundColor: "#ffffff", onclone: doc => applyPrintStylesSnapshot(doc, printStyles, elementId) });
   const baseName = fileName.replace(/\.(pdf|png)$/i, "");
   if (format === "image") {
     const link = document.createElement("a");
