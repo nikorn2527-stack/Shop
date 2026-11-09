@@ -31,6 +31,28 @@ function caller(appRole?: string) {
 }
 
 describe("business API permissions", () => {
+  it("requires login for member statements and exposes only the requested member without writes", async () => {
+    db.exec("INSERT INTO members(member_number,first_name,last_name,balance) VALUES('statement-001','ตัวอย่าง','สเตทเมนต์',500)");
+    const input={memberNumber:"statement-001",from:"2026-11-01",to:"2026-11-30"};
+    await expect(caller().member.statement(input)).rejects.toMatchObject({code:"UNAUTHORIZED"});
+    const before=db.prepare("SELECT * FROM members").all();
+    expect(await caller("cashier").member.statement(input)).toMatchObject({openingBalance:500,closingBalance:500,entries:[]});
+    await expect(caller("cashier").member.statement({...input,from:"2026-02-30"})).rejects.toMatchObject({code:"BAD_REQUEST"});
+    expect(db.prepare("SELECT * FROM members").all()).toEqual(before);
+  });
+
+  it("authenticates print metadata and records the server actor without modifying sales", async () => {
+    const product = createProduct(db, {name:"Print identity",price:10,stock:1});
+    registerPosTerminal(db,"12345678-1234-4234-8234-123456789012",1,"Admin");
+    const receipt = await caller("cashier").pos.checkout({terminalDeviceId:"12345678-1234-4234-8234-123456789012",items:[{productId:product.id,qty:1}],paymentMethod:"เงินสด",receivedCash:10,clientRequestId:"print-sale"});
+    const input = {document:{kind:"sale" as const,key:receipt.orderNumber},requestId:"12345678-1234-4234-8234-123456789013"};
+    await expect(caller().printing.issue(input)).rejects.toMatchObject({code:"UNAUTHORIZED"});
+    const before = db.prepare("SELECT * FROM sales").all();
+    expect(await caller("cashier").printing.issue(input)).toMatchObject({ordinal:1,variant:"original",actor:"Test operator"});
+    expect(await caller("cashier").printing.issue({...input,requestId:"12345678-1234-4234-8234-123456789014"})).toMatchObject({ordinal:2,variant:"copy"});
+    expect(db.prepare("SELECT * FROM sales").all()).toEqual(before);
+  });
+
   it.each(["auditor", "stock_officer"])("blocks %s from checkout and void even with a valid login", async role => {
     await expect(caller(role).pos.checkout({ items: [{ productId: 1, qty: 1 }], paymentMethod: "เงินสด" })).rejects.toMatchObject({ code: "FORBIDDEN" });
     await expect(caller(role).pos.void({ saleId: 1, reason: "Unauthorized attempt" })).rejects.toMatchObject({ code: "FORBIDDEN" });

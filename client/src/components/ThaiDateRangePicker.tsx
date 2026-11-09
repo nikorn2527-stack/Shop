@@ -162,6 +162,6 @@ export function ThaiDateRangePicker({
         <button type="button" className="mini-button" onClick={() => { const iso = toIso(today); onChange(iso, iso); setAnchor(""); setOpen(false); }}>วันนี้ · {today.getDate()} {THAI_MONTHS_SHORT[today.getMonth()]} {today.getFullYear() + 543}</button>
         <button type="button" className="mini-button" onClick={() => { onChange("", ""); setAnchor(""); setOpen(false); }}>ล้างช่วงวันที่</button>
       </div>
-    </div>, document.body)}
+    </div>, wrapRef.current?.closest<HTMLElement>('[role="dialog"]') ?? document.body)}
   </div>;
 }

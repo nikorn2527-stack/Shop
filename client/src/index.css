@@ -3469,7 +3469,7 @@ th { font-weight: 600; }
 .wallet-confirm-actions .outline-button, .wallet-confirm-actions .primary-button { flex: 1; height: 38px; }
 .wallet-success { display: flex; flex-direction: column; gap: 12px; }
 .wallet-slip { margin: 0 auto; width: 300px; max-width: 100%; }
-.wallet-success-actions { display: flex; gap: 8px; }
+.wallet-success-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .wallet-success-actions .outline-button, .wallet-success-actions .primary-button { flex: 1; }
 /* slip has its own print isolation โ€” เธเธธเนเธกเธเธดเธกเธเนเธชเธฅเธดเธเธ—เธตเนเธซเธเนเธฒเธเธฅเธฅเธฑเธเธเน */
 @media print {
@@ -15753,3 +15753,25 @@ body:has(.modal-backdrop) .shortcuts-fab { display: none; }
 
 .product-label-modal input:not([type=checkbox]),.product-label-modal select{min-height:40px;border:1px solid #cbd9ea;border-radius:9px;padding:8px 10px;font-size:14px;background:#fff;color:#17304e;max-width:100%;box-sizing:border-box}
 @media(max-width:600px){.product-label-modal input:not([type=checkbox]),.product-label-modal select{min-height:44px}}
+
+/* Configured store address is shared by receipt previews, exports and print. */
+.receipt-brand-text { min-width: 0; max-width: 100%; }
+.receipt-brand-text .receipt-address { display: block; margin-top: 4px; white-space: pre-line; overflow-wrap: anywhere; line-height: 1.5; }
+
+/* Sale receipt identity: readable on screen, in exports and on thermal paper. */
+#receipt-paper .receipt-customer > .receipt-member-name { font-size: 15px; line-height: 1.6; font-weight: 700; }
+
+.slip-copy-mark { text-align: center; font-size: 13px; font-weight: 700; margin: 4px 0 8px; color: #111; }
+.slip-document-options { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 12px 0; font-size: 12px; }
+.slip-document-options select { border: 1px solid #cbd5e1; border-radius: 8px; padding: 6px 10px; background: white; color: #0f172a; }
+.slip-document-options small { color: #64748b; }
+@media print { .slip-document-options { display: none !important; } }
+
+/* Member statements share the A4 export pipeline and keep actions in view. */
+.statement-modal { width: min(1040px, calc(100vw - 32px)); display: flex; flex-direction: column; overflow: hidden; }
+.statement-filters { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin: 8px 0 12px; }
+.statement-filters > label { display: grid; gap: 4px; min-width: 220px; font-size: 12px; }
+.statement-stage { display: block; overflow: auto; min-height: 100px; flex: 1; }
+.statement-actions { flex-wrap: wrap; gap: 8px; flex-shrink: 0; }
+.statement-actions .preview-format-list { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 600px) { .statement-modal { padding: 14px; } .statement-actions .preview-format-list { flex: 1 1 100%; } .statement-actions .preview-format-btn { flex: 1; } }

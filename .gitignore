@@ -145,3 +145,6 @@ migration-reports/
 
 # Private SQL rehearsal exports contain customer data, password hashes and sessions.
 migration-private/
+
+# Isolated Local transaction demonstration (contains private copied data)
+.transaction-demo/

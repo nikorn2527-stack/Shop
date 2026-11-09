@@ -176,6 +176,7 @@ export type MemberBalancesInput = { search?: string };
 
 export type StockBalanceRow = {
   productId: number;
+  itemNumber: number;
   /** รหัสสินค้า — บาร์โค้ดถ้ามี ไม่มีก็ใช้ SKU */
   code: string;
   sku: string;

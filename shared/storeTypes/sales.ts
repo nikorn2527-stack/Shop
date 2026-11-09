@@ -1,3 +1,4 @@
+import type { PrintDocumentRef } from "./documents";
 /** Database-independent business contracts. No database clients or server runtime imports. */
 
 export const PAYMENT_METHODS = [
@@ -29,6 +30,7 @@ export type SaleItem = {
 };
 
 export type CheckoutReceipt = {
+  documentRef?: PrintDocumentRef;
   terminalId?: string | null;
   terminalNumber?: number | null;
   orderNumber: string;

@@ -2,6 +2,8 @@
 
 export type Product = {
   id: number;
+  /** Permanent Item number, independent of ID, SKU and barcode. */
+  itemNumber: number;
   sku: string;
   barcode: string | null;
   name: string;

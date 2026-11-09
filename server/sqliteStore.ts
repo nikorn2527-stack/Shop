@@ -1,6 +1,8 @@
+import { bangkokParts } from "../shared/storeTime";
+import { initializeDocumentPrinting } from "./documentPrinting";
+import { initializeProductItemNumbers } from "./migrations/productItemNumbers";
 import { createSqliteCheckoutRepository } from "./repositories/sqliteCheckoutRepository";
 import { repairImportedProductArtwork } from "./migrations/importedProductArtwork";
-import { confirmImportedOpeningBalance } from "./migrations/confirmedOpeningBalance";
 import { backupSqliteDatabase } from "./sqliteBackup";
 import { DEFAULT_LOGIN_ORGANIZATION_NAME } from "../shared/loginBranding";
 import { createSqliteWalletRepository } from "./repositories/sqliteWalletRepository";
@@ -651,7 +653,9 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
       retentionDays: 3650,
     }).file,
   });
-  confirmImportedOpeningBalance(db, {
+  // Historical balance corrections require explicit maintenance, never an app startup.
+
+  initializeProductItemNumbers(db, {
     now: formatDateTime(),
     backup: filename === ":memory:" ? undefined : () => backupSqliteDatabase({
       sourcePath: filename,
@@ -659,6 +663,7 @@ export function createSqliteStore(filename = ":memory:"): SqliteDb {
       retentionDays: 3650,
     }).file,
   });
+  initializeDocumentPrinting(db, formatDateTime());
   return db;
 }
 
@@ -1298,13 +1303,13 @@ export function setSchemaVersion(db: SqliteDb, version: string): void {
 
 export function listProducts(db: SqliteDb, includeInactive = false): SqliteProduct[] {
   if (includeInactive) {
-    return db.prepare(`SELECT id, sku, barcode, name, category, emoji, color, size, image_url AS imageUrl, quick_pick AS quickPick, sell_mode AS sellMode, price_tiers AS priceTiers, unit, price, cost, stock, reorder_point AS reorderPoint, active, created_at AS createdAt FROM products ORDER BY active DESC, id`).all() as unknown as SqliteProduct[];
+    return db.prepare(`SELECT id, item_number AS itemNumber, sku, barcode, name, category, emoji, color, size, image_url AS imageUrl, quick_pick AS quickPick, sell_mode AS sellMode, price_tiers AS priceTiers, unit, price, cost, stock, reorder_point AS reorderPoint, active, created_at AS createdAt FROM products ORDER BY active DESC, item_number, id`).all() as unknown as SqliteProduct[];
   }
-  return db.prepare(`SELECT id, sku, barcode, name, category, emoji, color, size, image_url AS imageUrl, quick_pick AS quickPick, sell_mode AS sellMode, price_tiers AS priceTiers, unit, price, cost, stock, reorder_point AS reorderPoint, active, created_at AS createdAt FROM products WHERE active = 1 ORDER BY id`).all() as unknown as SqliteProduct[];
+  return db.prepare(`SELECT id, item_number AS itemNumber, sku, barcode, name, category, emoji, color, size, image_url AS imageUrl, quick_pick AS quickPick, sell_mode AS sellMode, price_tiers AS priceTiers, unit, price, cost, stock, reorder_point AS reorderPoint, active, created_at AS createdAt FROM products WHERE active = 1 ORDER BY item_number, id`).all() as unknown as SqliteProduct[];
 }
 
 function getProductById(db: SqliteDb, productId: number): SqliteProduct | undefined {
-  return db.prepare(`SELECT id, sku, barcode, name, category, emoji, color, size, image_url AS imageUrl, quick_pick AS quickPick, sell_mode AS sellMode, price_tiers AS priceTiers, unit, price, cost, stock, reorder_point AS reorderPoint, active, created_at AS createdAt FROM products WHERE id = ?`).get(productId) as SqliteProduct | undefined;
+  return db.prepare(`SELECT id, item_number AS itemNumber, sku, barcode, name, category, emoji, color, size, image_url AS imageUrl, quick_pick AS quickPick, sell_mode AS sellMode, price_tiers AS priceTiers, unit, price, cost, stock, reorder_point AS reorderPoint, active, created_at AS createdAt FROM products WHERE id = ?`).get(productId) as SqliteProduct | undefined;
 }
 
 
@@ -1995,9 +2000,16 @@ function yyMMdd(date: Date) {
 }
 
 function nextOrderNumber(db: SqliteDb, date = new Date()) {
-  const prefix = `RC-${yyMMdd(date)}-`;
-  const row = db.prepare(`SELECT MAX(CAST(SUBSTR(order_number, 11) AS INTEGER)) AS maxSeq FROM sales WHERE order_number LIKE ?`).get(`${prefix}%`) as { maxSeq: number | null };
-  return `${prefix}${String((row?.maxSeq ?? 0) + 1).padStart(3, "0")}`;
+  const { year, month } = bangkokParts(date);
+  const prefix = `${String((year + 543) % 100).padStart(2, "0")}${pad2(month)}`;
+  // Exact eight-digit format only. Legacy daily RC numbers remain unchanged.
+  // Allocate inside checkout's transaction; the unique constraint prevents duplicates.
+  // Voided receipts also reserve their numbers.
+  const row = db.prepare(`SELECT MAX(CAST(SUBSTR(order_number, 5, 4) AS INTEGER)) AS maxSeq
+    FROM sales WHERE order_number GLOB ?`).get(`${prefix}[0-9][0-9][0-9][0-9]`) as { maxSeq: number | null };
+  const sequence = (row.maxSeq ?? 0) + 1;
+  if (sequence > 9999) throw new StoreError("เลขที่ใบเสร็จเดือนนี้ครบ 9999 รายการแล้ว กรุณาติดต่อผู้ดูแลระบบ");
+  return `${prefix}${String(sequence).padStart(4, "0")}`;
 }
 
 
@@ -2733,15 +2745,25 @@ export function memberTransactions(db: SqliteDb, input: MemberTransactionsInput 
 
 
 /**
- * ROUND 65 — รายงาน "ยอดเงินในบัตร" ทุกใบในระบบ (ยอดทั้งหมด/ยอดจ่าย/คงเหลือ
+ * รายงาน "ยอดเงินในบัตร" ของสมาชิกปัจจุบัน รวมยอดศูนย์ (ยอดทั้งหมด/ยอดจ่าย/คงเหลือ
  * คำนวณจาก member_transactions ทั้งหมด) · เรียงตามหมายเลขสมาชิก · ค้นหาได้จาก
  * ชื่อ/เลขสมาชิก/รหัสบัตร/รหัสผู้ป่วย
  */
 export function memberBalances(db: SqliteDb, input: MemberBalancesInput = {}): MemberBalanceRow[] {
   const search = input.search?.trim();
-  const where = search
-    ? ` WHERE (m.first_name || ' ' || m.last_name || ' ' || m.member_number || ' ' || COALESCE(m.card_number, '') || ' ' || COALESCE(m.patient_code, '')) LIKE ?`
-    : "";
+  // No clinical departure flag exists here. Hide only completed account/card
+  // returns recorded by the official flows, never zero balance or no card alone.
+  // A later assignment/replacement makes the member current again.
+  const where = ` WHERE NOT (
+    m.balance = 0 AND NULLIF(TRIM(m.card_number), '') IS NULL
+    AND (m.account_closed = 1 OR COALESCE((
+      SELECT CASE WHEN ca.action = 'release' AND ca.note IN (
+        'รับคืนบัตรยอดศูนย์', 'คืนเงินครบยอดและรับคืนบัตร'
+      ) THEN 1 ELSE 0 END
+      FROM card_assignments ca WHERE ca.member_number = m.member_number
+      ORDER BY ca.id DESC LIMIT 1
+    ), 0) = 1)
+  )${search ? ` AND (m.first_name || ' ' || m.last_name || ' ' || m.member_number || ' ' || COALESCE(m.card_number, '') || ' ' || COALESCE(m.patient_code, '')) LIKE ?` : ''}`;
   const params = search ? [`%${search}%`] : [];
   return db.prepare(`
     SELECT m.id, m.member_number AS memberNumber, m.card_number AS cardNumber, m.patient_code AS patientCode,
@@ -2801,13 +2823,13 @@ export function stockBalanceReport(db: SqliteDb, input: StockBalanceInput = {}):
   const categoryFilter = categoryWhere("products", input);
   if (categoryFilter.sql !== "") whereParts.push(categoryFilter.sql.replace(/^\s*AND\s+/i, ""));
   const where = whereParts.length > 0 ? ` WHERE ${whereParts.join(" AND ")}` : "";
-  const products = db.prepare(`SELECT id, sku, barcode, name, unit, category, stock, price, active FROM products${where} ORDER BY id`).all(...params, ...categoryFilter.params) as unknown as { id: number; sku: string; barcode: string | null; name: string; unit: string; category: string; stock: number; price: number; active: number }[];
-  const codeOrder = new Intl.Collator("th", {numeric: true, sensitivity: "base"});
+  const products = db.prepare(`SELECT id, item_number AS itemNumber, sku, barcode, name, unit, category, stock, price, active FROM products${where} ORDER BY item_number, id`).all(...params, ...categoryFilter.params) as unknown as { id: number; itemNumber: number; sku: string; barcode: string | null; name: string; unit: string; category: string; stock: number; price: number; active: number }[];
   return products.map((product) => {
     const sold = soldByProduct.get(product.id) ?? 0;
     const received = receivedByProduct.get(product.id) ?? 0;
     return {
       productId: product.id,
+      itemNumber: product.itemNumber,
       code: product.barcode?.trim() || product.sku,
       sku: product.sku,
       barcode: product.barcode,
@@ -2822,7 +2844,7 @@ export function stockBalanceReport(db: SqliteDb, input: StockBalanceInput = {}):
       sellingPrice: product.price,
       sellingValue: reportSellingValue(product.stock, product.price),
     };
-  }).sort((left,right)=>codeOrder.compare(left.code,right.code) || left.productId-right.productId);
+  });
 }
 
 export function dashboardStats(db: SqliteDb, rangeDays = 30): DashboardStats {

@@ -1,9 +1,12 @@
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe,expect,it,vi } from 'vitest';
 import { createSqliteStore,createBlankCards,assignMemberCard } from '../sqliteStore';
 import { confirmImportedOpeningBalance, openingBalanceCorrectionStatus } from './confirmedOpeningBalance';
 const batch='2026-11-02 07:10:52';
-function fixture(){
- const db=createSqliteStore();
+function fixture(filename=":memory:"){
+ const db=createSqliteStore(filename);
  db.exec('CREATE TABLE opening_import_rows(entity_type TEXT,entity_key TEXT,source_file TEXT,source_row INTEGER,source_json TEXT,imported_at TEXT)');
  db.prepare("INSERT INTO members(member_number,first_name,last_name,balance,status) VALUES ('TEST','Test','Member',0,'active')").run();
  db.prepare("INSERT INTO members(member_number,first_name,last_name,balance,status) VALUES ('OTHER','Other','Member',200,'active')").run();
@@ -12,6 +15,19 @@ function fixture(){
  return db;
 }
 describe('confirmed imported opening balance',()=>{
+ it('never applies the historical G100 correction automatically when opening an existing database',()=>{
+  const dir=mkdtempSync(join(tmpdir(),'shop-startup-financial-'));const file=join(dir,'store.sqlite');
+  vi.stubEnv('SQLITE_BACKUP_DIR',join(dir,'backups'));
+  let db=fixture(file);
+  const financial=()=>JSON.stringify(['members','member_transactions','card_usage_sessions','opening_import_rows'].map(table=>db.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()));
+  try {
+   const before=financial();db.close();db=createSqliteStore(file);
+   expect(financial()).toBe(before);
+   expect(db.prepare("SELECT balance FROM members WHERE member_number='TEST'").get()?.balance).toBe(0);
+   expect(openingBalanceCorrectionStatus(db)).toBe('not_applicable');
+  }finally{db.close();vi.unstubAllEnvs();rmSync(dir,{recursive:true,force:true});}
+ });
+
  it('corrects the confirmed provisional zero once without a deposit or modifying other balances',()=>{
   const db=fixture();try{const backup=vi.fn(()=> 'safety.sqlite');expect(confirmImportedOpeningBalance(db,{now:'now',backup})).toMatchObject({status:'applied',delta:500});
    expect(db.prepare("SELECT balance FROM members WHERE member_number='TEST'").get()?.balance).toBe(500);

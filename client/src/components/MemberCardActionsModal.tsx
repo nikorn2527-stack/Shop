@@ -1,3 +1,5 @@
+import { useSlipDocument } from "@/hooks/useSlipDocument";
+import { SlipCopyMark, SlipDocumentOptions } from "./SlipDocumentOptions";
 import { createBrowserUuid } from "@/lib/browserUuid";
 import { WorkflowDialog } from "./WorkflowDialog";
 import { useEffect, useState } from "react";
@@ -42,6 +44,8 @@ export function MemberCardActionsModal({ memberNumber, onClose, onSuccess, initi
     memberName: string; memberNumber: string; amount: number;
     balanceBefore: number; balanceAfter: number; doneAt: Date;
   } | null>(null);
+  const [returnSessionId, setReturnSessionId] = useState("");
+  const slipDocument = useSlipDocument(returnSessionId ? {kind: "card_return", key: returnSessionId} : null);
   const [slipBusy, setSlipBusy] = useState("");
   const [printPreview, setPrintPreview] = useState(false);
   const done = async (completedAction: CompletedMemberCardAction) => {
@@ -61,6 +65,7 @@ export function MemberCardActionsModal({ memberNumber, onClose, onSuccess, initi
   /* ---------- Wallet-style card return handlers ---------- */
   const prepareReturn = () => {
     if (!member) return;
+    setReturnSessionId(session ? String(session.id) : "");
     setReturnResult({
       memberName: `${member.firstName} ${member.lastName}`,
       memberNumber,
@@ -100,7 +105,7 @@ export function MemberCardActionsModal({ memberNumber, onClose, onSuccess, initi
         : String(Date.now());
       await downloadSlipFile(
         "member-card-return-slip",
-        `สลิปคืนบัตรเงินสด-${returnResult.memberNumber}-${stamp}`,
+        `สลิปคืนบัตรเงินสด-${returnResult.memberNumber}-${stamp}${slipDocument.variant === "copy" ? "-สำเนา" : ""}`,
         format
       );
     } finally {
@@ -110,7 +115,7 @@ export function MemberCardActionsModal({ memberNumber, onClose, onSuccess, initi
   return (
     <WorkflowDialog title="จัดการบัตรสมาชิก" onClose={onClose} busy={busy} className="form-modal">
         {printPreview && (
-          <PrintPreviewModal targetId="member-card-return-slip" title="สลิปคืนบัตรสมาชิก" onClose={() => setPrintPreview(false)} />
+          <PrintPreviewModal stayOpenAfterPrint targetId="member-card-return-slip" onBeforePrint={slipDocument.beforePrint} documentVersion={slipDocument.variant} title="สลิปคืนบัตรสมาชิก" onClose={() => setPrintPreview(false)} />
         )}
         <div className="modal-heading">
           <h2>{labels[action]}</h2>
@@ -269,6 +274,7 @@ export function MemberCardActionsModal({ memberNumber, onClose, onSuccess, initi
                       <span>คืนบัตรเงินสดสำเร็จ</span>
                       <small>บันทึกลงรายการธุรกรรมของสมาชิกแล้ว</small>
                     </div>
+                    <SlipCopyMark variant={slipDocument.variant} />
                     <div className="receipt-divider" />
                     <div className="receipt-meta">
                       <span>ใบยืนยันการคืนบัตรเงินสด</span>
@@ -304,6 +310,7 @@ export function MemberCardActionsModal({ memberNumber, onClose, onSuccess, initi
                       <small>ข้อมูลถูกบันทึกในประวัติระบบ แล้ว</small>
                     </div>
                   </div>
+                  <SlipDocumentOptions variant={slipDocument.variant} onChange={slipDocument.setVariant} disabled={Boolean(slipBusy)} />
                   <div className="wallet-success-actions">
                     <button
                       className="outline-button"

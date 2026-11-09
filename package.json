@@ -10,6 +10,7 @@
     "check": "tsc --noEmit",
     "test:lan": "node scripts/lan-test.mjs",
     "test:lan:recover": "tsx scripts/lan-test-recover.ts",
+    "demo:transactions": "tsx scripts/demo-transactions.ts",
     "format": "prettier --write .",
     "test": "vitest run",
     "test:sqlite": "vitest run server/sqliteStore.test.ts server/welfareStore.test.ts --pool=forks --maxWorkers=1 --minWorkers=1",

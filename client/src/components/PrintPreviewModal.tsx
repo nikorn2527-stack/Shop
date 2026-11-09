@@ -45,6 +45,8 @@ export function PrintPreviewModal({
   showContentLength = true,
   showPrintHelp = true,
   onPrint,
+  onBeforePrint,
+  stayOpenAfterPrint = false,
   onClose,
   documentVersion,
   renderControls,
@@ -64,6 +66,9 @@ export function PrintPreviewModal({
   showPrintHelp?: boolean;
   /** เรียกหลังสั่ง window.print() แล้ว (ใช้ทำ toast / ล้าง state) */
   onPrint?: () => void;
+  onBeforePrint?: () => Promise<void>;
+  /** Keep financial slips available for repeated printing until explicitly closed. */
+  stayOpenAfterPrint?: boolean;
   onClose: () => void;
 }) {
   const [ready, setReady] = useState(false);
@@ -122,12 +127,17 @@ export function PrintPreviewModal({
     printingRef.current = true; setPrinting(true);
     toast.dismiss();
     try {
-      await printElementDocument(
+      await onBeforePrint?.();
+      const result = await printElementDocument(
         targetId,
         paper === "thermal" ? thermalProfile.paperWidthMm : undefined,
       );
       onPrint?.();
-      onClose();
+      if (stayOpenAfterPrint) {
+        toast.info(result.usedFallback ? "กลับจากหน้าต่างพิมพ์แล้ว" : "ส่งงานพิมพ์แล้ว", {
+          description: "กดพิมพ์ซ้ำได้ หรือกดปิดเมื่อเรียบร้อย",
+        });
+      } else onClose();
     } catch {
       notify.error("เปิดหน้าต่างพิมพ์ไม่สำเร็จ ลองอีกครั้ง");
     } finally { printingRef.current = false; setPrinting(false); }
@@ -182,7 +192,7 @@ export function PrintPreviewModal({
         <div className="print-preview-actions">
           <div className="print-preview-buttons">
             <button type="button" className="ghost-button" disabled={printing} onClick={onClose}><X size={15} /> ปิด</button>
-            <button type="button" className="primary-button" onClick={doPrint}><Printer size={16} /> พิมพ์เลย</button>
+            <button type="button" className="primary-button" disabled={printing || !ready} onClick={doPrint}><Printer size={16} /> พิมพ์เลย</button>
           </div>
         </div>
         )}
