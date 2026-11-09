@@ -1,3 +1,4 @@
+import { capturePrintStyles, applyPrintStylesSnapshot } from "@/lib/printStyles";
 import { useSlipDocument } from "@/hooks/useSlipDocument";
 import { SlipCopyMark, SlipDocumentOptions } from "./SlipDocumentOptions";
 import { useRef, useState } from "react";
@@ -101,7 +102,9 @@ export function ReceiptModal({ receipt, onClose, onNewSale, onPrinted, mode = "n
         } catch {}
       }
       // scale 2.0 พอ — สูงกว่านี้ไฟล์ใหญ่ + บางเครื่อง render เพี้ยน
-      const canvas = await html2canvas(element, { scale: 2.0, backgroundColor: "#ffffff", useCORS: true, onclone: (doc) => {
+      const printStyles = capturePrintStyles();
+      const canvas = await html2canvas(element, { scale: 2.0, backgroundColor: "#ffffff", useCORS: true, onclone: async (doc) => {
+        await applyPrintStylesSnapshot(doc, printStyles, "receipt-paper");
         const paper = doc.getElementById("receipt-paper");
         if (paper) {
           paper.style.lineHeight = "1.8";
