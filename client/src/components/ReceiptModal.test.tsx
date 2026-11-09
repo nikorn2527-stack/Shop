@@ -38,3 +38,19 @@ describe('receipt reference and time rows',()=>{
   expect(html).toContain('white-space:nowrap;text-align:right');
  });
 });
+
+describe('receipt member identity',()=>{
+ it('keeps the full name separate from the member number without a duplicate member prefix',()=>{
+  const html=renderToStaticMarkup(createElement(ReceiptModal,{receipt:{...receipt,memberName:'นายสมชาย นามสกุลตัวอย่าง',memberNumber:'TEST-001'},onClose:()=>{}}));
+  const customer=html.slice(html.indexOf('class="receipt-customer"'),html.indexOf('</div>',html.indexOf('class="receipt-customer"')));
+  expect(customer).toContain('นายสมชาย นามสกุลตัวอย่าง');
+  expect(customer).not.toContain('TEST-001');
+  expect(customer).not.toContain('สมาชิกนาย');
+  expect(customer).toContain('font-size:12px');
+  expect(html).toContain('class="receipt-member-reference"');
+  expect(html).toContain('เลขสมาชิก');expect(html).toContain('TEST-001');
+ });
+ it('does not add an empty membership row for a general customer',()=>{
+  const html=render();expect(html).toContain('บุคคลทั่วไป');expect(html).not.toContain('class="receipt-member-reference"');
+ });
+});
