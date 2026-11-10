@@ -27,6 +27,10 @@ export type ReportDocConfig = {
   nowrapCols?: number[];
   /** คอลัมน์ (index) ที่ชิดขวา + ตัวเลข */
   numericCols?: number[];
+  /** Align multiline ledger rows with their date, reference and amounts. */
+  topAlignCells?: boolean;
+  /** Explicit detail lines, kept together instead of arbitrary wrapping. */
+  multilineCols?: number[];
   rows: string[][];
   /** Index of subtotal/header rows that start a distinct financial group. */
   groupStartRows?: number[];
@@ -93,6 +97,7 @@ export const REPORT_DOC_CSS = `
   .rd-table th.num { white-space: normal; }
   .rd-table th.nowrap, .rd-table td.nowrap { white-space: nowrap; overflow-wrap: normal; word-break: normal; }
   .rd-table td { padding: 6px 8px; font-weight: 500; border-bottom: 1px solid #e0e0dc; vertical-align: middle; }
+  .report-doc.rd-top-align .rd-table td { vertical-align: top; }
   .rd-table tbody.rd-row-group + tbody.rd-row-group::before { content: ""; display: table-row; height: 16px; }
   .rd-table tr.rd-group-total td { font-weight: 800; padding-top: 10px; padding-bottom: 10px; border-top: 1px solid #000; border-bottom: 1px solid #000; }
   .rd-table tbody.rd-row-group tr:not(.rd-group-total) td:first-child { padding-left: 20px; }
@@ -159,6 +164,7 @@ export type BuildReportHtmlOptions = {
 export function buildReportDocumentHtml(config: ReportDocConfig, opts: BuildReportHtmlOptions): string {
   const numeric = new Set(config.numericCols ?? []);
   const nowrap = new Set(config.nowrapCols ?? []);
+  const multiline = new Set(config.multilineCols ?? []);
   const metaRows = (config.meta ?? []).map(([label, text]) => `<div><span>${escapeHtml(label)}</span><b>${escapeHtml(text)}</b></div>`).join("");
   const summaryRows = (config.summaryBlocks ?? []).map(([label, text]) => `<div><span>${escapeHtml(label)}</span><b>${escapeHtml(text)}</b></div>`).join("");
   const groupStarts = new Set(config.groupStartRows ?? []);
@@ -170,7 +176,7 @@ export function buildReportDocumentHtml(config: ReportDocConfig, opts: BuildRepo
     }
     bodyRows += `<tr${groupStarts.has(rowIndex) ? ' class="rd-group-total"' : ""}>${row.map((cell, index) => {
       const classes = [numeric.has(index) ? "num" : "", nowrap.has(index) ? "nowrap" : ""].filter(Boolean).join(" ");
-      return `<td${classes ? ` class="${classes}"` : ""}>${escapeHtml(cell)}</td>`;
+      return `<td${classes ? ` class="${classes}"` : ""}>${multiline.has(index) && cell.includes("\n") ? cell.split("\n").map((line, lineIndex) => `<span${lineIndex === 0 && line.startsWith("บัตร ") ? ' style="white-space:nowrap"' : ""}>${escapeHtml(line)}</span>`).join("<br>") : escapeHtml(cell)}</td>`;
     }).join("")}</tr>`;
   });
   bodyRows += config.rows.length ? "</tbody>" : "<tbody></tbody>";
@@ -210,7 +216,7 @@ export function buildReportDocumentHtml(config: ReportDocConfig, opts: BuildRepo
   ${REPORT_DOC_CSS}
 </style></head>
 <body>
-  <div class="report-doc${config.compact ? " compact" : ""}${config.borderlessGroups ? " rd-borderless-groups" : ""}">
+  <div class="report-doc${config.compact ? " compact" : ""}${config.borderlessGroups ? " rd-borderless-groups" : ""}${config.topAlignCells ? " rd-top-align" : ""}">
     <div class="rd-head">
       <div class="rd-brand"><div><b>${escapeHtml(config.brandName)}</b><small>ระบบร้านค้าสวัสดิการ · Welfare Store</small></div></div>
       <div class="rd-stamp">${escapeHtml(opts.stampText)}</div>

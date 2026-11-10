@@ -57,3 +57,9 @@ describe("monochrome report document", () => {
     expect(html).not.toContain("color:red");
   });
 });
+it('preserves card-first detail lines, escapes HTML, and leaves single-line products intact',()=>{
+ const html=buildReportDocumentHtml({...config,multilineCols:[0],rows:[['บัตร 0000123\nเติมเงิน · เงินสด\n<script>','10'],['สินค้า A','1']]},{stampText:'test'});
+ expect(html).toContain('<span style="white-space:nowrap">บัตร 0000123</span><br><span>เติมเงิน · เงินสด</span>');
+ expect(html).toContain('&lt;script&gt;');expect(html).not.toContain('<script>');
+ expect(html).toContain('<td>สินค้า A</td>');
+});
