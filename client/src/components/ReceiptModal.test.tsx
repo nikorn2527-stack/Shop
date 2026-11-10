@@ -22,11 +22,11 @@ describe('store address in the shared receipt document',()=>{
  });
 });
 
-describe('receipt copy markup',()=>{
- it('starts a reopened document as copy and exposes original/copy download choices',()=>{
+describe('receipt without copy labels',()=>{
+ it('omits copy labels and download variant choices on new and reopened receipts',()=>{
   const html=renderToStaticMarkup(createElement(ReceiptModal,{receipt,onClose:()=>{},mode:'reprint'}));
-  expect(html).toContain('class="slip-copy-mark">สำเนา');
-  expect(html).toContain('รูปแบบเอกสารดาวน์โหลด');
+  expect(html).not.toContain('สำเนา');
+  expect(html).not.toContain('รูปแบบเอกสารดาวน์โหลด');
   expect(render()).not.toContain('class="slip-copy-mark"');
  });
 });

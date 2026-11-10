@@ -213,6 +213,7 @@ describe("per-product sales report (salesByProduct)", () => {
     expect(waterRow.category).toBe("เครื่องดื่ม");
     expect(waterRow.bills).toBe(2);
     expect(waterRow.qty).toBe(3);
+    expect(waterRow).toMatchObject({priceMin:7,priceMax:7});
     expect(waterRow.revenue).toBe(21);
     expect(waterRow.cogs).toBe(12);
     expect(waterRow.profit).toBe(9);
@@ -239,6 +240,14 @@ describe("per-product sales report (salesByProduct)", () => {
     // Sorted by revenue DESC; the from/to range is respected (a past window sees nothing).
     expect(rows.map((row) => row.revenue)).toEqual([40, 21, 20]);
     expect(salesByProduct(db, { from: "2020-01-01", to: "2020-01-02" })).toEqual([]);
+    // Historical prices come from sold lines even if the product price later changes.
+    db.prepare("UPDATE products SET price = 99 WHERE id = ?").run(water.id);
+    expect(salesByProduct(db, {}).find(row=>row.productId===water.id)).toMatchObject({priceMin:7,priceMax:7});
+    db.prepare("UPDATE sale_items SET price = 9 WHERE id = (SELECT MIN(id) FROM sale_items WHERE product_id = ?)").run(water.id);
+    const before=db.prepare("SELECT * FROM sale_items ORDER BY id").all();
+    expect(salesByProduct(db, {}).find(row=>row.productId===water.id)).toMatchObject({priceMin:7,priceMax:9});
+    expect(db.prepare("SELECT * FROM sale_items ORDER BY id").all()).toEqual(before);
+
   });
 
   it("uses the sale price as estimated cost when a product has no cost", () => {

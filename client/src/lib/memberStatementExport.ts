@@ -15,7 +15,7 @@ import { money } from "@/pages/pageData";
 function entryLabel(entry: StatementEntry) {
   if (entry.type === "refund" && entry.amount > 0) return "คืนเงินจากยกเลิกบิล";
   const base = WALLET_TX_META[entry.type]?.label ?? entry.type;
-  return `${base}${entry.kind === "purchase" ? ` · ${entry.paymentMethod ?? "ไม่ระบุวิธีชำระ"}` : ""}${entry.purchase?.voided ? " · บิลยกเลิก" : ""}`;
+  return `${base}${entry.paymentMethod ? ` · ${entry.paymentMethod}` : ""}${entry.purchase?.voided ? " · บิลยกเลิก" : ""}`;
 }
 /** Compact Buddhist date, with Bangkok time, to keep the whole identifier on one line. */
 function statementDate(value: string) {
@@ -56,17 +56,17 @@ export function memberStatementExport(
     const purchase = entry.purchase;
     // Product names and quantities live only in their own rows, never repeated in the bill summary.
     const detail = [
+      entry.cardNumber ? `บัตร ${entry.cardNumber}` : "บัตร —",
       entryLabel(entry),
       purchase
         ? `รวมบิล ${money(purchase.total)}${purchase.discount ? ` · ส่วนลด ${money(purchase.discount)}` : ""}`
         : entry.detail,
-      entry.cardNumber ? `บัตร ${entry.cardNumber}` : "",
       entry.kind === "purchase" && entry.paymentMethod !== "หักบัญชีสมาชิก"
         ? "ไม่หักยอดในบัตร"
         : "",
     ]
       .filter(Boolean)
-      .join(" · ");
+      .join("\n");
     groupStartRows.push(rows.length);
     rows.push([
       statementDate(entry.createdAt),
@@ -147,6 +147,8 @@ export function memberStatementExport(
     ],
     nowrapCols: [0, 1, 3, 4, 5, 6, 7, 8],
     numericCols,
+    topAlignCells: true,
+    multilineCols: [2],
     groupStartRows,
     rows,
     totalsRow: [

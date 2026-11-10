@@ -150,7 +150,7 @@ describe("single member statement export mapping", () => {
     expect(result.doc.rows.some(r => r[2].includes("ยกเลิก"))).toBe(true);
     expect(
       result.doc.rows.some(
-        r => r[2].startsWith("คืนเงินจากยกเลิกบิล") && r[6] === "30.00"
+        r => r[2].includes("\nคืนเงินจากยกเลิกบิล") && r[6] === "30.00"
       )
     ).toBe(true);
     expect(
@@ -214,4 +214,11 @@ describe("single member statement export mapping", () => {
         .every(r => r.slice(6).every(cell => cell === ""))
     ).toBe(true);
   });
+});
+
+it('puts the whole card identifier on the first detail line before transaction type',()=>{
+ const result=memberStatementExport(statement,{brandName:'ร้าน'});
+ const row=result.doc.rows.find(r=>r[1]==='TX-001')!;
+ expect(row[2].split('\n').slice(0,2)).toEqual(['บัตร OLD','เติมเงิน · เงินสด']);
+ expect(result.doc.multilineCols).toEqual([2]);
 });

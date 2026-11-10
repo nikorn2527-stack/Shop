@@ -1,3 +1,4 @@
+import {productSalesExport,nonzeroStockRows} from "@/lib/reportExportLayouts";
 import { memberBalanceExport } from "@/lib/memberBalanceExport";
 import { normalizeBillSearch } from "@/lib/billSearch";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuSeparator, DropdownMenuGroup } from "@/components/ui/dropdown-menu";
@@ -835,37 +836,8 @@ export function Reports({
     label: string;
   } => {
     if (salesView === "product") {
-      return {
-        fileName: "sales-by-product",
-        sheetName: "ยอดขายตามสินค้า",
-        label: "แยกตามสินค้า",
-        rows: [
-          [
-            "สินค้า (รหัส)",
-            "บิล",
-            "ชิ้น",
-            "ยอดขาย (บาท)",
-            "ต้นทุน (บาท)",
-            "กำไร (บาท)",
-          ],
-          ...productRows.map(row => [
-            `${row.name}${row.sku ? ` (${row.sku})` : ""}`,
-            exportCount(row.bills),
-            exportCount(row.qty),
-            exportNumber(row.revenue),
-            exportNumber(row.cogs),
-            exportNumber(row.profit),
-          ]),
-          [
-            "รวมทุกสินค้า",
-            exportCount(productTotal.bills),
-            exportCount(productTotal.qty),
-            exportNumber(productTotal.revenue),
-            exportNumber(productTotal.cogs),
-            exportNumber(productTotal.profit),
-          ],
-        ],
-      };
+      const pack=productSalesExport(productRows,true);
+      return {fileName:"sales-by-product",sheetName:"ยอดขายตามสินค้า",label:"แยกตามสินค้า",rows:[pack.columns,...pack.rows,pack.totalsRow]};
     }
     if (salesView === "category") {
       return {
@@ -1000,63 +972,11 @@ export function Reports({
         brandName: "ร้านค้าสวัสดิการ",
       };
     }
-    if (salesView === "product" || salesView === "category") {
-      const rows =
-        salesView === "product"
-          ? productRows.map(row => [
-              `${row.name}${row.sku ? ` (${row.sku})` : ""}`,
-              exportCount(row.bills),
-              exportCount(row.qty),
-              exportNumber(row.revenue),
-              exportNumber(row.cogs),
-              exportNumber(row.profit),
-            ])
-          : categoryRows.map(row => [
-              row.category,
-              exportCount(row.orders),
-              exportCount(row.qty),
-              exportNumber(row.revenue),
-              exportNumber(row.cogs),
-              exportNumber(row.profit),
-            ]);
-      const totalsRow =
-        salesView === "product"
-          ? [
-              "รวมทุกสินค้า",
-              exportCount(productTotal.bills),
-              exportCount(productTotal.qty),
-              exportNumber(productTotal.revenue),
-              exportNumber(productTotal.cogs),
-              exportNumber(productTotal.profit),
-            ]
-          : [
-              "รวมทุกชนิดสินค้า",
-              exportCount(categoryTotal.orders),
-              exportCount(categoryTotal.qty),
-              exportNumber(categoryTotal.revenue),
-              exportNumber(categoryTotal.cogs),
-              exportNumber(categoryTotal.profit),
-            ];
-      return {
-        fileName: "daily-sales-summary.pdf",
-        title:
-          salesView === "product"
-            ? "รายงานสรุปยอดขายแยกตามสินค้า"
-            : "รายงานสรุปยอดขายแยกตามชนิดสินค้า",
-        periodLabel: `ช่วงข้อมูล ${rangeLabel}${staffSuffix}${categorySuffix}`,
-        columns: [
-          salesView === "product" ? "สินค้า (รหัส)" : "ชนิดสินค้า",
-          "บิล",
-          "ชิ้น",
-          "ยอดขาย (บาท)",
-          "ต้นทุน (บาท)",
-          "กำไร (บาท)",
-        ],
-        numericCols: [1, 2, 3, 4, 5],
-        rows,
-        totalsRow,
-        brandName: "ร้านค้าสวัสดิการ",
-      };
+    if (salesView === "product") {
+      return {fileName:"sales-by-product.pdf",title:"รายงานสรุปยอดขายแยกตามสินค้า",periodLabel:`ช่วงข้อมูล ${rangeLabel}${staffSuffix}${categorySuffix}`,...productSalesExport(productRows,false),columnWidths:["21%","39%","13%","6%","6%","15%"],nowrapCols:[0,3,4,5],brandName:"ร้านค้าสวัสดิการ",footnote:"ราคาขายต่อหน่วยอ้างอิงราคาที่บันทึกในบิล · หากมีหลายราคาในช่วงที่เลือก จะแสดงเป็นช่วงราคา"};
+    }
+    if (salesView === "category") {
+      return {fileName:"daily-sales-summary.pdf",title:"รายงานสรุปยอดขายแยกตามชนิดสินค้า",periodLabel:`ช่วงข้อมูล ${rangeLabel}${staffSuffix}${categorySuffix}`,columns:["ชนิดสินค้า","บิล","ชิ้น","ยอดขาย (บาท)","ต้นทุน (บาท)","กำไร (บาท)"],numericCols:[1,2,3,4,5],rows:categoryRows.map(row=>[row.category,exportCount(row.orders),exportCount(row.qty),exportNumber(row.revenue),exportNumber(row.cogs),exportNumber(row.profit)]),totalsRow:["รวมทุกชนิดสินค้า",exportCount(categoryTotal.orders),exportCount(categoryTotal.qty),exportNumber(categoryTotal.revenue),exportNumber(categoryTotal.cogs),exportNumber(categoryTotal.profit)],brandName:"ร้านค้าสวัสดิการ"};
     }
     if (salesView === "items") {
       const hospitalSales = hospitalPreset === "sales";
@@ -1160,7 +1080,7 @@ export function Reports({
       fileName: pack.fileName,
       sheetName: pack.sheetName,
       rows: pack.rows,
-      numericCols: doc.numericCols ?? [],
+      numericCols: salesView === "product" ? [2,3,4,5,6,7] : doc.numericCols ?? [],
       preferred: preferred ?? "pdf",
       doc,
       hasTotalsRow: true,
@@ -1445,29 +1365,33 @@ export function Reports({
       setExportPreview(state);
     }
   };
-  const stockBalanceDocConfig = (): ReportDocConfig => ({
+  const stockBalanceDocConfig = (): ReportDocConfig => {
+    const visibleRows=nonzeroStockRows(stockBalanceRows);
+    const visibleTotals={items:visibleRows.length,opening:visibleRows.reduce((s,r)=>s+r.opening,0),sold:visibleRows.reduce((s,r)=>s+r.sold,0),remaining:visibleRows.reduce((s,r)=>s+r.remaining,0),sellingValue:visibleRows.reduce((s,r)=>s+r.sellingValue,0)};
+    return ({
     fileName: hospitalPreset === "stock" ? "hospital-stock-balance.pdf" : "stock-balance-period.pdf",
     title: "รายงานสินค้าคงคลัง",
     periodLabel: `ช่วงข้อมูล ${rangeLabel}${categorySuffix} · ยอดยกมา ณ ต้นช่วง${debouncedStockSearch ? ` · ค้นหา “${debouncedStockSearch}”` : ""}`,
     meta: [
-      ["จำนวนรายการ", `${stockTotals.items.toLocaleString("th-TH")} รายการ`],
-      ["ขายออกในช่วง", `${stockTotals.sold.toLocaleString("th-TH")} ชิ้น`],
-      ["คงเหลือรวม", `${stockTotals.remaining.toLocaleString("th-TH")} ชิ้น`],
-      ["มูลค่าคงเหลือตามราคาขายปัจจุบัน", money(stockTotals.sellingValue)],
+      ["จำนวนรายการ", `${visibleTotals.items.toLocaleString("th-TH")} รายการ`],
+      ["ขายออกในช่วง", `${visibleTotals.sold.toLocaleString("th-TH")} ชิ้น`],
+      ["คงเหลือรวม", `${visibleTotals.remaining.toLocaleString("th-TH")} ชิ้น`],
+      ["มูลค่าคงเหลือตามราคาขายปัจจุบัน", money(visibleTotals.sellingValue)],
     ],
     columns: hospitalPreset === "stock"
       ? ["Item", "รหัสสินค้า", "ชื่อสินค้า", "ยอดยกมา", "ยอดขาย", "คงเหลือ", "ราคาต่อหน่วย", "มูลค่าคงเหลือ"]
       : ["Item", "รหัสสินค้า", "ชื่อสินค้า", "หน่วย", "ยอดยกมา", "ยอดขาย", "คงเหลือ", "ราคาต่อหน่วย", "มูลค่าคงเหลือ"],
     numericCols: hospitalPreset === "stock" ? [3, 4, 5, 6, 7] : [4, 5, 6, 7, 8],
-    rows: stockBalanceRows.map((row) => hospitalPreset === "stock"
+    rows: visibleRows.map((row) => hospitalPreset === "stock"
       ? [exportCount(row.itemNumber), row.code, row.name, exportCount(row.opening), exportCount(row.sold), exportCount(row.remaining), exportNumber(row.sellingPrice), exportNumber(row.sellingValue)]
       : [exportCount(row.itemNumber), row.code, row.name, row.unit, exportCount(row.opening), exportCount(row.sold), exportCount(row.remaining), exportNumber(row.sellingPrice), exportNumber(row.sellingValue)]),
     totalsRow: hospitalPreset === "stock"
-      ? ["รวม", `${stockTotals.items} รายการ`, "", exportCount(stockTotals.opening), exportCount(stockTotals.sold), exportCount(stockTotals.remaining), "", exportNumber(stockTotals.sellingValue)]
-      : ["รวม", `${stockTotals.items} รายการ`, "", "", exportCount(stockTotals.opening), exportCount(stockTotals.sold), exportCount(stockTotals.remaining), "", exportNumber(stockTotals.sellingValue)],
+      ? ["รวม", `${visibleTotals.items} รายการ`, "", exportCount(visibleTotals.opening), exportCount(visibleTotals.sold), exportCount(visibleTotals.remaining), "", exportNumber(visibleTotals.sellingValue)]
+      : ["รวม", `${visibleTotals.items} รายการ`, "", "", exportCount(visibleTotals.opening), exportCount(visibleTotals.sold), exportCount(visibleTotals.remaining), "", exportNumber(visibleTotals.sellingValue)],
     brandName: "ร้านค้าสวัสดิการ",
     compact: true, // Keep the hospital template compact with its permanent Item column.
   });
+  };
   const openStockBalanceExportPreview = async (preferred?: ExportFormat, direct = false) => {
     if (stockBalanceRows.length === 0) {
       setNotice("ยังไม่มีรายการคงคลังที่จะส่งออก");

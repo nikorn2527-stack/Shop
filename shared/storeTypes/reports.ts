@@ -77,6 +77,9 @@ export type SalesByProductRow = {
   sku: string | null;
   barcode: string | null;
   category: string | null;
+  /** Historical line prices in the selected period; no database migration. */
+  priceMin?: number;
+  priceMax?: number;
   bills: number;
   qty: number;
   revenue: number;

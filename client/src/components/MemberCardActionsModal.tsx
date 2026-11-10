@@ -1,5 +1,4 @@
 import { useSlipDocument } from "@/hooks/useSlipDocument";
-import { SlipCopyMark, SlipDocumentOptions } from "./SlipDocumentOptions";
 import { createBrowserUuid } from "@/lib/browserUuid";
 import { WorkflowDialog } from "./WorkflowDialog";
 import { useEffect, useState } from "react";
@@ -105,7 +104,7 @@ export function MemberCardActionsModal({ memberNumber, onClose, onSuccess, initi
         : String(Date.now());
       await downloadSlipFile(
         "member-card-return-slip",
-        `สลิปคืนบัตรเงินสด-${returnResult.memberNumber}-${stamp}${slipDocument.variant === "copy" ? "-สำเนา" : ""}`,
+        `สลิปคืนบัตรเงินสด-${returnResult.memberNumber}-${stamp}`,
         format
       );
     } finally {
@@ -274,7 +273,7 @@ export function MemberCardActionsModal({ memberNumber, onClose, onSuccess, initi
                       <span>คืนบัตรเงินสดสำเร็จ</span>
                       <small>บันทึกลงรายการธุรกรรมของสมาชิกแล้ว</small>
                     </div>
-                    <SlipCopyMark variant={slipDocument.variant} />
+
                     <div className="receipt-divider" />
                     <div className="receipt-meta">
                       <span>ใบยืนยันการคืนบัตรเงินสด</span>
@@ -310,7 +309,7 @@ export function MemberCardActionsModal({ memberNumber, onClose, onSuccess, initi
                       <small>ข้อมูลถูกบันทึกในประวัติระบบ แล้ว</small>
                     </div>
                   </div>
-                  <SlipDocumentOptions variant={slipDocument.variant} onChange={slipDocument.setVariant} disabled={Boolean(slipBusy)} />
+
                   <div className="wallet-success-actions">
                     <button
                       className="outline-button"

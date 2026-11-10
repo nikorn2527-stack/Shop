@@ -1,5 +1,4 @@
 import { useSlipDocument } from "@/hooks/useSlipDocument";
-import { SlipCopyMark, SlipDocumentOptions } from "@/components/SlipDocumentOptions";
 import { createBrowserUuid } from "@/lib/browserUuid";
 import { useRef as useRequestRef } from "react";
 import { notify } from "@/lib/notifications";
@@ -246,7 +245,7 @@ export function MemberDetail({
             : "ถอนเงิน";
       await downloadSlipFile(
         "member-wallet-slip",
-        `สลิป${kindLabel}-${walletResult.memberNumber}-${stamp}${slipDocument.variant === "copy" ? "-สำเนา" : ""}`,
+        `สลิป${kindLabel}-${walletResult.memberNumber}-${stamp}`,
         format
       );
     } finally {
@@ -799,7 +798,7 @@ export function MemberDetail({
                         <small>บันทึกลงรายการธุรกรรมของสมาชิกแล้ว</small>
                       </div>
                     </div>
-                    <SlipCopyMark variant={slipDocument.variant} />
+
                     <div className="receipt-divider" />
                     <div className="receipt-meta">
                       <span>
@@ -852,7 +851,7 @@ export function MemberDetail({
                       <small>ข้อมูลถูกบันทึกในประวัติระบบ แล้ว</small>
                     </div>
                   </div>
-                  <SlipDocumentOptions variant={slipDocument.variant} onChange={slipDocument.setVariant} disabled={Boolean(walletSlipBusy)} />
+
                   <div className="wallet-success-actions">
                     <button
                       className="outline-button"
