@@ -328,6 +328,10 @@ export function Reports({
   };
   // ROUND 65 — ช่องค้นหาของรายงานใหม่: ยอดเงินในบัตร + สินค้าคงคลัง (debounce เหมือนประวัติบิล)
   const [balanceSearch, setBalanceSearch] = useState("");
+  const [includeReturnedZero, setIncludeReturnedZero] = useState(false);
+  const balanceScopeLabel = includeReturnedZero
+    ? "สมาชิกทั้งหมด รวมผู้คืนบัตรหรือปิดบัญชีที่ยอด 0 บาท"
+    : "สมาชิกที่ยังอยู่ รวมยอด 0 บาท";
   const [debouncedBalanceSearch, setDebouncedBalanceSearch] = useState("");
   const [stockSearch, setStockSearch] = useState("");
   const [debouncedStockSearch, setDebouncedStockSearch] = useState("");
@@ -457,6 +461,7 @@ export function Reports({
     setTxCustomRange(false);
     setTxTo(todayIso());
     setBalanceSearch("");
+    setIncludeReturnedZero(false);
     setStockSearch("");
     setReportTab("sales");
   };
@@ -532,7 +537,7 @@ export function Reports({
   const txRows = txQuery.data ?? [];
   // ROUND 65 — รายงานใหม่: ยอดเงินในบัตรทุกใบ + สินค้าคงคลังตามช่วงเวลา (ยอดยกมา/ยอดขาย/คงเหลือ)
   const balancesQuery = trpc.reports.memberBalances.useQuery(
-    { search: debouncedBalanceSearch || undefined },
+    { search: debouncedBalanceSearch || undefined, includeReturnedZero },
     { enabled: reportTab === "balances", refetchOnMount: "always", refetchOnWindowFocus: "always" }
   );
   const balanceRows = balancesQuery.data ?? [];
@@ -1327,7 +1332,7 @@ export function Reports({
   const balancesDocConfig = (): ReportDocConfig => ({
     fileName: hospitalPreset === "balances" ? "hospital-member-card-balance.pdf" : "member-card-balances.pdf",
     title: hospitalPreset === "balances" ? "รายงานแสดงยอดเงินในบัตรเงินสด" : "รายงานยอดเงินในบัตรสมาชิก",
-    periodLabel: `ณ วันที่สร้างรายงาน ${formatThaiDate(new Date())} · สมาชิกที่ยังอยู่ รวมยอด 0 บาท${debouncedBalanceSearch ? ` · ค้นหา “${debouncedBalanceSearch}”` : ""}`,
+    periodLabel: `ณ วันที่สร้างรายงาน ${formatThaiDate(new Date())} · ${balanceScopeLabel}${debouncedBalanceSearch ? ` · ค้นหา “${debouncedBalanceSearch}”` : ""}`,
     meta: [
       ["จำนวนสมาชิก", `${balanceTotals.members.toLocaleString("th-TH")} ราย`],
       ["ยอดเงินเข้ารวม", money(balanceTotals.totalIn)],
@@ -3127,6 +3132,10 @@ export function Reports({
                     />
                   </div></SharedSearch>
                   <span>สมาชิกที่ยังอยู่ รวมยอด 0 บาท</span>
+                  <label style={{display:"inline-flex",alignItems:"center",gap:8}}>
+                    <input type="checkbox" checked={includeReturnedZero} onChange={event => setIncludeReturnedZero(event.target.checked)} />
+                    <span>รวมผู้คืนบัตรหรือปิดบัญชีที่คงเหลือ 0 บาท</span>
+                  </label>
                 </div>
                 <div
                   className="report-export-actions"

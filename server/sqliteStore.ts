@@ -2754,7 +2754,7 @@ export function memberBalances(db: SqliteDb, input: MemberBalancesInput = {}): M
   // No clinical departure flag exists here. Hide only completed account/card
   // returns recorded by the official flows, never zero balance or no card alone.
   // A later assignment/replacement makes the member current again.
-  const where = ` WHERE NOT (
+  const where = ` WHERE (? = 1 OR NOT (
     m.balance = 0 AND NULLIF(TRIM(m.card_number), '') IS NULL
     AND (m.account_closed = 1 OR COALESCE((
       SELECT CASE WHEN ca.action = 'release' AND ca.note IN (
@@ -2763,8 +2763,8 @@ export function memberBalances(db: SqliteDb, input: MemberBalancesInput = {}): M
       FROM card_assignments ca WHERE ca.member_number = m.member_number
       ORDER BY ca.id DESC LIMIT 1
     ), 0) = 1)
-  )${search ? ` AND (m.first_name || ' ' || m.last_name || ' ' || m.member_number || ' ' || COALESCE(m.card_number, '') || ' ' || COALESCE(m.patient_code, '')) LIKE ?` : ''}`;
-  const params = search ? [`%${search}%`] : [];
+  ))${search ? ` AND (m.first_name || ' ' || m.last_name || ' ' || m.member_number || ' ' || COALESCE(m.card_number, '') || ' ' || COALESCE(m.patient_code, '')) LIKE ?` : ''}`;
+  const params = [input.includeReturnedZero ? 1 : 0, ...(search ? [`%${search}%`] : [])];
   return db.prepare(`
     SELECT m.id, m.member_number AS memberNumber, m.card_number AS cardNumber, m.patient_code AS patientCode,
       m.prename, m.first_name AS firstName, m.last_name AS lastName, m.type, m.status,

@@ -492,6 +492,7 @@ const memberTransactionsInput = z
 const memberBalancesInput = z
   .object({
     search: z.string().max(120).optional(),
+    includeReturnedZero: z.boolean().optional(),
   })
   .nullish();
 

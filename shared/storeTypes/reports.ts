@@ -175,7 +175,7 @@ export type MemberBalanceRow = {
   balance: number;
 };
 
-export type MemberBalancesInput = { search?: string };
+export type MemberBalancesInput = { search?: string; includeReturnedZero?: boolean };
 
 export type StockBalanceRow = {
   productId: number;
