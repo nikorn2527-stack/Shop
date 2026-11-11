@@ -742,7 +742,7 @@ function initializeCardUsageSessions(db: SqliteDb) {
 
 export function cardUsageHistory(db: SqliteDb, cardNumber: string) {
   const sessions = db.prepare(`SELECT s.id, s.card_number AS cardNumber, s.member_number AS memberNumber,
-    TRIM(m.first_name || ' ' || m.last_name) AS memberName, s.started_at AS startedAt, s.ended_at AS endedAt, s.opened_by AS openedBy,
+    TRIM(COALESCE(NULLIF(TRIM(m.prename), '') || ' ', '') || m.first_name || ' ' || m.last_name) AS memberName, s.started_at AS startedAt, s.ended_at AS endedAt, s.opened_by AS openedBy,
     s.closed_by AS closedBy, s.opening_balance AS openingBalance, s.closing_balance AS closingBalance, s.legacy,
     COUNT(t.id) AS transactionCount,
     COALESCE(SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END),0) AS incoming,
@@ -2724,7 +2724,7 @@ export function memberTransactions(db: SqliteDb, input: MemberTransactionsInput 
   const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
   const limitSql = limit === null ? "" : " LIMIT ?";
   const txRows = db.prepare(`SELECT t.id, t.member_number AS memberNumber,
-    NULLIF(TRIM(m.first_name || ' ' || m.last_name), '') AS memberName,
+    NULLIF(TRIM(COALESCE(NULLIF(TRIM(m.prename), '') || ' ', '') || m.first_name || ' ' || m.last_name), '') AS memberName,
     s.card_number AS cardNumber, m.patient_code AS patientCode, t.type, t.detail,
     t.amount, t.payment_method AS paymentMethod, t.balance_after AS balanceAfter,
     t.actor, t.created_at AS createdAt

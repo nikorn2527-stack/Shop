@@ -1129,7 +1129,7 @@ export function Reports({
       fileName: `${billExportBase}.pdf`,
       title: "รายงานประวัติบิลขาย",
       periodLabel: billMember
-        ? `แยกรายสมาชิก ${billMember.memberNumber} · สมาชิก${billMember.firstName} ${billMember.lastName}`
+        ? `แยกรายสมาชิก ${billMember.memberNumber} · สมาชิก ${memberFullName(billMember)}`
         : `บิลล่าสุดที่โหลดไว้ ${salesHistory.length} บิล`,
       meta: [
         ["จำนวนบิล", `${salesHistory.length} บิล`],
@@ -1244,7 +1244,7 @@ export function Reports({
     fileName: `${txExportBase}.pdf`,
     title: hospitalTxPreset ? hospitalTxTitle[hospitalPreset] : "รายงานประวัติธุรกรรมสมาชิก",
     periodLabel: txMember
-      ? `สมาชิก ${txMember.memberNumber} · สมาชิก${txMember.firstName} ${txMember.lastName}`
+      ? `สมาชิก ${txMember.memberNumber} · สมาชิก ${memberFullName(txMember)}`
       : "ทุกสมาชิก",
     meta: [
       [
@@ -2487,8 +2487,7 @@ export function Reports({
                     <>
                       สมาชิก{" "}
                       <b>
-                        {billMember.memberNumber} · สมาชิก{billMember.firstName}{" "}
-                        {billMember.lastName}
+                        {billMember.memberNumber} · สมาชิก {memberFullName(billMember)}
                       </b>{" "}
                       — แยกรายบิลของสมาชิกรายนี้
                     </>

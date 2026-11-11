@@ -1,3 +1,4 @@
+import {memberFullName} from "@/pages/pageData";
 import type {MemberSlipDocument} from "@shared/storeTypes/documents";
 import {MemberTransactionSlip} from "./MemberTransactionSlip";
 import { useSlipDocument } from "@/hooks/useSlipDocument";
@@ -69,7 +70,7 @@ export function MemberCardActionsModal({ memberNumber, onClose, onSuccess, initi
     if (!member) return;
     setReturnSessionId(session ? String(session.id) : "");
     setReturnResult({
-      memberName: `${member.firstName} ${member.lastName}`,
+      memberName: memberFullName(member),
       memberNumber,
       amount: member.balance,
       balanceBefore: member.balance,
@@ -129,7 +130,7 @@ export function MemberCardActionsModal({ memberNumber, onClose, onSuccess, initi
         {detail.isLoading && <p role="status">กำลังโหลด…</p>}
         {!detail.isLoading && member && (
   <>
-            <p>{member.firstName} {member.lastName} · {memberNumber}</p>
+            <p>{memberFullName(member)} · {memberNumber}</p>
             <p>บัตร {member.cardNumber ?? "ยังไม่มีบัตร"} · ยอดคงเหลือ {member.balance.toFixed(2)} บาท</p>
             {Boolean(member.accountClosed) && (
               <p className="notice-bar" role="status">
