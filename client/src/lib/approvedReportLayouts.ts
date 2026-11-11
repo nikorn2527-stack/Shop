@@ -14,7 +14,7 @@ export function stockReceiptLayout(source:readonly StockReceipt[]){
   if(row.receivedQty!==null)units.set(row.unit,(units.get(row.unit)||0)+row.receivedQty);
   return [day,code,row.name,shortOpeningLot(row.lot,code),row.receivedQty===null?'ไม่ระบุ':`${exportCount(row.receivedQty)} ${row.unit}`,exportNumber(row.sellingPrice),row.sellingValue===null?'ไม่ระบุ':exportNumber(row.sellingValue),row.expiry??'—',row.actor??'ไม่ระบุ'];
  });
- return {columns:['วันที่รับเข้า','บาร์โค้ดสินค้า','ชื่อสินค้า','LOT','จำนวน/หน่วย','ราคาขาย/หน่วย','มูลค่าราคาขาย','หมดอายุ','ผู้ทำรายการ'],rows,numericCols:[5,6],columnWidths:['11%','15%','21%','14%','10%','7%','9%','6%','7%'],nowrapCols:[0,1],topAlignCells:true,summaryBlocks:Array.from(units,([unit,qty])=>[`จำนวนรับรวม · ${unit}`,exportCount(qty)] as [string,string])};
+ return {columns:['วันที่รับเข้า','บาร์โค้ดสินค้า','ชื่อสินค้า','LOT','จำนวน/หน่วย','ราคาขาย/หน่วย','มูลค่าราคาขาย','หมดอายุ','ผู้ทำรายการ'],rows,numericCols:[5,6],columnWidths:['9%','14%','18%','13%','8%','8%','8%','9%','13%'],nowrapCols:[0,1,7],topAlignCells:true,summaryBlocks:Array.from(units,([unit,qty])=>[`จำนวนรับรวม · ${unit}`,exportCount(qty)] as [string,string])};
 }
 type Transaction={createdAt:string;cardNumber:string|null;memberNumber:string;amount:number;memberName:string|null;actor:string|null};
 export function hospitalTransactionLayout(source:readonly Transaction[]){

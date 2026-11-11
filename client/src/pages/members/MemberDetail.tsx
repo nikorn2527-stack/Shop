@@ -1,4 +1,5 @@
-import { useSlipDocument } from "@/hooks/useSlipDocument";
+import type {MemberSlipDocument} from "@shared/storeTypes/documents";
+import {MemberTransactionSlip} from "@/components/MemberTransactionSlip";
 import { createBrowserUuid } from "@/lib/browserUuid";
 import { useRef as useRequestRef } from "react";
 import { notify } from "@/lib/notifications";
@@ -34,11 +35,9 @@ import { blocker } from "@/components/BlockerAlert";
 import { CameraCaptureModal } from "@/components/CameraCaptureModal";
 import { MemberBarcodePrintModal } from "@/components/MemberBarcodePrintModal";
 import { MemberCardModal } from "@/components/MemberCardModal";
-import { PrintPreviewModal } from "@/components/PrintPreviewModal";
 import { SlipViewButton } from "@/components/SlipViewModal";
 import { StatementModal } from "@/components/StatementModal";
 import { trpc } from "@/lib/trpc";
-import { downloadSlipFile } from "@/exportUtils";
 import {
   ConfirmDialog,
   SectionHeader,
@@ -124,10 +123,8 @@ export function MemberDetail({
     balanceBefore: number;
     balanceAfter: number;
     detail: string;
+    slip: MemberSlipDocument;
   } | null>(null);
-  const [walletDoneAt, setWalletDoneAt] = useState<Date | null>(null);
-  const [walletSlipBusy, setWalletSlipBusy] = useState("");
-  const [walletPrintPreview, setWalletPrintPreview] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [editOpen, setEditOpen] = useState(false);
@@ -193,16 +190,14 @@ export function MemberDetail({
       : walletOpen === "refund"
         ? "คืนบัตรเงินสด"
         : "ถอนเงิน";
-  const [walletDocumentKey, setWalletDocumentKey] = useState("");
-  const slipDocument = useSlipDocument(walletDocumentKey ? {kind: "wallet_request", key: walletDocumentKey} : null);
   const walletRequestRef = useRequestRef<{ fingerprint: string; id: string } | null>(null);
   const walletMutation = trpc.member.wallet.useMutation({
     onSuccess: result => {
-      setWalletDocumentKey(walletRequestRef.current?.id ?? "");
+
       walletRequestRef.current = null;
       // ROUND 77 — ไม่ปิดโมดัลทันที: เปลี่ยนเป็นหน้าสลิกให้พิมพ์/ดาวน์โหลดก่อน
       setWalletResult(result);
-      setWalletDoneAt(new Date());
+
       setWalletConfirm(false);
       setWalletAmount("");
       setWalletNote("");
@@ -226,31 +221,9 @@ export function MemberDetail({
   const closeWalletSlip = () => {
     setWalletOpen(null);
     setWalletResult(null);
-    setWalletDoneAt(null);
-    setWalletSlipBusy("");
-    setWalletPrintPreview(false);
-  };
-  const downloadWalletSlip = async (format: "pdf" | "image") => {
-    if (!walletResult) return;
-    setWalletSlipBusy(format);
-    try {
-      const stamp = walletDoneAt
-        ? `${String(walletDoneAt.getFullYear() + 543).slice(2)}${String(walletDoneAt.getMonth() + 1).padStart(2, "0")}${String(walletDoneAt.getDate()).padStart(2, "0")}-${String(walletDoneAt.getHours()).padStart(2, "0")}${String(walletDoneAt.getMinutes()).padStart(2, "0")}`
-        : String(Date.now());
-      const kindLabel =
-        walletResult.type === "deposit"
-          ? "เติมเงิน"
-          : walletResult.type === "refund"
-            ? "คืนบัตรเงินสด"
-            : "ถอนเงิน";
-      await downloadSlipFile(
-        "member-wallet-slip",
-        `สลิป${kindLabel}-${walletResult.memberNumber}-${stamp}`,
-        format
-      );
-    } finally {
-      setWalletSlipBusy("");
-    }
+
+
+
   };
   const statusMutation = trpc.member.setStatus.useMutation({
     onSuccess: result => {
@@ -732,7 +705,7 @@ export function MemberDetail({
           </div>
         )}
       </section>
-      {walletOpen && (
+      {walletOpen && !walletResult && (
         <div className="modal-backdrop" onClick={closeWalletSlip}>
           <div
             className="form-modal"
@@ -740,156 +713,15 @@ export function MemberDetail({
           >
             <div className="modal-heading">
               <div>
-                <span className="eyebrow">
-                  {walletResult
-                    ? walletResult.type === "deposit"
-                      ? "สลิปเติมเงิน"
-                      : walletResult.type === "refund"
-                        ? "สลิปคืนบัตรเงินสด"
-                        : "สลิปถอนเงิน"
-                    : "รายการธุรกรรม"}
-                </span>
-                <h2>
-                  {walletResult
-                    ? walletResult.type === "deposit"
-                      ? "สลิปเติมเงิน"
-                      : walletResult.type === "refund"
-                        ? "สลิปคืนบัตรเงินสด"
-                        : "สลิปถอนเงิน"
-                    : walletOpen === "deposit"
-                      ? "เติมเงินเข้าบัญชีสมาชิก"
-                      : walletOpen === "refund"
-                        ? "คืนบัตรเงินสด (จ่ายเงินคืนผู้ป่วย)"
-                        : "ถอนเงินจากบัญชีสมาชิก"}
-                </h2>
-                <p>
-                  {walletResult
-                    ? `${walletResult.memberName} · ${walletResult.memberNumber} · บันทึกเรียบร้อย`
-                    : `${displayName} · ${profile.memberNumber} · ยอดคงเหลือ ${money(profile.balance)}${walletOpen === "refund" ? " · บัตรที่คืนต้องเหลือยอด 0" : ""}`}
-                </p>
+                <span className="eyebrow">รายการธุรกรรม</span>
+                <h2>{walletOpen === "deposit" ? "เติมเงินเข้าบัญชีสมาชิก" : walletOpen === "refund" ? "คืนบัตรเงินสด (จ่ายเงินคืนผู้ป่วย)" : "ถอนเงินจากบัญชีสมาชิก"}</h2>
+                <p>{`${displayName} · ${profile.memberNumber} · ยอดคงเหลือ ${money(profile.balance)}`}</p>
               </div>
               <button className="icon-button" onClick={closeWalletSlip}>
                 <X size={17} />
               </button>
             </div>
-            {walletResult ? (
-              <>
-                <div className="wallet-success">
-                  <div
-                    className="receipt-paper wallet-slip"
-                    id="member-wallet-slip"
-                  >
-                    <div className="receipt-success slip">
-                      <span>
-                        {walletResult.type === "deposit" ? (
-                          <ArrowDownToLine size={22} />
-                        ) : (
-                          <ArrowUpFromLine size={22} />
-                        )}
-                      </span>
-                      <div>
-                        <b>
-                          {walletResult.type === "deposit"
-                            ? "เติมเงินสำเร็จ"
-                            : walletResult.type === "refund"
-                              ? "คืนบัตรเงินสดสำเร็จ"
-                              : "ถอนเงินสำเร็จ"}
-                        </b>
-                        <small>บันทึกลงรายการธุรกรรมของสมาชิกแล้ว</small>
-                      </div>
-                    </div>
-
-                    <div className="receipt-divider" />
-                    <div className="receipt-meta">
-                      <span>
-                        {walletResult.type === "deposit"
-                          ? "ใบยืนยันการเติมเงิน"
-                          : walletResult.type === "refund"
-                            ? "ใบยืนยันการคืนบัตรเงินสด"
-                            : "ใบยืนยันการถอนเงิน"}
-                      </span>
-                      <b>
-                        {walletDoneAt
-                          ? `${walletDoneAt.toLocaleDateString("th-TH", { timeZone: "Asia/Bangkok", day: "numeric", month: "short", year: "numeric" })} · ${walletDoneAt.toLocaleTimeString("th-TH", { timeZone: "Asia/Bangkok", hourCycle: "h23", hour: "2-digit", minute: "2-digit" })} น.`
-                          : ""}
-                      </b>
-                    </div>
-                    <div className="receipt-customer">
-                      <span>สมาชิก</span>
-                      <b>
-                        {walletResult.memberName} · {walletResult.memberNumber}
-                      </b>
-                    </div>
-                    <div className="receipt-line">
-                      <span>
-                        {walletResult.type === "deposit"
-                          ? "จำนวนเงินที่เติม"
-                          : walletResult.type === "refund"
-                            ? "จำนวนเงินที่คืน"
-                            : "จำนวนเงินที่ถอน"}
-                      </span>
-                      <b>{money(walletResult.amount)}</b>
-                    </div>
-                    <div className="receipt-line">
-                      <span>ยอดคงเหลือก่อนรายการ</span>
-                      <b>{money(walletResult.balanceBefore)}</b>
-                    </div>
-                    <div className="receipt-total">
-                      <span>ยอดคงเหลือหลังรายการ</span>
-                      <b>{money(walletResult.balanceAfter)}</b>
-                    </div>
-                    <div className="receipt-payment">
-                      <span>ผู้ทำรายการ</span>
-                      <b>
-                        {actor} · {actorRole}
-                      </b>
-                    </div>
-                    <div className="receipt-thanks">
-                      บันทึกเข้าระบบเรียบร้อย
-                      ตรวจสอบยอดได้ที่ประวัติการทำรายการด้านล่าง
-                      <br />
-                      <small>ข้อมูลถูกบันทึกในประวัติระบบ แล้ว</small>
-                    </div>
-                  </div>
-
-                  <div className="wallet-success-actions">
-                    <button
-                      className="outline-button"
-                      disabled={Boolean(walletSlipBusy)}
-                      onClick={() => void downloadWalletSlip("pdf")}
-                    >
-                      <Download size={16} />{" "}
-                      {walletSlipBusy === "pdf"
-                        ? "กำลังสร้าง PDF..."
-                        : "ดาวน์โหลด PDF"}
-                    </button>
-                    <button
-                      className="outline-button"
-                      disabled={Boolean(walletSlipBusy)}
-                      onClick={() => void downloadWalletSlip("image")}
-                    >
-                      <FileImage size={16} />{" "}
-                      {walletSlipBusy === "image"
-                        ? "กำลังสร้างรูป..."
-                        : "ดาวน์โหลดรูปภาพ"}
-                    </button>
-                    <button
-                      className="outline-button"
-                      onClick={() => setWalletPrintPreview(true)}
-                    >
-                      <Printer size={16} /> พิมพ์สลิป
-                    </button>
-                    <button
-                      className="primary-button"
-                      data-action-tone="success"
-                      onClick={closeWalletSlip}
-                    >
-                      <Check size={16} /> เสร็จสิ้น · ปิดหน้าต่าง
-                    </button>
-                  </div>
-                </div>
-              </>
-            ) : walletConfirm ? (
+            {walletConfirm ? (
               <>
                 <div className="wallet-confirm-warning">
                   <ShieldCheck size={16} />
@@ -1328,30 +1160,7 @@ export function MemberDetail({
           </div>
         </div>
       )}
-      {walletPrintPreview && walletResult && (
-        <PrintPreviewModal
-          targetId="member-wallet-slip" onBeforePrint={slipDocument.beforePrint} documentVersion={slipDocument.variant}
-          title={
-            walletResult.type === "deposit"
-              ? "พรีวิวก่อนพิมพ์สลิปเติมเงิน"
-              : walletResult.type === "refund"
-                ? "พรีวิวก่อนพิมพ์สลิปคืนบัตรเงินสด"
-                : "พรีวิวก่อนพิมพ์สลิปถอนเงิน"
-          }
-          subtitle={`${walletResult.memberName} · ${walletResult.memberNumber} · ${money(walletResult.amount)}`}
-          paper="thermal"
-          chips={[
-            walletResult.type === "deposit"
-              ? "เติมเงินเข้าบัญชีสมาชิก"
-              : walletResult.type === "refund"
-                ? "คืนบัตรเงินสด"
-                : "ถอนเงินจากบัญชีสมาชิก",
-            `คงเหลือ ${money(walletResult.balanceAfter)}`,
-          ]}
-          stayOpenAfterPrint
-          onClose={() => setWalletPrintPreview(false)}
-        />
-      )}
+      {walletResult && <MemberTransactionSlip document={walletResult.slip} onClose={closeWalletSlip}/>}
       {editCameraOpen && (
         <CameraCaptureModal
           open

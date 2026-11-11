@@ -1,3 +1,5 @@
+import type {MemberSlipDocument} from "@shared/storeTypes/documents";
+import {MemberTransactionSlip} from "./MemberTransactionSlip";
 import { WorkflowDialog } from "./WorkflowDialog";
 import { useRef, useState } from "react";
 import { blocker } from "./BlockerAlert";
@@ -34,6 +36,7 @@ export function MemberRegistrationModal({
   onRegistered: (member: MemberCardData) => void;
   onUseExisting: (member: MemberLite, cardNumber: string, openDetails: boolean) => void;
 }) {
+  const [completed,setCompleted] = useState<{member:MemberCardData;slip:MemberSlipDocument}|null>(null);
   const utils = trpc.useUtils();
   const settingsQuery = trpc.settings.get.useQuery(undefined);
   const nextNumberQuery = trpc.member.nextNumber.useQuery(undefined, { staleTime: 0, refetchOnMount: "always", refetchOnWindowFocus: true });
@@ -104,7 +107,7 @@ export function MemberRegistrationModal({
   const cardsQuery = trpc.card.list.useQuery(undefined);
   const registerMutation = trpc.member.register.useMutation({
     onSuccess: result => {
-      onRegistered(result.member);
+      setCompleted(result);
       void utils.card.list.invalidate();
       void utils.member.list.invalidate();
       void utils.member.nextNumber.invalidate();
@@ -237,6 +240,7 @@ export function MemberRegistrationModal({
     });
   };
 
+  if(completed) return <MemberTransactionSlip document={completed.slip} onClose={()=>onRegistered(completed.member)}/>;
   return (
     <>
       {registerCameraOpen && (

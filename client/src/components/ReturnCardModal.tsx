@@ -1,3 +1,5 @@
+import type {MemberSlipDocument} from "@shared/storeTypes/documents";
+import {MemberTransactionSlip} from "./MemberTransactionSlip";
 import { createBrowserUuid } from "@/lib/browserUuid";
 import { useRef, useState } from 'react';
 import { trpc } from '@/lib/trpc';
@@ -18,11 +20,14 @@ type Props = {
 };
 
 export function ReturnCardModal({ members, initialMember, allowMemberChange = true, onClose, onReturned }: Props) {
+  const [completed,setCompleted] = useState<MemberSlipDocument | null>(null);
+  const finish = () => { if(completed) onReturned(completed.memberNumber,completed.amount); };
   const [selected, setSelected] = useState(initialMember);
+  if(completed) return <MemberTransactionSlip document={completed} onClose={finish}/>;
   return <WorkflowDialog title="คืนบัตรสมาชิก" description="เลือกสมาชิก ตรวจสอบยอดเงิน และยืนยันว่าได้รับบัตรจริงคืนแล้ว" className="form-modal card-return-modal" onClose={onClose}>
     <div className="modal-heading card-return-heading"><div className="card-return-title"><span><RotateCcw size={23} /></span><div><span className="eyebrow">บัตรสมาชิกและเงินคงเหลือ</span><h2>คืนบัตรสมาชิก</h2></div></div><button type="button" className="icon-button" aria-label="ปิดหน้าคืนบัตร" onClick={onClose}><X size={18} /></button></div>
     <ol className="card-return-steps" aria-label="ขั้นตอนคืนบัตร"><li aria-current={!selected ? 'step' : undefined}><span>1</span>เลือกสมาชิก</li><li aria-current={selected ? 'step' : undefined}><span>2</span>ตรวจสอบยอดคืน</li><li><span>3</span>ยืนยันคืนบัตร</li></ol>
-    {selected ? <ReturnCardReview key={selected.memberNumber} memberNumber={selected.memberNumber} onBack={allowMemberChange ? () => setSelected(null) : undefined} onClose={onClose} onReturned={onReturned} /> : <>
+    {selected ? <ReturnCardReview key={selected.memberNumber} memberNumber={selected.memberNumber} onBack={allowMemberChange ? () => setSelected(null) : undefined} onClose={onClose} onCompleted={setCompleted} /> : <>
       <section className="card-return-search" aria-labelledby="return-search-label"><label id="return-search-label" htmlFor="pos-return-card">สแกนบัตรหรือค้นหาสมาชิก</label><p>ค้นหาด้วยชื่อ เลขสมาชิก หรือเลขบัตร</p><MemberScanPicker members={members} selectedNumber={null} onSelect={setSelected} inputId="pos-return-card" inputLabel="สแกนบัตรหรือค้นหาสมาชิกเพื่อคืนบัตร" placeholder="สแกนบัตร หรือพิมพ์ชื่อ / เลขสมาชิก / เลขบัตร" allowGeneralCustomer={false} autoFocus /></section>
       <div className="card-return-empty"><span><ScanLine size={36} /></span><h3>เริ่มจากบัตรที่รับคืน</h3><p>สแกนบัตรด้วยเครื่องอ่านหรือกล้อง<br />จากนั้นตรวจสอบชื่อสมาชิกและเงินที่ต้องคืน</p></div>
       <div className="card-return-help"><ShieldCheck size={18} /><span>ระบบจะยังไม่คืนเงินหรือเปลี่ยนสถานะบัตร จนกว่าจะยืนยันรายการ</span></div>
@@ -31,8 +36,8 @@ export function ReturnCardModal({ members, initialMember, allowMemberChange = tr
   </WorkflowDialog>;
 }
 
-function ReturnCardReview({ memberNumber, onBack, onClose, onReturned }: {
-  memberNumber: string; onBack?: () => void; onClose: () => void; onReturned: Props['onReturned'];
+function ReturnCardReview({ memberNumber, onBack, onClose, onCompleted }: {
+  memberNumber: string; onBack?: () => void; onClose: () => void; onCompleted: (document:MemberSlipDocument)=>void;
 }) {
   const utils = trpc.useUtils();
   const detail = trpc.member.detail.useQuery({ memberNumber });
@@ -45,10 +50,10 @@ function ReturnCardReview({ memberNumber, onBack, onClose, onReturned }: {
   const requestId = useRef(createBrowserUuid());
   const inFlight = useRef(false);
   const release = trpc.card.return.useMutation({
-    onSuccess: async () => {
-      const amount = review?.amount ?? 0;
+    onSuccess: async (result) => {
+      onCompleted(result.slip);
       await Promise.all([utils.member.detail.invalidate(), utils.member.list.invalidate(), utils.card.list.invalidate(), utils.card.history.invalidate(), utils.logs.list.invalidate()]);
-      onReturned(memberNumber, amount);
+
     },
     onError: e => setError(getErrorMessage(e)),
     onSettled: () => { inFlight.current = false; },

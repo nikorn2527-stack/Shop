@@ -47,10 +47,10 @@ describe("member card workflow UI", () => {
     const reportSource = readSource("./pages/reports/Reports.tsx");
 
     expect(reportSource).toContain('"เลขที่บัตร"');
-    expect(reportSource).toContain('withdrawal: "รายงานยอดแสดงการถอนเงิน"');
-    expect(reportSource).toContain('deposit: "รายงานยอดแสดงการเติมเงิน"');
-    expect(reportSource).toContain('refund: "รายงานยอดแสดงการคืนบัตรเงินสด"');
-    expect(reportSource).toContain('activation: "รายงานยอดแสดงการเปิดใช้บัตรเงินสด"');
+    expect(reportSource).toContain('withdrawal: "รายงานการถอนเงิน"');
+    expect(reportSource).toContain('deposit: "รายงานการเติมเงิน"');
+    expect(reportSource).toContain('refund: "รายงานการคืนบัตรเงินสด"');
+    expect(reportSource).toContain('activation: "รายงานการเปิดใช้บัตรเงินสด"');
     expect(reportSource).toContain("const transactionLabel = (row: typeof txRows[number]) => TX_TYPE_LABEL[row.type]");
     expect(reportSource).toContain("...visibleTxSummary.map(item => [item.label, `${item.sign}${exportNumber(item.amount)}");
     expect(reportSource).toContain('columnWidths: hospitalTxPreset');

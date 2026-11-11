@@ -1,18 +1,35 @@
-import { receiptAddressLines, receiptHeaderDateTime } from "@/lib/receiptHeader";
-import { capturePrintStyles, applyPrintStylesSnapshot } from "@/lib/printStyles";
+import type { MemberSlipDocument } from "@shared/storeTypes/documents";
+import { memberSlipLabels } from "@/lib/memberSlipReceipt";
+import {
+  receiptAddressLines,
+  receiptHeaderDateTime,
+} from "@/lib/receiptHeader";
+import {
+  capturePrintStyles,
+  applyPrintStylesSnapshot,
+} from "@/lib/printStyles";
 import { useSlipDocument } from "@/hooks/useSlipDocument";
 import { useRef, useState } from "react";
 import { WorkflowDialog } from "./WorkflowDialog";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
-import { Bank, Check, Download, FileImage, Plus, Printer, X } from "@/lib/icons";
-import type { CheckoutReceipt } from '@shared/storeTypes/sales';
+import {
+  Bank,
+  Check,
+  Download,
+  FileImage,
+  Printer,
+  X,
+} from "@/lib/icons";
+import type { CheckoutReceipt } from "@shared/storeTypes/sales";
 import { money } from "../pages/pageData";
 import { trpc } from "@/lib/trpc";
-import { PrintPreviewModal } from "./PrintPreviewModal";
 import { printElementDocument } from "@/lib/printHelper";
 import { toast } from "sonner";
-import { getThermalPrintProfile, thermalContentLeftMm } from "@/lib/thermalPrint";
+import {
+  getThermalPrintProfile,
+  thermalContentLeftMm,
+} from "@/lib/thermalPrint";
 
 /**
  * Shared receipt modal — extracted from the POS checkout success screen.
@@ -32,15 +49,27 @@ import { getThermalPrintProfile, thermalContentLeftMm } from "@/lib/thermalPrint
  * remaining balance on ALL member bills (cash / QR included — the balance
  * simply stays put, but the cashier and member still see it).
  */
-export function ReceiptModal({ receipt, onClose, onNewSale, onPrinted, mode = "new", documentTitle = "ใบเสร็จรับเงิน · ซื้อสินค้า" }: {
+export function ReceiptModal({
+  receipt,
+  onClose,
+  onNewSale,
+  onPrinted,
+  mode = "new",
+  documentTitle = "ใบเสร็จรับเงิน · ซื้อสินค้า",
+  transaction,
+}: {
   receipt: CheckoutReceipt;
+  transaction?: MemberSlipDocument;
   onClose: () => void;
   onNewSale?: () => void;
   onPrinted?: () => void;
   mode?: "new" | "reprint";
   documentTitle?: string;
 }) {
-  const slipDocument = useSlipDocument(receipt.documentRef ?? {kind: "sale", key: receipt.orderNumber}, mode === "reprint" ? "copy" : "original");
+  const slipDocument = useSlipDocument(
+    receipt.documentRef ?? { kind: "sale", key: receipt.orderNumber },
+    mode === "reprint" ? "copy" : "original"
+  );
   const [receiptBusy, setReceiptBusy] = useState("");
   const busyRef = useRef(false);
   const [documentError, setDocumentError] = useState("");
@@ -48,8 +77,11 @@ export function ReceiptModal({ receipt, onClose, onNewSale, onPrinted, mode = "n
   const showBalance = settingsQuery.data?.showBalanceOnReceipt !== false;
   // FIX-26 (user) — ปุ่ม 'พิมพ์' พิมพ์เลย ไม่เข้าพรีวิวก่อน
   // ROUND 25 — แบรนด์ที่ผู้บริหารปรับเอง แสดงบนหัวใบเสร็จด้วย
-  const receiptName = (settingsQuery.data?.appName ?? "").trim() || "ร้านค้าสวัสดิการ";
+  const receiptName =
+    (settingsQuery.data?.appName ?? "").trim() || "ร้านค้าสวัสดิการ";
   const receiptAddress = receiptAddressLines(settingsQuery.data?.storeAddress);
+  const transactionLabels = transaction ? memberSlipLabels(transaction) : null;
+  const successTitle = transactionLabels?.success ?? "ชำระเงินสำเร็จ";
   const receiptDateTime = receiptHeaderDateTime(receipt.createdAt);
   // พิมพ์สลิป Thermal ตรง ๆ — ฉีด @page size ให้ตรงความกว้างสลิป (58/72/80 มม.)
   // ก่อนสั่งพิมพ์ ไม่เช่นนั้นเบราว์เซอร์จะใช้กระดาษ A4/Letter ปริ้นใบเสร็จเล็กอยู่กลางหน้า
@@ -59,20 +91,37 @@ export function ReceiptModal({ receipt, onClose, onNewSale, onPrinted, mode = "n
     busyRef.current = true;
     setDocumentError("");
     setReceiptBusy("printing");
-    const profile = getThermalPrintProfile(settingsQuery.data?.receiptPaperWidth);
+    const profile = getThermalPrintProfile(
+      settingsQuery.data?.receiptPaperWidth
+    );
     try {
       await slipDocument.beforePrint();
-      const result = await printElementDocument("receipt-paper", profile.paperWidthMm);
+      const result = await printElementDocument(
+        "receipt-paper",
+        profile.paperWidthMm
+      );
       if (result.usedFallback) {
-        toast.info("กลับจากหน้าต่างพิมพ์แล้ว", { description: "ตรวจเอกสารที่เครื่องพิมพ์ หากยกเลิกการพิมพ์สามารถพิมพ์ซ้ำจากหน้านี้ได้" });
+        toast.info("กลับจากหน้าต่างพิมพ์แล้ว", {
+          description:
+            "ตรวจเอกสารที่เครื่องพิมพ์ หากยกเลิกการพิมพ์สามารถพิมพ์ซ้ำจากหน้านี้ได้",
+        });
       } else {
-        toast.info("ส่งงานพิมพ์แล้ว · ตรวจเอกสารที่เครื่องพิมพ์", { description: result.message });
+        toast.info("ส่งงานพิมพ์แล้ว · ตรวจเอกสารที่เครื่องพิมพ์", {
+          description: result.message,
+        });
       }
       onPrinted?.();
       // Printing never dismisses a completed receipt; exit is a separate user action.
     } catch (error) {
-      setDocumentError(error instanceof Error ? error.message : "ลองตรวจเครื่องพิมพ์แล้วพิมพ์อีกครั้ง");
-    } finally { busyRef.current = false; setReceiptBusy(""); }
+      setDocumentError(
+        error instanceof Error
+          ? error.message
+          : "ลองตรวจเครื่องพิมพ์แล้วพิมพ์อีกครั้ง"
+      );
+    } finally {
+      busyRef.current = false;
+      setReceiptBusy("");
+    }
   };
 
   // Enter activates the focused button. Never intercept other receipt actions globally.
@@ -96,19 +145,28 @@ export function ReceiptModal({ receipt, onClose, onNewSale, onPrinted, mode = "n
       }
       // scale 2.0 พอ — สูงกว่านี้ไฟล์ใหญ่ + บางเครื่อง render เพี้ยน
       const printStyles = capturePrintStyles();
-      const canvas = await html2canvas(element, { scale: 2.0, backgroundColor: "#ffffff", useCORS: true, onclone: async (doc) => {
-        await applyPrintStylesSnapshot(doc, printStyles, "receipt-paper");
-        const paper = doc.getElementById("receipt-paper");
-        if (paper) {
-          paper.style.lineHeight = "1.8";
-          paper.querySelectorAll<HTMLElement>(".receipt-total, .receipt-customer, .receipt-payment, .receipt-balance").forEach(row => {
-            row.style.minHeight = "32px";
-            row.style.paddingTop = "8px";
-            row.style.paddingBottom = "8px";
-            row.style.alignItems = "center";
-          });
-        }
-      } });
+      const canvas = await html2canvas(element, {
+        scale: 2.0,
+        backgroundColor: "#ffffff",
+        useCORS: true,
+        onclone: async doc => {
+          await applyPrintStylesSnapshot(doc, printStyles, "receipt-paper");
+          const paper = doc.getElementById("receipt-paper");
+          if (paper) {
+            paper.style.lineHeight = "1.8";
+            paper
+              .querySelectorAll<HTMLElement>(
+                ".receipt-total, .receipt-customer, .receipt-payment, .receipt-balance"
+              )
+              .forEach(row => {
+                row.style.minHeight = "32px";
+                row.style.paddingTop = "8px";
+                row.style.paddingBottom = "8px";
+                row.style.alignItems = "center";
+              });
+          }
+        },
+      });
       const filename = `${receipt.orderNumber}.${format === "pdf" ? "pdf" : "png"}`;
       if (format === "image") {
         const link = document.createElement("a");
@@ -116,18 +174,375 @@ export function ReceiptModal({ receipt, onClose, onNewSale, onPrinted, mode = "n
         link.href = canvas.toDataURL("image/png");
         link.click();
       } else {
-        const profile = getThermalPrintProfile(settingsQuery.data?.receiptPaperWidth);
-        const contentHeightMm = (canvas.height / canvas.width) * profile.printableWidthMm;
+        const profile = getThermalPrintProfile(
+          settingsQuery.data?.receiptPaperWidth
+        );
+        const contentHeightMm =
+          (canvas.height / canvas.width) * profile.printableWidthMm;
         const pageHeightMm = contentHeightMm + profile.bottomFeedMm;
-        const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: [profile.paperWidthMm, pageHeightMm] });
+        const pdf = new jsPDF({
+          orientation: "portrait",
+          unit: "mm",
+          format: [profile.paperWidthMm, pageHeightMm],
+        });
         // ใช้ JPEG quality สูงแทน PNG ลดขนาดไฟล์ + ไม่เพี้ยนสี
         const imgData = canvas.toDataURL("image/jpeg", 0.92);
-        pdf.addImage(imgData, "JPEG", thermalContentLeftMm(profile), 0, profile.printableWidthMm, contentHeightMm);
+        pdf.addImage(
+          imgData,
+          "JPEG",
+          thermalContentLeftMm(profile),
+          0,
+          profile.printableWidthMm,
+          contentHeightMm
+        );
         pdf.save(filename);
       }
     } catch (error) {
-      setDocumentError(error instanceof Error ? error.message : "สร้างเอกสารไม่สำเร็จ กรุณาลองอีกครั้ง");
-    } finally { busyRef.current = false; setReceiptBusy(""); }
+      setDocumentError(
+        error instanceof Error
+          ? error.message
+          : "สร้างเอกสารไม่สำเร็จ กรุณาลองอีกครั้ง"
+      );
+    } finally {
+      busyRef.current = false;
+      setReceiptBusy("");
+    }
   };
-  return <WorkflowDialog title={mode === "new" ? "ชำระเงินสำเร็จ" : "พิมพ์ใบเสร็จซ้ำ"} onClose={onClose} busy={Boolean(receiptBusy)} className="receipt-modal"><div className={`receipt-success${mode === "reprint" ? " reprint" : ""}`}><span>{mode === "reprint" ? <Printer size={22} /> : <Check size={22} />}</span><div><b>{mode === "reprint" ? "พิมพ์ใบเสร็จซ้ำ" : "ชำระเงินสำเร็จ"}</b><small>{mode === "reprint" ? "เรียกดูบิลย้อนหลังจากระบบ" : "บันทึกรายการแล้ว · พิมพ์ซ้ำได้ กดเสร็จสิ้นเมื่อเรียบร้อย"}</small></div><button type="button" className="icon-button" aria-label="ปิดใบเสร็จ" disabled={Boolean(receiptBusy)} onClick={onClose}><X size={17} /></button></div><div className="receipt-paper" id="receipt-paper"><div className="receipt-brand"><div className="receipt-brand-text"><b>{receiptName}</b><small>Welfare Store</small>{receiptAddress.length > 0 && <small className="receipt-address">{receiptAddress.map((line, index) => <span key={index} style={{display:"block",whiteSpace:line.contact ? "nowrap" : undefined}}>{line.text}</span>)}</small>}</div></div><h2 className="receipt-document-title">{documentTitle}</h2><div className="receipt-divider" /><div className="receipt-meta" style={{display:"grid",gridTemplateColumns:"minmax(0, 1fr)",gap:4}}>{[["เลขที่ใบเสร็จ",receipt.orderNumber],["วันที่",receiptDateTime.date],["เวลา",receiptDateTime.time]].map(([label,value])=><div key={label} className="receipt-meta-row" style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:6}}><span style={{whiteSpace:"nowrap",flexShrink:0}}>{label}</span><b style={{whiteSpace:"nowrap",textAlign:"right"}}>{value}</b></div>)}</div><div className="receipt-customer" style={receipt.memberNumber ? {paddingBottom:2,borderBottom:"none"} : undefined}><span>ผู้ซื้อ</span><b className={receipt.memberName ? "receipt-member-name" : undefined} style={{fontSize:12,lineHeight:1.45,textAlign:"right"}}>{receipt.memberName || "บุคคลทั่วไป"}</b></div>{receipt.memberNumber && <div className="receipt-member-reference" style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",gap:6,padding:"2px 0 8px",borderBottom:"1px solid #e0e0dc",fontSize:10}}><span style={{whiteSpace:"nowrap",flexShrink:0}}>เลขสมาชิก</span><b style={{whiteSpace:"nowrap",textAlign:"right",fontSize:11}}>{receipt.memberNumber}</b></div>}{receipt.items.map((item) => <div className="receipt-line" key={`${item.productId}-${item.name}`}><span>{item.name}<small>{item.qty} {item.unit}{item.price >= 0.05 ? ` × ${money(item.price)}` : ""}</small></span><b>{money(item.amount)}</b></div>)}<div className="receipt-line"><span>ยอดรวมสินค้า</span><b>{money(receipt.subtotal)}</b></div>{receipt.discount > 0 && <div className="receipt-line"><span>ส่วนลด</span><b>- {money(receipt.discount)}</b></div>}<div className="receipt-total"><span>ยอดชำระทั้งหมด</span><b>{money(receipt.total)}</b></div><div className="receipt-payment"><span>วิธีชำระเงิน</span><b>{receipt.paymentMethod}</b></div>{receipt.terminalNumber != null && <div className="receipt-payment"><span>จุดขาย</span><b>{String(receipt.terminalNumber).padStart(2, "0")}</b></div>}<div className="receipt-payment"><span>ผู้ทำรายการ</span><b>{receipt.cashier?.trim() || "เจ้าหน้าที่ร้านค้า"}</b></div>{receipt.memberNumber && receipt.balanceAfter !== null && showBalance && <div className="receipt-balance"><span>ยอดเงินคงเหลือของสมาชิก</span><b>{money(receipt.balanceAfter)}</b></div>}{receipt.paymentMethod === "เงินสด" && receipt.receivedCash != null && <div className="receipt-cash-change"><div className="receipt-line"><span>รับเงินมา</span><b>{money(receipt.receivedCash)}</b></div><div className="receipt-line"><span>ทอนเงิน</span><b>{money(receipt.changeDue ?? 0)}</b></div></div>}{receipt.paymentMethod === "QR / สแกน" && (settingsQuery.data?.bankAccounts ?? []).filter(a => a.active).length > 0 && <div className="receipt-bank-wrap"><div className="receipt-divider" /><div className="receipt-bank-section"><div className="receipt-bank-head"><Bank size={13} /> บัญชีธนาคารร้าน (หากโอนผ่านแอปธนาคาร)</div>{(settingsQuery.data?.bankAccounts ?? []).filter(a => a.active).map(account => <div className="receipt-bank-line" key={account.id}><b>{account.bankName}</b><small>เลขที่ {account.accountNumber}</small><small>ชื่อ {account.accountName}</small>{account.branch && <small>สาขา {account.branch}</small>}{account.note && <small className="muted">{account.note}</small>}</div>)}</div></div>}<div className="receipt-thanks">ขอบคุณที่ใช้บริการ<br /></div></div>{documentError && <div className="receipt-document-error" role="alert"><b>บันทึกรายการขายแล้ว แต่จัดการเอกสารไม่สำเร็จ</b><p>{documentError}</p><small>ลองเอกสารอีกครั้งได้โดยไม่ชำระเงินซ้ำ หรือกลับไปทำรายการถัดไปและพิมพ์จากประวัติ</small></div>}<div className="receipt-actions"><button className="outline-button" disabled={Boolean(receiptBusy)} onClick={() => downloadReceipt("pdf")} title="ดาวน์โหลดใบเสร็จเป็น PDF"><Download size={16} /> {receiptBusy === "pdf" ? "กำลังสร้าง PDF..." : "ดาวน์โหลด PDF"}</button><button className="outline-button" disabled={Boolean(receiptBusy)} onClick={() => downloadReceipt("image")} title="ดาวน์โหลดใบเสร็จเป็นรูปภาพ"><FileImage size={16} /> {receiptBusy === "image" ? "กำลังสร้างรูป..." : "ดาวน์โหลดรูปภาพ"}</button><button type="button" autoFocus className="primary-button receipt-print-action" disabled={Boolean(receiptBusy)} onClick={printReceipt}><Printer size={16} /> {receiptBusy === "printing" ? "กำลังจัดการงานพิมพ์…" : "พิมพ์สลิป"}</button>{mode === "new" ? (onNewSale && <button type="button" className="outline-button receipt-finish-action" data-action-tone="success" disabled={Boolean(receiptBusy)} onClick={onNewSale}><Plus size={16} /> เสร็จสิ้น · เริ่มรายการใหม่</button>) : <button className="outline-button" disabled={Boolean(receiptBusy)} onClick={onClose}><X size={16} /> เสร็จสิ้น · ปิดหน้าต่าง</button>}</div></WorkflowDialog>;
+  return (
+    <WorkflowDialog
+      title={mode === "new" ? successTitle : "พิมพ์ใบเสร็จซ้ำ"}
+      onClose={onClose}
+      busy={Boolean(receiptBusy)}
+      className="receipt-modal"
+    >
+      <div className={`receipt-success${mode === "reprint" ? " reprint" : ""}`}>
+        <span>
+          {mode === "reprint" ? <Printer size={22} /> : <Check size={22} />}
+        </span>
+        <div>
+          <b>{mode === "reprint" ? "พิมพ์ใบเสร็จซ้ำ" : successTitle}</b>
+          <small>
+            {mode === "reprint"
+              ? "เรียกดูบิลย้อนหลังจากระบบ"
+              : "บันทึกรายการแล้ว · พิมพ์ซ้ำได้ กดเสร็จสิ้นเมื่อเรียบร้อย"}
+          </small>
+        </div>
+        <button
+          type="button"
+          className="icon-button"
+          aria-label="ปิดใบเสร็จ"
+          disabled={Boolean(receiptBusy)}
+          onClick={onClose}
+        >
+          <X size={17} />
+        </button>
+      </div>
+      <div className="receipt-paper" id="receipt-paper">
+        <div className="receipt-brand">
+          <div className="receipt-brand-text">
+            <b>{receiptName}</b>
+            <small>Welfare Store</small>
+            {receiptAddress.length > 0 && (
+              <small className="receipt-address">
+                {receiptAddress.map((line, index) => (
+                  <span
+                    key={index}
+                    style={{
+                      display: "block",
+                      whiteSpace: line.contact ? "nowrap" : undefined,
+                    }}
+                  >
+                    {line.text}
+                  </span>
+                ))}
+              </small>
+            )}
+          </div>
+        </div>
+        <h2 className="receipt-document-title">{documentTitle}</h2>
+        <div className="receipt-divider" />
+        <div
+          className="receipt-meta"
+          style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1fr)",
+            gap: 4,
+          }}
+        >
+          {[
+            [
+              transaction ? "เลขที่รายการ" : "เลขที่ใบเสร็จ",
+              receipt.orderNumber,
+            ],
+            ["วันที่", receiptDateTime.date],
+            ["เวลา", receiptDateTime.time],
+          ].map(([label, value]) => (
+            <div
+              key={label}
+              className="receipt-meta-row"
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "baseline",
+                gap: 6,
+              }}
+            >
+              <span style={{ whiteSpace: "nowrap", flexShrink: 0 }}>
+                {label}
+              </span>
+              <b style={{ whiteSpace: "nowrap", textAlign: "right" }}>
+                {value}
+              </b>
+            </div>
+          ))}
+        </div>
+        <div
+          className="receipt-customer"
+          style={
+            receipt.memberNumber
+              ? { paddingBottom: 2, borderBottom: "none" }
+              : undefined
+          }
+        >
+          <span>{transaction ? "สมาชิก" : "ผู้ซื้อ"}</span>
+          <b
+            className={receipt.memberName ? "receipt-member-name" : undefined}
+            style={{ fontSize: 12, lineHeight: 1.45, textAlign: "right" }}
+          >
+            {receipt.memberName || "บุคคลทั่วไป"}
+          </b>
+        </div>
+        {receipt.memberNumber && (
+          <div
+            className="receipt-member-reference"
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "baseline",
+              gap: 6,
+              padding: "2px 0 8px",
+              borderBottom: "1px solid #e0e0dc",
+              fontSize: 10,
+            }}
+          >
+            <span style={{ whiteSpace: "nowrap", flexShrink: 0 }}>
+              เลขสมาชิก
+            </span>
+            <b
+              style={{ whiteSpace: "nowrap", textAlign: "right", fontSize: 11 }}
+            >
+              {receipt.memberNumber}
+            </b>
+          </div>
+        )}
+        {transaction ? (
+          <>
+            <div className="receipt-line">
+              <span>ยอดคงเหลือก่อนรายการ</span>
+              <b>{money(transaction.balanceBefore)}</b>
+            </div>
+            <div className="receipt-line">
+              <span>{transactionLabels!.amount}</span>
+              <b>{money(transaction.amount)}</b>
+            </div>
+            <div className="receipt-total">
+              <span>ยอดคงเหลือหลังรายการ</span>
+              <b>{money(transaction.balanceAfter)}</b>
+            </div>
+            <div className="receipt-payment">
+              <span>วิธีรับ / จ่ายเงิน</span>
+              <b>{transaction.paymentMethod}</b>
+            </div>
+          </>
+        ) : (
+          <>
+            {receipt.items.map(item => (
+              <div
+                className="receipt-line"
+                key={`${item.productId}-${item.name}`}
+              >
+                <span>
+                  {item.name}
+                  <small>
+                    {item.qty} {item.unit}
+                    {item.price >= 0.05 ? ` × ${money(item.price)}` : ""}
+                  </small>
+                </span>
+                <b>{money(item.amount)}</b>
+              </div>
+            ))}
+            <div className="receipt-line">
+              <span>ยอดรวมสินค้า</span>
+              <b>{money(receipt.subtotal)}</b>
+            </div>
+            {receipt.discount > 0 && (
+              <div className="receipt-line">
+                <span>ส่วนลด</span>
+                <b>- {money(receipt.discount)}</b>
+              </div>
+            )}
+            <div className="receipt-total">
+              <span>ยอดชำระทั้งหมด</span>
+              <b>{money(receipt.total)}</b>
+            </div>
+            <div className="receipt-payment">
+              <span>วิธีชำระเงิน</span>
+              <b>{receipt.paymentMethod}</b>
+            </div>
+            {receipt.terminalNumber != null && (
+              <div className="receipt-payment">
+                <span>จุดขาย</span>
+                <b>{String(receipt.terminalNumber).padStart(2, "0")}</b>
+              </div>
+            )}
+          </>
+        )}
+        <div className="receipt-payment">
+          <span>ผู้ทำรายการ</span>
+          <b>{receipt.cashier?.trim() || "เจ้าหน้าที่ร้านค้า"}</b>
+        </div>
+        {!transaction &&
+          receipt.memberNumber &&
+          receipt.balanceAfter !== null &&
+          showBalance && (
+            <div className="receipt-balance">
+              <span>ยอดเงินคงเหลือของสมาชิก</span>
+              <b>{money(receipt.balanceAfter)}</b>
+            </div>
+          )}
+        {!transaction &&
+          receipt.paymentMethod === "เงินสด" &&
+          receipt.receivedCash != null && (
+            <div className="receipt-cash-change">
+              <div className="receipt-line">
+                <span>รับเงินมา</span>
+                <b>{money(receipt.receivedCash)}</b>
+              </div>
+              <div className="receipt-line">
+                <span>ทอนเงิน</span>
+                <b>{money(receipt.changeDue ?? 0)}</b>
+              </div>
+            </div>
+          )}
+        {!transaction &&
+          receipt.paymentMethod === "QR / สแกน" &&
+          (settingsQuery.data?.bankAccounts ?? []).filter(a => a.active)
+            .length > 0 && (
+            <div className="receipt-bank-wrap">
+              <div className="receipt-divider" />
+              <div className="receipt-bank-section">
+                <div className="receipt-bank-head">
+                  <Bank size={13} /> บัญชีธนาคารร้าน (หากโอนผ่านแอปธนาคาร)
+                </div>
+                {(settingsQuery.data?.bankAccounts ?? [])
+                  .filter(a => a.active)
+                  .map(account => (
+                    <div className="receipt-bank-line" key={account.id}>
+                      <b>{account.bankName}</b>
+                      <small>เลขที่ {account.accountNumber}</small>
+                      <small>ชื่อ {account.accountName}</small>
+                      {account.branch && <small>สาขา {account.branch}</small>}
+                      {account.note && (
+                        <small className="muted">{account.note}</small>
+                      )}
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+        {transactionLabels && (
+          <div
+            className="receipt-signatures"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 16,
+              marginTop: 32,
+              textAlign: "center",
+              fontSize: 10,
+            }}
+          >
+            {transactionLabels.signatures.map(role => (
+              <div key={role}>
+                <div
+                  style={{
+                    borderBottom: "1px dotted #777",
+                    height: 16,
+                    marginBottom: 6,
+                  }}
+                />
+                {role}
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="receipt-thanks">
+          ขอบคุณที่ใช้บริการ
+          <br />
+        </div>
+      </div>
+      {documentError && (
+        <div className="receipt-document-error" role="alert">
+          <b>บันทึกรายการแล้ว แต่จัดการเอกสารไม่สำเร็จ</b>
+          <p>{documentError}</p>
+          <small>
+            ลองเอกสารอีกครั้งได้โดยไม่ทำรายการเงินซ้ำ
+            หรือกลับไปทำรายการถัดไปและพิมพ์จากประวัติ
+          </small>
+        </div>
+      )}
+      <div className="receipt-actions">
+        <button
+          className="outline-button"
+          disabled={Boolean(receiptBusy)}
+          onClick={() => downloadReceipt("pdf")}
+          title="ดาวน์โหลดใบเสร็จเป็น PDF"
+        >
+          <Download size={16} />{" "}
+          {receiptBusy === "pdf" ? "กำลังสร้าง PDF..." : "ดาวน์โหลด PDF"}
+        </button>
+        <button
+          className="outline-button"
+          disabled={Boolean(receiptBusy)}
+          onClick={() => downloadReceipt("image")}
+          title="ดาวน์โหลดใบเสร็จเป็นรูปภาพ"
+        >
+          <FileImage size={16} />{" "}
+          {receiptBusy === "image" ? "กำลังสร้างรูป..." : "ดาวน์โหลดรูปภาพ"}
+        </button>
+        <button
+          type="button"
+          autoFocus
+          className="primary-button receipt-print-action"
+          disabled={Boolean(receiptBusy)}
+          onClick={printReceipt}
+        >
+          <Printer size={16} />{" "}
+          {receiptBusy === "printing" ? "กำลังจัดการงานพิมพ์…" : "พิมพ์สลิป"}
+        </button>
+        {mode === "new" ? (
+          <button
+            type="button"
+            className="outline-button receipt-finish-action"
+            data-action-tone="success"
+            disabled={Boolean(receiptBusy)}
+            onClick={onNewSale ?? onClose}
+          >
+            <Check size={16} />{" "}
+            {onNewSale
+              ? "เสร็จสิ้น · เริ่มรายการใหม่"
+              : "เสร็จสิ้น · ปิดหน้าต่าง"}
+          </button>
+        ) : (
+          <button
+            className="outline-button"
+            disabled={Boolean(receiptBusy)}
+            onClick={onClose}
+          >
+            <X size={16} /> เสร็จสิ้น · ปิดหน้าต่าง
+          </button>
+        )}
+      </div>
+    </WorkflowDialog>
+  );
 }

@@ -1,3 +1,5 @@
+import {randomUUID} from "node:crypto";
+import {walletRequestSlip,registrationSlip,returnedCardSlip} from "./memberSlipDocuments";
 import { getMemberStatement } from "./memberStatement";
 import { issueDocumentPrint } from "./documentPrinting";
 import { getRuntimePolicy } from "./runtimePolicy";
@@ -654,7 +656,7 @@ export const appRouter = router({
     issue: publicProcedure
       .input(z.object({
         document: z.object({
-          kind: z.enum(["sale", "wallet", "wallet_request", "card_return"]),
+          kind: z.enum(["sale", "wallet", "wallet_request", "card_return", "card_return_zero", "registration"]),
           key: z.string().trim().min(1).max(200),
         }),
         requestId: z.string().uuid(),
@@ -1221,7 +1223,10 @@ export const appRouter = router({
     return: permissionProcedure("MEMBER.WALLET").input(z.object({ memberNumber: z.string().trim().min(1), cardNumber: z.string().trim().min(1), expectedSessionId: z.number().int().positive(), mode: z.literal("refund"), clientRequestId: z.string().max(100).optional() })).mutation(({ ctx, input }) => withStoreErrors(() => {
       requireLogin(ctx);
       const { actor, actorRole } = resolveActor(ctx, {});
-      return returnMemberCard(getWelfareDb(), { ...input, actor, actorRole });
+      const db=getWelfareDb();
+      const requestId=input.clientRequestId??randomUUID();
+      const result=returnMemberCard(db, { ...input, clientRequestId:requestId, actor, actorRole });
+      return {...result,slip:returnedCardSlip(db,input.expectedSessionId,requestId)};
     })),
     assign: publicProcedure.input(z.object({ memberNumber: z.string().trim().min(1), cardNumber: z.string().trim().min(1).max(30), expectedCardNumber: z.string().nullable(), expectedSessionId: z.number().int().positive().optional() })).mutation(({ ctx, input }) => withStoreErrors(() => {
       requireLogin(ctx);
@@ -1304,7 +1309,9 @@ export const appRouter = router({
         return withStoreErrors(() => {
           requireLogin(ctx); // P1-c — ลงทะเบียนสมาชิกต้องมีเซสชันเจ้าหน้าที่
           if (!input.cardNumber?.trim()) throw new StoreError("กรุณายิงบัตรว่างก่อนลงทะเบียน");
-          return registerMember(getWelfareDb(), { ...input, actor, actorRole });
+          const db=getWelfareDb();
+          const result=registerMember(db, { ...input, actor, actorRole });
+          return {...result,slip:registrationSlip(db,result.member.memberNumber)};
         });
       }),
     setStatus: permissionProcedure("MEMBER.EDIT")
@@ -1322,7 +1329,9 @@ export const appRouter = router({
         const { actor, actorRole } = resolveActor(ctx, input);
         return withStoreErrors(() => {
           requireLogin(ctx); // P1-c — เติม/ถอนเงินสมาชิกต้องมีเซสชัน (CRITICAL — เกี่ยวกับเงิน)
-          return walletTx(getWelfareDb(), { ...input, actor, actorUserId: ctx.user!.id, actorRole });
+          const db=getWelfareDb();
+          const result=walletTx(db, { ...input, actor, actorUserId: ctx.user!.id, actorRole });
+          return {...result,slip:walletRequestSlip(db,input.clientRequestId)};
         });
       }),
     // ROUND 63 (user) — ดึงรูปหลักฐานของรายการเติม/ถอนเงินสมาชิก (แนบตอนทำรายการที่ POS)
