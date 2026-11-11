@@ -1531,7 +1531,7 @@ export function receiveStock(
 }
 
 export function stockReceiptHistory(db: SqliteDb, input: { from?: string; to?: string; search?: string; actor?: string } = {}) {
-  return db.prepare(`SELECT l.id, p.sku, p.name, p.unit, l.lot,
+  return db.prepare(`SELECT l.id, p.sku, p.barcode, p.name, p.unit, l.lot,
     l.received_at AS receivedAt, l.received_qty AS receivedQty,
     l.expiry_date AS expiry, l.cost, p.price AS sellingPrice,
     ROUND(l.received_qty * p.price, 2) AS sellingValue, m.actor,
@@ -1545,7 +1545,7 @@ export function stockReceiptHistory(db: SqliteDb, input: { from?: string; to?: s
     ORDER BY l.received_at DESC, l.id DESC`).all(
       input.from ?? '', input.from ?? '', input.to ?? '', input.to ?? '',
       input.search?.trim() ?? '', input.search?.trim() ?? '', input.actor?.trim() ?? '', input.actor?.trim() ?? ''
-    ) as { id: number; sku: string; name: string; unit: string; lot: string; receivedAt: string; receivedQty: number | null; expiry: string | null; cost: number; sellingPrice: number; sellingValue: number | null; actor: string | null; value: number | null }[];
+    ) as { id: number; sku: string; barcode: string | null; name: string; unit: string; lot: string; receivedAt: string; receivedQty: number | null; expiry: string | null; cost: number; sellingPrice: number; sellingValue: number | null; actor: string | null; value: number | null }[];
 }
 
 export function listStockRows(db: SqliteDb): SqliteStockRow[] {

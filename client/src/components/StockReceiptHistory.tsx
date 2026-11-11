@@ -1,3 +1,4 @@
+import {stockReceiptLayout} from "@/lib/approvedReportLayouts";
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 import { Download, Eye, FileBarChart, FileText, Printer } from "@/lib/icons";
@@ -25,24 +26,18 @@ export function StockReceiptHistory({ canExport, onUpgrade, expanded = false }: 
   const [notice, setNotice] = useState("");
   const query = trpc.stock.receipts.useQuery({ from, to, search, actor }, { enabled: open });
   const entries = query.data ?? [];
-  const columns = ["วัน–เวลา", "รหัส / สินค้า", "Lot", "จำนวนรับ", "หน่วย", "ราคาขาย/หน่วย", "มูลค่าราคาขาย", "หมดอายุ", "เจ้าหน้าที่"];
-  const rows = entries.map(row => [formatLogDateTime(row.receivedAt), `${row.sku} · ${row.name}`, row.lot,
-    row.receivedQty === null ? "ไม่ระบุ" : String(row.receivedQty), row.unit,
-    exportNumber(row.sellingPrice), row.sellingValue === null ? "ไม่ระบุ" : exportNumber(row.sellingValue),
-    row.expiry ?? "—", row.actor ?? "ไม่ระบุ"]);
+  const layout = stockReceiptLayout(entries);
+  const {columns,rows,numericCols} = layout;
   const total = entries.reduce((sum, row) => sum + (row.sellingValue ?? 0), 0);
   const unknownValues = entries.filter(row => row.receivedQty === null).length;
-  const numericCols = [3, 5, 6];
   const buildExportState = (preferred: ExportFormat = "pdf"): ExportPreviewState => {
-    const units = new Map<string, number>();
-    for (const row of entries) if (row.receivedQty !== null) units.set(row.unit, (units.get(row.unit) ?? 0) + row.receivedQty);
     const periodLabel = `${from || "ทั้งหมด"} ถึง ${to || "ปัจจุบัน"}${search ? ` · ค้นหา ${search}` : ""}${actor ? ` · เจ้าหน้าที่ ${actor}` : ""}`;
     return { kind: "stock", title: "ประวัติรับเข้าสินค้า", periodLabel, label: "ประวัติรับเข้า", fileName: "stock-receipts",
       sheetName: "ประวัติรับเข้า", rows: [columns, ...rows], numericCols, preferred, hasTotalsRow: false,
       downloadNoticeBase: "ประวัติรับเข้า", printNotice: "สั่งพิมพ์ประวัติรับเข้าแล้ว",
-      doc: { fileName: "stock-receipts.pdf", title: "ประวัติรับเข้าสินค้า", periodLabel, columns, rows, numericCols,
-        columnWidths: ["12%", "24%", "9%", "7%", "6%", "10%", "12%", "10%", "10%"],
-        meta: [["จำนวนบรรทัดรับเข้า", String(entries.length)], ["จำนวนตามหน่วย", Array.from(units).map(([unit, qty]) => `${qty} ${unit}`).join(" · ") || "—"], ...(unknownValues ? [["ไม่ระบุจำนวนรับเข้า", `${unknownValues} รายการ`] as [string, string]] : []), ["มูลค่าตามราคาขายปัจจุบัน", money(total)]],
+      doc: { fileName: "stock-receipts.pdf", title: "ประวัติรับเข้าสินค้า", periodLabel,
+        ...layout,
+        meta: [["จำนวนรายการ", String(entries.length)], ...(unknownValues ? [["ไม่ระบุจำนวนรับเข้า", `${unknownValues} รายการ`] as [string, string]] : []), ["มูลค่าตามราคาขายปัจจุบัน", money(total)]],
         compact: true, brandName: "ร้านค้าสวัสดิการ" }
     };
   };
