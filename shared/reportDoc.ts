@@ -107,6 +107,7 @@ export const REPORT_DOC_CSS = `
   .report-doc.rd-borderless-groups .rd-table tbody.rd-row-group + tbody.rd-row-group::before { height: 24px; }
   .rd-table th, .rd-table td { overflow-wrap: anywhere; word-break: normal; }
   .rd-table tbody tr:nth-child(even) td { background: #f7f7f5; }
+  .rd-table tfoot { display: table-row-group; }
   .rd-table tfoot td { font-weight: 800; background: #f0f0ee; border-top: 2px solid #111111; border-bottom: 2px solid #111111; color: #111111; padding: 8px; font-size: 13px; }
   .rd-note { margin-top: 10px; font-size: 10pt; color: #444444; font-weight: 500; line-height: 1.5; break-inside: avoid; page-break-inside: avoid; }
 

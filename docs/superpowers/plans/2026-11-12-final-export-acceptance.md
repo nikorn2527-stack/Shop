@@ -30,5 +30,7 @@ Legacy hyphenated receipt references;13-digit cards/barcodes;OPEN lots;quantity+
 -21 CSV/Excel pairs have identical row/value matrices and preserved leading zeros.21 PDFs retain checked identities/numeric values and expected model rows.
 -10 isolated slip cases keep documents open after PDF/PNG/two prints; financial tables unchanged by document actions.
 - Independent reviewer found auto-layout long-name overflow; corrected and independently rechecked clean.
-- Delivery:46 document/variant entries,45 PDFs(123 source pages),21 Excel,22 CSV,11 PNG, indexed ZIP and combined all-pages PDF. Print-only samples come from actual captured print HTML; no physical printer used.
+- Delivery:46 document/variant entries,45 PDFs(122 source pages),21 Excel,22 CSV,11 PNG, indexed ZIP and combined all-pages PDF. Print-only samples come from actual captured print HTML; no physical printer used.
 - Artifacts and QA databases remain outside git under /workspace/private/final-export-acceptance-20261112/. No production merge/deploy/database upload. No migration or business-operation code changed.
+
+- Grand-total footer repeats prevented: actual202-row multipage PDF verified footer occurs once, compared with6 occurrences before fix.
