@@ -186,7 +186,7 @@ export async function printElementDocument(targetId: string, widthMm?: number): 
   let heightMm = 297;
   let runtimeCss = thermalProfile
     ? buildThermalPageCss(thermalProfile, 1000, targetId)
-    : `@page{size:A4;margin:8mm}html,body{margin:0;padding:0;background:white}#${targetId}{position:static!important;transform:none!important;box-shadow:none!important;height:auto!important;max-height:none!important;overflow:visible!important}`;
+    : `@page{size:A4 portrait;margin:14mm}html,body{margin:0;padding:0;background:white}#${targetId}{position:static!important;transform:none!important;box-shadow:none!important;height:auto!important;max-height:none!important;overflow:visible!important;width:100%!important;box-sizing:border-box!important;padding:0!important;min-height:0!important}`;
   const marker = thermalProfile ? ` data-thermal-paper-width="${thermalProfile.paperWidthMm}" data-paper-width="${thermalProfile.paperWidthMm}"` : '';
   let html = `<!doctype html><html lang="th"${marker}><head><meta charset="utf-8"><base href="${location.origin}/">${styles}<style>${runtimeCss}body>*{display:block!important;visibility:visible!important}</style></head><body>${clone.outerHTML}</body></html>`;
   if (thermalProfile) {

@@ -70,7 +70,7 @@ export const REPORT_DOC_CSS = `
   .rd-summary-footer b { font-variant-numeric: tabular-nums; text-align: right; }
   .report-doc { background: #ffffff; color: #1c1c1a; font-family: "Sarabun", "TH Sarabun New", "Leelawadee UI", Tahoma, sans-serif; font-size: 13px; line-height: 1.5; box-sizing: border-box; }
   .report-doc.compact { font-size: 12px; }
-  .rd-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; padding-bottom: 12px; border-bottom: 2.5px solid #1c1c1a; }
+  .rd-head { min-height: 48px; display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; padding-bottom: 12px; border-bottom: 2.5px solid #1c1c1a; }
   .rd-brand { display: flex; align-items: center; gap: 11px; }
   .rd-brand img, .rd-mark { display: none; }
   .rd-brand b { display: block; font-size: 17px; font-weight: 800; color: #111111; line-height: 1.25; }
@@ -78,8 +78,9 @@ export const REPORT_DOC_CSS = `
   .rd-stamp { font-size: 10px; color: #666666; text-align: right; font-weight: 500; }
   .rd-title { margin-top: 14px; }
   .rd-title h1 { margin: 0; font-size: 18px; font-weight: 800; color: #111111; letter-spacing: .2px; }
-  .rd-title p { margin: 4px 0 8px; color: #555555; font-size: 11px; font-weight: 500; }
-  .rd-meta { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 8px 0 10px; padding: 8px 12px; background: #f5f5f3; border: 1px solid #c0c0bc; border-radius: 4px; }
+  .rd-title p { min-height: 17px; margin: 4px 0 8px; color: #555555; font-size: 11px; font-weight: 500; }
+  .rd-meta-slot { min-height: 80px; margin: 8px 0 10px; }
+  .rd-meta { min-height: 52px; display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; padding: 8px 12px; background: #f5f5f3; border: 1px solid #c0c0bc; border-radius: 4px; }
   .rd-meta > div { display: flex; gap: 5px; align-items: baseline; }
   .rd-meta span { color: #666666; font-size: 10px; text-transform: uppercase; letter-spacing: .3px; font-weight: 600; }
   .rd-meta b { color: #1c1c1a; font-weight: 700; margin-left: 5px; text-transform: none; letter-spacing: 0; font-size: 12px; }
@@ -92,27 +93,32 @@ export const REPORT_DOC_CSS = `
   .rd-table.rd-fixed-layout { table-layout: fixed; }
   .rd-table thead { display: table-header-group; }
   .rd-table tbody tr { break-inside: avoid; page-break-inside: avoid; }
-  .rd-table th { background: #f0f0ee; color: #111111; font-weight: 700; text-align: left; padding: 7px 8px; border-top: 2px solid #111111; border-bottom: 1.5px solid #555555; white-space: normal; font-size: 11px; text-transform: uppercase; letter-spacing: .3px; }
+  .rd-table th { height: 44px; background: #f0f0ee; color: #111111; font-weight: 700; text-align: left; padding: 7px 8px; border-top: 2px solid #111111; border-bottom: 1.5px solid #555555; white-space: normal; font-size: 11px; line-height: 1.35; vertical-align: middle; text-transform: uppercase; letter-spacing: 0; }
   .rd-table th.num, .rd-table td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .rd-table th.num { white-space: normal; }
-  .rd-table th.nowrap, .rd-table td.nowrap { white-space: nowrap; overflow-wrap: normal; word-break: normal; }
-  .rd-table td { padding: 6px 8px; font-weight: 500; border-bottom: 1px solid #e0e0dc; vertical-align: middle; }
+  .rd-table th.head-nowrap { white-space: nowrap; overflow-wrap: normal; word-break: normal; }
+  .rd-table td.nowrap { white-space: nowrap; overflow-wrap: normal; word-break: normal; }
+  .rd-table td { padding: 6px 8px; font-weight: 500; border-bottom: 1px solid #e0e0dc; vertical-align: top; }
   .report-doc.rd-top-align .rd-table td { vertical-align: top; }
   .rd-table tbody.rd-row-group + tbody.rd-row-group::before { content: ""; display: table-row; height: 16px; }
   .rd-table tr.rd-group-total td { font-weight: 800; padding-top: 10px; padding-bottom: 10px; border-top: 1px solid #000; border-bottom: 1px solid #000; }
   .rd-table tbody.rd-row-group tr:not(.rd-group-total) td:first-child { padding-left: 20px; }
   .report-doc.rd-borderless-groups .rd-table :is(th, td) { border: 0 !important; }
   .report-doc.rd-borderless-groups .rd-table tbody.rd-row-group + tbody.rd-row-group::before { height: 24px; }
-  .rd-table th, .rd-table td { overflow-wrap: anywhere; }
+  .rd-table th, .rd-table td { overflow-wrap: anywhere; word-break: normal; }
   .rd-table tbody tr:nth-child(even) td { background: #f7f7f5; }
   .rd-table tfoot td { font-weight: 800; background: #f0f0ee; border-top: 2px solid #111111; border-bottom: 2px solid #111111; color: #111111; padding: 8px; font-size: 13px; }
   .rd-note { margin-top: 10px; font-size: 10pt; color: #444444; font-weight: 500; line-height: 1.5; break-inside: avoid; page-break-inside: avoid; }
-  .report-doc.compact .rd-title h1 { font-size: 16px; }
-  .report-doc.compact .rd-meta span { font-size: 9.5px; }
-  .report-doc.compact .rd-meta b { font-size: 11px; }
+
+
+
   .report-doc.compact .rd-table { font-size: 11.5px; }
   .report-doc.compact .rd-table th { font-size: 10px; padding: 5px 6px; }
   .report-doc.compact .rd-table td { padding: 4px 6px; }
+  .report-doc.rd-dense .rd-table { font-size: 10.5px; line-height: 1.4; }
+  .report-doc.rd-dense .rd-table th { font-size: 10px; padding: 4px; }
+  .report-doc.rd-dense .rd-table td { padding: 4px; }
+  .report-doc.rd-dense .rd-table tfoot td { font-size: 10.5px; }
   /* Same monochrome paper in preview, vector PDF, raster fallback and print.
      Scope to the document so application theme and controls stay unchanged. */
   .report-doc, .report-doc * {
@@ -186,9 +192,10 @@ export function buildReportDocumentHtml(config: ReportDocConfig, opts: BuildRepo
         return `<td${classes ? ` class="${classes}"` : ""}>${escapeHtml(cell)}</td>`;
       }).join("")}</tr></tfoot>`
     : "";
+  const shortHeadings = new Set(["Item","ลำดับ","เลขสมาชิก","เลขบัตร","เลขที่บัตร","รายการ","จำนวน","ชิ้น","บิล","หน่วย","LOT","คงเหลือ","ยอดขาย","ยอดยกมา","ผู้ทำรายการ","ชื่อสมาชิก","ชื่อสินค้า"]);
   const headCells = config.columns.map((column, index) => {
-    const classes = [numeric.has(index) ? "num" : "", nowrap.has(index) ? "nowrap" : ""].filter(Boolean).join(" ");
-    return `<th${classes ? ` class="${classes}"` : ""}>${escapeHtml(column)}</th>`;
+    const classes = [numeric.has(index) ? "num" : "", shortHeadings.has(column) ? "head-nowrap" : ""].filter(Boolean).join(" ");
+    return `<th${classes ? ` class="${classes}"` : ""}>${escapeHtml(column).replace(/\s+(\([^)]*\))$/, "<br>$1")}</th>`;
   }).join("");
   const colgroup = config.columnWidths?.length
     ? `<colgroup>${config.columns.map((_, index) => {
@@ -216,13 +223,13 @@ export function buildReportDocumentHtml(config: ReportDocConfig, opts: BuildRepo
   ${REPORT_DOC_CSS}
 </style></head>
 <body>
-  <div class="report-doc${config.compact ? " compact" : ""}${config.borderlessGroups ? " rd-borderless-groups" : ""}${config.topAlignCells ? " rd-top-align" : ""}">
+  <div class="report-doc${config.compact ? " compact" : ""}${config.columns.length >= 8 ? " rd-dense" : ""}${config.borderlessGroups ? " rd-borderless-groups" : ""}${config.topAlignCells ? " rd-top-align" : ""}">
     <div class="rd-head">
       <div class="rd-brand"><div><b>${escapeHtml(config.brandName)}</b><small>ระบบร้านค้าสวัสดิการ · Welfare Store</small></div></div>
       <div class="rd-stamp">${escapeHtml(opts.stampText)}</div>
     </div>
-    <div class="rd-title"><h1>${escapeHtml(config.title)}</h1>${config.periodLabel ? `<p>${escapeHtml(config.periodLabel)}</p>` : ""}</div>
-    ${metaRows ? `<div class="rd-meta">${metaRows}</div>` : ""}
+    <div class="rd-title"><h1>${escapeHtml(config.title)}</h1><p class="rd-period">${config.periodLabel ? escapeHtml(config.periodLabel) : ""}</p></div>
+    <div class="rd-meta-slot">${metaRows ? `<div class="rd-meta">${metaRows}</div>` : ""}</div>
     <table class="rd-table${colgroup ? " rd-fixed-layout" : ""}">${colgroup}<thead><tr>${headCells}</tr></thead>${bodyRows}${totalsRow}</table>
     ${summaryRows ? `<div class="rd-summary-footer">${summaryRows}</div>` : ""}
     ${config.footnote ? `<div class="rd-note">${escapeHtml(config.footnote)}</div>` : ""}

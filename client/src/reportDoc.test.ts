@@ -43,7 +43,7 @@ describe("monochrome report document", () => {
 
     expect(html).toContain('class="rd-table rd-fixed-layout"');
     expect(html).toContain('<col style="width:70%" />');
-    expect(html).toContain('<th class="num nowrap">จำนวน</th>');
+    expect(html).toContain('<th class="num head-nowrap">จำนวน</th>');
     expect(html).toContain('<td class="num nowrap">10</td>');
   });
 
@@ -56,6 +56,14 @@ describe("monochrome report document", () => {
     expect(html).toContain("<col />");
     expect(html).not.toContain("color:red");
   });
+});
+it('keeps document anchors even without period/metadata and reduces dense table text only',()=>{
+ const html=buildReportDocumentHtml({...config,columns:Array.from({length:8},(_,i)=>`ช่อง ${i}`),meta:undefined,periodLabel:undefined},{stampText:'test'});
+ expect(html).toContain('rd-meta-slot');
+ expect(html).toContain('rd-period');
+ expect(html).toContain('rd-dense');
+ expect(REPORT_DOC_CSS).toContain('.rd-meta-slot');
+ expect(REPORT_DOC_CSS).toContain('font-size: 10.5px');
 });
 it('preserves card-first detail lines, escapes HTML, and leaves single-line products intact',()=>{
  const html=buildReportDocumentHtml({...config,multilineCols:[0],rows:[['บัตร 0000123\nเติมเงิน · เงินสด\n<script>','10'],['สินค้า A','1']]},{stampText:'test'});

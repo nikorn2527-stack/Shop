@@ -37,6 +37,7 @@ export function StockCountSheet({ products }: { products: Product[] }) {
       <style>{REPORT_DOC_CSS}</style>
       <style>{`
         .stock-count-sheet.report-doc { padding: 0; margin: 0; max-width: none; }
+        .stock-count-sheet .scs-fill-row { min-height:80px; margin:8px 0 10px; }
         .stock-count-sheet .scs-table { width: 100%; min-width: 0; table-layout: fixed; font-size: 12px; line-height: 1.5; }
         .stock-count-sheet .scs-table th, .stock-count-sheet .scs-table td { padding: 6px 4px; letter-spacing: 0; width: auto; }
         .stock-count-sheet .scs-table th { font-size: 11px; white-space: nowrap; overflow-wrap: normal; }

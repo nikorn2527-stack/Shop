@@ -979,7 +979,7 @@ export function Reports({
       };
     }
     if (salesView === "product") {
-      return {fileName:"sales-by-product.pdf",title:"รายงานสรุปยอดขายแยกตามสินค้า",periodLabel:`ช่วงข้อมูล ${rangeLabel}${staffSuffix}${categorySuffix}`,...productSalesExport(productRows,false),columnWidths:["21%","39%","13%","6%","6%","15%"],nowrapCols:[0,3,4,5],brandName:"ร้านค้าสวัสดิการ",footnote:"ราคาขายต่อหน่วยอ้างอิงราคาที่บันทึกในบิล · หากมีหลายราคาในช่วงที่เลือก จะแสดงเป็นช่วงราคา"};
+      return {fileName:"sales-by-product.pdf",title:"รายงานสรุปยอดขายแยกตามสินค้า",periodLabel:`ช่วงข้อมูล ${rangeLabel}${staffSuffix}${categorySuffix}`,...productSalesExport(productRows,false),columnWidths:["20%","36%","17%","6%","6%","15%"],nowrapCols:[0,2,3,4,5],brandName:"ร้านค้าสวัสดิการ",footnote:"ราคาขายต่อหน่วยอ้างอิงราคาที่บันทึกในบิล · หากมีหลายราคาในช่วงที่เลือก จะแสดงเป็นช่วงราคา"};
     }
     if (salesView === "category") {
       return {fileName:"daily-sales-summary.pdf",title:"รายงานสรุปยอดขายแยกตามชนิดสินค้า",periodLabel:`ช่วงข้อมูล ${rangeLabel}${staffSuffix}${categorySuffix}`,columns:["ชนิดสินค้า","บิล","ชิ้น","ยอดขาย (บาท)","ต้นทุน (บาท)","กำไร (บาท)"],numericCols:[1,2,3,4,5],rows:categoryRows.map(row=>[row.category,exportCount(row.orders),exportCount(row.qty),exportNumber(row.revenue),exportNumber(row.cogs),exportNumber(row.profit)]),totalsRow:["รวมทุกชนิดสินค้า",exportCount(categoryTotal.orders),exportCount(categoryTotal.qty),exportNumber(categoryTotal.revenue),exportNumber(categoryTotal.cogs),exportNumber(categoryTotal.profit)],brandName:"ร้านค้าสวัสดิการ"};
@@ -1001,6 +1001,8 @@ export function Reports({
         columns: hospitalSales
           ? ["วันที่ · เวลา", "รหัสสินค้า", "ชื่อสินค้า", "จำนวน", "ราคา/หน่วย (บาท)", "รวมเงิน (บาท)"]
           : ["วันที่ · เวลา", "เลขที่บิล", "รายการสินค้า", "ชิ้น", "ราคา/ชิ้น (บาท)", "ยอดรวม (บาท)", "ชำระโดย", "พนักงานขาย"],
+        columnWidths: hospitalSales ? ["21%","17%","32%","6%","12%","12%"] : ["19%","15%","23%","7%","8%","10%","8%","10%"],
+        nowrapCols: hospitalSales ? [0,1,3,4,5] : [0,1,3,4,5],
         numericCols: [3, 4, 5],
         rows: lineItemRows.map(row => hospitalSales
           ? [formatLogDateTime(row.createdAt), row.productCode ?? "—", row.productName, exportCount(row.qty), exportNumber(row.price), exportNumber(row.amount)]
@@ -1144,6 +1146,8 @@ export function Reports({
         "ชำระโดย",
         "ยอดรวม (บาท)",
       ],
+      columnWidths: ["16%","21%","25%","10%","7%","11%","10%"],
+      nowrapCols: [0,1,3,4,6],
       numericCols: [4, 6],
       rows: salesHistory.map(entry => [
         entry.orderNumber,
@@ -1266,8 +1270,8 @@ export function Reports({
       : ["วันที่ · เวลา", "เลขที่บัตร", "เลขสมาชิก", "ชื่อสมาชิก", "รายการ", "ยอด (บาท)", "คงเหลือ (บาท)", "ผู้ทำรายการ"],
     columnWidths: hospitalTxPreset
       ? ["16%", "16%", "15%", "15%", "19%", "19%"]
-      : ["15%", "13%", "11%", "13%", "9%", "14%", "14%", "11%"],
-    nowrapCols: hospitalTxPreset ? [2, 3] : [5, 6],
+      : ["19%", "16%", "10%", "18%", "9%", "9%", "9%", "10%"],
+    nowrapCols: hospitalTxPreset ? [0,1,2,3] : [0,1,2,5,6],
     numericCols: hospitalTxPreset ? [2] : [5, 6],
     rows: txRows.map(row => hospitalTxPreset
       ? [
