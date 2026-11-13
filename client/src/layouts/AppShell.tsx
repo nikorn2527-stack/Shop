@@ -933,7 +933,7 @@ export function AppShell({
             <small> · ระบบร้านค้าสวัสดิการ</small>
           </span>
           <span className="footer-powered">
-            ⚡ Powered by <b>PNG TEAM</b>
+            ⚡ POWERED BY <b>PNG TEAM</b>
           </span>
           {helpPhone && (
             <span className="footer-help">

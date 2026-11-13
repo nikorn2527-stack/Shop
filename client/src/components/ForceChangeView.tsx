@@ -221,7 +221,7 @@ export function ForceChangeView({
         <p className="login-footer">
           v1.0.0 · ระบบร้านค้าสวัสดิการ
           <span className="powered-line">
-            ⚡ Powered by <b>PNG TEAM</b>
+            ⚡ POWERED BY <b>PNG TEAM</b>
           </span>
         </p>
       </div>

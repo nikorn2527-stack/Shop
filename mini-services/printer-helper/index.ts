@@ -339,7 +339,7 @@ p { font-size: 12px; }
 <p>หากคุณเห็นหน้านี้พิมพ์ออกมา → เครื่องพิมพ์ทำงานได้ปกติ ✅</p>
 <p class="barcode-test">*1234567*</p>
 <div class="test-line">─────────────────────</div>
-<p style="font-size:9px;color:#999;">⚡ Powered by PNG TEAM · Printer Helper @ port 3031</p>
+<p style="font-size:9px;color:#999;">⚡ POWERED BY PNG TEAM · Printer Helper @ port 3031</p>
 </body></html>`;
   return printToPrinter(printerName, testContent, 80, 120);
 }
