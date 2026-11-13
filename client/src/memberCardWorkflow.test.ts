@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { hospitalTransactionLayout } from "./lib/approvedReportLayouts";
 
 const readSource = (relativePath: string) =>
   readFileSync(new URL(relativePath, import.meta.url), "utf8");
@@ -51,9 +52,21 @@ describe("member card workflow UI", () => {
     expect(reportSource).toContain('deposit: "รายงานการเติมเงิน"');
     expect(reportSource).toContain('refund: "รายงานการคืนบัตรเงินสด"');
     expect(reportSource).toContain('activation: "รายงานการเปิดใช้บัตรเงินสด"');
-    expect(reportSource).toContain("const transactionLabel = (row: typeof txRows[number]) => TX_TYPE_LABEL[row.type]");
+    expect(reportSource).toContain("const transactionLabel = (row: typeof txRows[number]) => reportTransactionLabel(row, TX_TYPE_LABEL[row.type])");
     expect(reportSource).toContain("...visibleTxSummary.map(item => [item.label, `${item.sign}${exportNumber(item.amount)}");
-    expect(reportSource).toContain('columnWidths: hospitalTxPreset');
+    expect(reportSource).toContain('...(hospitalTxPreset ? hospitalTransactionLayout(txRows) : {})');
+    const hospitalTable = hospitalTransactionLayout([{
+      createdAt: "2026-11-02 07:10:00",
+      cardNumber: "000123",
+      memberNumber: "000007",
+      amount: -25,
+      memberName: "นาย ตัวอย่าง นามสกุลเต็ม",
+      actor: "เจ้าหน้าที่",
+    }]);
+    expect(hospitalTable.columns).toEqual(["วัน–เวลา", "เลขบัตร", "เลขสมาชิก", "ชื่อสมาชิก", "จำนวนเงิน (บาท)", "ผู้ทำรายการ"]);
+    expect(hospitalTable.rows[0]).toEqual(["2 พ.ย. 2569 07:10", "000123", "000007", "นาย ตัวอย่าง นามสกุลเต็ม", "25.00", "เจ้าหน้าที่"]);
+    expect(hospitalTable.numericCols).toEqual([4]);
+    expect(hospitalTable.columnWidths).toHaveLength(hospitalTable.columns.length);
     expect(reportSource).not.toContain("ทุกสมาชิก · แสดง 300 รายการล่าสุด");
     expect(reportSource).not.toContain("transactionDescription");
   });

@@ -2640,13 +2640,29 @@ export function salesByProduct(db: SqliteDb, input: DailyRangeInput = {}): Sales
 
 
 
+/**
+ * One row per bill/product/unit; unrelated special lines remain separate.
+ * Keep historical names; mixed tier labels use their common historical base name.
+ */
 export function salesLineItems(db: SqliteDb, input: DailyRangeInput = {}): SalesLineItemRow[] {
   const { fromDate, toDate } = resolveRangeDates(input);
   const since = `${formatDate(fromDate)} 00:00:00`;
   const until = `${formatDate(toDate)} 23:59:59`;
   const filter = cashierWhere("s", input);
   const categoryFilter = categoryWhere("p", input);
-  return db.prepare(`SELECT s.order_number AS orderNumber, s.created_at AS createdAt, COALESCE(NULLIF(TRIM(p.sku), ''), NULLIF(TRIM(p.barcode), '')) AS productCode, si.name AS productName, COALESCE(si.unit, p.unit, 'ชิ้น') AS unit, si.qty, si.price, COALESCE(si.amount, ROUND(si.qty * si.price, 2)) AS amount, s.payment_method AS paymentMethod, COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, s.member_number AS memberNumber, CASE WHEN m.member_number IS NULL THEN NULL WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id LEFT JOIN members m ON m.member_number = s.member_number WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql}${categoryFilter.sql} ORDER BY s.created_at DESC, s.id DESC, si.id ASC LIMIT 1000`).all(since, until, ...filter.params, ...categoryFilter.params) as unknown as SalesLineItemRow[];
+  const rows = db.prepare(`SELECT s.order_number AS orderNumber, s.created_at AS createdAt, COALESCE(NULLIF(TRIM(p.sku), ''), NULLIF(TRIM(p.barcode), '')) AS productCode, JSON_GROUP_ARRAY(DISTINCT si.name) AS snapshotNames, COALESCE(si.unit, p.unit, 'ชิ้น') AS unit, SUM(si.qty) AS qty, SUM(si.qty * si.price) / SUM(si.qty) AS price, MIN(si.price) AS priceMin, MAX(si.price) AS priceMax, ROUND(SUM(COALESCE(si.amount, ROUND(si.qty * si.price, 2))), 2) AS amount, s.payment_method AS paymentMethod, COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, s.member_number AS memberNumber, CASE WHEN m.member_number IS NULL THEN NULL WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id LEFT JOIN members m ON m.member_number = s.member_number WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql}${categoryFilter.sql} GROUP BY s.id, si.product_id, COALESCE(si.unit, p.unit, 'ชิ้น'), CASE WHEN si.product_id IS NULL THEN si.id END ORDER BY s.created_at DESC, s.id DESC, MIN(si.id) ASC LIMIT 1000`).all(since, until, ...filter.params, ...categoryFilter.params) as unknown as (Omit<SalesLineItemRow, "productName"> & { snapshotNames: string })[];
+  return rows.map(({ snapshotNames, ...row }) => {
+    const names = (JSON.parse(snapshotNames) as string[]).sort();
+    const bases = names.map(name => {
+      const separator = name.lastIndexOf(" · ");
+      return separator > 0 ? name.slice(0, separator) : null;
+    });
+    // Never replace a historical name with the product's current catalog name.
+    const productName = names.length > 1 && bases[0] && bases.every(base => base === bases[0])
+      ? bases[0]
+      : names.join(" / ");
+    return { ...row, productName };
+  });
 }
 
 

@@ -175,5 +175,5 @@ export function memberStatementExport(
     [],
     ["ยอดซื้อสินค้า (ไม่รวมบิลยกเลิก)", exportNumber(statement.purchaseTotal)],
   ];
-  return { doc, rows: exportRows, fileName, numericCols };
+  return { doc, rows: exportRows, fileName, numericCols, headerRowIndex: exportRows.indexOf(doc.columns) };
 }

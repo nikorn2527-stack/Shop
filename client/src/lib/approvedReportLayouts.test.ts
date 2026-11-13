@@ -14,9 +14,9 @@ describe('approved portrait report layouts',()=>{
   expect(result.numericCols).not.toContain(1);
  });
  it('orders transaction card, member and amount consistently with an unbroken Bangkok date/time',()=>{
-  const result=hospitalTransactionLayout([{createdAt:'2026-11-02 07:10:00',cardNumber:'000123',memberNumber:'000007',amount:-25,memberName:'ตัวอย่าง',actor:'เจ้าหน้าที่'}]);
-  expect(result.columns).toEqual(['วัน–เวลา','เลขบัตร','เลขสมาชิก','จำนวนเงิน (บาท)','ชื่อสมาชิก','ผู้ทำรายการ']);
-  expect(result.rows[0]).toEqual(['2 พ.ย. 2569 07:10','000123','000007','25.00','ตัวอย่าง','เจ้าหน้าที่']);
-  expect(result.totalsRow).toEqual(['รวม 1 รายการ','','','25.00','','']);expect(result.nowrapCols).toContain(0);expect(result.numericCols).toEqual([3]);
+  const result=hospitalTransactionLayout([{createdAt:'2026-11-02 07:10:00',cardNumber:'000123',memberNumber:'000007',amount:-25,memberName:'นาย ตัวอย่าง นามสกุลเต็ม',actor:'เจ้าหน้าที่'}]);
+  expect(result.columns).toEqual(['วัน–เวลา','เลขบัตร','เลขสมาชิก','ชื่อสมาชิก','จำนวนเงิน (บาท)','ผู้ทำรายการ']);
+  expect(result.rows[0]).toEqual(['2 พ.ย. 2569 07:10','000123','000007','นาย ตัวอย่าง นามสกุลเต็ม','25.00','เจ้าหน้าที่']);
+  expect(result.totalsRow).toEqual(['รวม 1 รายการ','','','','25.00','']);expect(result.nowrapCols).toContain(0);expect(result.numericCols).toEqual([4]);
  });
 });

@@ -93,7 +93,7 @@ export const REPORT_DOC_CSS = `
   .rd-table.rd-fixed-layout { table-layout: fixed; }
   .rd-table thead { display: table-header-group; }
   .rd-table tbody tr { break-inside: avoid; page-break-inside: avoid; }
-  .rd-table th { height: 44px; background: #f0f0ee; color: #111111; font-weight: 700; text-align: left; padding: 7px 8px; border-top: 2px solid #111111; border-bottom: 1.5px solid #555555; white-space: normal; font-size: 11px; line-height: 1.35; vertical-align: middle; text-transform: uppercase; letter-spacing: 0; }
+  .rd-table th { height: 28px; background: #f0f0ee; color: #111111; font-weight: 700; text-align: left; padding: 7px 8px; border-top: 2px solid #111111; border-bottom: 1.5px solid #555555; white-space: normal; font-size: 11px; line-height: 1.35; vertical-align: top; text-transform: uppercase; letter-spacing: 0; }
   .rd-table th.num, .rd-table td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
   .rd-table th.num { white-space: normal; }
   .rd-table th.head-nowrap { white-space: nowrap; overflow-wrap: normal; word-break: normal; }
@@ -106,6 +106,8 @@ export const REPORT_DOC_CSS = `
   .report-doc.rd-borderless-groups .rd-table :is(th, td) { border: 0 !important; }
   .report-doc.rd-borderless-groups .rd-table tbody.rd-row-group + tbody.rd-row-group::before { height: 24px; }
   .rd-table th, .rd-table td { overflow-wrap: anywhere; word-break: normal; }
+  .rd-table th { overflow-wrap: normal; word-break: normal; }
+  .rd-heading-unit, .rd-heading-word { white-space: nowrap; }
   .rd-table tbody tr:nth-child(even) td { background: #f7f7f5; }
   .rd-table tfoot { display: table-row-group; }
   .rd-table tfoot td { font-weight: 800; background: #f0f0ee; border-top: 2px solid #111111; border-bottom: 2px solid #111111; color: #111111; padding: 8px; font-size: 13px; }
@@ -196,7 +198,11 @@ export function buildReportDocumentHtml(config: ReportDocConfig, opts: BuildRepo
   const shortHeadings = new Set(["Item","ลำดับ","เลขสมาชิก","เลขบัตร","เลขที่บัตร","รายการ","จำนวน","ชิ้น","บิล","หน่วย","LOT","คงเหลือ","ยอดขาย","ยอดยกมา","ผู้ทำรายการ","ชื่อสมาชิก","ชื่อสินค้า"]);
   const headCells = config.columns.map((column, index) => {
     const classes = [numeric.has(index) ? "num" : "", shortHeadings.has(column) ? "head-nowrap" : ""].filter(Boolean).join(" ");
-    return `<th${classes ? ` class="${classes}"` : ""}>${escapeHtml(column).replace(/\s+(\([^)]*\))$/, "<br>$1")}</th>`;
+    const label = escapeHtml(column)
+      .replaceAll("/", "/<wbr>")
+      .replace(/^มูลค่า(ราคาขาย|คงเหลือ|รวม)(?=\s|$)/, 'มูลค่า<wbr><span class="rd-heading-word">$1</span>')
+      .replace(/\s+(\([^)]*\))$/, ' <span class="rd-heading-unit">$1</span>');
+    return `<th${classes ? ` class="${classes}"` : ""}>${label}</th>`;
   }).join("");
   const colgroup = config.columnWidths?.length
     ? `<colgroup>${config.columns.map((_, index) => {

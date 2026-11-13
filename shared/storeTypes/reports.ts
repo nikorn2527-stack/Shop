@@ -103,6 +103,9 @@ export type SalesLineItemRow = {
   unit: string;
   qty: number;
   price: number;
+  /** Historical bounds for a bill/product aggregate; price is the weighted mean. */
+  priceMin?: number;
+  priceMax?: number;
   amount: number;
   paymentMethod: string;
   cashier: string;

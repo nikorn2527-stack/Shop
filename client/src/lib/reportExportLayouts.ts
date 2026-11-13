@@ -1,10 +1,14 @@
 import {exportCount,exportNumber} from '@/exportUtils';
+export function historicalUnitPrice(row:{price:number;priceMin?:number;priceMax?:number},format:(value:number)=>string=exportNumber){
+ const min=row.priceMin??row.price,max=row.priceMax??row.price;
+ return min===max?format(min):`${format(min)}–${format(max)}`;
+}
 type ProductSalesExportRow={name:string;sku:string|null;barcode:string|null;bills:number;qty:number;revenue:number;cogs:number;profit:number;priceMin?:number;priceMax?:number};
 export function productSalesExport(source:ProductSalesExportRow[],includeCosts:boolean){
- const columns=['บาร์โค้ดสินค้า','สินค้า (รหัส)','ราคาขาย/หน่วย (บาท)','บิล','ชิ้น','ยอดขาย (บาท)',...(includeCosts?['ต้นทุน (บาท)','กำไร (บาท)']:[])];
+ const columns=['บาร์โค้ดสินค้า','สินค้า','ราคาขาย/หน่วย (บาท)','บิล','ชิ้น','ยอดขาย (บาท)',...(includeCosts?['ต้นทุน (บาท)','กำไร (บาท)']:[])];
  const rows=source.map(row=>{
   const price=row.priceMin==null||row.priceMax==null?'—':row.priceMin===row.priceMax?exportNumber(row.priceMin):`${exportNumber(row.priceMin)}–${exportNumber(row.priceMax)}`;
-  return [row.barcode||'—',`${row.name}${row.sku?` (${row.sku})`:''}`,price,exportCount(row.bills),exportCount(row.qty),exportNumber(row.revenue),...(includeCosts?[exportNumber(row.cogs),exportNumber(row.profit)]:[])];
+  return [row.barcode||'—',row.name,price,exportCount(row.bills),exportCount(row.qty),exportNumber(row.revenue),...(includeCosts?[exportNumber(row.cogs),exportNumber(row.profit)]:[])];
  });
  const total=(key:'bills'|'qty'|'revenue'|'cogs'|'profit')=>source.reduce((sum,row)=>sum+row[key],0);
  const totalsRow=['รวมทุกสินค้า','','',exportCount(total('bills')),exportCount(total('qty')),exportNumber(total('revenue')),...(includeCosts?[exportNumber(total('cogs')),exportNumber(total('profit'))]:[])];

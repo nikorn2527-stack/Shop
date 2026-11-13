@@ -1,5 +1,6 @@
+import {hospitalTransactionRows,refundReportSummary,reportTransactionLabel} from "@/lib/reportTransactionSemantics";
 import {hospitalTransactionLayout} from "@/lib/approvedReportLayouts";
-import {productSalesExport,nonzeroStockRows} from "@/lib/reportExportLayouts";
+import {productSalesExport,nonzeroStockRows,historicalUnitPrice} from "@/lib/reportExportLayouts";
 import { memberBalanceExport } from "@/lib/memberBalanceExport";
 import { normalizeBillSearch } from "@/lib/billSearch";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuSeparator, DropdownMenuGroup } from "@/components/ui/dropdown-menu";
@@ -535,7 +536,7 @@ export function Reports({
     from: txFrom || undefined,
     to: txTo || undefined,
   });
-  const txRows = txQuery.data ?? [];
+  const txRows = hospitalTransactionRows(txQuery.data ?? [], hospitalPreset);
   // ROUND 65 — รายงานใหม่: ยอดเงินในบัตรทุกใบ + สินค้าคงคลังตามช่วงเวลา (ยอดยกมา/ยอดขาย/คงเหลือ)
   const balancesQuery = trpc.reports.memberBalances.useQuery(
     { search: debouncedBalanceSearch || undefined, includeReturnedZero },
@@ -802,10 +803,6 @@ export function Reports({
       .filter(row => row.type === "activation")
       .reduce((sum, row) => sum + row.amount, 0),
     activationCount: txRows.filter(row => row.type === "activation").length,
-    refund: txRows
-      .filter(row => row.type === "refund")
-      .reduce((sum, row) => sum + row.amount, 0),
-    refundCount: txRows.filter(row => row.type === "refund").length,
   };
   const dailySalesRows = [
     [
@@ -922,8 +919,8 @@ export function Reports({
             ? ["วันที่ · เวลา", "รหัสสินค้า", "ชื่อสินค้า", "จำนวน", "ราคา/หน่วย (บาท)", "รวมเงิน (บาท)"]
             : ["วันที่ · เวลา", "เลขที่บิล", "รายการสินค้า", "ชิ้น", "ราคา/ชิ้น (บาท)", "ยอดรวม (บาท)", "ชำระโดย", "พนักงานขาย"],
           ...lineItemRows.map(row => hospitalSales
-            ? [formatLogDateTime(row.createdAt), row.productCode ?? "—", row.productName, exportCount(row.qty), exportNumber(row.price), exportNumber(row.amount)]
-            : [formatLogDateTime(row.createdAt), row.orderNumber, row.productName, exportCount(row.qty), exportNumber(row.price), exportNumber(row.amount), row.paymentMethod, row.cashier]),
+            ? [formatLogDateTime(row.createdAt), row.productCode ?? "—", row.productName, exportCount(row.qty), historicalUnitPrice(row), exportNumber(row.amount)]
+            : [formatLogDateTime(row.createdAt), row.orderNumber, row.productName, exportCount(row.qty), historicalUnitPrice(row), exportNumber(row.amount), row.paymentMethod, row.cashier]),
           hospitalSales
             ? ["รวม", `${exportCount(lineItemTotals.lines)} รายการ`, "", exportCount(lineItemTotals.qty), "—", exportNumber(lineItemTotals.revenue)]
             : ["รวม", `${exportCount(lineItemTotals.bills)} บิล`, `${exportCount(lineItemTotals.lines)} รายการ`, exportCount(lineItemTotals.qty), "—", exportNumber(lineItemTotals.revenue), "—", "—"],
@@ -1001,12 +998,12 @@ export function Reports({
         columns: hospitalSales
           ? ["วันที่ · เวลา", "รหัสสินค้า", "ชื่อสินค้า", "จำนวน", "ราคา/หน่วย (บาท)", "รวมเงิน (บาท)"]
           : ["วันที่ · เวลา", "เลขที่บิล", "รายการสินค้า", "ชิ้น", "ราคา/ชิ้น (บาท)", "ยอดรวม (บาท)", "ชำระโดย", "พนักงานขาย"],
-        columnWidths: hospitalSales ? ["21%","17%","32%","6%","12%","12%"] : ["19%","15%","23%","7%","8%","10%","8%","10%"],
+        columnWidths: hospitalSales ? ["21%","17%","32%","6%","12%","12%"] : ["19%","12%","23%","6%","12%","10%","8%","10%"],
         nowrapCols: hospitalSales ? [0,1,3,4,5] : [0,1,3,4,5],
         numericCols: [3, 4, 5],
         rows: lineItemRows.map(row => hospitalSales
-          ? [formatLogDateTime(row.createdAt), row.productCode ?? "—", row.productName, exportCount(row.qty), exportNumber(row.price), exportNumber(row.amount)]
-          : [formatLogDateTime(row.createdAt), row.orderNumber, row.productName, exportCount(row.qty), exportNumber(row.price), exportNumber(row.amount), row.paymentMethod, row.cashier]),
+          ? [formatLogDateTime(row.createdAt), row.productCode ?? "—", row.productName, exportCount(row.qty), historicalUnitPrice(row), exportNumber(row.amount)]
+          : [formatLogDateTime(row.createdAt), row.orderNumber, row.productName, exportCount(row.qty), historicalUnitPrice(row), exportNumber(row.amount), row.paymentMethod, row.cashier]),
         totalsRow: hospitalSales
           ? ["รวม", `${exportCount(lineItemTotals.lines)} รายการ`, "", exportCount(lineItemTotals.qty), "—", exportNumber(lineItemTotals.revenue)]
           : ["รวม", `${exportCount(lineItemTotals.bills)} บิล`, `${exportCount(lineItemTotals.lines)} รายการ`, exportCount(lineItemTotals.qty), "—", exportNumber(lineItemTotals.revenue), "—", "—"],
@@ -1207,40 +1204,34 @@ export function Reports({
     refund: "รายงานการคืนบัตรเงินสด",
     activation: "รายงานการเปิดใช้บัตรเงินสด",
   };
-  const transactionLabel = (row: typeof txRows[number]) => TX_TYPE_LABEL[row.type];
-  const txAmountForReport = (row: typeof txRows[number]) => hospitalTxPreset ? Math.abs(row.amount) : row.amount;
+  const transactionLabel = (row: typeof txRows[number]) => reportTransactionLabel(row, TX_TYPE_LABEL[row.type]);
   const txSummaryByType = [
     { type: "deposit" as const, label: "เติมเงิน", amount: Math.abs(txTotals.deposit), count: txTotals.depositCount, sign: "+" as const },
     { type: "withdrawal" as const, label: "ถอนเงิน", amount: Math.abs(txTotals.withdraw), count: txTotals.withdrawCount, sign: "-" as const },
     { type: "purchase" as const, label: "ใช้จ่าย", amount: Math.abs(txTotals.spend), count: txTotals.spendCount, sign: "-" as const },
     { type: "activation" as const, label: "เปิดใช้บัตร", amount: Math.abs(txTotals.activation), count: txTotals.activationCount, sign: "+" as const },
-    { type: "refund" as const, label: "คืนบัตรเงินสด", amount: Math.abs(txTotals.refund), count: txTotals.refundCount, sign: "-" as const },
+    ...refundReportSummary(txRows).filter(item => item.sign === "-" || item.count > 0),
   ];
   const visibleTxSummary = txSummaryByType.filter(item => txTypes.length === 0 || txTypes.includes(item.type));
-  const txExportRows = () => [
-    ...(hospitalTxPreset
-      ? [["วันที่ · เวลา", "เลขที่บัตร", "จำนวนเงิน (บาท)", "เลขสมาชิก", "ชื่อสมาชิก", "ผู้ทำรายการ"]]
-      : [["วันที่ · เวลา", "เลขที่บัตร", "เลขสมาชิก", "ชื่อสมาชิก", "รายการ", "ยอด (บาท)", "คงเหลือ (บาท)", "ผู้ทำรายการ"]]),
-    ...txRows.map(row => hospitalTxPreset
-      ? [
-          formatLogDateTime(row.createdAt),
-          row.cardNumber ?? "—",
-          exportNumber(txAmountForReport(row)),
-          row.memberNumber,
-          row.memberName ?? "—",
-          row.actor ?? "ไม่ระบุ",
-        ]
-      : [
-          formatLogDateTime(row.createdAt),
-          row.cardNumber ?? "—",
-          row.memberNumber,
-          row.memberName ?? "—",
-          transactionLabel(row),
-          exportNumber(txAmountForReport(row)),
-          row.balanceAfter !== null ? exportNumber(row.balanceAfter) : "—",
-          row.actor ?? "ไม่ระบุ",
-        ]),
-  ];
+  const txExportRows = () => {
+    if (hospitalTxPreset) {
+      const layout = hospitalTransactionLayout(txRows);
+      return [layout.columns, ...layout.rows];
+    }
+    return [
+      ["วันที่ · เวลา", "เลขที่บัตร", "เลขสมาชิก", "ชื่อสมาชิก", "รายการ", "ยอด (บาท)", "คงเหลือ (บาท)", "ผู้ทำรายการ"],
+      ...txRows.map(row => [
+        formatLogDateTime(row.createdAt),
+        row.cardNumber ?? "—",
+        row.memberNumber,
+        row.memberName ?? "—",
+        transactionLabel(row),
+        exportNumber(row.amount),
+        row.balanceAfter !== null ? exportNumber(row.balanceAfter) : "—",
+        row.actor ?? "ไม่ระบุ",
+      ]),
+    ];
+  };
   const txExportBase = txMember
     ? `member-transactions-${txMember.memberNumber}`
     : "member-transactions";
@@ -1265,33 +1256,11 @@ export function Reports({
       ],
       ["จำนวนรายการ", `${txRows.length} รายการ`],
     ],
-    columns: hospitalTxPreset
-      ? ["วันที่ · เวลา", "เลขที่บัตร", "จำนวนเงิน (บาท)", "เลขสมาชิก", "ชื่อสมาชิก", "ผู้ทำรายการ"]
-      : ["วันที่ · เวลา", "เลขที่บัตร", "เลขสมาชิก", "ชื่อสมาชิก", "รายการ", "ยอด (บาท)", "คงเหลือ (บาท)", "ผู้ทำรายการ"],
-    columnWidths: hospitalTxPreset
-      ? ["16%", "16%", "15%", "15%", "19%", "19%"]
-      : ["19%", "16%", "10%", "18%", "9%", "9%", "9%", "10%"],
-    nowrapCols: hospitalTxPreset ? [0,1,2,3] : [0,1,2,5,6],
-    numericCols: hospitalTxPreset ? [2] : [5, 6],
-    rows: txRows.map(row => hospitalTxPreset
-      ? [
-          formatLogDateTime(row.createdAt),
-          row.cardNumber ?? "—",
-          exportNumber(txAmountForReport(row)),
-          row.memberNumber,
-          row.memberName ?? "—",
-          row.actor ?? "ไม่ระบุ",
-        ]
-      : [
-          formatLogDateTime(row.createdAt),
-          row.cardNumber ?? "—",
-          row.memberNumber,
-          row.memberName ?? "—",
-          transactionLabel(row),
-          exportNumber(txAmountForReport(row)),
-          row.balanceAfter !== null ? exportNumber(row.balanceAfter) : "—",
-          row.actor ?? "ไม่ระบุ",
-        ]),
+    columns: ["วันที่ · เวลา", "เลขที่บัตร", "เลขสมาชิก", "ชื่อสมาชิก", "รายการ", "ยอด (บาท)", "คงเหลือ (บาท)", "ผู้ทำรายการ"],
+    columnWidths: ["19%", "16%", "10%", "18%", "9%", "9%", "9%", "10%"],
+    nowrapCols: [0,1,2,5,6],
+    numericCols: [5, 6],
+    rows: txExportRows().slice(1),
     // Summarize the filtered transactions below the document table.
     summaryBlocks: hospitalTxPreset ? undefined : [
       ...visibleTxSummary.map(item => [item.label, `${item.sign}${exportNumber(item.amount)} · ${exportCount(item.count)} รายการ`] as [string, string]),
@@ -1300,9 +1269,7 @@ export function Reports({
         exportNumber(txRows.reduce((sum, row) => sum + row.amount, 0)),
       ],
     ],
-    totalsRow: hospitalTxPreset
-      ? [`รวม ${exportCount(txRows.length)} รายการ`, "", exportNumber(txRows.reduce((sum, row) => sum + Math.abs(row.amount), 0)), "", "", ""]
-      : [`รวมทั้งหมด ${txRows.length} รายการ`, "", "", "", "", exportNumber(txRows.reduce((sum, row) => sum + row.amount, 0)), "", ""],
+    totalsRow: [`รวมทั้งหมด ${txRows.length} รายการ`, "", "", "", "", exportNumber(txRows.reduce((sum, row) => sum + row.amount, 0)), "", ""],
     brandName: "ร้านค้าสวัสดิการ",
     compact: true,
     ...(hospitalTxPreset ? hospitalTransactionLayout(txRows) : {}),
@@ -2140,11 +2107,6 @@ export function Reports({
                             <tr key={row.productId ?? `special-${index}`}>
                               <td>
                                 <span className="row-label">{row.name}</span>
-                                <small className="cell-sub cell-mono">
-                                  {row.sku ??
-                                    row.barcode ??
-                                    "รายการพิเศษ · ไม่มีรหัส"}
-                                </small>
                                 <span
                                   className={`sales-bar ${["", "blue", "amber", "purple"][index % 4]}`}
                                   aria-hidden="true"
@@ -2272,7 +2234,7 @@ export function Reports({
                               <td className="num">
                                 {row.qty.toLocaleString("th-TH")}
                               </td>
-                              <td className="num">{money(row.price)}</td>
+                              <td className="num">{historicalUnitPrice(row, money)}</td>
                               <td className="num">
                                 <strong>{money(row.amount)}</strong>
                               </td>
@@ -2775,8 +2737,8 @@ export function Reports({
                           <th>วัน–เวลา</th>
                           <th>เลขบัตร</th>
                           <th>เลขสมาชิก</th>
-                          <th className="num">จำนวนเงิน</th>
                           <th>ชื่อสมาชิก</th>
+                          <th className="num">จำนวนเงิน</th>
                           <th>ผู้ทำรายการ</th>
                         </tr>
                       ) : (
@@ -2796,12 +2758,12 @@ export function Reports({
                         if (hospitalTxPreset) {
                           return (
                             <tr key={row.id}>
-                              <td style={{whiteSpace:"nowrap"}}><small className="cell-sub" style={{ marginTop: 0 }}>{formatLogDateTime(row.createdAt)}</small></td>
-                              <td><small className="cell-mono" style={{ marginTop: 0 }}>{row.cardNumber ?? "—"}</small></td>
-                              <td><small className="cell-mono" style={{ marginTop: 0 }}>{row.memberNumber}</small></td>
+                              <td style={{whiteSpace:"nowrap"}}><small className="cell-sub" style={{ marginTop: 0, fontSize: "inherit" }}>{formatLogDateTime(row.createdAt)}</small></td>
+                              <td><small className="cell-mono" style={{ marginTop: 0, fontSize: "inherit" }}>{row.cardNumber ?? "—"}</small></td>
+                              <td><small className="cell-mono" style={{ marginTop: 0, fontSize: "inherit" }}>{row.memberNumber}</small></td>
+                              <td style={{whiteSpace:"nowrap"}}><span className="cell-strong">{row.memberName ?? "—"}</span></td>
                               <td className="num cell-mono"><strong>{money(Math.abs(row.amount))}</strong></td>
-                              <td><span className="cell-strong">{row.memberName ?? "—"}</span></td>
-                              <td><small className="cell-sub" style={{ marginTop: 0 }}>{row.actor ?? "ไม่ระบุ"}</small></td>
+                              <td><small className="cell-sub" style={{ marginTop: 0, fontSize: "inherit" }}>{row.actor ?? "ไม่ระบุ"}</small></td>
                             </tr>
                           );
                         }
@@ -2865,9 +2827,9 @@ export function Reports({
               </div>
               <div className="report-summary-footer">
                 {visibleTxSummary.map(item => (
-                  <div key={item.type}>
+                  <div key={`${item.type}-${item.sign}`}>
                     <small>{item.label}รวม</small>
-                    <strong className={item.type === "deposit" || item.type === "activation" ? "green-text" : item.type === "withdrawal" ? "amber-text" : "red-text"}>
+                    <strong className={item.sign === "+" ? "green-text" : item.type === "withdrawal" ? "amber-text" : "red-text"}>
                       {item.sign}{money(item.amount)}
                     </strong>
                     <span>{item.count} รายการ</span>

@@ -3846,8 +3846,17 @@ th { font-weight: 600; }
 .thai-date-grid button { height: 27px; border: 0; border-radius: 7px; background: transparent; color: #47544b; font-size: 11px; cursor: pointer; font-variant-numeric: tabular-nums; }
 .thai-date-grid button:hover:not(:disabled) { background: #eaf6f0; }
 .thai-date-grid button:disabled { color: #c9cec2; cursor: not-allowed; }
-.thai-date-grid button.today { color: var(--teal); font-weight: 700; }
-.thai-date-grid button.picked { background: var(--teal); color: #fff; font-weight: 700; }
+.thai-date-grid button.today { position: relative; color: var(--teal); font-weight: 700; box-shadow: inset 0 0 0 1.5px var(--teal); }
+.thai-date-grid button.today::after { content: ""; position: absolute; bottom: 2px; left: calc(50% - 1.5px); width: 3px; height: 3px; border-radius: 50%; background: var(--teal); }
+.thai-date-pop .thai-date-grid button.picked { background: var(--teal); color: #fff; font-weight: 700; }
+.thai-date-grid button.today.picked { box-shadow: inset 0 0 0 2px var(--teal), inset 0 0 0 3.5px #fff; }
+.thai-date-grid button.today.picked::after { background: #fff; }
+.thai-date-legend { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 9px; color: #59665e; font-size: 10px; }
+.thai-date-legend > span { display: inline-flex; align-items: center; gap: 5px; }
+.thai-date-legend i { position: relative; display: inline-block; width: 14px; height: 14px; border-radius: 4px; }
+.thai-date-today-key { border: 1.5px solid var(--teal); }
+.thai-date-today-key::after { content: ""; position: absolute; bottom: 1px; left: calc(50% - 1.5px); width: 3px; height: 3px; border-radius: 50%; background: var(--teal); }
+.thai-date-selected-key { background: var(--teal); }
 .thai-date-week { margin-bottom: 4px; }
 .thai-date-week span { text-align: center; color: #8a9184; font-size: 9px; padding: 3px 0; }
 .thai-date-foot { display: flex; gap: 6px; margin-top: 8px; padding-top: 8px; border-top: 1px dashed #e4ece8; }
@@ -5027,7 +5036,7 @@ nav button.active .nav-badge { background: #007a55; color: #fff; box-shadow: non
 .scs-fill-row span { display: block; font-size: 10px; font-weight: 600; color: #666666; }
 .scs-fill-row i { display: block; border-bottom: 1px dotted #8a8a85; height: 20px; }
 .stock-count-sheet .scs-table { min-width: 0; table-layout: fixed; }
-.stock-count-sheet .scs-table td { height: 34px; vertical-align: middle; }
+.stock-count-sheet .scs-table td { height: 34px; vertical-align: top; }
 .stock-count-sheet .scs-table .scs-cat td { background: #f0f0ee; color: #111111; font-weight: 700; border-bottom: 1.5px solid #555555; }
 .scs-no { width: 6%; text-align: center; color: #444444; }
 .scs-code { width: 13%; font-variant-numeric: tabular-nums; }

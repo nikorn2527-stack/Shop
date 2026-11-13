@@ -18,5 +18,5 @@ export function stockReceiptLayout(source:readonly StockReceipt[]){
 }
 type Transaction={createdAt:string;cardNumber:string|null;memberNumber:string;amount:number;memberName:string|null;actor:string|null};
 export function hospitalTransactionLayout(source:readonly Transaction[]){
- return {columns:['วัน–เวลา','เลขบัตร','เลขสมาชิก','จำนวนเงิน (บาท)','ชื่อสมาชิก','ผู้ทำรายการ'],columnWidths:['21%','18%','13%','14%','18%','16%'],nowrapCols:[0,1,2,3],numericCols:[3],rows:source.map(row=>[formatLogDateTime(row.createdAt),row.cardNumber??'—',row.memberNumber,exportNumber(Math.abs(row.amount)),row.memberName??'—',row.actor??'ไม่ระบุ']),totalsRow:[`รวม ${exportCount(source.length)} รายการ`,'','',exportNumber(source.reduce((sum,row)=>sum+Math.abs(row.amount),0)),'','']};
+ return {columns:['วัน–เวลา','เลขบัตร','เลขสมาชิก','ชื่อสมาชิก','จำนวนเงิน (บาท)','ผู้ทำรายการ'],columnWidths:['21%','16%','12%','23%','14%','14%'],nowrapCols:[0,1,2,4],numericCols:[4],rows:source.map(row=>[formatLogDateTime(row.createdAt),row.cardNumber??'—',row.memberNumber,row.memberName??'—',exportNumber(Math.abs(row.amount)),row.actor??'ไม่ระบุ']),totalsRow:[`รวม ${exportCount(source.length)} รายการ`,'','','',exportNumber(source.reduce((sum,row)=>sum+Math.abs(row.amount),0)),'']};
 }

@@ -42,11 +42,12 @@ export function StockCountSheet({ products }: { products: Product[] }) {
         .stock-count-sheet .scs-table th, .stock-count-sheet .scs-table td { padding: 6px 4px; letter-spacing: 0; width: auto; }
         .stock-count-sheet .scs-table th { font-size: 11px; white-space: nowrap; overflow-wrap: normal; }
         .stock-count-sheet .scs-table .scs-code { padding-right: 10px; }
+        .stock-count-sheet .scs-table thead .scs-code { white-space: normal; overflow-wrap: normal; }
         .stock-count-sheet .scs-table .scs-name { padding-left: 10px; }
         .stock-count-sheet .scs-table .scs-name b { overflow-wrap: break-word; word-break: normal; }
         .stock-count-sheet .scs-table :is(.scs-no, .scs-code, .scs-unit, .scs-num) { white-space: nowrap; overflow-wrap: normal; word-break: normal; }
         .stock-count-sheet .scs-table :is(.scs-name, .scs-note) { white-space: normal; overflow-wrap: break-word; word-break: normal; }
-        .stock-count-sheet .scs-table td { height: 34px; }
+        .stock-count-sheet .scs-table td { height: 34px; vertical-align: top; }
         .stock-count-sheet .scs-table .scs-cat td { white-space: normal; }
       `}</style>
       <div className="rd-head">

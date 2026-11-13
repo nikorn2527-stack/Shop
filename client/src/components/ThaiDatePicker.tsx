@@ -112,10 +112,14 @@ export function ThaiDatePicker({ value, onChange, min, max, ariaLabel = "เล�
             {THAI_WEEKDAYS.map((day) => <span key={day}>{day}</span>)}
           </div>
           <div className="thai-date-grid">
-            {grid.map((date, index) => date === null
-              ? <span key={`empty-${index}`} />
-              : <button type="button" key={toIso(date)} className={value === toIso(date) ? "picked" : toIso(date) === toIso(today) ? "today" : ""} disabled={Boolean(outOfRange(date))} onClick={() => pick(date)} aria-label={`${date.getDate()} ${THAI_MONTHS_FULL[date.getMonth()]} ${date.getFullYear() + 543}`}>{date.getDate()}</button>)}
+            {grid.map((date, index) => {
+              if (!date) return <span key={`empty-${index}`} />;
+              const iso = toIso(date);
+              const isToday = iso === toIso(today);
+              return <button type="button" key={iso} className={`${value === iso ? "picked " : ""}${isToday ? "today" : ""}`.trim()} disabled={Boolean(outOfRange(date))} onClick={() => pick(date)} aria-current={isToday ? "date" : undefined} aria-label={`${date.getDate()} ${THAI_MONTHS_FULL[date.getMonth()]} ${date.getFullYear() + 543}${isToday ? " · วันนี้" : ""}`}>{date.getDate()}</button>;
+            })}
           </div>
+          <div className="thai-date-legend"><span><i className="thai-date-today-key" aria-hidden="true" />วันนี้</span><span><i className="thai-date-selected-key" aria-hidden="true" />วันที่เลือก</span></div>
           <div className="thai-date-foot">
             <button type="button" className="mini-button" disabled={Boolean(outOfRange(today))} onClick={() => pick(today)}>วันนี้ · {today.getDate()} {THAI_MONTHS_SHORT[today.getMonth()]} {today.getFullYear() + 543}</button>
             {value && <button type="button" className="mini-button" onClick={() => { onChange(""); setOpen(false); }}>ล้างวันที่</button>}

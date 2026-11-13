@@ -71,3 +71,15 @@ it('preserves card-first detail lines, escapes HTML, and leaves single-line prod
  expect(html).toContain('&lt;script&gt;');expect(html).not.toContain('<script>');
  expect(html).toContain('<td>สินค้า A</td>');
 });
+
+it("keeps heading units together without forcing a second line when the column can fit", () => {
+ const html=buildReportDocumentHtml({...config,columns:["ชื่อสมาชิก","จำนวนเงิน (บาท)"],numericCols:[1]},{stampText:"test"});
+ expect(html).toContain('จำนวนเงิน <span class="rd-heading-unit">(บาท)</span>');
+ expect(html).not.toContain('จำนวนเงิน<br>');
+ expect(REPORT_DOC_CSS).toMatch(/\.rd-table th \{[^}]*vertical-align: top/);
+});
+
+it("breaks a narrow selling-value heading between its meaningful words", () => {
+ const html=buildReportDocumentHtml({...config,columns:["สินค้า","มูลค่าราคาขาย"]},{stampText:"test"});
+ expect(html).toContain('มูลค่า<wbr><span class="rd-heading-word">ราคาขาย</span>');
+});

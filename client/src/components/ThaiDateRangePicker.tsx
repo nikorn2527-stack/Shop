@@ -155,9 +155,11 @@ export function ThaiDateRangePicker({
           const iso = toIso(date);
           const inRange = Boolean(effectiveFrom && effectiveTo && iso >= effectiveFrom && iso <= effectiveTo);
           const edge = iso === effectiveFrom || iso === effectiveTo;
-          return <button type="button" key={iso} className={`${edge ? "picked " : ""}${inRange ? "in-range " : ""}${iso === toIso(today) ? "today" : ""}`.trim()} onClick={() => pick(date)} aria-label={`${date.getDate()} ${THAI_MONTHS_FULL[date.getMonth()]} ${date.getFullYear() + 543}`}>{date.getDate()}</button>;
+          const isToday = iso === toIso(today);
+          return <button type="button" key={iso} className={`${edge ? "picked " : ""}${inRange ? "in-range " : ""}${isToday ? "today" : ""}`.trim()} onClick={() => pick(date)} aria-current={isToday ? "date" : undefined} aria-label={`${date.getDate()} ${THAI_MONTHS_FULL[date.getMonth()]} ${date.getFullYear() + 543}${isToday ? " · วันนี้" : ""}`}>{date.getDate()}</button>;
         })}
       </div>
+      <div className="thai-date-legend"><span><i className="thai-date-today-key" aria-hidden="true" />วันนี้</span><span><i className="thai-date-selected-key" aria-hidden="true" />วันที่เลือก</span></div>
       <div className="thai-date-foot">
         <button type="button" className="mini-button" onClick={() => { const iso = toIso(today); onChange(iso, iso); setAnchor(""); setOpen(false); }}>วันนี้ · {today.getDate()} {THAI_MONTHS_SHORT[today.getMonth()]} {today.getFullYear() + 543}</button>
         <button type="button" className="mini-button" onClick={() => { onChange("", ""); setAnchor(""); setOpen(false); }}>ล้างช่วงวันที่</button>
