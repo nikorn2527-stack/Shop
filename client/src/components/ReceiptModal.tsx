@@ -296,22 +296,6 @@ export function ReceiptModal({
             </div>
           ))}
         </div>
-        <div
-          className="receipt-customer"
-          style={
-            receipt.memberNumber
-              ? { paddingBottom: 2, borderBottom: "none" }
-              : undefined
-          }
-        >
-          <span>{transaction ? "สมาชิก" : "ผู้ซื้อ"}</span>
-          <b
-            className={receipt.memberName ? "receipt-member-name" : undefined}
-            style={{ fontSize: 12, lineHeight: 1.45, textAlign: "right" }}
-          >
-            {receipt.memberName || "บุคคลทั่วไป"}
-          </b>
-        </div>
         {receipt.memberNumber && (
           <div
             className="receipt-member-reference"
@@ -320,8 +304,8 @@ export function ReceiptModal({
               justifyContent: "space-between",
               alignItems: "baseline",
               gap: 6,
-              padding: "2px 0 8px",
-              borderBottom: "1px solid #e0e0dc",
+              padding: "4px 0 2px",
+              borderBottom: "none",
               fontSize: 10,
             }}
           >
@@ -335,6 +319,17 @@ export function ReceiptModal({
             </b>
           </div>
         )}
+        <div
+          className="receipt-customer"
+        >
+          <span>{transaction ? "สมาชิก" : "ผู้ซื้อ"}</span>
+          <b
+            className={receipt.memberName ? "receipt-member-name" : undefined}
+            style={{ fontSize: 12, lineHeight: 1.45, textAlign: "right" }}
+          >
+            {receipt.memberName || "บุคคลทั่วไป"}
+          </b>
+        </div>
         {transaction ? (
           <>
             <div className="receipt-line">

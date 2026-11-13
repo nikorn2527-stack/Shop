@@ -48,6 +48,7 @@ describe('receipt member identity',()=>{
   expect(customer).not.toContain('สมาชิกนาย');
   expect(customer).toContain('font-size:12px');
   expect(html).toContain('class="receipt-member-reference"');
+  expect(html.indexOf('class="receipt-member-reference"')).toBeLessThan(html.indexOf('class="receipt-customer"'));
   expect(html).toContain('เลขสมาชิก');expect(html).toContain('TEST-001');
  });
  it('does not add an empty membership row for a general customer',()=>{

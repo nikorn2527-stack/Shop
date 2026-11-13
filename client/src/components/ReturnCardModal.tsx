@@ -68,7 +68,7 @@ function ReturnCardReview({ memberNumber, onBack, onClose, onCompleted }: {
   return <>
     {loading && <p role="status" className="card-return-help">กำลังตรวจสอบบัตรและยอดเงินล่าสุด…</p>}
     {member && <>
-      <section className="card-return-member"><MemberAvatar member={member} size={52} /><div><h3>{memberFullName(member)}</h3><p>เลขสมาชิก {member.memberNumber}</p><span><CreditCard size={14} /> บัตร {member.cardNumber || 'ยังไม่มีบัตร'}</span></div>{onBack && <button type="button" className="outline-button compact" disabled={release.isPending} onClick={onBack}>เปลี่ยนสมาชิก</button>}</section>
+      <section className="card-return-member"><MemberAvatar member={member} size={52} /><div><span><CreditCard size={14} /> บัตร {member.cardNumber || 'ยังไม่มีบัตร'}</span><p>เลขสมาชิก {member.memberNumber}</p><h3>{memberFullName(member)}</h3></div>{onBack && <button type="button" className="outline-button compact" disabled={release.isPending} onClick={onBack}>เปลี่ยนสมาชิก</button>}</section>
       <section className="card-return-refund"><span>เงินคงเหลือที่ต้องคืนสมาชิก</span><strong>{money(Math.max(0, member.balance))}</strong><p>{member.balance > 0 ? 'คืนเงินทั้งหมดตามยอดคงเหลือของบัตร' : member.balance === 0 ? 'ยอดเป็นศูนย์ คืนบัตรได้โดยไม่ต้องจ่ายเงินคืน' : 'ยังคืนบัตรไม่ได้เนื่องจากมียอดค้าง'}</p><div><span>ยอดหลังคืนบัตร</span><b>{money(0)}</b></div></section>
       <div className="card-return-outcome"><RotateCcw size={18} /><p>หลังยืนยัน บัตรจะกลับเป็นบัตรว่างพร้อมจ่ายใหม่<br /><small>บัญชีและประวัติรายการของสมาชิกยังคงอยู่</small></p></div>
     </>}
@@ -78,11 +78,11 @@ function ReturnCardReview({ memberNumber, onBack, onClose, onCompleted }: {
       if (!ready || !member?.cardNumber || !session) return;
       setError(''); setReview({ cardNumber: member.cardNumber, sessionId: session.id, amount: member.balance, name: memberFullName(member) });
     }}>ตรวจสอบการคืนบัตร</ActionButton></div>
-    {review && <FeedbackDialog tone="warning" title={review.amount > 0 ? 'ยืนยันคืนบัตรและคืนเงิน' : 'ยืนยันคืนบัตร'} description={`${review.name} · ${memberNumber}`} className="card-return-confirm" pending={release.isPending} error={error} actionLabel={review.amount > 0 ? `ยืนยันคืนบัตร · ${money(review.amount)}` : 'ยืนยันคืนบัตร'} onClose={() => setReview(null)} onCancel={() => setReview(null)} cancelLabel="กลับไปตรวจสอบ" onAction={() => {
+    {review && <FeedbackDialog tone="warning" title={review.amount > 0 ? 'ยืนยันคืนบัตรและคืนเงิน' : 'ยืนยันคืนบัตร'} description={`บัตร ${review.cardNumber} · เลขสมาชิก ${memberNumber} · ${review.name}`} className="card-return-confirm" pending={release.isPending} error={error} actionLabel={review.amount > 0 ? `ยืนยันคืนบัตร · ${money(review.amount)}` : 'ยืนยันคืนบัตร'} onClose={() => setReview(null)} onCancel={() => setReview(null)} cancelLabel="กลับไปตรวจสอบ" onAction={() => {
       if (release.isPending || inFlight.current) return;
       inFlight.current = true;
       setError('');
       release.mutate({ memberNumber, cardNumber: review.cardNumber, expectedSessionId: review.sessionId, clientRequestId: requestId.current, mode: 'refund' });
-    }}><div className="card-return-confirm-total"><span>เงินที่ต้องจ่ายคืน</span><strong>{money(review.amount)}</strong><small>บัตร {review.cardNumber}</small></div><p>{review.amount > 0 ? 'กดยืนยันเมื่อส่งมอบเงินคืนและได้รับบัตรจริงแล้ว' : 'กดยืนยันเมื่อได้รับบัตรจริงกลับมาแล้ว'}</p></FeedbackDialog>}
+    }}><div className="card-return-confirm-total"><span>เงินที่ต้องจ่ายคืน</span><strong>{money(review.amount)}</strong></div><p>{review.amount > 0 ? 'กดยืนยันเมื่อส่งมอบเงินคืนและได้รับบัตรจริงแล้ว' : 'กดยืนยันเมื่อได้รับบัตรจริงกลับมาแล้ว'}</p></FeedbackDialog>}
   </>;
 }

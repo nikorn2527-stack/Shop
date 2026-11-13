@@ -117,7 +117,7 @@ export function GlobalSearch({ role, open, onClose, onNavigate, onOpenMember, on
       for (const member of (membersQuery.data ?? []).slice(0, 400)) {
         const haystack = `${member.firstName} ${member.lastName} ${member.memberNumber}`.toLowerCase();
         if (!haystack.includes(needle)) continue;
-        list.push({ key: `member-${member.memberNumber}`, section: "สมาชิก", icon: UsersRound, label: `${member.firstName} ${member.lastName}`, sub: `${member.memberNumber} · ยอดคงเหลือ ${money(member.balance)} · ${member.type}`, select: () => onOpenMember(member.memberNumber) });
+        list.push({ key: `member-${member.memberNumber}`, section: "สมาชิก", icon: UsersRound, label: `${member.memberNumber} · ${member.firstName} ${member.lastName}`, sub: `ยอดคงเหลือ ${money(member.balance)} · ${member.type}`, select: () => onOpenMember(member.memberNumber) });
       }
       for (const product of productsQuery.data ?? []) {
         const haystack = `${product.name} ${product.sku} ${product.barcode ?? ""}`.toLowerCase();

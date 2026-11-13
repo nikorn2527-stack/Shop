@@ -130,8 +130,9 @@ export function MemberCardActionsModal({ memberNumber, onClose, onSuccess, initi
         {detail.isLoading && <p role="status">กำลังโหลด…</p>}
         {!detail.isLoading && member && (
   <>
-            <p>{memberFullName(member)} · {memberNumber}</p>
-            <p>บัตร {member.cardNumber ?? "ยังไม่มีบัตร"} · ยอดคงเหลือ {member.balance.toFixed(2)} บาท</p>
+            <p>บัตร {member.cardNumber ?? "ยังไม่มีบัตร"} · เลขสมาชิก {memberNumber}</p>
+            <p>{memberFullName(member)}</p>
+            <p>ยอดคงเหลือ {member.balance.toFixed(2)} บาท</p>
             {Boolean(member.accountClosed) && (
               <p className="notice-bar" role="status">
                 บัญชีรอบนี้ปิดแล้ว · ยังไม่ได้รับบัตรคืน เลือกคืนบัตรเมื่อรับบัตรกลับมาจริง
@@ -212,7 +213,7 @@ export function MemberCardActionsModal({ memberNumber, onClose, onSuccess, initi
                 <div className="wallet-confirm-rows">
                   <div>
                     <span>สมาชิก</span>
-                    <b>{returnResult?.memberName} · {returnResult?.memberNumber}</b>
+                    <b>{returnResult?.memberNumber} · {returnResult?.memberName}</b>
                   </div>
                   <div>
                     <span>ยอดคงเหลือก่อนคืนบัตร</span>
@@ -290,7 +291,7 @@ export function MemberCardActionsModal({ memberNumber, onClose, onSuccess, initi
                     </div>
                     <div className="receipt-customer">
                       <span>สมาชิก</span>
-                      <b>{returnResult?.memberName} · {returnResult?.memberNumber}</b>
+                      <b>{returnResult?.memberNumber} · {returnResult?.memberName}</b>
                     </div>
                     <div className="receipt-line">
                       <span>ยอดคงเหลือก่อนคืนบัตร</span>

@@ -1099,26 +1099,6 @@ export function Reports({
       setExportPreview(state);
     }
   };
-  const billsExportRows = () => [
-    [
-      "เลขที่บิล",
-      "วันที่ · เวลา",
-      "ลูกค้า",
-      "เลขสมาชิก",
-      "จำนวนรายการ",
-      "ชำระโดย",
-      "ยอดรวม (บาท)",
-    ],
-    ...salesHistory.map(entry => [
-      entry.orderNumber,
-      formatLogDateTime(entry.createdAt),
-      entry.memberName ? `สมาชิก ${entry.memberName}` : "บุคคลทั่วไป",
-      entry.memberNumber ?? "—",
-      exportCount(entry.items.length),
-      entry.paymentMethod,
-      exportNumber(entry.total),
-    ]),
-  ];
   const billExportBase = billMember
     ? `bills-${billMember.memberNumber}`
     : "bills-history";
@@ -1137,20 +1117,20 @@ export function Reports({
       columns: [
         "เลขที่บิล",
         "วันที่ · เวลา",
-        "ลูกค้า",
         "เลขสมาชิก",
+        "ลูกค้า",
         "รายการ",
         "ชำระโดย",
         "ยอดรวม (บาท)",
       ],
-      columnWidths: ["16%","21%","25%","10%","7%","11%","10%"],
-      nowrapCols: [0,1,3,4,6],
+      columnWidths: ["16%","21%","10%","25%","7%","11%","10%"],
+      nowrapCols: [0,1,2,4,6],
       numericCols: [4, 6],
       rows: salesHistory.map(entry => [
         entry.orderNumber,
         formatLogDateTime(entry.createdAt),
-        entry.memberName ? `สมาชิก ${entry.memberName}` : "บุคคลทั่วไป",
         entry.memberNumber ?? "—",
+        entry.memberName ? `สมาชิก ${entry.memberName}` : "บุคคลทั่วไป",
         exportCount(entry.items.length),
         entry.paymentMethod,
         exportNumber(entry.total),
@@ -1183,7 +1163,7 @@ export function Reports({
       label: "ประวัติบิล",
       fileName: billExportBase,
       sheetName: "ประวัติบิล",
-      rows: [...billsExportRows(), ...(doc.totalsRow ? [doc.totalsRow] : [])],
+      rows: [doc.columns, ...doc.rows, ...(doc.totalsRow ? [doc.totalsRow] : [])],
       numericCols: doc.numericCols ?? [],
       preferred: preferred ?? "pdf",
       doc,
@@ -2495,6 +2475,7 @@ export function Reports({
                       <tr>
                         <th>เลขที่บิล</th>
                         <th>วันที่ · เวลา</th>
+                        <th>เลขสมาชิก</th>
                         <th>ลูกค้า</th>
                         <th>รายการ</th>
                         <th>ชำระโดย</th>
@@ -2522,17 +2503,13 @@ export function Reports({
                                 {formatLogDateTime(entry.createdAt)}
                               </small>
                             </td>
+                            <td><small className="cell-mono">{entry.memberNumber ?? "—"}</small></td>
                             <td>
                               <b>
                                 {entry.memberName
                                   ? `สมาชิก ${entry.memberName}`
                                   : "บุคคลทั่วไป"}
                               </b>
-                              {entry.memberNumber && (
-                                <small className="cell-mono">
-                                  {entry.memberNumber}
-                                </small>
-                              )}
                             </td>
                             <td>
                               <span className="bill-items-cell">
@@ -2745,7 +2722,8 @@ export function Reports({
                         <tr>
                           <th>วันที่ · เวลา</th>
                           <th>เลขที่บัตร</th>
-                          <th>สมาชิก / เลขสมาชิก</th>
+                          <th>เลขสมาชิก</th>
+                          <th>ชื่อสมาชิก</th>
                           <th>รายการ</th>
                           <th className="num">ยอดเคลื่อน</th>
                           <th className="num hide-sm">คงเหลือ (บาท)</th>
@@ -2782,13 +2760,11 @@ export function Reports({
                               {transactionReceipt(row) && <button type="button" className="outline-button compact" onClick={() => setViewedTransaction(row)}><ReceiptText size={14} /> ใบเสร็จ</button>}
                             </td>
                             <td><small className="cell-mono">{row.cardNumber ?? "—"}</small></td>
+                            <td><small className="cell-mono">{row.memberNumber}</small></td>
                             <td>
                               <span className="cell-strong">
                                 {row.memberName ?? "—"}
                               </span>
-                              <small className="cell-sub">
-                                เลขสมาชิก {row.memberNumber}
-                              </small>
                             </td>
                             <td>
                               <span className="tx-detail">{transactionLabel(row)}</span>
@@ -3172,8 +3148,8 @@ export function Reports({
                     <thead>
                       <tr>
                         <th className="hide-sm">ลำดับ</th>
-                        <th>เลขสมาชิก</th>
                         <th>เลขบัตรปัจจุบัน</th>
+                        <th>เลขสมาชิก</th>
                         <th>ชื่อ-นามสกุล</th>
                         <th className="hide-sm">วันที่เปิดใช้สมาชิก</th>
                         <th className="num hide-sm">ยอดทั้งหมด</th>
@@ -3192,6 +3168,7 @@ export function Reports({
                           <td className="hide-sm cell-mono">
                             {exportCount(index + 1)}
                           </td>
+                          <td className="cell-mono">{row.cardNumber?.trim() || "—"}</td>
                           <td>
                             <small
                               className="cell-mono"
@@ -3200,7 +3177,6 @@ export function Reports({
                               {row.memberNumber}
                             </small>
                           </td>
-                          <td className="cell-mono">{row.cardNumber?.trim() || "—"}</td>
                           <td>
                             <span className="cell-strong">
                               {memberFullName(row)}

@@ -104,9 +104,9 @@ export function memberStatementExport(
     periodLabel: range,
     brandName: options.brandName,
     meta: [
-      ["สมาชิก", name],
-      ["เลขสมาชิก", member.memberNumber],
       ["เลขบัตรปัจจุบัน", member.cardNumber || "—"],
+      ["เลขสมาชิก", member.memberNumber],
+      ["สมาชิก", name],
       [
         "ออกรายงาน",
         formatHistoryDate((options.generatedAt ?? new Date()).toISOString()),

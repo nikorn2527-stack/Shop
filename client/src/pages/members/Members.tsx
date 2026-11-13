@@ -356,6 +356,7 @@ export function Members({
                       title={allVisibleSelected ? "ยกเลิกเลือกทุกแถวที่แสดง" : "เลือกทุกแถวที่แสดงเพื่อพิมพ์บัตร"}
                     />
                   </th>
+                  <th>เลขบัตร</th>
                   <th>หมายเลขสมาชิก</th>
                   <th>ชื่อ-นามสกุล</th>
                   <th>สถานะ</th>
@@ -385,10 +386,10 @@ export function Members({
                         />
                       </td>
                       <td className="cell-mono">
+                        {row.cardNumber ?? "—"}
+                      </td>
+                      <td className="cell-mono">
                         {row.memberNumber}
-                        {row.cardNumber && (
-                          <small className="cell-sub cell-mono-line">{`บัตร ${row.cardNumber}`}</small>
-                        )}
                       </td>
                       <td>
                         <span className="cell-strong">

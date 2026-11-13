@@ -396,11 +396,11 @@ export function MemberDetail({
           </span>
           <div>
             <span className="eyebrow">
-              {profile.type} · {profile.memberNumber}
+              {profile.type}
             </span>
+            <p>บัตร <b className="cell-mono">{profile.cardNumber ?? "—"}</b> · เลขสมาชิก <b className="cell-mono">{profile.memberNumber}</b></p>
             <h2>{displayName}</h2>
             <p>
-              บัตร <b className="cell-mono">{profile.cardNumber ?? "—"}</b> ·
               รหัสผู้ป่วย{" "}
               <b className="cell-mono">{profile.patientCode ?? "—"}</b> ·
               เปิดใช้ {formatThaiDate(profile.createdAt)}
@@ -715,7 +715,7 @@ export function MemberDetail({
               <div>
                 <span className="eyebrow">รายการธุรกรรม</span>
                 <h2>{walletOpen === "deposit" ? "เติมเงินเข้าบัญชีสมาชิก" : walletOpen === "refund" ? "คืนบัตรเงินสด (จ่ายเงินคืนผู้ป่วย)" : "ถอนเงินจากบัญชีสมาชิก"}</h2>
-                <p>{`${displayName} · ${profile.memberNumber} · ยอดคงเหลือ ${money(profile.balance)}`}</p>
+                <p>{`${profile.memberNumber} · ${displayName} · ยอดคงเหลือ ${money(profile.balance)}`}</p>
               </div>
               <button className="icon-button" onClick={closeWalletSlip}>
                 <X size={17} />
@@ -744,7 +744,7 @@ export function MemberDetail({
                   <div>
                     <span>สมาชิก</span>
                     <b>
-                      {displayName} · {profile.memberNumber}
+                      {profile.memberNumber} · {displayName}
                     </b>
                   </div>
                   <div>
@@ -956,9 +956,6 @@ export function MemberDetail({
               <div>
                 <span className="eyebrow">แก้ไขสมาชิก</span>
                 <h2>แก้ไขข้อมูลสมาชิก</h2>
-                <p>
-                  {displayName} · {profile.memberNumber}
-                </p>
               </div>
               <button
                 className="icon-button"
@@ -971,6 +968,19 @@ export function MemberDetail({
               className="form-grid compact-form"
               onKeyDownCapture={event => formEnterNav(event, submitEdit)}
             >
+              <label className="wide">
+                รหัสบัตรเงินสด
+                <input
+                  value={editForm.cardNumber}
+                  onChange={event =>
+                    setEditForm({ ...editForm, cardNumber: event.target.value })
+                  }
+                  placeholder="เช่น 2395100201"
+                  maxLength={30}
+                  title="รหัสบัตรเงินสดของสมาชิก — ใช้ค้นหาและขึ้นรายงานยอดเงินในบัตร"
+                />
+              </label>
+              <p className="wide">เลขสมาชิก <b className="cell-mono">{profile.memberNumber}</b></p>
               <label>
                 คำนำหน้า
                 <input
@@ -1032,19 +1042,6 @@ export function MemberDetail({
                   placeholder="เช่น 08x-xxx-xxxx"
                 />
               </label>
-              <label>
-                รหัสบัตรเงินสด
-                <input
-                  value={editForm.cardNumber}
-                  onChange={event =>
-                    setEditForm({ ...editForm, cardNumber: event.target.value })
-                  }
-                  placeholder="เช่น 2395100201"
-                  maxLength={30}
-                  title="รหัสบัตรเงินสดของสมาชิก — ใช้ค้นหาและขึ้นรายงานยอดเงินในบัตร"
-                />
-              </label>
-
               <label className="wide">
                 เลขที่บัตรประชาชน
                 <input
