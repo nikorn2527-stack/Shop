@@ -103,6 +103,9 @@ export type SalesLineItemRow = {
   unit: string;
   qty: number;
   price: number;
+  /** Historical bounds for a bill/product aggregate; price is the weighted mean. */
+  priceMin?: number;
+  priceMax?: number;
   amount: number;
   paymentMethod: string;
   cashier: string;
@@ -175,7 +178,7 @@ export type MemberBalanceRow = {
   balance: number;
 };
 
-export type MemberBalancesInput = { search?: string };
+export type MemberBalancesInput = { search?: string; includeReturnedZero?: boolean };
 
 export type StockBalanceRow = {
   productId: number;

@@ -155,7 +155,7 @@ export function SetupView({ brand, onAuthed }: { brand?: BrandSettings | null | 
             </button>
           </div>
         </form>
-        <p className="login-footer">v1.0.0 · ระบบร้านค้าสวัสดิการ<span className="powered-line">⚡ Powered by <b>PNG TEAM</b></span></p>
+        <p className="login-footer">v1.0.0 · ระบบร้านค้าสวัสดิการ<span className="powered-line">⚡ POWERED BY <b>PNG TEAM</b></span></p>
       </div>
     </div>
   );

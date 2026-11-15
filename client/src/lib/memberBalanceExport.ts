@@ -6,9 +6,9 @@ import {formatThaiDate} from '../pages/viewFormat';
 /** One column mapping shared by CSV, Excel, PDF, preview and print. */
 export function memberBalanceExport(members:readonly MemberBalanceRow[]){
  return {
-  columns:['ลำดับ','เลขสมาชิก','เลขบัตรปัจจุบัน','ชื่อสมาชิก','วันที่เปิดใช้บัตร','ยอดทั้งหมด (บาท)','ยอดจ่าย (บาท)','คงเหลือ (บาท)'],
+  columns:['ลำดับ','เลขบัตรปัจจุบัน','เลขสมาชิก','ชื่อสมาชิก','วันที่เปิดใช้บัตร','ยอดทั้งหมด (บาท)','ยอดจ่าย (บาท)','คงเหลือ (บาท)'],
   numericCols:[5,6,7],
-  rows:members.map((row,index)=>[exportCount(index+1),row.memberNumber,row.cardNumber?.trim()||'—',memberFullName(row),formatThaiDate(row.createdAt),exportNumber(row.totalIn),exportNumber(row.totalOut),exportNumber(row.balance)]),
-  totalsRow:['รวม',`${members.length} ราย`,'','','',exportNumber(members.reduce((sum,row)=>sum+row.totalIn,0)),exportNumber(members.reduce((sum,row)=>sum+row.totalOut,0)),exportNumber(members.reduce((sum,row)=>sum+row.balance,0))],
+  rows:members.map((row,index)=>[exportCount(index+1),row.cardNumber?.trim()||'—',row.memberNumber,memberFullName(row),formatThaiDate(row.createdAt),exportNumber(row.totalIn),exportNumber(row.totalOut),exportNumber(row.balance)]),
+  totalsRow:['รวม','',`${members.length} ราย`,'','',exportNumber(members.reduce((sum,row)=>sum+row.totalIn,0)),exportNumber(members.reduce((sum,row)=>sum+row.totalOut,0)),exportNumber(members.reduce((sum,row)=>sum+row.balance,0))],
  };
 }

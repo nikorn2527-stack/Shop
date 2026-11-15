@@ -1,3 +1,5 @@
+import type {MemberSlipDocument} from "@shared/storeTypes/documents";
+import {MemberTransactionSlip} from "./MemberTransactionSlip";
 import { WorkflowDialog } from "./WorkflowDialog";
 import { useRef, useState } from "react";
 import { blocker } from "./BlockerAlert";
@@ -34,6 +36,7 @@ export function MemberRegistrationModal({
   onRegistered: (member: MemberCardData) => void;
   onUseExisting: (member: MemberLite, cardNumber: string, openDetails: boolean) => void;
 }) {
+  const [completed,setCompleted] = useState<{member:MemberCardData;slip:MemberSlipDocument}|null>(null);
   const utils = trpc.useUtils();
   const settingsQuery = trpc.settings.get.useQuery(undefined);
   const nextNumberQuery = trpc.member.nextNumber.useQuery(undefined, { staleTime: 0, refetchOnMount: "always", refetchOnWindowFocus: true });
@@ -104,7 +107,7 @@ export function MemberRegistrationModal({
   const cardsQuery = trpc.card.list.useQuery(undefined);
   const registerMutation = trpc.member.register.useMutation({
     onSuccess: result => {
-      onRegistered(result.member);
+      setCompleted(result);
       void utils.card.list.invalidate();
       void utils.member.list.invalidate();
       void utils.member.nextNumber.invalidate();
@@ -237,6 +240,7 @@ export function MemberRegistrationModal({
     });
   };
 
+  if(completed) return <MemberTransactionSlip document={completed.slip} onClose={()=>onRegistered(completed.member)}/>;
   return (
     <>
       {registerCameraOpen && (
@@ -267,15 +271,6 @@ export function MemberRegistrationModal({
             </button>
           </div>
           <div className="member-registration-body">
-          <div className="member-number-preview">
-            <span>
-              <IdCard size={16} />{" "}
-              {numberMode === "manual"
-                ? "กรอกหมายเลขสมาชิกเอง"
-                : `หมายเลขสมาชิกถัดไป (${numberMode === "year" ? "ขึ้นต้นด้วยปี" : "รันเลขต่อเนื่อง"})`}
-            </span>
-            <b>{numberMode === "manual" ? "ใส่ในช่องด้านล่าง" : nextNumberQuery.isError ? "\u0e42\u0e2b\u0e25\u0e14\u0e44\u0e21\u0e48\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08" : nextNumber ?? "\u0e01\u0e33\u0e25\u0e31\u0e07\u0e42\u0e2b\u0e25\u0e14..."}</b>
-          </div>
           <div
             className="form-grid compact-form"
             onKeyDownCapture={event => formEnterNav(event, submitRegister)}
@@ -298,6 +293,31 @@ export function MemberRegistrationModal({
                 title="ใช้บัตรที่พร้อมใช้งานจากทะเบียนบัตร"
               />
             </label>
+            <div className="member-number-preview wide">
+              <span>
+                <IdCard size={16} />{" "}
+                {numberMode === "manual"
+                  ? "กรอกหมายเลขสมาชิกเอง"
+                  : `หมายเลขสมาชิกถัดไป (${numberMode === "year" ? "ขึ้นต้นด้วยปี" : "รันเลขต่อเนื่อง"})`}
+              </span>
+              <b>{numberMode === "manual" ? "ใส่ในช่องด้านล่าง" : nextNumberQuery.isError ? "\u0e42\u0e2b\u0e25\u0e14\u0e44\u0e21\u0e48\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08" : nextNumber ?? "\u0e01\u0e33\u0e25\u0e31\u0e07\u0e42\u0e2b\u0e25\u0e14..."}</b>
+            </div>
+            {numberMode === "manual" && (
+              <label className="wide">
+                หมายเลขสมาชิกที่ต้องการใช้ *
+                <input
+                  name="memberNumber"
+                  value={registerForm.memberNumber}
+                  onChange={event =>
+                    setRegisterForm({
+                      ...registerForm,
+                      memberNumber: event.target.value,
+                    })
+                  }
+                  placeholder="เช่น VIP-001 หรือเลขจากระบบเดิม"
+                />
+              </label>
+            )}
             <label>
               คำนำหน้า
               <input
@@ -452,22 +472,7 @@ export function MemberRegistrationModal({
 
 
 
-            {numberMode === "manual" && (
-              <label className="wide">
-                หมายเลขสมาชิกที่ต้องการใช้ *
-                <input
-                  name="memberNumber"
-                  value={registerForm.memberNumber}
-                  onChange={event =>
-                    setRegisterForm({
-                      ...registerForm,
-                      memberNumber: event.target.value,
-                    })
-                  }
-                  placeholder="เช่น VIP-001 หรือเลขจากระบบเดิม"
-                />
-              </label>
-            )}
+
             <label className="wide">
               เงินเริ่มต้น (ถ้ามี)
               <input
@@ -521,8 +526,9 @@ export function MemberRegistrationModal({
           </DialogHeader>
           <div className="member-duplicate-list">
             {existingMembers.map(member => <div className="existing-member-match" key={member.memberNumber}>
+              <p>เลขสมาชิก {member.memberNumber}</p>
               <strong>{member.name}</strong>
-              <p>เลขสมาชิก {member.memberNumber} · {member.status === "active" ? "ใช้งาน" : "ระงับการใช้งาน"}</p>
+              <p>{member.status === "active" ? "ใช้งาน" : "ระงับการใช้งาน"}</p>
               <small>{member.reason === "citizenId" ? "เลขบัตรประชาชนตรงกับสมาชิกนี้ จึงไม่สามารถสมัครซ้ำได้" : member.reason === "phone" ? "เบอร์โทรศัพท์ที่กรอกตรงกับสมาชิกนี้ หากใช้เบอร์ร่วมกันและเป็นคนละคน สามารถยืนยันสมัครใหม่ได้" : member.reason === "card" ? "รหัสบัตรซ้ำกับสมาชิกที่ลงทะเบียนไว้แล้ว กรุณาใช้บัญชีเดิม" : "ชื่อและนามสกุลที่กรอกตรงกับสมาชิกนี้ หากเป็นคนละคนที่ชื่อเหมือนกัน สามารถยืนยันสมัครใหม่ได้"}</small>
               <div className="existing-member-actions">
                 <button type="button" className="primary-button" disabled={openingMember !== null || checkingExisting || registerMutation.isPending} onClick={() => void useExisting(member.memberNumber, member.status !== "active")}>{openingMember === member.memberNumber ? "กำลังเปิดข้อมูล…" : member.status === "active" ? "เลือกสมาชิกเดิม · ทำต่อ" : "เปิดข้อมูลสมาชิกที่ถูกระงับ"}</button>

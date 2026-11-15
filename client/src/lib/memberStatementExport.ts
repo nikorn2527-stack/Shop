@@ -104,9 +104,9 @@ export function memberStatementExport(
     periodLabel: range,
     brandName: options.brandName,
     meta: [
-      ["สมาชิก", name],
-      ["เลขสมาชิก", member.memberNumber],
       ["เลขบัตรปัจจุบัน", member.cardNumber || "—"],
+      ["เลขสมาชิก", member.memberNumber],
+      ["สมาชิก", name],
       [
         "ออกรายงาน",
         formatHistoryDate((options.generatedAt ?? new Date()).toISOString()),
@@ -163,8 +163,6 @@ export function memberStatementExport(
       exportNumber(statement.closingBalance),
     ],
     compact: true,
-    footnote:
-      "วันที่เป็น พ.ศ. 2 หลัก · ราคาเป็นราคาต่อหน่วย · จำนวนเงินเป็นบาท · สินค้าใต้หัวบิลเป็นรายละเอียดของบิลนั้น · เงินเข้า/เงินออกหมายถึงยอดในบัตร และแสดงครั้งเดียวต่อบิล ไม่หักซ้ำตามแถวสินค้า · ยอดยกมาและยอดในบัตรคำนวณจากประวัติเงินในระบบ · การซื้อเงินสด/QR แสดงเพื่อประกอบรายละเอียดและไม่หักยอดในบัตร · บิลยกเลิกยังแสดงประวัติเดิมพร้อมรายการคืนเงินที่อยู่ในช่วงวันที่เลือก",
   };
   const exportRows = [
     [doc.title],
@@ -177,5 +175,5 @@ export function memberStatementExport(
     [],
     ["ยอดซื้อสินค้า (ไม่รวมบิลยกเลิก)", exportNumber(statement.purchaseTotal)],
   ];
-  return { doc, rows: exportRows, fileName, numericCols };
+  return { doc, rows: exportRows, fileName, numericCols, headerRowIndex: exportRows.indexOf(doc.columns) };
 }

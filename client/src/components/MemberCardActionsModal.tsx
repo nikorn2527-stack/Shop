@@ -1,3 +1,6 @@
+import {memberFullName} from "@/pages/pageData";
+import type {MemberSlipDocument} from "@shared/storeTypes/documents";
+import {MemberTransactionSlip} from "./MemberTransactionSlip";
 import { useSlipDocument } from "@/hooks/useSlipDocument";
 import { createBrowserUuid } from "@/lib/browserUuid";
 import { WorkflowDialog } from "./WorkflowDialog";
@@ -24,6 +27,7 @@ export type InitialMemberCardAction = "return" | "close";
 export function MemberCardActionsModal({ memberNumber, onClose, onSuccess, initialAction, initialCardNumber = "" }: {
   memberNumber: string; onClose: () => void; onSuccess: (action: CompletedMemberCardAction) => void; initialAction?: InitialMemberCardAction; initialCardNumber?: string;
 }) {
+  const [completed,setCompleted] = useState<MemberSlipDocument|null>(null);
   const utils = trpc.useUtils();
   const detail = trpc.member.detail.useQuery({ memberNumber });
   const member = detail.data?.member;
@@ -52,7 +56,7 @@ export function MemberCardActionsModal({ memberNumber, onClose, onSuccess, initi
     onSuccess(completedAction); onClose();
   };
   const fail = (e: unknown) => { setError(getErrorMessage(e)); setConfirm(false); };
-  const release = trpc.card.return.useMutation({ onSuccess: () => done("return"), onError: fail });
+  const release = trpc.card.return.useMutation({ onSuccess: result => setCompleted(result.slip), onError: fail });
   const assign = trpc.card.assign.useMutation({ onSuccess: () => done(action === "replace" ? "replace" : "assign"), onError: fail });
   const closeAccount = trpc.card.closeAccount.useMutation({ onSuccess: () => done("close"), onError: fail });
   const busy = release.isPending || assign.isPending || closeAccount.isPending;
@@ -66,7 +70,7 @@ export function MemberCardActionsModal({ memberNumber, onClose, onSuccess, initi
     if (!member) return;
     setReturnSessionId(session ? String(session.id) : "");
     setReturnResult({
-      memberName: `${member.firstName} ${member.lastName}`,
+      memberName: memberFullName(member),
       memberNumber,
       amount: member.balance,
       balanceBefore: member.balance,
@@ -111,6 +115,7 @@ export function MemberCardActionsModal({ memberNumber, onClose, onSuccess, initi
       setSlipBusy("");
     }
   };
+  if(completed) return <MemberTransactionSlip document={completed} onClose={()=>void done("return")}/>;
   return (
     <WorkflowDialog title="จัดการบัตรสมาชิก" onClose={onClose} busy={busy} className="form-modal">
         {printPreview && (
@@ -125,8 +130,9 @@ export function MemberCardActionsModal({ memberNumber, onClose, onSuccess, initi
         {detail.isLoading && <p role="status">กำลังโหลด…</p>}
         {!detail.isLoading && member && (
   <>
-            <p>{member.firstName} {member.lastName} · {memberNumber}</p>
-            <p>บัตร {member.cardNumber ?? "ยังไม่มีบัตร"} · ยอดคงเหลือ {member.balance.toFixed(2)} บาท</p>
+            <p>บัตร {member.cardNumber ?? "ยังไม่มีบัตร"} · เลขสมาชิก {memberNumber}</p>
+            <p>{memberFullName(member)}</p>
+            <p>ยอดคงเหลือ {member.balance.toFixed(2)} บาท</p>
             {Boolean(member.accountClosed) && (
               <p className="notice-bar" role="status">
                 บัญชีรอบนี้ปิดแล้ว · ยังไม่ได้รับบัตรคืน เลือกคืนบัตรเมื่อรับบัตรกลับมาจริง
@@ -207,7 +213,7 @@ export function MemberCardActionsModal({ memberNumber, onClose, onSuccess, initi
                 <div className="wallet-confirm-rows">
                   <div>
                     <span>สมาชิก</span>
-                    <b>{returnResult?.memberName} · {returnResult?.memberNumber}</b>
+                    <b>{returnResult?.memberNumber} · {returnResult?.memberName}</b>
                   </div>
                   <div>
                     <span>ยอดคงเหลือก่อนคืนบัตร</span>
@@ -285,7 +291,7 @@ export function MemberCardActionsModal({ memberNumber, onClose, onSuccess, initi
                     </div>
                     <div className="receipt-customer">
                       <span>สมาชิก</span>
-                      <b>{returnResult?.memberName} · {returnResult?.memberNumber}</b>
+                      <b>{returnResult?.memberNumber} · {returnResult?.memberName}</b>
                     </div>
                     <div className="receipt-line">
                       <span>ยอดคงเหลือก่อนคืนบัตร</span>

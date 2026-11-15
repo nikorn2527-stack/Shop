@@ -82,10 +82,10 @@ export function downloadCsvFile(fileName: string, rows: string[][]): void {
  * เลขวิทยาศาสตร์ 8.85E+12 ใน Excel) + รองรับตัวเลขที่มีลูกน้ำแล้วจาก exportNumber
  * จำนวนเต็มใช้รูปแบบ #,##0 (ไม่ต่อทศนิยม .00 ต่อท้ายจำนวนบิล/ชิ้น)
  */
-export function downloadXlsxFile(fileName: string, sheetName: string, rows: string[][], numericCols: number[] = []): void {
+export function buildXlsxFileBytes(sheetName: string, rows: string[][], numericCols: number[] = [], headerRowIndex = 0): Uint8Array<ArrayBuffer> {
   const numeric = new Set(numericCols);
   const sheet = XLSX.utils.aoa_to_sheet(
-    rows.map((row) => row.map((cell, index) => (numeric.has(index) && NUMBER_LIKE.test(cell ?? "") ? Number(cell.replaceAll(",", "")) : cell))),
+    rows.map((row, rowIndex) => row.map((cell, index) => (rowIndex !== headerRowIndex && numeric.has(index) && NUMBER_LIKE.test(cell ?? "") ? Number(cell.replaceAll(",", "")) : cell))),
   );
   sheet["!cols"] = autoColumnWidths(rows);
   // รูปแบบตัวเลข: ตามที่พรีวิว/CSV/PDF แสดง — ตัวเลขที่มีทศนิยม (เงิน) เป็น #,##0.00
@@ -99,7 +99,44 @@ export function downloadXlsxFile(fileName: string, sheetName: string, rows: stri
   }
   const book = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(book, sheet, sheetName);
-  XLSX.writeFile(book, fileName.endsWith(".xlsx") ? fileName : `${fileName}.xlsx`);
+  // SheetJS CE does not serialize cell.s alignment. Update the generated OOXML
+  // cell formats instead; keep style indexes and number formats unchanged.
+  const zip = XLSX.CFB.read(new Uint8Array(XLSX.write(book, { type: "array", bookType: "xlsx" })), { type: "buffer" });
+  const stylesFile = XLSX.CFB.find(zip, "/xl/styles.xml");
+  if (!stylesFile) throw new Error("ไม่พบรูปแบบเซลล์ในไฟล์ Excel");
+  const styles = new TextDecoder().decode(stylesFile.content);
+  let numericHeadingStyle = 0;
+  const alignedStyles = styles.replace(/<cellXfs\b([^>]*)>([\s\S]*?)<\/cellXfs>/, (_block, attributes: string, formats: string) => {
+    const aligned = formats.replace(/<xf\b([^>]*?)\s*\/>/g, '<xf$1 applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>');
+    const cells = aligned.match(/<xf\b[^>]*>[\s\S]*?<\/xf>/g) ?? [];
+    numericHeadingStyle = cells.length;
+    // Append a text-number-format heading style; existing data styles/indexes
+    // remain intact. Text headings retain Excel's default left alignment.
+    const heading = numeric.size && cells[0] ? cells[0].replace('<alignment ', '<alignment horizontal="right" ') : "";
+    return `<cellXfs${attributes.replace(/\bcount="\d+"/, `count="${cells.length + (heading ? 1 : 0)}"`)}>${aligned}${heading}</cellXfs>`;
+  });
+  if (alignedStyles === styles) throw new Error("จัดรูปแบบเซลล์ Excel ไม่สำเร็จ");
+  XLSX.CFB.utils.cfb_add(zip, "/xl/styles.xml", new TextEncoder().encode(alignedStyles));
+  if (numeric.size && headerRowIndex >= 0 && headerRowIndex < rows.length) {
+    const sheetFile = XLSX.CFB.find(zip, "/xl/worksheets/sheet1.xml");
+    if (!sheetFile) throw new Error("ไม่พบตารางในไฟล์ Excel");
+    const headings = new Set(numericCols.map(col => XLSX.utils.encode_cell({ r: headerRowIndex, c: col })));
+    const sheetXml = new TextDecoder().decode(sheetFile.content).replace(/<c\b([^>]*\br="([A-Z]+\d+)"[^>]*)>/g, (cell, attributes: string, address: string) =>
+      headings.has(address) ? `<c${attributes.replace(/\s+s="\d+"/, "")} s="${numericHeadingStyle}">` : cell);
+    XLSX.CFB.utils.cfb_add(zip, "/xl/worksheets/sheet1.xml", new TextEncoder().encode(sheetXml));
+  }
+  // Leave row heights automatic so wrapped names and explicit statement detail
+  // lines can grow together without clipping adjacent identifiers or amounts.
+  return new Uint8Array(XLSX.CFB.write(zip, { type: "buffer", fileType: "zip", compression: true }));
+}
+
+export function downloadXlsxFile(fileName: string, sheetName: string, rows: string[][], numericCols: number[] = [], headerRowIndex = 0): void {
+  const bytes = buildXlsxFileBytes(sheetName, rows, numericCols, headerRowIndex);
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+  link.download = fileName.endsWith(".xlsx") ? fileName : `${fileName}.xlsx`;
+  link.click();
+  URL.revokeObjectURL(link.href);
 }
 
 /**

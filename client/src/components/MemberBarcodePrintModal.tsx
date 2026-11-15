@@ -53,9 +53,9 @@ export function MemberBarcodePrintModal({ members = NO_MEMBERS, cards = NO_CARDS
       <div id="member-barcode-slip" className="member-barcode-slip" style={{ width: `${profile.printableWidthMm}mm` }}>
         {labels.map(({ code, name, kind, image, widthMm }) => <section className="member-barcode-label" key={code}>
           <b>{settings.data?.appName?.trim() || "ร้านค้าสวัสดิการ"}</b>
+          <strong>{kind} {code}</strong>
           {name && <div>{name}</div>}
           {image && <img src={image} style={{ width: `${widthMm}mm` }} alt={`บาร์โค้ด${kind} ${code}`} />}
-          <strong>{kind} {code}</strong>
         </section>)}
       </div>
     </div>

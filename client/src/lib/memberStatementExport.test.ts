@@ -222,3 +222,10 @@ it('puts the whole card identifier on the first detail line before transaction t
  expect(row[2].split('\n').slice(0,2)).toEqual(['บัตร OLD','เติมเงิน · เงินสด']);
  expect(result.doc.multilineCols).toEqual([2]);
 });
+
+it('orders existing identity metadata card, member number, then full name in documents and spreadsheets',()=>{
+ const result=memberStatementExport(statement,{brandName:'ร้าน'});
+ expect(result.doc.meta?.slice(0,3)).toEqual([['เลขบัตรปัจจุบัน','000099'],['เลขสมาชิก','000001'],['สมาชิก','นาย ทดสอบ สเตทเมนต์']]);
+ expect(result.rows.slice(1,4)).toEqual(result.doc.meta?.slice(0,3));
+ expect(result.rows[result.headerRowIndex]).toEqual(result.doc.columns);
+});

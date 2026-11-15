@@ -104,7 +104,7 @@ export function LoginView({ brand, onAuthed }: { brand?: BrandSettings | null | 
             <span>ระบบนี้สำหรับ<b>เจ้าหน้าที่และผู้บริหารร้านค้า</b>เท่านั้น · สมาชิกใช้บัตรหรือหมายเลขสมาชิกที่เคาน์เตอร์</span>
           </div>
         </div>
-        <p className="login-footer">Powered by <b>PNG TEAM</b></p>
+        <p className="login-footer">POWERED BY <b>PNG TEAM</b></p>
       </main>
       {transfer && <FeedbackDialog tone="warning" title="บัญชีนี้เข้าใช้งานอยู่แล้ว" description="การย้ายมาเครื่องนี้จะออกจากระบบที่เครื่องเดิม กรุณาตรวจให้แน่ใจว่างานที่เครื่องเดิมเสร็จแล้วก่อนยืนยัน" className="login-session-dialog" pending={loginMutation.isPending} error={error} actionLabel="ยืนยันย้ายมาเครื่องนี้" onAction={() => {
         if (loginMutation.isPending || loginInFlight.current) return;

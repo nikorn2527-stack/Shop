@@ -15,6 +15,7 @@ import {
 import { StoreError } from "./domain/storeError";
 export { StoreError } from "./domain/storeError";
 import { money, round2 } from "./domain/money";
+import { validateWalletAmount } from "./domain/walletPlan";
 export { money, round2 } from "./domain/money";
 import type { ReceiveStockLinesInput } from "../shared/storeTypes/inventory";
 import { createSqliteStockIntakeRepository } from "./repositories/sqliteStockIntakeRepository";
@@ -742,7 +743,7 @@ function initializeCardUsageSessions(db: SqliteDb) {
 
 export function cardUsageHistory(db: SqliteDb, cardNumber: string) {
   const sessions = db.prepare(`SELECT s.id, s.card_number AS cardNumber, s.member_number AS memberNumber,
-    TRIM(m.first_name || ' ' || m.last_name) AS memberName, s.started_at AS startedAt, s.ended_at AS endedAt, s.opened_by AS openedBy,
+    TRIM(COALESCE(NULLIF(TRIM(m.prename), '') || ' ', '') || m.first_name || ' ' || m.last_name) AS memberName, s.started_at AS startedAt, s.ended_at AS endedAt, s.opened_by AS openedBy,
     s.closed_by AS closedBy, s.opening_balance AS openingBalance, s.closing_balance AS closingBalance, s.legacy,
     COUNT(t.id) AS transactionCount,
     COALESCE(SUM(CASE WHEN t.amount > 0 THEN t.amount ELSE 0 END),0) AS incoming,
@@ -1531,7 +1532,7 @@ export function receiveStock(
 }
 
 export function stockReceiptHistory(db: SqliteDb, input: { from?: string; to?: string; search?: string; actor?: string } = {}) {
-  return db.prepare(`SELECT l.id, p.sku, p.name, p.unit, l.lot,
+  return db.prepare(`SELECT l.id, p.sku, p.barcode, p.name, p.unit, l.lot,
     l.received_at AS receivedAt, l.received_qty AS receivedQty,
     l.expiry_date AS expiry, l.cost, p.price AS sellingPrice,
     ROUND(l.received_qty * p.price, 2) AS sellingValue, m.actor,
@@ -1545,7 +1546,7 @@ export function stockReceiptHistory(db: SqliteDb, input: { from?: string; to?: s
     ORDER BY l.received_at DESC, l.id DESC`).all(
       input.from ?? '', input.from ?? '', input.to ?? '', input.to ?? '',
       input.search?.trim() ?? '', input.search?.trim() ?? '', input.actor?.trim() ?? '', input.actor?.trim() ?? ''
-    ) as { id: number; sku: string; name: string; unit: string; lot: string; receivedAt: string; receivedQty: number | null; expiry: string | null; cost: number; sellingPrice: number; sellingValue: number | null; actor: string | null; value: number | null }[];
+    ) as { id: number; sku: string; barcode: string | null; name: string; unit: string; lot: string; receivedAt: string; receivedQty: number | null; expiry: string | null; cost: number; sellingPrice: number; sellingValue: number | null; actor: string | null; value: number | null }[];
 }
 
 export function listStockRows(db: SqliteDb): SqliteStockRow[] {
@@ -2270,7 +2271,7 @@ export function registerMember(db: SqliteDb, input: RegisterMemberInput) {
   if (!firstName || !lastName) throw new StoreError("กรุณาระบุชื่อและนามสกุลสมาชิก");
   const existingIdentity = findExistingMembers(db, input).find(member => member.reason === "citizenId");
   if (existingIdentity) throw new StoreError(`เลขประจำตัวนี้เคยลงทะเบียนแล้ว สมาชิก ${existingIdentity.memberNumber} กรุณาใช้บัญชีเดิม`);
-  if (input.initialDeposit !== undefined && !(input.initialDeposit > 0)) throw new StoreError("จำนวนเงินต้องมากกว่า 0");
+  const initialDeposit = input.initialDeposit === undefined ? 0 : validateWalletAmount(input.initialDeposit);
   const memberNumber = generateMemberNumber(db, getMemberNumberMode(db), input.memberNumber);
   if (db.prepare(`SELECT id FROM members WHERE member_number = ?`).get(memberNumber)) {
     throw new StoreError(`หมายเลขสมาชิก ${memberNumber} ถูกใช้แล้ว`);
@@ -2284,7 +2285,6 @@ export function registerMember(db: SqliteDb, input: RegisterMemberInput) {
   if (patientCode && db.prepare(`SELECT id FROM members WHERE patient_code = ?`).get(patientCode)) {
     throw new StoreError(`รหัสผู้ป่วย ${patientCode} ถูกใช้กับสมาชิกอื่นแล้ว`);
   }
-  const initialDeposit = input.initialDeposit ? round2(input.initialDeposit) : 0;
   const createdAt = formatDateTime();
   runInTransaction(db, () => {
     db.prepare(`INSERT INTO members (member_number, prename, first_name, last_name, id_card, phone, type, balance, status, created_at, photo_url, gender, card_number, patient_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)`).run(
@@ -2640,13 +2640,29 @@ export function salesByProduct(db: SqliteDb, input: DailyRangeInput = {}): Sales
 
 
 
+/**
+ * One row per bill/product/unit; unrelated special lines remain separate.
+ * Keep historical names; mixed tier labels use their common historical base name.
+ */
 export function salesLineItems(db: SqliteDb, input: DailyRangeInput = {}): SalesLineItemRow[] {
   const { fromDate, toDate } = resolveRangeDates(input);
   const since = `${formatDate(fromDate)} 00:00:00`;
   const until = `${formatDate(toDate)} 23:59:59`;
   const filter = cashierWhere("s", input);
   const categoryFilter = categoryWhere("p", input);
-  return db.prepare(`SELECT s.order_number AS orderNumber, s.created_at AS createdAt, COALESCE(NULLIF(TRIM(p.sku), ''), NULLIF(TRIM(p.barcode), '')) AS productCode, si.name AS productName, COALESCE(si.unit, p.unit, 'ชิ้น') AS unit, si.qty, si.price, COALESCE(si.amount, ROUND(si.qty * si.price, 2)) AS amount, s.payment_method AS paymentMethod, COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, s.member_number AS memberNumber, CASE WHEN m.member_number IS NULL THEN NULL WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id LEFT JOIN members m ON m.member_number = s.member_number WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql}${categoryFilter.sql} ORDER BY s.created_at DESC, s.id DESC, si.id ASC LIMIT 1000`).all(since, until, ...filter.params, ...categoryFilter.params) as unknown as SalesLineItemRow[];
+  const rows = db.prepare(`SELECT s.order_number AS orderNumber, s.created_at AS createdAt, COALESCE(NULLIF(TRIM(p.sku), ''), NULLIF(TRIM(p.barcode), '')) AS productCode, JSON_GROUP_ARRAY(DISTINCT si.name) AS snapshotNames, COALESCE(si.unit, p.unit, 'ชิ้น') AS unit, SUM(si.qty) AS qty, SUM(si.qty * si.price) / SUM(si.qty) AS price, MIN(si.price) AS priceMin, MAX(si.price) AS priceMax, ROUND(SUM(COALESCE(si.amount, ROUND(si.qty * si.price, 2))), 2) AS amount, s.payment_method AS paymentMethod, COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, s.member_number AS memberNumber, CASE WHEN m.member_number IS NULL THEN NULL WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id LEFT JOIN members m ON m.member_number = s.member_number WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql}${categoryFilter.sql} GROUP BY s.id, si.product_id, COALESCE(si.unit, p.unit, 'ชิ้น'), CASE WHEN si.product_id IS NULL THEN si.id END ORDER BY s.created_at DESC, s.id DESC, MIN(si.id) ASC`).all(since, until, ...filter.params, ...categoryFilter.params) as unknown as (Omit<SalesLineItemRow, "productName"> & { snapshotNames: string })[];
+  return rows.map(({ snapshotNames, ...row }) => {
+    const names = (JSON.parse(snapshotNames) as string[]).sort();
+    const bases = names.map(name => {
+      const separator = name.lastIndexOf(" · ");
+      return separator > 0 ? name.slice(0, separator) : null;
+    });
+    // Never replace a historical name with the product's current catalog name.
+    const productName = names.length > 1 && bases[0] && bases.every(base => base === bases[0])
+      ? bases[0]
+      : names.join(" / ");
+    return { ...row, productName };
+  });
 }
 
 
@@ -2724,7 +2740,7 @@ export function memberTransactions(db: SqliteDb, input: MemberTransactionsInput 
   const where = conditions.length ? ` WHERE ${conditions.join(" AND ")}` : "";
   const limitSql = limit === null ? "" : " LIMIT ?";
   const txRows = db.prepare(`SELECT t.id, t.member_number AS memberNumber,
-    NULLIF(TRIM(m.first_name || ' ' || m.last_name), '') AS memberName,
+    NULLIF(TRIM(COALESCE(NULLIF(TRIM(m.prename), '') || ' ', '') || m.first_name || ' ' || m.last_name), '') AS memberName,
     s.card_number AS cardNumber, m.patient_code AS patientCode, t.type, t.detail,
     t.amount, t.payment_method AS paymentMethod, t.balance_after AS balanceAfter,
     t.actor, t.created_at AS createdAt
@@ -2754,7 +2770,7 @@ export function memberBalances(db: SqliteDb, input: MemberBalancesInput = {}): M
   // No clinical departure flag exists here. Hide only completed account/card
   // returns recorded by the official flows, never zero balance or no card alone.
   // A later assignment/replacement makes the member current again.
-  const where = ` WHERE NOT (
+  const where = ` WHERE (? = 1 OR NOT (
     m.balance = 0 AND NULLIF(TRIM(m.card_number), '') IS NULL
     AND (m.account_closed = 1 OR COALESCE((
       SELECT CASE WHEN ca.action = 'release' AND ca.note IN (
@@ -2763,8 +2779,8 @@ export function memberBalances(db: SqliteDb, input: MemberBalancesInput = {}): M
       FROM card_assignments ca WHERE ca.member_number = m.member_number
       ORDER BY ca.id DESC LIMIT 1
     ), 0) = 1)
-  )${search ? ` AND (m.first_name || ' ' || m.last_name || ' ' || m.member_number || ' ' || COALESCE(m.card_number, '') || ' ' || COALESCE(m.patient_code, '')) LIKE ?` : ''}`;
-  const params = search ? [`%${search}%`] : [];
+  ))${search ? ` AND (m.first_name || ' ' || m.last_name || ' ' || m.member_number || ' ' || COALESCE(m.card_number, '') || ' ' || COALESCE(m.patient_code, '')) LIKE ?` : ''}`;
+  const params = [input.includeReturnedZero ? 1 : 0, ...(search ? [`%${search}%`] : [])];
   return db.prepare(`
     SELECT m.id, m.member_number AS memberNumber, m.card_number AS cardNumber, m.patient_code AS patientCode,
       m.prename, m.first_name AS firstName, m.last_name AS lastName, m.type, m.status,

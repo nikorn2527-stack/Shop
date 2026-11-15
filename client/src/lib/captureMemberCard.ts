@@ -1,5 +1,5 @@
 import { MEMBER_CARD_WIDTH_PX as width, MEMBER_CARD_HEIGHT_PX as height, MEMBER_CARD_IMAGE_WIDTH as imageWidth, MEMBER_CARD_IMAGE_HEIGHT as imageHeight } from "@shared/memberCardSize";
-/** Rasterize the browser's own Thai text shaping, rather than drawing individual glyphs. */
+/** Rasterize browser-shaped Thai text with embedded fonts ready before SVG decoding. */
 let fontCssPromise: Promise<string> | undefined;
 async function asDataUrl(url: string): Promise<string> {
   if (url.startsWith("data:")) return url;
@@ -16,7 +16,14 @@ async function asDataUrl(url: string): Promise<string> {
 function cardFonts(): Promise<string> {
   return fontCssPromise ??= Promise.all([400, 600, 700].flatMap(weight => ["thai", "latin"].map(async subset => {
     const data = await asDataUrl(`/fonts/Sarabun-${weight}-${subset}.woff2`);
-    return `@font-face{font-family:Sarabun;font-style:normal;font-weight:${weight};src:url("${data}") format("woff2");unicode-range:${subset === "thai" ? "U+0E01-0E5B,U+200C-200D,U+25CC" : "U+0000-00FF,U+2000-206F"}}`;
+    const unicodeRange = subset === "thai" ? "U+0E01-0E5B,U+200C-200D,U+25CC" : "U+0000-00FF,U+2000-206F";
+    // Image.decode does not wait for fonts in SVG foreignObject. Load the exact
+    // embedded font URLs before assigning image.src, so the first snapshot has
+    // the same glyphs as later captures. Page URL fonts are a separate resource.
+    const font = new FontFace("Sarabun", `url("${data}") format("woff2")`, { weight: String(weight), style: "normal", unicodeRange });
+    await font.load();
+    document.fonts.add(font);
+    return `@font-face{font-family:Sarabun;font-style:normal;font-weight:${weight};src:url("${data}") format("woff2");unicode-range:${unicodeRange}}`;
   }))).then(rules => rules.join("\n")).catch(error => { fontCssPromise = undefined; throw error; });
 }
 export async function captureMemberCard(element: HTMLElement): Promise<HTMLCanvasElement> {

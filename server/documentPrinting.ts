@@ -57,7 +57,7 @@ function resolveDocument(
     const column = ref.kind === "wallet" ? "id" : "client_request_id";
     const row = db
       .prepare(
-        `SELECT id FROM member_transactions WHERE ${column}=? AND type IN ('deposit','withdrawal','refund')`
+        `SELECT id FROM member_transactions WHERE ${column}=? AND type IN ('deposit','withdrawal','refund','activation')`
       )
       .get(ref.key);
     if (row)
@@ -65,18 +65,32 @@ function resolveDocument(
         key: `wallet:${row.id}`,
         legacy: Number(row.id) <= boundary.wallet,
       };
-  } else if (ref.kind === "card_return") {
+  } else if (ref.kind === "registration") {
+    const member = db
+      .prepare(
+        "SELECT member_number,created_at FROM members WHERE member_number=?"
+      )
+      .get(ref.key);
+    if (member)
+      return {
+        key: `registration:${member.member_number}`,
+        legacy: String(member.created_at) <= boundary.startedAt,
+      };
+  } else if (ref.kind === "card_return" || ref.kind === "card_return_zero") {
     const session = db
       .prepare(
         "SELECT id,ended_at,end_reason FROM card_usage_sessions WHERE id=?"
       )
       .get(ref.key);
     if (session?.ended_at) {
-      const refund = db
-        .prepare(
-          "SELECT id FROM member_transactions WHERE card_usage_session_id=? AND type='refund' AND balance_after=0 ORDER BY id DESC LIMIT 1"
-        )
-        .get(ref.key);
+      const refund =
+        ref.kind === "card_return_zero"
+          ? undefined
+          : db
+              .prepare(
+                "SELECT id FROM member_transactions WHERE card_usage_session_id=? AND type='refund' AND balance_after=0 ORDER BY id DESC LIMIT 1"
+              )
+              .get(ref.key);
       if (refund)
         return {
           key: `wallet:${refund.id}`,

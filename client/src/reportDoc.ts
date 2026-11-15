@@ -28,101 +28,16 @@ const REPORT_DOC_PDF_STAGE_CSS = `
 `;
 
 function buildPage(config: ReportDocConfig, rows: string[][], pageIndex: number, pageCount: number) {
-  const numeric = new Set(config.numericCols ?? []);
-  const nowrap = new Set(config.nowrapCols ?? []);
-  const page = document.createElement("div");
-  page.className = `report-doc${config.compact ? " compact" : ""}${config.borderlessGroups ? " rd-borderless-groups" : ""}`;
-  const head = document.createElement("div");
-  head.className = "rd-head";
-  head.innerHTML = `
-    <div class="rd-brand"><div><b>${escapeHtmlLocal(config.brandName)}</b><small>ระบบร้านค้าสวัสดิการ · Welfare Store</small></div></div>
-    <div class="rd-stamp">สร้างเมื่อ ${thaiStamp(new Date())}</div>`;
-  page.appendChild(head);
-  const title = document.createElement("div");
-  title.className = "rd-title";
-  title.innerHTML = `<h1>${escapeHtmlLocal(config.title)}</h1>${config.periodLabel ? `<p>${escapeHtmlLocal(config.periodLabel)}</p>` : ""}`;
-  page.appendChild(title);
-  if (config.meta?.length) {
-    const meta = document.createElement("div");
-    meta.className = "rd-meta";
-    for (const [label, text] of config.meta) {
-      const item = document.createElement("div");
-      item.innerHTML = `<span>${escapeHtmlLocal(label)}</span><b>${escapeHtmlLocal(text)}</b>`;
-      meta.appendChild(item);
-    }
-    page.appendChild(meta);
-  }
-  if (config.summaryBlocks?.length && pageIndex === pageCount - 1) {
-    const summary = document.createElement("div");
-    summary.className = "rd-summary-footer";
-    for (const [label, value] of config.summaryBlocks) {
-      const block = document.createElement("div");
-      block.innerHTML = `<span>${escapeHtmlLocal(label)}</span><b>${escapeHtmlLocal(value)}</b>`;
-      summary.appendChild(block);
-    }
-    // Append after the table, on the last page only.
-    page.appendChild(summary);
-  }
-  const table = document.createElement("table");
-  table.className = `rd-table${config.columnWidths?.length ? " rd-fixed-layout" : ""}`;
-  if (config.columnWidths?.length) {
-    const colgroup = document.createElement("colgroup");
-    config.columns.forEach((_, index) => {
-      const col = document.createElement("col");
-      const width = config.columnWidths?.[index]?.trim();
-      if (width && /^\d+(?:\.\d+)?(?:%|px|mm|cm|in|pt)$/.test(width)) col.style.width = width;
-      colgroup.appendChild(col);
-    });
-    table.appendChild(colgroup);
-  }
-  const thead = document.createElement("thead");
-  const headRow = document.createElement("tr");
-  config.columns.forEach((column, index) => {
-    const th = document.createElement("th");
-    th.textContent = column;
-    th.className = [numeric.has(index) ? "num" : "", nowrap.has(index) ? "nowrap" : ""].filter(Boolean).join(" ");
-    headRow.appendChild(th);
-  });
-  thead.appendChild(headRow);
-  table.appendChild(thead);
-  const tbody = document.createElement("tbody");
-  for (const row of rows) {
-    const tr = document.createElement("tr");
-    row.forEach((cell, index) => {
-      const td = document.createElement("td");
-      td.textContent = cell;
-      td.className = [numeric.has(index) ? "num" : "", nowrap.has(index) ? "nowrap" : ""].filter(Boolean).join(" ");
-      tr.appendChild(td);
-    });
-    tbody.appendChild(tr);
-  }
-  table.appendChild(tbody);
-  if (config.totalsRow && pageIndex === pageCount - 1) {
-    const tfoot = document.createElement("tfoot");
-    const tr = document.createElement("tr");
-    config.totalsRow.forEach((cell, index) => {
-      const td = document.createElement("td");
-      td.textContent = cell;
-      td.className = [numeric.has(index) ? "num" : "", nowrap.has(index) ? "nowrap" : ""].filter(Boolean).join(" ");
-      tr.appendChild(td);
-    });
-    tfoot.appendChild(tr);
-    table.appendChild(tfoot);
-  }
-  page.appendChild(table);
-  const summary = page.querySelector(".rd-summary-footer");
-  if (summary) page.appendChild(summary);
-  if (config.footnote) {
-    const note = document.createElement("div");
-    note.className = "rd-note";
-    note.textContent = config.footnote;
-    page.appendChild(note);
-  }
-  return page;
-}
-
-function escapeHtmlLocal(value: string) {
-  return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char] ?? char);
+  const start = rows.length ? config.rows.indexOf(rows[0]) : 0;
+  const last = pageIndex === pageCount - 1;
+  const html = buildReportDocumentHtml({
+    ...config, rows,
+    groupStartRows: config.groupStartRows?.filter(index => index >= start && index < start + rows.length).map(index => index - start),
+    totalsRow: last ? config.totalsRow : undefined,
+    summaryBlocks: last ? config.summaryBlocks : undefined,
+    footnote: last ? config.footnote : undefined,
+  }, {mode:"pdf",stampText:`สร้างเมื่อ ${thaiStamp(new Date())}`});
+  return new DOMParser().parseFromString(html,"text/html").querySelector<HTMLElement>(".report-doc")!;
 }
 
 /**
@@ -233,8 +148,7 @@ export function printReportDoc(config: ReportDocConfig) {
   if (printerName) {
     // ส่งไปยังเครื่องพิมพ์รายงานที่เลือกไว้ (ตั้งค่า → เครื่องพิมพ์ 3 เครื่องจริง)
     // ถ้า Helper ไม่ตอบ จะเข้า fallback อัตโนมัติ
-    const fullHtml = `<!DOCTYPE html><html><head><meta charset="utf-8"><style>${REPORT_DOC_CSS}</style></head><body>${html}</body></html>`;
-    printViaHelper(printerName, fullHtml).catch(() => {
+    printViaHelper(printerName, html).catch(() => {
       printReportDocFallback(html);
     });
     return;

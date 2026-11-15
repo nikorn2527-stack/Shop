@@ -64,7 +64,8 @@ export function StatementModal({
           exportData.fileName,
           "รายการเดินบัญชีสมาชิก",
           exportData.rows,
-          exportData.numericCols
+          exportData.numericCols,
+          exportData.headerRowIndex
         );
       else if (format === "pdf") await downloadReportPdf(exportData.doc);
       else printReportDoc(exportData.doc);

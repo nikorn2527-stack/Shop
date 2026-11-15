@@ -45,3 +45,24 @@ describe('current-member balance report eligibility',()=>{
   const db=fresh(),a=member(db,'STILL-HERE',20);walletTx(db,{memberNumber:a.memberNumber,type:'withdrawal',amount:20});expect(numbers(db)).toContain(a.memberNumber);
  });
 });
+
+describe('optional returned-zero members in balance reports',()=>{
+ it('includes returned/closed zero accounts only on request, keeps search/current card identity, and is read-only',()=>{
+  const db=fresh(),current=member(db,'OPTION-CURRENT'),returned=member(db,'OPTION-RETURN');
+  returnMemberCard(db,{memberNumber:returned.memberNumber,cardNumber:'OPTION-RETURN',expectedSessionId:session(db,returned.memberNumber),mode:'refund'});
+  const closed=member(db,'OPTION-CLOSED');
+  closeMemberAccount(db,{memberNumber:closed.memberNumber,cardNumber:'OPTION-CLOSED',expectedSessionId:session(db,closed.memberNumber)});
+  releasePhysicalCard(db,'OPTION-CLOSED');
+  const replacement=registerMember(db,{firstName:'ผู้ถือบัตรใหม่',lastName:'ตัวเลือก',cardNumber:'OPTION-RETURN'}).member;
+  const snapshot=()=>JSON.stringify(['members','member_transactions','card_assignments','card_usage_sessions','products','stock_lots','sales','sale_items','audit_logs'].map(table=>[table,db.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()]));
+  const before=snapshot();
+  const defaults=memberBalances(db);expect(defaults.map(row=>row.memberNumber)).toEqual([current.memberNumber,replacement.memberNumber]);
+  const all=memberBalances(db,{includeReturnedZero:true});
+  expect(all.map(row=>row.memberNumber)).toEqual([current.memberNumber,returned.memberNumber,closed.memberNumber,replacement.memberNumber]);
+  expect(all.find(row=>row.memberNumber===returned.memberNumber)).toMatchObject({cardNumber:null,balance:0});
+  expect(all.find(row=>row.memberNumber===replacement.memberNumber)).toMatchObject({cardNumber:'OPTION-RETURN',balance:0});
+  expect(memberBalances(db,{includeReturnedZero:true,search:returned.memberNumber})).toHaveLength(1);
+  expect(memberBalances(db,{includeReturnedZero:false,search:returned.memberNumber})).toEqual([]);
+  expect(memberBalances(db)).toEqual(defaults);expect(snapshot()).toBe(before);
+ });
+});

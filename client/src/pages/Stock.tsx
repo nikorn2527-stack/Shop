@@ -760,7 +760,7 @@ export function Stock({ role, userName, initialAction, embeddedAction = false, r
         fileName: "purchase-order.pdf", title: "รายการสั่งซื้อสินค้า",
         periodLabel: `สะสมไว้ ${orderItems.length} รายการ · พิมพ์เมื่อ ${new Date().toLocaleDateString("th-TH", { timeZone: "Asia/Bangkok", day: "numeric", month: "long", year: "numeric" })}`,
         meta: [["จำนวนรายการ", `${orderItems.length} รายการ`], ["มูลค่ารวมโดยประมาณ", money(orderTotalValue)]],
-        columns: ["สินค้า", "รหัส SKU", "คงเหลือ", "จะสั่ง", "หน่วย", "ราคาขาย/หน่วย", "มูลค่ารวม", "หมายเหตุ"], numericCols: [2, 3, 5, 6],
+        columns: ["สินค้า", "รหัส SKU", "คงเหลือ", "จะสั่ง", "หน่วย", "ราคาขาย/หน่วย", "มูลค่ารวม", "หมายเหตุ"], columnWidths:["23%","18%","8%","8%","9%","10%","10%","14%"],nowrapCols:[1,2,3,4,5,6],numericCols: [2, 3, 5, 6],
         rows: orderItems.map((item) => [item.name, item.sku, exportCount(item.stock), exportCount(item.qty), item.unit, exportNumber(orderSellingPrice(item)), exportNumber(reportSellingValue(item.qty, orderSellingPrice(item))), item.note ?? "—"]),
         totalsRow: ["รวม", "—", "—", exportCount(orderItems.reduce((sum, item) => sum + item.qty, 0)), "—", "—", exportNumber(orderTotalValue), `${orderItems.length} รายการ`],
         brandName: "ร้านค้าสวัสดิการ", footnote: "ใช้ตรวจทานก่อนสั่งซื้อจริง เพื่อไม่ให้ตกหล่น · ลบรายการที่รับเข้าแล้วออกจากลิสต์ได้ที่หน้าจอ",

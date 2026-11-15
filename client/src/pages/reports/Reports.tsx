@@ -1,4 +1,6 @@
-import {productSalesExport,nonzeroStockRows} from "@/lib/reportExportLayouts";
+import {hospitalTransactionRows,refundReportSummary,reportTransactionLabel} from "@/lib/reportTransactionSemantics";
+import {hospitalTransactionLayout} from "@/lib/approvedReportLayouts";
+import {productSalesExport,nonzeroStockRows,historicalUnitPrice} from "@/lib/reportExportLayouts";
 import { memberBalanceExport } from "@/lib/memberBalanceExport";
 import { normalizeBillSearch } from "@/lib/billSearch";
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuSeparator, DropdownMenuGroup } from "@/components/ui/dropdown-menu";
@@ -328,6 +330,10 @@ export function Reports({
   };
   // ROUND 65 — ช่องค้นหาของรายงานใหม่: ยอดเงินในบัตร + สินค้าคงคลัง (debounce เหมือนประวัติบิล)
   const [balanceSearch, setBalanceSearch] = useState("");
+  const [includeReturnedZero, setIncludeReturnedZero] = useState(false);
+  const balanceScopeLabel = includeReturnedZero
+    ? "สมาชิกทั้งหมด รวมผู้คืนบัตรหรือปิดบัญชีที่ยอด 0 บาท"
+    : "สมาชิกที่ยังอยู่ รวมยอด 0 บาท";
   const [debouncedBalanceSearch, setDebouncedBalanceSearch] = useState("");
   const [stockSearch, setStockSearch] = useState("");
   const [debouncedStockSearch, setDebouncedStockSearch] = useState("");
@@ -457,6 +463,7 @@ export function Reports({
     setTxCustomRange(false);
     setTxTo(todayIso());
     setBalanceSearch("");
+    setIncludeReturnedZero(false);
     setStockSearch("");
     setReportTab("sales");
   };
@@ -529,10 +536,10 @@ export function Reports({
     from: txFrom || undefined,
     to: txTo || undefined,
   });
-  const txRows = txQuery.data ?? [];
+  const txRows = hospitalTransactionRows(txQuery.data ?? [], hospitalPreset);
   // ROUND 65 — รายงานใหม่: ยอดเงินในบัตรทุกใบ + สินค้าคงคลังตามช่วงเวลา (ยอดยกมา/ยอดขาย/คงเหลือ)
   const balancesQuery = trpc.reports.memberBalances.useQuery(
-    { search: debouncedBalanceSearch || undefined },
+    { search: debouncedBalanceSearch || undefined, includeReturnedZero },
     { enabled: reportTab === "balances", refetchOnMount: "always", refetchOnWindowFocus: "always" }
   );
   const balanceRows = balancesQuery.data ?? [];
@@ -796,10 +803,6 @@ export function Reports({
       .filter(row => row.type === "activation")
       .reduce((sum, row) => sum + row.amount, 0),
     activationCount: txRows.filter(row => row.type === "activation").length,
-    refund: txRows
-      .filter(row => row.type === "refund")
-      .reduce((sum, row) => sum + row.amount, 0),
-    refundCount: txRows.filter(row => row.type === "refund").length,
   };
   const dailySalesRows = [
     [
@@ -916,8 +919,8 @@ export function Reports({
             ? ["วันที่ · เวลา", "รหัสสินค้า", "ชื่อสินค้า", "จำนวน", "ราคา/หน่วย (บาท)", "รวมเงิน (บาท)"]
             : ["วันที่ · เวลา", "เลขที่บิล", "รายการสินค้า", "ชิ้น", "ราคา/ชิ้น (บาท)", "ยอดรวม (บาท)", "ชำระโดย", "พนักงานขาย"],
           ...lineItemRows.map(row => hospitalSales
-            ? [formatLogDateTime(row.createdAt), row.productCode ?? "—", row.productName, exportCount(row.qty), exportNumber(row.price), exportNumber(row.amount)]
-            : [formatLogDateTime(row.createdAt), row.orderNumber, row.productName, exportCount(row.qty), exportNumber(row.price), exportNumber(row.amount), row.paymentMethod, row.cashier]),
+            ? [formatLogDateTime(row.createdAt), row.productCode ?? "—", row.productName, exportCount(row.qty), historicalUnitPrice(row), exportNumber(row.amount)]
+            : [formatLogDateTime(row.createdAt), row.orderNumber, row.productName, exportCount(row.qty), historicalUnitPrice(row), exportNumber(row.amount), row.paymentMethod, row.cashier]),
           hospitalSales
             ? ["รวม", `${exportCount(lineItemTotals.lines)} รายการ`, "", exportCount(lineItemTotals.qty), "—", exportNumber(lineItemTotals.revenue)]
             : ["รวม", `${exportCount(lineItemTotals.bills)} บิล`, `${exportCount(lineItemTotals.lines)} รายการ`, exportCount(lineItemTotals.qty), "—", exportNumber(lineItemTotals.revenue), "—", "—"],
@@ -973,7 +976,7 @@ export function Reports({
       };
     }
     if (salesView === "product") {
-      return {fileName:"sales-by-product.pdf",title:"รายงานสรุปยอดขายแยกตามสินค้า",periodLabel:`ช่วงข้อมูล ${rangeLabel}${staffSuffix}${categorySuffix}`,...productSalesExport(productRows,false),columnWidths:["21%","39%","13%","6%","6%","15%"],nowrapCols:[0,3,4,5],brandName:"ร้านค้าสวัสดิการ",footnote:"ราคาขายต่อหน่วยอ้างอิงราคาที่บันทึกในบิล · หากมีหลายราคาในช่วงที่เลือก จะแสดงเป็นช่วงราคา"};
+      return {fileName:"sales-by-product.pdf",title:"รายงานสรุปยอดขายแยกตามสินค้า",periodLabel:`ช่วงข้อมูล ${rangeLabel}${staffSuffix}${categorySuffix}`,...productSalesExport(productRows,false),columnWidths:["20%","36%","17%","6%","6%","15%"],nowrapCols:[0,2,3,4,5],brandName:"ร้านค้าสวัสดิการ",footnote:"ราคาขายต่อหน่วยอ้างอิงราคาที่บันทึกในบิล · หากมีหลายราคาในช่วงที่เลือก จะแสดงเป็นช่วงราคา"};
     }
     if (salesView === "category") {
       return {fileName:"daily-sales-summary.pdf",title:"รายงานสรุปยอดขายแยกตามชนิดสินค้า",periodLabel:`ช่วงข้อมูล ${rangeLabel}${staffSuffix}${categorySuffix}`,columns:["ชนิดสินค้า","บิล","ชิ้น","ยอดขาย (บาท)","ต้นทุน (บาท)","กำไร (บาท)"],numericCols:[1,2,3,4,5],rows:categoryRows.map(row=>[row.category,exportCount(row.orders),exportCount(row.qty),exportNumber(row.revenue),exportNumber(row.cogs),exportNumber(row.profit)]),totalsRow:["รวมทุกชนิดสินค้า",exportCount(categoryTotal.orders),exportCount(categoryTotal.qty),exportNumber(categoryTotal.revenue),exportNumber(categoryTotal.cogs),exportNumber(categoryTotal.profit)],brandName:"ร้านค้าสวัสดิการ"};
@@ -995,10 +998,12 @@ export function Reports({
         columns: hospitalSales
           ? ["วันที่ · เวลา", "รหัสสินค้า", "ชื่อสินค้า", "จำนวน", "ราคา/หน่วย (บาท)", "รวมเงิน (บาท)"]
           : ["วันที่ · เวลา", "เลขที่บิล", "รายการสินค้า", "ชิ้น", "ราคา/ชิ้น (บาท)", "ยอดรวม (บาท)", "ชำระโดย", "พนักงานขาย"],
+        columnWidths: hospitalSales ? ["21%","17%","32%","6%","12%","12%"] : ["19%","12%","23%","6%","12%","10%","8%","10%"],
+        nowrapCols: hospitalSales ? [0,1,3,4,5] : [0,1,3,4,5],
         numericCols: [3, 4, 5],
         rows: lineItemRows.map(row => hospitalSales
-          ? [formatLogDateTime(row.createdAt), row.productCode ?? "—", row.productName, exportCount(row.qty), exportNumber(row.price), exportNumber(row.amount)]
-          : [formatLogDateTime(row.createdAt), row.orderNumber, row.productName, exportCount(row.qty), exportNumber(row.price), exportNumber(row.amount), row.paymentMethod, row.cashier]),
+          ? [formatLogDateTime(row.createdAt), row.productCode ?? "—", row.productName, exportCount(row.qty), historicalUnitPrice(row), exportNumber(row.amount)]
+          : [formatLogDateTime(row.createdAt), row.orderNumber, row.productName, exportCount(row.qty), historicalUnitPrice(row), exportNumber(row.amount), row.paymentMethod, row.cashier]),
         totalsRow: hospitalSales
           ? ["รวม", `${exportCount(lineItemTotals.lines)} รายการ`, "", exportCount(lineItemTotals.qty), "—", exportNumber(lineItemTotals.revenue)]
           : ["รวม", `${exportCount(lineItemTotals.bills)} บิล`, `${exportCount(lineItemTotals.lines)} รายการ`, exportCount(lineItemTotals.qty), "—", exportNumber(lineItemTotals.revenue), "—", "—"],
@@ -1094,26 +1099,6 @@ export function Reports({
       setExportPreview(state);
     }
   };
-  const billsExportRows = () => [
-    [
-      "เลขที่บิล",
-      "วันที่ · เวลา",
-      "ลูกค้า",
-      "เลขสมาชิก",
-      "จำนวนรายการ",
-      "ชำระโดย",
-      "ยอดรวม (บาท)",
-    ],
-    ...salesHistory.map(entry => [
-      entry.orderNumber,
-      formatLogDateTime(entry.createdAt),
-      entry.memberName ? `สมาชิก ${entry.memberName}` : "บุคคลทั่วไป",
-      entry.memberNumber ?? "—",
-      exportCount(entry.items.length),
-      entry.paymentMethod,
-      exportNumber(entry.total),
-    ]),
-  ];
   const billExportBase = billMember
     ? `bills-${billMember.memberNumber}`
     : "bills-history";
@@ -1123,7 +1108,7 @@ export function Reports({
       fileName: `${billExportBase}.pdf`,
       title: "รายงานประวัติบิลขาย",
       periodLabel: billMember
-        ? `แยกรายสมาชิก ${billMember.memberNumber} · สมาชิก${billMember.firstName} ${billMember.lastName}`
+        ? `แยกรายสมาชิก ${billMember.memberNumber} · สมาชิก ${memberFullName(billMember)}`
         : `บิลล่าสุดที่โหลดไว้ ${salesHistory.length} บิล`,
       meta: [
         ["จำนวนบิล", `${salesHistory.length} บิล`],
@@ -1132,18 +1117,20 @@ export function Reports({
       columns: [
         "เลขที่บิล",
         "วันที่ · เวลา",
-        "ลูกค้า",
         "เลขสมาชิก",
+        "ลูกค้า",
         "รายการ",
         "ชำระโดย",
         "ยอดรวม (บาท)",
       ],
+      columnWidths: ["16%","21%","10%","25%","7%","11%","10%"],
+      nowrapCols: [0,1,2,4,6],
       numericCols: [4, 6],
       rows: salesHistory.map(entry => [
         entry.orderNumber,
         formatLogDateTime(entry.createdAt),
-        entry.memberName ? `สมาชิก ${entry.memberName}` : "บุคคลทั่วไป",
         entry.memberNumber ?? "—",
+        entry.memberName ? `สมาชิก ${entry.memberName}` : "บุคคลทั่วไป",
         exportCount(entry.items.length),
         entry.paymentMethod,
         exportNumber(entry.total),
@@ -1176,7 +1163,7 @@ export function Reports({
       label: "ประวัติบิล",
       fileName: billExportBase,
       sheetName: "ประวัติบิล",
-      rows: [...billsExportRows(), ...(doc.totalsRow ? [doc.totalsRow] : [])],
+      rows: [doc.columns, ...doc.rows, ...(doc.totalsRow ? [doc.totalsRow] : [])],
       numericCols: doc.numericCols ?? [],
       preferred: preferred ?? "pdf",
       doc,
@@ -1192,45 +1179,39 @@ export function Reports({
   };
   const hospitalTxPreset = hospitalPreset === "deposit" || hospitalPreset === "withdrawal" || hospitalPreset === "refund" || hospitalPreset === "activation";
   const hospitalTxTitle: Record<Exclude<HospitalReportPreset, "standard" | "sales" | "balances" | "stock">, string> = {
-    deposit: "รายงานยอดแสดงการเติมเงิน",
-    withdrawal: "รายงานยอดแสดงการถอนเงิน",
-    refund: "รายงานยอดแสดงการคืนบัตรเงินสด",
-    activation: "รายงานยอดแสดงการเปิดใช้บัตรเงินสด",
+    deposit: "รายงานการเติมเงิน",
+    withdrawal: "รายงานการถอนเงิน",
+    refund: "รายงานการคืนบัตรเงินสด",
+    activation: "รายงานการเปิดใช้บัตรเงินสด",
   };
-  const transactionLabel = (row: typeof txRows[number]) => TX_TYPE_LABEL[row.type];
-  const txAmountForReport = (row: typeof txRows[number]) => hospitalTxPreset ? Math.abs(row.amount) : row.amount;
+  const transactionLabel = (row: typeof txRows[number]) => reportTransactionLabel(row, TX_TYPE_LABEL[row.type]);
   const txSummaryByType = [
     { type: "deposit" as const, label: "เติมเงิน", amount: Math.abs(txTotals.deposit), count: txTotals.depositCount, sign: "+" as const },
     { type: "withdrawal" as const, label: "ถอนเงิน", amount: Math.abs(txTotals.withdraw), count: txTotals.withdrawCount, sign: "-" as const },
     { type: "purchase" as const, label: "ใช้จ่าย", amount: Math.abs(txTotals.spend), count: txTotals.spendCount, sign: "-" as const },
     { type: "activation" as const, label: "เปิดใช้บัตร", amount: Math.abs(txTotals.activation), count: txTotals.activationCount, sign: "+" as const },
-    { type: "refund" as const, label: "คืนบัตรเงินสด", amount: Math.abs(txTotals.refund), count: txTotals.refundCount, sign: "-" as const },
+    ...refundReportSummary(txRows).filter(item => item.sign === "-" || item.count > 0),
   ];
   const visibleTxSummary = txSummaryByType.filter(item => txTypes.length === 0 || txTypes.includes(item.type));
-  const txExportRows = () => [
-    ...(hospitalTxPreset
-      ? [["วันที่ · เวลา", "เลขที่บัตร", "จำนวนเงิน (บาท)", "เลขสมาชิก", "ชื่อสมาชิก", "ผู้ทำรายการ"]]
-      : [["วันที่ · เวลา", "เลขที่บัตร", "เลขสมาชิก", "ชื่อสมาชิก", "รายการ", "ยอด (บาท)", "คงเหลือ (บาท)", "ผู้ทำรายการ"]]),
-    ...txRows.map(row => hospitalTxPreset
-      ? [
-          formatLogDateTime(row.createdAt),
-          row.cardNumber ?? "—",
-          exportNumber(txAmountForReport(row)),
-          row.memberNumber,
-          row.memberName ?? "—",
-          row.actor ?? "ไม่ระบุ",
-        ]
-      : [
-          formatLogDateTime(row.createdAt),
-          row.cardNumber ?? "—",
-          row.memberNumber,
-          row.memberName ?? "—",
-          transactionLabel(row),
-          exportNumber(txAmountForReport(row)),
-          row.balanceAfter !== null ? exportNumber(row.balanceAfter) : "—",
-          row.actor ?? "ไม่ระบุ",
-        ]),
-  ];
+  const txExportRows = () => {
+    if (hospitalTxPreset) {
+      const layout = hospitalTransactionLayout(txRows);
+      return [layout.columns, ...layout.rows];
+    }
+    return [
+      ["วันที่ · เวลา", "เลขที่บัตร", "เลขสมาชิก", "ชื่อสมาชิก", "รายการ", "ยอด (บาท)", "คงเหลือ (บาท)", "ผู้ทำรายการ"],
+      ...txRows.map(row => [
+        formatLogDateTime(row.createdAt),
+        row.cardNumber ?? "—",
+        row.memberNumber,
+        row.memberName ?? "—",
+        transactionLabel(row),
+        exportNumber(row.amount),
+        row.balanceAfter !== null ? exportNumber(row.balanceAfter) : "—",
+        row.actor ?? "ไม่ระบุ",
+      ]),
+    ];
+  };
   const txExportBase = txMember
     ? `member-transactions-${txMember.memberNumber}`
     : "member-transactions";
@@ -1238,7 +1219,7 @@ export function Reports({
     fileName: `${txExportBase}.pdf`,
     title: hospitalTxPreset ? hospitalTxTitle[hospitalPreset] : "รายงานประวัติธุรกรรมสมาชิก",
     periodLabel: txMember
-      ? `สมาชิก ${txMember.memberNumber} · สมาชิก${txMember.firstName} ${txMember.lastName}`
+      ? `สมาชิก ${txMember.memberNumber} · สมาชิก ${memberFullName(txMember)}`
       : "ทุกสมาชิก",
     meta: [
       [
@@ -1250,51 +1231,28 @@ export function Reports({
       [
         "ช่วงวันที่",
         txFrom || txTo
-          ? `${txFrom || "ต้นช่วง"} → ${txTo || "ปัจจุบัน"}`
+          ? `${txFrom ? formatThaiDate(txFrom) : "ต้นช่วง"} – ${txTo ? formatThaiDate(txTo) : "ปัจจุบัน"}`
           : "ทั้งหมด",
       ],
       ["จำนวนรายการ", `${txRows.length} รายการ`],
     ],
-    columns: hospitalTxPreset
-      ? ["วันที่ · เวลา", "เลขที่บัตร", "จำนวนเงิน (บาท)", "เลขสมาชิก", "ชื่อสมาชิก", "ผู้ทำรายการ"]
-      : ["วันที่ · เวลา", "เลขที่บัตร", "เลขสมาชิก", "ชื่อสมาชิก", "รายการ", "ยอด (บาท)", "คงเหลือ (บาท)", "ผู้ทำรายการ"],
-    columnWidths: hospitalTxPreset
-      ? ["16%", "16%", "15%", "15%", "19%", "19%"]
-      : ["15%", "13%", "11%", "13%", "9%", "14%", "14%", "11%"],
-    nowrapCols: hospitalTxPreset ? [2, 3] : [5, 6],
-    numericCols: hospitalTxPreset ? [2] : [5, 6],
-    rows: txRows.map(row => hospitalTxPreset
-      ? [
-          formatLogDateTime(row.createdAt),
-          row.cardNumber ?? "—",
-          exportNumber(txAmountForReport(row)),
-          row.memberNumber,
-          row.memberName ?? "—",
-          row.actor ?? "ไม่ระบุ",
-        ]
-      : [
-          formatLogDateTime(row.createdAt),
-          row.cardNumber ?? "—",
-          row.memberNumber,
-          row.memberName ?? "—",
-          transactionLabel(row),
-          exportNumber(txAmountForReport(row)),
-          row.balanceAfter !== null ? exportNumber(row.balanceAfter) : "—",
-          row.actor ?? "ไม่ระบุ",
-        ]),
+    columns: ["วันที่ · เวลา", "เลขที่บัตร", "เลขสมาชิก", "ชื่อสมาชิก", "รายการ", "ยอด (บาท)", "คงเหลือ (บาท)", "ผู้ทำรายการ"],
+    columnWidths: ["19%", "16%", "10%", "18%", "9%", "9%", "9%", "10%"],
+    nowrapCols: [0,1,2,5,6],
+    numericCols: [5, 6],
+    rows: txExportRows().slice(1),
     // Summarize the filtered transactions below the document table.
-    summaryBlocks: hospitalTxPreset ? [["จำนวนรายการ", `${exportCount(txRows.length)} รายการ`], ["ยอดรวม", exportNumber(txRows.reduce((sum, row) => sum + Math.abs(row.amount), 0))]] : [
+    summaryBlocks: hospitalTxPreset ? undefined : [
       ...visibleTxSummary.map(item => [item.label, `${item.sign}${exportNumber(item.amount)} · ${exportCount(item.count)} รายการ`] as [string, string]),
       [
         "ยอดสุทธิ",
         exportNumber(txRows.reduce((sum, row) => sum + row.amount, 0)),
       ],
     ],
-    totalsRow: hospitalTxPreset
-      ? [`รวม ${exportCount(txRows.length)} รายการ`, "", exportNumber(txRows.reduce((sum, row) => sum + Math.abs(row.amount), 0)), "", "", ""]
-      : [`รวมทั้งหมด ${txRows.length} รายการ`, "", "", "", "", exportNumber(txRows.reduce((sum, row) => sum + row.amount, 0)), "", ""],
+    totalsRow: [`รวมทั้งหมด ${txRows.length} รายการ`, "", "", "", "", exportNumber(txRows.reduce((sum, row) => sum + row.amount, 0)), "", ""],
     brandName: "ร้านค้าสวัสดิการ",
-    compact: !hospitalTxPreset,
+    compact: true,
+    ...(hospitalTxPreset ? hospitalTransactionLayout(txRows) : {}),
   });
   const openTxExportPreview = async (preferred?: ExportFormat, direct = false) => {
     if (txRows.length === 0) {
@@ -1309,7 +1267,7 @@ export function Reports({
       label: "ประวัติธุรกรรม",
       fileName: txExportBase,
       sheetName: "ประวัติธุรกรรม",
-      rows: [...txExportRows(), ...(doc.totalsRow ? [doc.totalsRow] : [])],
+      rows: hospitalTxPreset ? [doc.columns,...doc.rows,...(doc.totalsRow ? [doc.totalsRow] : [])] : [...txExportRows(), ...(doc.totalsRow ? [doc.totalsRow] : [])],
       numericCols: doc.numericCols ?? [],
       preferred: preferred ?? "pdf",
       doc,
@@ -1327,7 +1285,7 @@ export function Reports({
   const balancesDocConfig = (): ReportDocConfig => ({
     fileName: hospitalPreset === "balances" ? "hospital-member-card-balance.pdf" : "member-card-balances.pdf",
     title: hospitalPreset === "balances" ? "รายงานแสดงยอดเงินในบัตรเงินสด" : "รายงานยอดเงินในบัตรสมาชิก",
-    periodLabel: `ณ วันที่สร้างรายงาน ${formatThaiDate(new Date())} · สมาชิกที่ยังอยู่ รวมยอด 0 บาท${debouncedBalanceSearch ? ` · ค้นหา “${debouncedBalanceSearch}”` : ""}`,
+    periodLabel: `ณ วันที่สร้างรายงาน ${formatThaiDate(new Date())} · ${balanceScopeLabel}${debouncedBalanceSearch ? ` · ค้นหา “${debouncedBalanceSearch}”` : ""}`,
     meta: [
       ["จำนวนสมาชิก", `${balanceTotals.members.toLocaleString("th-TH")} ราย`],
       ["ยอดเงินเข้ารวม", money(balanceTotals.totalIn)],
@@ -2129,11 +2087,6 @@ export function Reports({
                             <tr key={row.productId ?? `special-${index}`}>
                               <td>
                                 <span className="row-label">{row.name}</span>
-                                <small className="cell-sub cell-mono">
-                                  {row.sku ??
-                                    row.barcode ??
-                                    "รายการพิเศษ · ไม่มีรหัส"}
-                                </small>
                                 <span
                                   className={`sales-bar ${["", "blue", "amber", "purple"][index % 4]}`}
                                   aria-hidden="true"
@@ -2261,7 +2214,7 @@ export function Reports({
                               <td className="num">
                                 {row.qty.toLocaleString("th-TH")}
                               </td>
-                              <td className="num">{money(row.price)}</td>
+                              <td className="num">{historicalUnitPrice(row, money)}</td>
                               <td className="num">
                                 <strong>{money(row.amount)}</strong>
                               </td>
@@ -2480,8 +2433,7 @@ export function Reports({
                     <>
                       สมาชิก{" "}
                       <b>
-                        {billMember.memberNumber} · สมาชิก{billMember.firstName}{" "}
-                        {billMember.lastName}
+                        {billMember.memberNumber} · สมาชิก {memberFullName(billMember)}
                       </b>{" "}
                       — แยกรายบิลของสมาชิกรายนี้
                     </>
@@ -2523,6 +2475,7 @@ export function Reports({
                       <tr>
                         <th>เลขที่บิล</th>
                         <th>วันที่ · เวลา</th>
+                        <th>เลขสมาชิก</th>
                         <th>ลูกค้า</th>
                         <th>รายการ</th>
                         <th>ชำระโดย</th>
@@ -2550,17 +2503,13 @@ export function Reports({
                                 {formatLogDateTime(entry.createdAt)}
                               </small>
                             </td>
+                            <td><small className="cell-mono">{entry.memberNumber ?? "—"}</small></td>
                             <td>
                               <b>
                                 {entry.memberName
                                   ? `สมาชิก ${entry.memberName}`
                                   : "บุคคลทั่วไป"}
                               </b>
-                              {entry.memberNumber && (
-                                <small className="cell-mono">
-                                  {entry.memberNumber}
-                                </small>
-                              )}
                             </td>
                             <td>
                               <span className="bill-items-cell">
@@ -2762,18 +2711,19 @@ export function Reports({
                     <thead>
                       {hospitalTxPreset ? (
                         <tr>
-                          <th>วันที่ · เวลา</th>
-                          <th>เลขที่บัตร</th>
-                          <th className="num">จำนวนเงิน</th>
+                          <th>วัน–เวลา</th>
+                          <th>เลขบัตร</th>
                           <th>เลขสมาชิก</th>
                           <th>ชื่อสมาชิก</th>
+                          <th className="num">จำนวนเงิน</th>
                           <th>ผู้ทำรายการ</th>
                         </tr>
                       ) : (
                         <tr>
                           <th>วันที่ · เวลา</th>
                           <th>เลขที่บัตร</th>
-                          <th>สมาชิก / เลขสมาชิก</th>
+                          <th>เลขสมาชิก</th>
+                          <th>ชื่อสมาชิก</th>
                           <th>รายการ</th>
                           <th className="num">ยอดเคลื่อน</th>
                           <th className="num hide-sm">คงเหลือ (บาท)</th>
@@ -2786,12 +2736,12 @@ export function Reports({
                         if (hospitalTxPreset) {
                           return (
                             <tr key={row.id}>
-                              <td><small className="cell-sub" style={{ marginTop: 0 }}>{formatLogDateTime(row.createdAt)}</small></td>
-                              <td><small className="cell-mono" style={{ marginTop: 0 }}>{row.cardNumber ?? "—"}</small></td>
+                              <td style={{whiteSpace:"nowrap"}}><small className="cell-sub" style={{ marginTop: 0, fontSize: "inherit" }}>{formatLogDateTime(row.createdAt)}</small></td>
+                              <td><small className="cell-mono" style={{ marginTop: 0, fontSize: "inherit" }}>{row.cardNumber ?? "—"}</small></td>
+                              <td><small className="cell-mono" style={{ marginTop: 0, fontSize: "inherit" }}>{row.memberNumber}</small></td>
+                              <td style={{whiteSpace:"nowrap"}}><span className="cell-strong">{row.memberName ?? "—"}</span></td>
                               <td className="num cell-mono"><strong>{money(Math.abs(row.amount))}</strong></td>
-                              <td><small className="cell-mono" style={{ marginTop: 0 }}>{row.memberNumber}</small></td>
-                              <td><span className="cell-strong">{row.memberName ?? "—"}</span></td>
-                              <td><small className="cell-sub" style={{ marginTop: 0 }}>{row.actor ?? "ไม่ระบุ"}</small></td>
+                              <td><small className="cell-sub" style={{ marginTop: 0, fontSize: "inherit" }}>{row.actor ?? "ไม่ระบุ"}</small></td>
                             </tr>
                           );
                         }
@@ -2810,13 +2760,11 @@ export function Reports({
                               {transactionReceipt(row) && <button type="button" className="outline-button compact" onClick={() => setViewedTransaction(row)}><ReceiptText size={14} /> ใบเสร็จ</button>}
                             </td>
                             <td><small className="cell-mono">{row.cardNumber ?? "—"}</small></td>
+                            <td><small className="cell-mono">{row.memberNumber}</small></td>
                             <td>
                               <span className="cell-strong">
                                 {row.memberName ?? "—"}
                               </span>
-                              <small className="cell-sub">
-                                เลขสมาชิก {row.memberNumber}
-                              </small>
                             </td>
                             <td>
                               <span className="tx-detail">{transactionLabel(row)}</span>
@@ -2855,9 +2803,9 @@ export function Reports({
               </div>
               <div className="report-summary-footer">
                 {visibleTxSummary.map(item => (
-                  <div key={item.type}>
+                  <div key={`${item.type}-${item.sign}`}>
                     <small>{item.label}รวม</small>
-                    <strong className={item.type === "deposit" || item.type === "activation" ? "green-text" : item.type === "withdrawal" ? "amber-text" : "red-text"}>
+                    <strong className={item.sign === "+" ? "green-text" : item.type === "withdrawal" ? "amber-text" : "red-text"}>
                       {item.sign}{money(item.amount)}
                     </strong>
                     <span>{item.count} รายการ</span>
@@ -3127,6 +3075,10 @@ export function Reports({
                     />
                   </div></SharedSearch>
                   <span>สมาชิกที่ยังอยู่ รวมยอด 0 บาท</span>
+                  <label style={{display:"inline-flex",alignItems:"center",gap:8}}>
+                    <input type="checkbox" checked={includeReturnedZero} onChange={event => setIncludeReturnedZero(event.target.checked)} />
+                    <span>รวมผู้คืนบัตรหรือปิดบัญชีที่คงเหลือ 0 บาท</span>
+                  </label>
                 </div>
                 <div
                   className="report-export-actions"
@@ -3196,8 +3148,8 @@ export function Reports({
                     <thead>
                       <tr>
                         <th className="hide-sm">ลำดับ</th>
-                        <th>เลขสมาชิก</th>
                         <th>เลขบัตรปัจจุบัน</th>
+                        <th>เลขสมาชิก</th>
                         <th>ชื่อ-นามสกุล</th>
                         <th className="hide-sm">วันที่เปิดใช้สมาชิก</th>
                         <th className="num hide-sm">ยอดทั้งหมด</th>
@@ -3216,6 +3168,7 @@ export function Reports({
                           <td className="hide-sm cell-mono">
                             {exportCount(index + 1)}
                           </td>
+                          <td className="cell-mono">{row.cardNumber?.trim() || "—"}</td>
                           <td>
                             <small
                               className="cell-mono"
@@ -3224,7 +3177,6 @@ export function Reports({
                               {row.memberNumber}
                             </small>
                           </td>
-                          <td className="cell-mono">{row.cardNumber?.trim() || "—"}</td>
                           <td>
                             <span className="cell-strong">
                               {memberFullName(row)}
