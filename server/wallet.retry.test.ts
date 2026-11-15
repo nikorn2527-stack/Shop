@@ -21,10 +21,50 @@ function input(): WalletTxInput { return { memberNumber, type: "deposit", amount
 function state() {
   return Object.fromEntries(["members", "member_transactions", "physical_cards", "card_assignments", "card_usage_sessions", "audit_logs", "sqlite_sequence"].map(table => [table, db.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()]));
 }
+function completeState() {
+  const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name").all() as { name: string }[];
+  return tables.map(({ name }) => [name, db.prepare(`SELECT * FROM "${name.replaceAll('"', '""')}" ORDER BY rowid`).all()]);
+}
 function api(appRole = "cashier", id = 1, name = "Cashier") {
   return appRouter.createCaller({ user: { id, name, role: appRole === "administrator" ? "admin" : "user", appRole } as TrpcContext["user"], req: { headers: {} } as TrpcContext["req"], res: {} as TrpcContext["res"] });
 }
 describe("durable member money requests", () => {
+  it.each([0.01, 1])("rejects a deposit of %s that would push a valid balance beyond safe cents without writes", async amount => {
+    db.prepare("UPDATE members SET balance=? WHERE member_number=?").run(Number.MAX_SAFE_INTEGER / 100, memberNumber);
+    const before = completeState();
+    await expect(api().member.wallet({ ...input(), amount })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(completeState()).toEqual(before);
+  });
+  it.each([Infinity, -Infinity, 90071992547410])("refuses to operate on an unrepresentable legacy balance %s without repairing rows", balance => {
+    db.prepare("UPDATE members SET balance=? WHERE member_number=?").run(balance, memberNumber);
+    const before = completeState();
+    expect(() => walletTx(db, input())).toThrow();
+    expect(completeState()).toEqual(before);
+  });
+  it("preserves a valid deposit that repays part of a negative legacy balance", () => {
+    db.prepare("UPDATE members SET balance=-10 WHERE member_number=?").run(memberNumber);
+    expect(walletTx(db, { ...input(), amount: 5 })).toMatchObject({ amount: 5, balanceBefore: -10, balanceAfter: -5 });
+  });
+  it.each([Number.MAX_VALUE, 90071992547410, 0.001])("rejects an unrepresentable opening deposit %s at the API before any business or sequence writes", async initialDeposit => {
+    createBlankCards(db, ["OPENING-INVALID"]);
+    const before = completeState();
+    await expect(api().member.register({ firstName: "Invalid", lastName: "Opening", cardNumber: "OPENING-INVALID", initialDeposit })).rejects.toMatchObject({ code: "BAD_REQUEST" });
+    expect(completeState()).toEqual(before);
+  });
+  it.each([NaN, Infinity, -Infinity, Number.MAX_VALUE, 90071992547410, 0.001])("rejects invalid internal opening deposit %s without writes", initialDeposit => {
+    createBlankCards(db, ["OPENING-INVALID"]);
+    const before = completeState();
+    expect(() => registerMember(db, { firstName: "Invalid", lastName: "Opening", cardNumber: "OPENING-INVALID", initialDeposit })).toThrow();
+    expect(completeState()).toEqual(before);
+  });
+  it.each([undefined, 0.005, 1.005, 25])("keeps ordinary registration rounding and finite slip fields for %s", async initialDeposit => {
+    createBlankCards(db, ["OPENING-VALID"]);
+    const result = await api().member.register({ firstName: "Valid", lastName: "Opening", cardNumber: "OPENING-VALID", ...(initialDeposit === undefined ? {} : { initialDeposit }) });
+    const expected = initialDeposit === undefined ? 0 : Math.round((initialDeposit + Number.EPSILON) * 100) / 100;
+    expect(result.member.balance).toBe(expected);
+    expect(result.slip).toMatchObject({ amount: expected, balanceBefore: 0, balanceAfter: expected });
+    for (const value of [result.slip.amount, result.slip.balanceBefore, result.slip.balanceAfter]) expect(Number.isFinite(value)).toBe(true);
+  });
   it.each(["deposit", "withdrawal", "refund"] as const)("replays %s after restart and profile/balance changes without another ledger or audit", type => {
     const request = { ...input(), type, amount: type === "refund" ? 100 : 20 };
     const receipt = walletTx(db, request);

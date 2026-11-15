@@ -29,12 +29,16 @@ export function planWalletOperation(
     throw new StoreError(`สมาชิกถูกระงับการใช้งาน · ${member.memberNumber}`);
   // Legacy REAL balances can be 99.989999...; compare the displayed cents.
   const roundedBalance = round2(member.balance);
+  if (!Number.isFinite(member.balance) || !Number.isSafeInteger(Math.round(roundedBalance * 100)))
+    throw new StoreError("ยอดเงินสมาชิกไม่อยู่ในขอบเขตที่ระบบรองรับ กรุณาตรวจประวัติรายการ");
   if (input.type !== "deposit" && roundedBalance < amount)
     throw new StoreError(
       `ยอดเงินคงเหลือไม่พอ · ${input.type === "refund" ? "คืนบัตร" : "ถอน"} ${money(amount)} คงเหลือ ${money(roundedBalance)}`,
     );
   const signedAmount = input.type === "deposit" ? amount : -amount;
   const balanceAfter = round2(member.balance + signedAmount);
+  if (!Number.isFinite(balanceAfter) || !Number.isSafeInteger(Math.round(balanceAfter * 100)))
+    throw new StoreError("ยอดเงินหลังรายการเกินขอบเขตที่ระบบรองรับ");
   const note = input.note?.trim();
   const fallbackDetail =
     input.type === "deposit"

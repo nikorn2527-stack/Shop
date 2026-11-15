@@ -1,5 +1,6 @@
 import {randomUUID} from "node:crypto";
 import {walletRequestSlip,registrationSlip,returnedCardSlip} from "./memberSlipDocuments";
+import { replayReturnedCard } from "./cardReturnReplay";
 import { getMemberStatement } from "./memberStatement";
 import { issueDocumentPrint } from "./documentPrinting";
 import { getRuntimePolicy } from "./runtimePolicy";
@@ -1224,6 +1225,8 @@ export const appRouter = router({
       requireLogin(ctx);
       const { actor, actorRole } = resolveActor(ctx, {});
       const db=getWelfareDb();
+      const replay = replayReturnedCard(db, input);
+      if (replay) return replay;
       const requestId=input.clientRequestId??randomUUID();
       const result=returnMemberCard(db, { ...input, clientRequestId:requestId, actor, actorRole });
       return {...result,slip:returnedCardSlip(db,input.expectedSessionId,requestId)};

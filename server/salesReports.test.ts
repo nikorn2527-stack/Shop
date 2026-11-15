@@ -9,6 +9,36 @@ let db: SqliteDb;
 afterEach(() => db?.close());
 
 describe("sales report aggregation", () => {
+  it("returns every grouped item beyond 1,000 bills without changing financial records", () => {
+    db = createSqliteStore();
+    const product = createProduct(db, { name: "Complete report", price: 10, cost: 4, stock: 2000 });
+    const orders: string[] = [];
+    let quantity = 0;
+    for (let index = 0; index < 1001; index += 1) {
+      const qty = 1 + index % 2;
+      quantity += qty;
+      orders.push(checkout(db, { items: [{ productId: product.id, qty }], paymentMethod: "เงินสด" }).orderNumber);
+    }
+    db.prepare("UPDATE sales SET created_at = '2026-11-14 12:00:00'").run();
+    const tables = ["sales", "sale_items", "sale_lot_allocations", "products", "stock_lots", "stock_movements", "members", "member_transactions"];
+    const snapshot = () => tables.map(table => db.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all());
+    const before = snapshot();
+    const range = { from: "2026-11-14", to: "2026-11-14" };
+
+    const lines = salesLineItems(db, range);
+    expect(lines).toHaveLength(1001);
+    expect(lines[0].orderNumber).toBe(orders.at(-1));
+    expect(lines.at(-1)?.orderNumber).toBe(orders[0]);
+    expect(lines.reduce((sum, row) => sum + row.qty, 0)).toBe(quantity);
+    const revenue = lines.reduce((sum, row) => sum + row.amount, 0);
+    expect(revenue).toBe(quantity * 10);
+    expect(dailySalesRows(db, range)[0]).toMatchObject({ orders: 1001, items: quantity, revenue });
+    expect(salesByProduct(db, range)[0]).toMatchObject({ bills: 1001, qty: quantity, revenue });
+    expect(salesByCategory(db, range)[0]).toMatchObject({ orders: 1001, qty: quantity, revenue });
+    expect(salesByCashier(db, range)[0]).toMatchObject({ orders: 1001, items: quantity, total: revenue });
+    expect(snapshot()).toEqual(before);
+  });
+
   it("combines product lines within a bill across prices and lots while all five modes reconcile", () => {
     db = createSqliteStore();
     const product = createProduct(db, { name: "น้ำ", sku: "REPORT-1", category: "เครื่องดื่ม", unit: "ขวด", price: 10, stock: 0, sellMode: "money", priceTiers: JSON.stringify([{ label: "สิบ", price: 10, qty: 1 }, { label: "สิบสอง", price: 12, qty: 1 }, { label: "สิบเอ็ด", price: 11, qty: 1 }]) });

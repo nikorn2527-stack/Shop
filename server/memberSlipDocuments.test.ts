@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import {
   createSqliteStore,
   registerMember,
@@ -6,6 +6,7 @@ import {
   walletTx,
   returnMemberCard,
   closeMemberAccount,
+  assignMemberCard,
   type SqliteDb,
 } from "./sqliteStore";
 import {
@@ -22,6 +23,52 @@ const fresh = () => {
 };
 afterEach(() => databases.splice(0).forEach(db => db.close()));
 describe("documents from existing successful member operations", () => {
+  it("does not turn an earlier account refund into a paid card replacement document", () => {
+    const db = fresh();
+    createBlankCards(db, ["REPLACE-OLD", "REPLACE-NEW"]);
+    const member = registerMember(db, { firstName: "Closed", lastName: "Replacement", cardNumber: "REPLACE-OLD", initialDeposit: 100 }).member;
+    const sessionId = Number(db.prepare("SELECT id FROM card_usage_sessions WHERE member_number=? AND ended_at IS NULL").get(member.memberNumber)!.id);
+    closeMemberAccount(db, { memberNumber: member.memberNumber, cardNumber: "REPLACE-OLD", expectedSessionId: sessionId, clientRequestId: "old-close" });
+    assignMemberCard(db, { memberNumber: member.memberNumber, cardNumber: "REPLACE-NEW", expectedCardNumber: "REPLACE-OLD", expectedSessionId: sessionId });
+    expect(() => returnedCardSlip(db, sessionId, "old-close")).toThrow();
+  });
+  it("keeps each release's money when the same holder recycles a card in the same second", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-14T12:00:00Z"));
+    try {
+      const db = fresh();
+      createBlankCards(db, ["RECYCLED-SAME-SECOND"]);
+      const member = registerMember(db, { firstName: "Same", lastName: "Holder", cardNumber: "RECYCLED-SAME-SECOND", initialDeposit: 100 }).member;
+      const firstSession = Number(db.prepare("SELECT id FROM card_usage_sessions WHERE member_number=? AND ended_at IS NULL").get(member.memberNumber)!.id);
+      returnMemberCard(db, { memberNumber: member.memberNumber, cardNumber: "RECYCLED-SAME-SECOND", expectedSessionId: firstSession, mode: "refund", clientRequestId: "paid-first" });
+      assignMemberCard(db, { memberNumber: member.memberNumber, cardNumber: "RECYCLED-SAME-SECOND", expectedCardNumber: null });
+      const nextSession = Number(db.prepare("SELECT id FROM card_usage_sessions WHERE member_number=? AND ended_at IS NULL").get(member.memberNumber)!.id);
+      returnMemberCard(db, { memberNumber: member.memberNumber, cardNumber: "RECYCLED-SAME-SECOND", expectedSessionId: nextSession, mode: "refund", clientRequestId: "zero-next" });
+      expect(returnedCardSlip(db, firstSession, "paid-first").amount).toBe(100);
+      expect(() => returnedCardSlip(db, firstSession, "wrong-key")).toThrow();
+      expect(returnedCardSlip(db, nextSession, "zero-next").amount).toBe(0);
+    } finally { vi.useRealTimers(); }
+  });
+  it("rejects a mismatched request key instead of claiming a paid card return was zero", () => {
+    const db = fresh();
+    createBlankCards(db, ["PAID-RETURN"]);
+    const member = registerMember(db, { firstName: "Paid", lastName: "Return", cardNumber: "PAID-RETURN", initialDeposit: 100 }).member;
+    const session = db.prepare("SELECT id FROM card_usage_sessions WHERE member_number=? AND ended_at IS NULL").get(member.memberNumber)!;
+    returnMemberCard(db, { memberNumber: member.memberNumber, cardNumber: "PAID-RETURN", expectedSessionId: Number(session.id), mode: "refund", clientRequestId: "actual-return" });
+    const before = db.prepare("SELECT * FROM member_transactions").all();
+    expect(() => returnedCardSlip(db, Number(session.id), "different-request")).toThrow();
+    expect(db.prepare("SELECT * FROM member_transactions").all()).toEqual(before);
+    expect(returnedCardSlip(db, Number(session.id), "actual-return")).toMatchObject({ amount: 100, balanceBefore: 100, balanceAfter: 0 });
+  });
+  it.each(["amount", "balance_after"])("refuses a nonfinite saved %s rather than producing a nonfinite document", column => {
+    const db = fresh();
+    createBlankCards(db, ["LEGACY-NUMBER"]);
+    const member = registerMember(db, { firstName: "Legacy", lastName: "Number", cardNumber: "LEGACY-NUMBER", initialDeposit: 100 }).member;
+    db.prepare(`UPDATE member_transactions SET ${column}=? WHERE member_number=?`).run(Infinity, member.memberNumber);
+    const before = db.prepare("SELECT * FROM member_transactions").all();
+    expect(() => registrationSlip(db, member.memberNumber)).toThrow();
+    expect(db.prepare("SELECT * FROM member_transactions").all()).toEqual(before);
+  });
   it("returns a saved opening-money reference and time without a second deposit", () => {
     const db = fresh();
     createBlankCards(db, ["SECRET-CARD-1"]);
@@ -155,6 +202,8 @@ describe("documents from existing successful member operations", () => {
       clientRequestId: "physical-return",
     });
     const slip = returnedCardSlip(db, Number(session.id), "physical-return");
+    // The earlier account refund is not the money paid at physical return.
+    expect(returnedCardSlip(db, Number(session.id), "account-close").amount).toBe(0);
     expect(slip).toMatchObject({
       kind: "refund",
       amount: 0,

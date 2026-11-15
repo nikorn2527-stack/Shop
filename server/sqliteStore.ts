@@ -15,6 +15,7 @@ import {
 import { StoreError } from "./domain/storeError";
 export { StoreError } from "./domain/storeError";
 import { money, round2 } from "./domain/money";
+import { validateWalletAmount } from "./domain/walletPlan";
 export { money, round2 } from "./domain/money";
 import type { ReceiveStockLinesInput } from "../shared/storeTypes/inventory";
 import { createSqliteStockIntakeRepository } from "./repositories/sqliteStockIntakeRepository";
@@ -2270,7 +2271,7 @@ export function registerMember(db: SqliteDb, input: RegisterMemberInput) {
   if (!firstName || !lastName) throw new StoreError("กรุณาระบุชื่อและนามสกุลสมาชิก");
   const existingIdentity = findExistingMembers(db, input).find(member => member.reason === "citizenId");
   if (existingIdentity) throw new StoreError(`เลขประจำตัวนี้เคยลงทะเบียนแล้ว สมาชิก ${existingIdentity.memberNumber} กรุณาใช้บัญชีเดิม`);
-  if (input.initialDeposit !== undefined && !(input.initialDeposit > 0)) throw new StoreError("จำนวนเงินต้องมากกว่า 0");
+  const initialDeposit = input.initialDeposit === undefined ? 0 : validateWalletAmount(input.initialDeposit);
   const memberNumber = generateMemberNumber(db, getMemberNumberMode(db), input.memberNumber);
   if (db.prepare(`SELECT id FROM members WHERE member_number = ?`).get(memberNumber)) {
     throw new StoreError(`หมายเลขสมาชิก ${memberNumber} ถูกใช้แล้ว`);
@@ -2284,7 +2285,6 @@ export function registerMember(db: SqliteDb, input: RegisterMemberInput) {
   if (patientCode && db.prepare(`SELECT id FROM members WHERE patient_code = ?`).get(patientCode)) {
     throw new StoreError(`รหัสผู้ป่วย ${patientCode} ถูกใช้กับสมาชิกอื่นแล้ว`);
   }
-  const initialDeposit = input.initialDeposit ? round2(input.initialDeposit) : 0;
   const createdAt = formatDateTime();
   runInTransaction(db, () => {
     db.prepare(`INSERT INTO members (member_number, prename, first_name, last_name, id_card, phone, type, balance, status, created_at, photo_url, gender, card_number, patient_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?, ?, ?)`).run(
@@ -2650,7 +2650,7 @@ export function salesLineItems(db: SqliteDb, input: DailyRangeInput = {}): Sales
   const until = `${formatDate(toDate)} 23:59:59`;
   const filter = cashierWhere("s", input);
   const categoryFilter = categoryWhere("p", input);
-  const rows = db.prepare(`SELECT s.order_number AS orderNumber, s.created_at AS createdAt, COALESCE(NULLIF(TRIM(p.sku), ''), NULLIF(TRIM(p.barcode), '')) AS productCode, JSON_GROUP_ARRAY(DISTINCT si.name) AS snapshotNames, COALESCE(si.unit, p.unit, 'ชิ้น') AS unit, SUM(si.qty) AS qty, SUM(si.qty * si.price) / SUM(si.qty) AS price, MIN(si.price) AS priceMin, MAX(si.price) AS priceMax, ROUND(SUM(COALESCE(si.amount, ROUND(si.qty * si.price, 2))), 2) AS amount, s.payment_method AS paymentMethod, COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, s.member_number AS memberNumber, CASE WHEN m.member_number IS NULL THEN NULL WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id LEFT JOIN members m ON m.member_number = s.member_number WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql}${categoryFilter.sql} GROUP BY s.id, si.product_id, COALESCE(si.unit, p.unit, 'ชิ้น'), CASE WHEN si.product_id IS NULL THEN si.id END ORDER BY s.created_at DESC, s.id DESC, MIN(si.id) ASC LIMIT 1000`).all(since, until, ...filter.params, ...categoryFilter.params) as unknown as (Omit<SalesLineItemRow, "productName"> & { snapshotNames: string })[];
+  const rows = db.prepare(`SELECT s.order_number AS orderNumber, s.created_at AS createdAt, COALESCE(NULLIF(TRIM(p.sku), ''), NULLIF(TRIM(p.barcode), '')) AS productCode, JSON_GROUP_ARRAY(DISTINCT si.name) AS snapshotNames, COALESCE(si.unit, p.unit, 'ชิ้น') AS unit, SUM(si.qty) AS qty, SUM(si.qty * si.price) / SUM(si.qty) AS price, MIN(si.price) AS priceMin, MAX(si.price) AS priceMax, ROUND(SUM(COALESCE(si.amount, ROUND(si.qty * si.price, 2))), 2) AS amount, s.payment_method AS paymentMethod, COALESCE(NULLIF(TRIM(s.cashier), ''), '${UNASSIGNED_CASHIER}') AS cashier, s.member_number AS memberNumber, CASE WHEN m.member_number IS NULL THEN NULL WHEN m.prename IS NULL OR m.prename = '' THEN m.first_name || ' ' || m.last_name ELSE m.prename || ' ' || m.first_name || ' ' || m.last_name END AS memberName FROM sale_items si JOIN sales s ON s.id = si.sale_id LEFT JOIN products p ON p.id = si.product_id LEFT JOIN members m ON m.member_number = s.member_number WHERE COALESCE(s.voided, 0) = 0 AND s.created_at >= ? AND s.created_at <= ?${filter.sql}${categoryFilter.sql} GROUP BY s.id, si.product_id, COALESCE(si.unit, p.unit, 'ชิ้น'), CASE WHEN si.product_id IS NULL THEN si.id END ORDER BY s.created_at DESC, s.id DESC, MIN(si.id) ASC`).all(since, until, ...filter.params, ...categoryFilter.params) as unknown as (Omit<SalesLineItemRow, "productName"> & { snapshotNames: string })[];
   return rows.map(({ snapshotNames, ...row }) => {
     const names = (JSON.parse(snapshotNames) as string[]).sort();
     const bases = names.map(name => {
